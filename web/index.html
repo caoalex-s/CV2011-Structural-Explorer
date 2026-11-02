@@ -13,16 +13,18 @@
   </header>
   <main id="workspace">
     <section class="workspace-heading"><div><div class="eyebrow">STRUCTURAL ANALYSIS 1 / INTERACTIVE LAB</div><h1 id="page-title">Draw. Change. Understand.</h1><p id="page-description">Move a load or change a restraint. Follow the response as it changes.</p></div><span class="version">FIRST RELEASE · 2D BEAMS &amp; FRAMES</span></section>
-    <section class="modelbar" aria-label="Model controls"><label>Start from <select id="preset"><option value="beam">Simply supported beam</option><option value="cantilever">Cantilever</option><option value="udl">Distributed load</option><option value="overhang">Overhanging beam</option><option value="frame">Portal frame</option><option value="empty">Blank canvas</option></select></label><button id="load-preset">Open example</button><span class="spacer"></span><button id="undo" title="Undo (Ctrl+Z)">↶ Undo</button><button id="redo" title="Redo (Ctrl+Y)">↷ Redo</button><button id="export-model">Save model</button><button id="import-model">Open model</button><input type="file" id="model-file" accept="application/json" hidden></section>
+    <section class="modelbar" aria-label="Model controls"><label>Start from <select id="preset"><option value="beam">Simply supported beam</option><option value="cantilever">Cantilever</option><option value="udl">Distributed load</option><option value="overhang">Overhanging beam</option><option value="frame">Portal frame</option><option value="hinge">Internal hinge</option><option value="semi-rigid">Semi-rigid connection</option><option value="mixed">Continuous beam with pinned branch</option><option value="sliding">Internal sliding joint</option><option value="empty">Blank canvas</option></select></label><button id="load-preset">Open example</button><span class="spacer"></span><button id="undo" title="Undo (Ctrl+Z)">↶ Undo</button><button id="redo" title="Redo (Ctrl+Y)">↷ Redo</button><button id="export-model">Save model</button><button id="import-model">Open model</button><input type="file" id="model-file" accept="application/json" hidden></section>
     <div class="work-grid">
       <aside class="left-panel panel"><div class="panel-label">BUILD YOUR SYSTEM</div><div id="tools" class="tools">
         <button data-tool="select" class="active"><span>↖</span>Select / move</button><button data-tool="member"><span>╱</span>Draw member</button>
+        <button data-tool="joint"><span>● ○</span>Add / edit joint</button>
         <button data-tool="pin"><span>△</span>Pin support</button><button data-tool="roller"><span>♧</span>Roller support</button><button data-tool="fixed"><span>▥</span>Fixed support</button>
+        <button data-tool="guided"><span>▤</span>Guided support</button>
         <button data-tool="force"><span>↓</span>Point force</button><button data-tool="moment"><span>↶</span>Applied moment</button><button data-tool="distributed"><span>↓↓</span>Distributed load</button>
         <button data-tool="delete"><span>×</span>Delete object</button>
       </div><label class="check"><input id="snap" type="checkbox" checked> Snap to grid and geometry</label><label class="field">Grid spacing (m)<input id="grid-spacing" type="number" value="0.5" min="0.05" max="5" step="0.05"></label>
       <div id="inspector" class="inspector"></div>
-      <div class="model-note">Rigid joints · small displacements · linear elasticity. Member crossings connect only when a joint is explicitly added.</div>
+      <div class="model-note">Small displacements · linear elasticity. Choose a joint to edit continuity, releases, or springs. Member crossings connect only when a joint is explicitly added. Node labels follow A, B, C, …, Z, AA, … automatically.</div>
       </aside>
       <section class="canvas-column">
         <div class="panel canvas-panel"><div class="canvas-header"><span id="tool-hint">Select an object to edit it. Drag joints, loads, or supports.</span><div><button id="zoom-out" aria-label="Zoom out">−</button><button id="fit">Fit</button><button id="zoom-in" aria-label="Zoom in">+</button></div></div>

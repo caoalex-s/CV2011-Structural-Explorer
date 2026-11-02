@@ -1,5 +1,6 @@
-import { analyse, example, position, splitMember } from './engine.js';
-import type { Model, Analysis, Point, Member, Support, Load, Sample } from './engine.js';
+import { analyse, example, position, splitMember, nodeLabels, endConnection, referenceMember } from './engine.js';
+import type { Model, Analysis, Point, Member, Support, Load, Sample, Connection, ConnectionRule } from './engine.js';
+import { courseColors, forceSymbol, momentSymbol, rotationalSpring, supportShape } from './symbols.js';
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const escape = (value: unknown) => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 const number = (value: number, digits = 3) => Math.abs(value) < 1e-8 ? '0' : Number(value.toPrecision(digits)).toString();
@@ -158,33 +159,34 @@ function attach(point: {
     return { member: closest.member, t };
 }
 function drawArrow(x: number, y: number, dx: number, dy: number, color: string, label = '', extra = '') {
-    if (Math.hypot(dx, dy) < 0.01)
-        return '';
-    const norm = Math.hypot(dx, dy), ux = dx / norm, uy = dy / norm;
-    return `<g ${extra}><path d="M ${x - dx} ${y - dy} L ${x} ${y}" stroke="${color}" stroke-width="2" fill="none"/><path d="M ${x} ${y} l ${-9 * ux + 4 * uy} ${-9 * uy - 4 * ux} l ${-8 * uy} ${8 * ux} Z" fill="${color}"/>${label ? `<text x="${x - dx + 8}" y="${y - dy - 8}" class="svg-label" style="fill:${color}">${escape(label)}</text>` : ''}</g>`;
+    return `<g ${extra}>${forceSymbol(x, y, dx, -dy, color, label, Math.hypot(dx, dy), 0)}</g>`;
 }
 function supportDrawing(support: Support) {
     const p = screen(position(model, support.member, support.t));
-    const rotation = support.kind === 'roller' ? 90 - support.angle : 0;
-    const color = selected?.id === support.id ? '#087f78' : '#4a6572';
-    let shape = support.kind === 'fixed' ? '<path d="M 0 -23 V 23 M -1 -20 l -10 10 M -1 -10 l -10 10 M -1 0 l -10 10 M -1 10 l -10 10 M -1 20 l -5 5"/>' : '<path d="M 0 3 L -14 24 H 14 Z" fill="#edf4f1"/>';
-    shape += support.kind === 'roller' ? '<circle cx="-8" cy="29" r="3"/><circle cx="8" cy="29" r="3"/><path d="M -20 34 H 20"/>' : support.kind === 'pin' ? '<path d="M -21 28 H 21 M -18 28 l -5 6 M -8 28 l -5 6 M 2 28 l -5 6 M 12 28 l -5 6"/>' : '';
-    return `<g class="clickable" data-object="support" data-id="${escape(support.id)}" transform="translate(${p.x} ${p.y}) rotate(${rotation})" stroke="${color}" stroke-width="1.6" fill="white"><circle r="28" class="node-hit" stroke="none"/>${shape}</g>`;
+    const member = model.members.find(item => item.id === support.member)!;
+    const a = position(model, member.id, 0), b = position(model, member.id, 1);
+    const memberAngle = -Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
+    const rotation = ['roller', 'guided'].includes(support.kind) ? 90 - support.angle : support.kind === 'fixed' ? memberAngle + (support.t === 1 ? 180 : 0) : 0;
+    const selectedRing = selected?.id === support.id ? '<circle r="36" fill="none" stroke-dasharray="3 3" opacity=".5"/>' : '';
+    const custom = support.kind === 'custom' ? `<text y="29" text-anchor="middle" stroke="none" fill="${courseColors.ink}" font-size="8">${support.fixX ? 'x' : ''}${support.fixY ? 'y' : ''}${support.fixRotation ? 'θ' : ''}</text>` : '';
+    return `<g class="clickable" data-object="support" data-id="${escape(support.id)}" transform="translate(${p.x} ${p.y}) rotate(${rotation})" stroke="${courseColors.member}" stroke-width="1.6" fill="none"><title>${escape(support.kind)} ground support</title><circle cy="15" r="25" class="node-hit" stroke="none"/>${selectedRing}${supportShape(support.kind)}${custom}</g>`;
 }
 function loadDrawing(load: Load) {
     const p = screen(position(model, load.member, load.t));
-    const color = selected?.id === load.id ? '#087f78' : '#c87538';
+    const color = courseColors.force;
     const tag = `class="clickable" data-object="load" data-id="${escape(load.id)}"`;
+    if (load.kind === 'force' && Math.hypot(load.fx, load.fy) < 1e-12 || load.kind === 'moment' && Math.abs(load.mz) < 1e-12)
+        return `<g ${tag}><circle cx="${p.x}" cy="${p.y}" r="16" class="node-hit"/><text x="${p.x + 8}" y="${p.y - 15}" class="svg-label">0 ${load.kind === 'force' ? 'kN' : 'kN m'}</text></g>`;
     if (load.kind === 'force') {
-        const magnitude = Math.hypot(load.fx, load.fy), norm = magnitude || 1;
-        return `<g ${tag}><circle cx="${p.x}" cy="${p.y - 40}" r="35" class="node-hit"/>${drawArrow(p.x, p.y, load.fx / norm * 65, -load.fy / norm * 65, color, `${number(magnitude)} kN`)}</g>`;
+        const magnitude = Math.hypot(load.fx, load.fy);
+        return `<g ${tag}>${forceSymbol(p.x, p.y, load.fx, load.fy, color, `${number(magnitude)} kN`)}</g>`;
     }
     if (load.kind === 'moment') {
-        return `<g ${tag}><circle cx="${p.x}" cy="${p.y}" r="25" class="node-hit"/><path d="M ${p.x - 18} ${p.y - 10} A 21 21 0 1 1 ${p.x - 18} ${p.y + 10}" fill="none" stroke="${color}" stroke-width="2"/><path d="M ${p.x - 18} ${p.y + (load.mz >= 0 ? 10 : -10)} l -5 ${load.mz >= 0 ? 10 : -10} l 11 ${load.mz >= 0 ? -2 : 2} Z" fill="${color}"/><text class="svg-label" x="${p.x + 24}" y="${p.y - 24}">${number(load.mz)} kN m</text></g>`;
+        return `<g ${tag}>${momentSymbol(p.x, p.y, load.mz, color, `${number(Math.abs(load.mz))} kN m`)}</g>`;
     }
     const end = screen(position(model, load.member, load.end));
     const max = Math.max(Math.abs(load.fy), Math.abs(load.qEnd), 1);
-    let result = `<g ${tag}><path class="hit" d="M ${p.x} ${p.y - 55} L ${end.x} ${end.y - 55}"/>`;
+    let result = `<g ${tag}><path class="hit" d="M ${p.x} ${p.y + load.fy / max * 53} L ${end.x} ${end.y + load.qEnd / max * 53}"/>`;
     const count = Math.max(3, Math.ceil(Math.hypot(end.x - p.x, end.y - p.y) / 27));
     for (let i = 0; i <= count; i++) {
         const t = i / count, q = load.fy + (load.qEnd - load.fy) * t;
@@ -192,6 +194,50 @@ function loadDrawing(load: Load) {
     }
     result += `<path d="M ${p.x} ${p.y + load.fy / max * 53} L ${end.x} ${end.y + load.qEnd / max * 53}" stroke="${color}" fill="none"/><text class="svg-label" x="${(p.x + end.x) / 2}" y="${Math.min(p.y, end.y) - 67}" text-anchor="middle">${number(load.fy)}${load.qEnd !== load.fy ? ' → ' + number(load.qEnd) : ''} kN/m</text></g>`;
     return result;
+}
+function memberLabel(member: Member): string {
+    const labels = nodeLabels(model);
+    return `${labels.get(member.a)}–${labels.get(member.b)}`;
+}
+function jointConnections(node: Point) {
+    return model.members.filter(member => member.a === node.id || member.b === node.id).map(member => {
+        const end = member.a === node.id ? 'a' : 'b';
+        return { member, end: end as 'a' | 'b', rule: endConnection(model, member, end) };
+    });
+}
+function jointDrawing(node: Point) {
+    const p = screen(node), connected = jointConnections(node);
+    const others = connected.filter(item => item.member.id !== referenceMember(model, node.id));
+    const pinned = others.length > 0 && others.every(item => item.rule.axial === 'rigid' && item.rule.transverse === 'rigid' && item.rule.rotation === 'free');
+    const semiRigid = others.length > 0 && others.every(item => item.rule.axial === 'rigid' && item.rule.transverse === 'rigid' && typeof item.rule.rotation === 'number');
+    let shape = `<circle cx="${p.x}" cy="${p.y}" r="3" fill="${courseColors.member}"/>`;
+    if (pinned) shape = `<circle cx="${p.x}" cy="${p.y}" r="5.5" fill="white" stroke="${courseColors.member}" stroke-width="1.6"/>`;
+    else if (semiRigid) shape = rotationalSpring(p.x, p.y);
+    else for (const { member, end, rule } of others) {
+        if (Object.values(rule).every(value => value === 'rigid')) continue;
+        const opposite = screen(position(model, member.id, end === 'a' ? 1 : 0));
+        const length = Math.hypot(opposite.x - p.x, opposite.y - p.y);
+        const q = { x: p.x + (opposite.x - p.x) / length * 19, y: p.y + (opposite.y - p.y) / length * 19 };
+        if (rule.axial === 'free' && rule.transverse === 'rigid' && rule.rotation === 'free') {
+            const angle = Math.atan2(opposite.y - p.y, opposite.x - p.x) * 180 / Math.PI;
+            shape += `<g transform="translate(${q.x} ${q.y}) rotate(${angle})" stroke="${courseColors.member}" stroke-width="1.5"><circle r="4" fill="white"/><path d="M -9 -6 H 9 M -9 6 H 9"/></g>`;
+        } else if (typeof rule.rotation === 'number' && rule.axial === 'rigid' && rule.transverse === 'rigid') shape += rotationalSpring(q.x, q.y);
+        else if (rule.rotation === 'free' && rule.axial === 'rigid' && rule.transverse === 'rigid') shape += `<circle cx="${q.x}" cy="${q.y}" r="5.5" fill="white" stroke="${courseColors.member}" stroke-width="1.6"/>`;
+        else shape += `<path d="M ${q.x} ${q.y - 7} l 7 7 l -7 7 l -7 -7 Z" fill="white" stroke="${courseColors.member}" stroke-width="1.5"/>`;
+    }
+    // Put labels away from the directions occupied by connected members. This
+    // moves only text; the node marker and all applied actions remain anchored.
+    const candidates = [{ x: -16, y: -15 }, { x: 16, y: -15 }, { x: 18, y: 19 }, { x: -18, y: 19 }];
+    const offset = candidates.sort((a, b) => {
+        const score = (candidate: { x: number; y: number }) => connected.reduce((sum, item) => {
+            const other = screen(position(model, item.member.id, item.end === 'a' ? 1 : 0));
+            const direction = ((other.x - p.x) * candidate.x + (other.y - p.y) * candidate.y) / (Math.hypot(other.x - p.x, other.y - p.y) * Math.hypot(candidate.x, candidate.y));
+            return sum + Math.max(0, direction);
+        }, 0);
+        return score(a) - score(b);
+    })[0];
+    const title = pinned ? 'Pinned joint' : semiRigid ? 'Semi-rigid joint' : others.some(item => Object.values(item.rule).some(value => value !== 'rigid')) ? 'Joint with member-specific constraints' : 'Rigid joint';
+    return `<g class="clickable" data-object="node" data-id="${escape(node.id)}" data-joint-symbol="${pinned ? 'pinned' : semiRigid ? 'semi-rigid' : title === 'Rigid joint' ? 'rigid' : 'custom'}"><title>${title} ${nodeLabels(model).get(node.id)}</title><circle cx="${p.x}" cy="${p.y}" r="13" class="node-hit"/>${shape}${selected?.id === node.id ? `<circle cx="${p.x}" cy="${p.y}" r="15" stroke="${courseColors.force}" fill="none" stroke-dasharray="3 3"/>` : ''}<text x="${p.x + offset.x}" y="${p.y + offset.y}" text-anchor="middle" class="node-label">${nodeLabels(model).get(node.id)}</text></g>`;
 }
 function renderCanvas() {
     const grid = Math.max(0.05, Number($<HTMLInputElement>('grid-spacing').value) || 0.5);
@@ -204,7 +250,7 @@ function renderCanvas() {
             const maximum = Math.max(...all.map(p => Math.hypot(p.ux, p.uy)), 1e-12), magnification = 55 / (view.scale * maximum);
             for (const element of analysis.elements) {
                 const path = element.samples.map((p, i) => { const q = screen({ x: p.x + p.ux * magnification, y: p.y + p.uy * magnification }); return `${i ? 'L' : 'M'} ${q.x} ${q.y}`; }).join(' ');
-                drawing += `<path d="${path}" fill="none" stroke="#087f78" stroke-width="2.5"/>`;
+                drawing += `<path d="${path}" fill="none" stroke="${courseColors.reaction}" stroke-width="2.5"/>`;
             }
             drawing += `<text x="22" y="495" class="svg-value">Displacement magnification ×${number(magnification)} · values are unscaled</text>`;
         }
@@ -225,23 +271,24 @@ function renderCanvas() {
     }
     for (const member of model.members) {
         const a = screen(position(model, member.id, 0)), b = screen(position(model, member.id, 1));
-        drawing += `<g class="clickable" data-object="member" data-id="${escape(member.id)}"><path d="M ${a.x} ${a.y} L ${b.x} ${b.y}" stroke="${selected?.id === member.id ? '#087f78' : '#203e4a'}" stroke-width="5" stroke-linecap="round"/><path d="M ${a.x} ${a.y} L ${b.x} ${b.y}" class="hit"/></g>`;
+        drawing += `<g class="clickable" data-object="member" data-id="${escape(member.id)}"><path d="M ${a.x} ${a.y} L ${b.x} ${b.y}" stroke="${courseColors.member}" stroke-width="${selected?.id === member.id ? 6 : 4}" stroke-linecap="round"/><path d="M ${a.x} ${a.y} L ${b.x} ${b.y}" class="hit"/></g>`;
     }
     for (const support of model.supports)
         drawing += supportDrawing(support);
     for (const load of model.loads)
         drawing += loadDrawing(load);
-    for (const node of model.nodes) {
-        const p = screen(node);
-        drawing += `<g class="clickable" data-object="node" data-id="${escape(node.id)}"><circle cx="${p.x}" cy="${p.y}" r="12" class="node-hit"/><circle cx="${p.x}" cy="${p.y}" r="4.5" fill="white" stroke="#203e4a" stroke-width="1.8"/><text x="${p.x + 8}" y="${p.y + 17}" class="svg-value">${escape(node.id.length < 5 ? node.id : 'J')}</text></g>`;
-    }
+    for (const node of model.nodes) drawing += jointDrawing(node);
     if ($<HTMLInputElement>('show-reactions').checked && (mode !== 'practice' || practiceResultsVisible))
         for (const reaction of analysis.reactions) {
             const p = screen(reaction);
+            const node = model.nodes.find(node => Math.hypot(node.x - reaction.x, node.y - reaction.y) < 1e-7);
+            const label = node ? nodeLabels(model).get(node.id)! : `R${analysis.reactions.indexOf(reaction) + 1}`;
             if (Math.abs(reaction.fy) > 1e-7)
-                drawing += drawArrow(p.x - 27, p.y + 5, 0, -Math.sign(reaction.fy) * 43, '#3673a0', `${number(reaction.fy)} kN`);
+                drawing += `<g pointer-events="none">${forceSymbol(p.x, p.y, 0, reaction.fy, courseColors.reaction, `${label}ᵧ = ${number(Math.abs(reaction.fy))} kN`, 42, 44)}</g>`;
             if (Math.abs(reaction.fx) > 1e-7)
-                drawing += drawArrow(p.x, p.y + 55, Math.sign(reaction.fx) * 45, 0, '#3673a0', `${number(reaction.fx)} kN`);
+                drawing += `<g pointer-events="none">${forceSymbol(p.x, p.y, reaction.fx, 0, courseColors.reaction, `${label}ₓ = ${number(Math.abs(reaction.fx))} kN`, 42, 20)}</g>`;
+            if (Math.abs(reaction.mz) > 1e-7)
+                drawing += `<g pointer-events="none">${momentSymbol(p.x, p.y, reaction.mz, courseColors.reaction, `M(${label}) = ${number(Math.abs(reaction.mz))} kN m`, 37)}</g>`;
         }
     if (analysis.mechanism)
         for (const motion of analysis.mechanism) {
@@ -265,6 +312,42 @@ function renderCanvas() {
         drawing += `<text x="500" y="235" text-anchor="middle" class="svg-label" style="font-size:23px">Your structure starts here.</text><text x="500" y="265" text-anchor="middle" class="svg-value">Choose Draw member. Click a start point and an end point.</text>`;
     svg.innerHTML = drawing;
 }
+function connectionEditor(member: Member, end: 'a' | 'b'): string {
+    const node = model.nodes.find(node => node.id === member[end])!;
+    const label = `${memberLabel(member)} at ${nodeLabels(model).get(node.id)}`;
+    if (referenceMember(model, node.id) === member.id) return `<p class="small"><b>${label}</b>: reference side</p>`;
+    const connection = endConnection(model, member, end);
+    const rows = (['axial', 'transverse', 'rotation'] as const).map(direction => {
+        const value = connection[direction], name = direction === 'axial' ? 'Axial N / local x' : direction === 'transverse' ? 'Shear V / local y' : 'Moment M / rotation';
+        const attributes = `data-connection-member="${escape(member.id)}" data-end="${end}" data-direction="${direction}"`;
+        return `<label class="field">${name}<select ${attributes} aria-label="${name}: ${label}">${[['rigid', 'Continuous'], ['free', 'Released'], ['spring', 'Elastic spring']].map(([key, caption]) => `<option value="${key}" ${key === (typeof value === 'number' ? 'spring' : value) ? 'selected' : ''}>${caption}</option>`).join('')}</select></label>${typeof value === 'number' ? `<label class="field">Stiffness (${direction === 'rotation' ? 'kN m/rad' : 'kN/m'})<input type="number" min="0" step="any" value="${value}" ${attributes} data-stiffness="true" aria-label="${direction} stiffness: ${label}"></label>` : ''}`;
+    }).join('');
+    const result = analysis.connections?.find(item => item.member === member.id && item.end === end);
+    const response = result && (mode !== 'practice' || practiceResultsVisible) ? `<p class="small">Relative rotation Δθ = ${number(result.relativeRotation)} rad<br>Axial slip = ${number(result.axialSlip * 1000)} mm<br>Transverse slip = ${number(result.transverseSlip * 1000)} mm</p>` : '';
+    return `<details class="connection-editor" open><summary>${label}</summary>${rows}${response}</details>`;
+}
+function bindConnectionEditors(container: HTMLElement) {
+    container.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-connection-member]').forEach(input => input.onchange = () => {
+        const member = model.members.find(member => member.id === input.dataset.connectionMember)!;
+        const end = input.dataset.end as 'a' | 'b', direction = input.dataset.direction as keyof Connection;
+        const node = model.nodes.find(node => node.id === member[end])!;
+        let value: ConnectionRule = input.value === 'spring' ? (direction === 'rotation' ? 20000 : 100000) : input.value as ConnectionRule;
+        if (input.dataset.stiffness) {
+            value = Number(input.value);
+            if (!Number.isFinite(value) || value <= 0) { toast('Use a positive spring stiffness, or choose Released.'); inspector(); return; }
+        }
+        commit(() => {
+            // Preserve every other end when converting a preset to a mixed joint.
+            for (const item of jointConnections(node)) {
+                if (item.member.id === referenceMember(model, node.id)) continue;
+                if (item.end === 'a') item.member.connectionA = { ...item.rule }; else item.member.connectionB = { ...item.rule };
+            }
+            node.joint = 'custom';
+            const rule = { ...endConnection(model, member, end), [direction]: value };
+            if (end === 'a') member.connectionA = rule; else member.connectionB = rule;
+        });
+    });
+}
 function inspector() {
     const container = $('inspector');
     if (!selected) {
@@ -278,15 +361,27 @@ function inspector() {
         inspector();
         return;
     }
-    const field = (key: string, label: string, step = 'any') => `<label class="field">${label}<input type="number" data-property="${key}" value="${item[key]}" step="${step}"></label>`;
+    const field = (key: string, label: string, step = 'any') => `<label class="field">${label}<input type="number" data-property="${key}" value="${item[key] ?? (key === 'rotationStiffness' ? 20000 : '')}" step="${step}"></label>`;
     let html = `<h3>${escape(selected.type[0].toUpperCase() + selected.type.slice(1))} properties</h3>`;
-    if (selected.type === 'node')
-        html += field('x', 'x (m)') + field('y', 'y (m)');
-    if (selected.type === 'member')
-        html += field('EA', 'Axial rigidity EA (kN)') + field('EI', 'Bending rigidity EI (kN m²)');
+    if (selected.type === 'load' || selected.type === 'support') html += `<label class="field">Attached member<select data-property="member">${model.members.map(member => `<option value="${escape(member.id)}" ${member.id === item.member ? 'selected' : ''}>${memberLabel(member)}</option>`).join('')}</select></label>`;
+    if (selected.type === 'node') {
+        const node = model.nodes.find(node => node.id === selected!.id)!;
+        const connected = jointConnections(node), reference = referenceMember(model, node.id);
+        html += `<p class="small">Node <b>${nodeLabels(model).get(node.id)}</b> · labels update automatically when nodes are added or removed.</p>` + field('x', 'x (m)') + field('y', 'y (m)');
+        html += `<label class="field">Joint connection<select data-property="joint">${['rigid', 'pinned', 'semi-rigid', 'custom'].map(kind => `<option value="${kind}" ${kind === (node.joint || 'rigid') ? 'selected' : ''}>${kind === 'custom' ? 'Member-specific constraints' : kind}</option>`).join('')}</select></label>`;
+        if (node.joint === 'semi-rigid') html += field('rotationStiffness', 'Rotational stiffness kθ (kN m/rad)');
+        if (connected.length > 1) html += `<label class="field">Reference member<select data-property="referenceMember">${connected.map(({ member }) => `<option value="${escape(member.id)}" ${member.id === reference ? 'selected' : ''}>${memberLabel(member)}</option>`).join('')}</select></label><p class="small">Connections relate each other member end to this reference. A pin shares translations and permits relative rotation. A rotational spring transfers moment M = kθ Δθ.</p>${connected.map(({ member, end }) => connectionEditor(member, end)).join('')}`;
+        else html += '<p class="small">A joint connection relates two or more members. At a single-member end, use a ground support to constrain movement.</p>';
+    }
+    if (selected.type === 'member') {
+        const member = model.members.find(member => member.id === selected!.id)!;
+        html += `<p class="small">Member <b>${memberLabel(member)}</b></p>` + field('EA', 'Axial rigidity EA (kN)') + field('EI', 'Bending rigidity EI (kN m²)');
+        html += connectionEditor(member, 'a') + connectionEditor(member, 'b');
+    }
     if (selected.type === 'support')
-        html += `<label class="field">Support type<select data-property="kind">${['pin', 'roller', 'fixed'].map(k => `<option ${item.kind === k ? 'selected' : ''}>${k}</option>`).join('')}</select></label>` + field('t', 'Position / member length', '0.01') + (item.kind === 'roller' ? field('angle', 'Reaction angle from +x (°)') : '');
+        html += `<label class="field">Support type<select data-property="kind">${['pin', 'roller', 'fixed', 'guided', 'custom'].map(k => `<option ${item.kind === k ? 'selected' : ''}>${k}</option>`).join('')}</select></label>` + field('t', 'Position / member length', '0.01') + (['roller', 'guided'].includes(String(item.kind)) ? field('angle', 'Restrained translation angle from +x (°)') : '') + (item.kind === 'custom' ? [['fixX', 'Restrain global x'], ['fixY', 'Restrain global y'], ['fixRotation', 'Restrain rotation θ']].map(([key, label]) => `<label class="check"><input type="checkbox" data-property="${key}" ${item[key] ? 'checked' : ''}>${label}</label>`).join('') : '') + '<p class="small">Ground restraints act on the selected member side. A pin support does not release continuity between connected members.</p>';
     if (selected.type === 'load') {
+        html += '<p class="small">The action belongs to this member side at a joint. Arrows retain their physical line of action; moment arcs retain their application centre.</p>';
         html += field('t', 'Start / member length', '0.01');
         if (item.kind === 'force')
             html += field('fx', 'Horizontal force (kN)') + field('fy', 'Vertical force (kN)');
@@ -298,7 +393,7 @@ function inspector() {
     container.innerHTML = html + '<button id="delete-selected">Delete selected object</button>';
     container.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-property]').forEach(input => input.addEventListener('change', () => {
         const key = input.dataset.property!;
-        const value = key === 'kind' ? input.value : Number(input.value);
+        const value = input.type === 'checkbox' ? (input as HTMLInputElement).checked : ['kind', 'joint', 'referenceMember', 'member'].includes(key) ? input.value : Number(input.value);
         if (typeof value === 'number' && !Number.isFinite(value)) {
             toast('Enter a finite number.');
             return;
@@ -308,8 +403,29 @@ function inspector() {
             inspector();
             return;
         }
-        commit(() => { item[key] = value; });
+        commit(() => {
+            const previousConnections = selected?.type === 'node' && key === 'joint' ? jointConnections(model.nodes.find(node => node.id === selected!.id)!) : [];
+            if (key === 'member') {
+                const point = position(model, String(item.member), Number(item.t));
+                const next = model.members.find(member => member.id === value)!;
+                const projected = projection(point, next);
+                item.t = projected.t;
+            }
+            (item as Record<string, unknown>)[key] = value;
+            if (selected?.type === 'node' && key === 'joint') {
+                const node = model.nodes.find(node => node.id === selected!.id)!;
+                if (value === 'semi-rigid' && !node.rotationStiffness) node.rotationStiffness = 20000;
+                // Physical presets replace the connections. Entering the custom
+                // editor retains the existing behaviour until a direction changes.
+                for (const { member, end, rule } of previousConnections) {
+                    if (value === 'custom') {
+                        if (end === 'a') member.connectionA = { ...rule }; else member.connectionB = { ...rule };
+                    } else if (end === 'a') delete member.connectionA; else delete member.connectionB;
+                }
+            }
+        });
     }));
+    bindConnectionEditors(container);
     $('delete-selected').onclick = () => removeSelected();
 }
 function removeSelected() {
@@ -351,14 +467,18 @@ function sectionSample(): Sample | undefined {
 function render() {
     if (!model.members.some(m => m.id === currentMember))
         currentMember = model.members[0]?.id || '';
-    $<HTMLSelectElement>('section-member').innerHTML = model.members.map(m => `<option value="${escape(m.id)}" ${m.id === currentMember ? 'selected' : ''}>${escape(m.a)}–${escape(m.b)}</option>`).join('');
+    $<HTMLSelectElement>('section-member').innerHTML = model.members.map(m => `<option value="${escape(m.id)}" ${m.id === currentMember ? 'selected' : ''}>${memberLabel(m)}</option>`).join('');
     const member = model.members.find(m => m.id === currentMember);
     const length = member ? Math.hypot(position(model, member.id, 1).x - position(model, member.id, 0).x, position(model, member.id, 1).y - position(model, member.id, 0).y) : 0;
     $('section-distance').textContent = `x = ${number(sectionT * length)} / ${number(length)} m`;
     const sample = sectionSample();
     $('section-results').innerHTML = [['Normal force N', sample?.N, 'kN'], ['Shear force V', sample?.V, 'kN'], ['Moment M', sample?.M, 'kN m'], ['Vertical displacement', sample ? sample.uy * 1000 : undefined, 'mm']].map(([label, value, unit]) => `<div class="metric"><small>${label}</small><strong>${value === undefined ? '—' : number(Number(value), 4)} <em>${unit}</em></strong></div>`).join('');
     $('status').innerHTML = `<span class="status-pill ${analysis.status}">${analysis.status === 'stable' ? '● Stable' : analysis.status === 'unstable' ? '○ Mechanism' : analysis.status === 'empty' ? 'Start drawing' : 'Check model'}</span><p class="small">${escape(analysis.message)}</p>${analysis.status === 'stable' ? `<p class="small">Rank check passed.<br>Equilibrium residual: ${analysis.residual!.toExponential(1)}</p>` : ''}`;
-    $('reactions').innerHTML = analysis.reactions.map((r, i) => `<div class="reaction-row"><b>Support ${i + 1} · (${number(r.x)}, ${number(r.y)}) m</b><span>Rx ${number(r.fx)} · Ry ${number(r.fy)} kN</span>${Math.abs(r.mz) > 1e-7 ? `<span>Moment ${number(r.mz)} kN m</span>` : ''}</div>`).join('');
+    $('reactions').innerHTML = analysis.reactions.map((r, i) => {
+        const node = model.nodes.find(node => Math.hypot(node.x - r.x, node.y - r.y) < 1e-7);
+        const name = node ? `Node ${nodeLabels(model).get(node.id)}` : `Support ${i + 1}`;
+        return `<div class="reaction-row"><b>${name} · (${number(r.x)}, ${number(r.y)}) m</b><span>Rx ${number(r.fx)} · Ry ${number(r.fy)} kN</span>${Math.abs(r.mz) > 1e-7 ? `<span>Moment ${number(r.mz)} kN m</span>` : ''}</div>`;
+    }).join('');
     $('reactions').hidden = mode === 'practice' && !practiceResultsVisible;
     $('section-results').hidden = mode === 'practice' && !practiceResultsVisible;
     const descriptions: Record<string, [
@@ -367,7 +487,7 @@ function render() {
     ]> = { M: ['Bending moment', 'Positive bending moment produces tension on the negative local-y side. Switching the plotted side preserves the numerical sign. The dashed cut selects a section.'], V: ['Shear force', 'Positive shear acts downward on the right cut face of the left segment for a member drawn left to right. A point force creates a jump. Between point actions, dM/dx = V.'], N: ['Normal force', 'Positive normal force represents tension. Negative values represent compression. The local member axis runs from the first joint to the second.'], displacement: ['Displaced shape', 'Displacements are magnified to make the shape visible. The numerical values retain their actual magnitude. Bending and axial deformation are included.'], none: ['Structural model', 'Click a joint, support, load, or member to inspect it. Snap to a member interior while drawing to create a rigid connection. Crossing members remain separate.'] };
     $('response-title').textContent = descriptions[layer][0];
     $('response-description').textContent = descriptions[layer][1];
-    $('legend').innerHTML = '<div class="legend-item"><span class="swatch"></span>Computed response</div><div class="legend-item"><span class="swatch orange"></span>Applied loading / selected cut</div><p class="small">At a point action the section readout uses the right-hand limit, except at the member end. Values between plotted samples are interpolated.</p>';
+    $('legend').innerHTML = `<div class="legend-item"><span class="swatch" style="background:${courseColors.force}"></span>Applied forces and moments</div><div class="legend-item"><span class="swatch" style="background:${courseColors.reaction}"></span>Reactions and displaced shape</div><p class="small">● Rigid continuity · ○ Pin / hinge<br>Spiral: rotational spring<br>Circle between rails: sliding joint<br>◇ Member-specific constraints</p><p class="small">Forces stay on their lines of action. Moment arcs are centred at their application points. A ground pin does not create an internal hinge.</p><p class="small">At a point action the section readout uses the right-hand limit, except at the member end. Values between plotted samples are interpolated.</p>`;
     $<HTMLButtonElement>('undo').disabled = !history.length;
     $<HTMLButtonElement>('redo').disabled = !future.length;
     inspector();
@@ -436,6 +556,13 @@ svg.addEventListener('pointerdown', event => {
     const attachment = attach(p);
     if (!attachment)
         return;
+    if (tool === 'joint') {
+        commit(() => {
+            const nodeId = ensureNode({ ...position(model, attachment.member, attachment.t), ...attachment });
+            selected = { type: 'node', id: nodeId };
+        });
+        return;
+    }
     if (tool === 'distributed') {
         if (!start) {
             start = { ...position(model, attachment.member, attachment.t), ...attachment };
@@ -457,7 +584,7 @@ svg.addEventListener('pointerdown', event => {
         return;
     }
     commit(() => {
-        if (['pin', 'roller', 'fixed'].includes(tool)) {
+        if (['pin', 'roller', 'fixed', 'guided'].includes(tool)) {
             const existing = model.supports.find(s => s.member === attachment.member && Math.abs(s.t - attachment.t) < 1e-6);
             if (existing) {
                 existing.kind = tool as Support['kind'];
@@ -577,7 +704,7 @@ $('load-preset').onclick = () => commit(() => { const preset = $<HTMLSelectEleme
 $<HTMLSelectElement>('section-member').onchange = () => { currentMember = $<HTMLSelectElement>('section-member').value; render(); };
 $<HTMLInputElement>('section-position').oninput = () => { sectionT = Number($<HTMLInputElement>('section-position').value) / 1000; render(); };
 function download(name: string, data: unknown) { const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })); const anchor = document.createElement('a'); anchor.href = url; anchor.download = name; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
-$('export-model').onclick = () => download('cv2011-model.json', { version: 1, model });
+$('export-model').onclick = () => download('cv2011-model.json', { version: 2, model });
 $('import-model').onclick = () => $('model-file').click();
 $<HTMLInputElement>('model-file').onchange = async () => { try {
     const file = $<HTMLInputElement>('model-file').files?.[0];
@@ -586,6 +713,7 @@ $<HTMLInputElement>('model-file').onchange = async () => { try {
     if (file.size > 100000)
         throw Error('Model file is too large.');
     const parsed = JSON.parse(await file.text()), candidate = parsed.model || parsed;
+    if (parsed.version && parsed.version > 2) throw Error('This model uses a newer file format. Update Structural Explorer before opening it.');
     const checked = analyse(candidate);
     if (checked.status === 'invalid')
         throw Error(checked.message);
@@ -777,6 +905,10 @@ async function renderInsights() {
         toast(`${count} queued events verified and recorded.`);
         void renderInsights();
     };
+}
+for (const kind of ['pin', 'roller', 'fixed', 'guided']) {
+    const icon = document.querySelector(`[data-tool="${kind}"] span`)!;
+    icon.innerHTML = `<svg class="tool-icon" viewBox="-28 -4 56 44" aria-hidden="true"><g stroke="currentColor" stroke-width="2" fill="none">${supportShape(kind)}</g></svg>`;
 }
 fit();
 setMode(location.hash.slice(1) || 'sandbox');

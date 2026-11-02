@@ -1,8 +1,143 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {analyse, example, splitMember} from '../web/engine.ts';
+import {analyse, example, splitMember, nodeLabel, nodeLabels} from '../web/engine.ts';
+import {forceGeometry, momentGeometry} from '../web/symbols.ts';
 const near = (actual, expected, tolerance=1e-7) => assert.ok(Math.abs(actual-expected)<tolerance*Math.max(1,Math.abs(expected)), `${actual} != ${expected}`);
 const sampleAt = (result,x) => result.elements.flatMap(e=>e.samples).reduce((a,b)=>Math.abs(a.x-x)<Math.abs(b.x-x)?a:b);
+
+test('internal hinge transfers shear, releases moment, and permits a slope jump', () => {
+  const result = analyse(example('hinge'));
+  assert.equal(result.status, 'stable');
+  assert.equal(result.degree, 0);
+  near(result.reactions[0].fy, 10);
+  near(result.reactions[0].mz, 40);
+  near(result.reactions[1].fy, 10);
+  const left = result.elements.find(element => element.member === 'AB').samples.at(-1);
+  const right = result.elements.find(element => element.member === 'BC').samples[0];
+  near(left.M, 0); near(right.M, 0); near(left.uy, right.uy);
+  assert.ok(Math.abs(left.rotation - right.rotation) > 1e-4);
+});
+
+test('rotational spring adds the analytical tip displacement P b² / kθ', () => {
+  const model = example('semi-rigid'), result = analyse(model);
+  assert.equal(result.status, 'stable'); assert.equal(result.degree, 0);
+  near(sampleAt(result, 8).uy, -20 * 8 ** 3 / (3 * 20000) - 20 * 4 ** 2 / 10000);
+  const connection = result.connections[0];
+  near(connection.relativeRotation, -80 / 10000);
+  near(connection.moment, 10000 * connection.relativeRotation);
+  near(result.reactions[0].mz, 160);
+  model.nodes[1].joint = 'pinned';
+  assert.equal(analyse(model).status, 'unstable');
+  model.nodes[1].joint = 'rigid';
+  near(sampleAt(analyse(model), 8).uy, -20 * 8 ** 3 / (3 * 20000));
+});
+
+test('axial and transverse joint springs contribute their own relative displacements', () => {
+  const model = example('semi-rigid'); model.nodes[1].joint = 'custom';
+  model.members[1].connectionA = { axial: 1000, transverse: 'rigid', rotation: 'rigid' };
+  model.loads[0].fx = 10; model.loads[0].fy = 0;
+  const axial = analyse(model);
+  near(sampleAt(axial, 8).ux, 10 * 8 / 2000000 + 10 / 1000);
+  near(axial.connections[0].axialForce, 1000 * axial.connections[0].axialSlip);
+  model.members[1].connectionA = { axial: 'rigid', transverse: 1000, rotation: 'rigid' };
+  model.loads[0].fx = 0; model.loads[0].fy = -20;
+  const transverse = analyse(model);
+  near(sampleAt(transverse, 8).uy, -20 * 8 ** 3 / (3 * 20000) - 20 / 1000);
+  near(transverse.connections[0].transverseForce, 1000 * transverse.connections[0].transverseSlip);
+  model.members[1].connectionA.transverse = 'free';
+  assert.equal(analyse(model).status, 'unstable');
+});
+
+test('local connection directions rotate with the member', () => {
+  const model = example('semi-rigid'); model.nodes[1].joint = 'custom';
+  model.members[1].connectionA = { axial: 1000, transverse: 'rigid', rotation: 'rigid' };
+  model.nodes.forEach(node => { node.y = node.x; node.x = 0; });
+  model.loads[0].fy = 10;
+  const result = analyse(model);
+  near(result.elements.at(-1).samples.at(-1).uy, 10 * 8 / 2000000 + 10 / 1000);
+  near(result.reactions[0].fy, -10);
+});
+
+test('mixed T joint keeps the beam continuous while the branch has zero end moment', () => {
+  const result = analyse(example('mixed'));
+  assert.equal(result.status, 'stable');
+  const beamLeft = result.elements.find(element => element.member === 'AB').samples.at(-1);
+  const beamRight = result.elements.find(element => element.member === 'BC').samples[0];
+  const branch = result.elements.find(element => element.member === 'BD').samples[0];
+  near(beamLeft.M, beamRight.M); near(beamLeft.rotation, beamRight.rotation);
+  assert.ok(Math.abs(beamLeft.M) > 1);
+  near(branch.M, 0);
+  near(result.reactions.reduce((sum, reaction) => sum + reaction.fy, 0), 20);
+});
+
+test('sliding joint transmits transverse force without axial force or moment', () => {
+  const result = analyse(example('sliding'));
+  assert.equal(result.status, 'stable'); assert.equal(result.degree, 1);
+  const connection = result.connections[0];
+  near(connection.axialForce, 0); near(connection.moment, 0);
+  assert.ok(Math.abs(connection.transverseForce) > 1);
+});
+
+test('a couple at a released end acts on the selected member side', () => {
+  const model = example('hinge');
+  model.loads = [{ ...model.loads[0], kind: 'moment', t: 0, mz: 24 }];
+  const result = analyse(model);
+  near(result.reactions[0].fy, 6); near(result.reactions[0].mz, 24);
+  near(result.reactions[1].fy, -6);
+  near(result.elements.find(element => element.member === 'AB').samples.at(-1).M, 0);
+  near(result.elements.find(element => element.member === 'BC').samples[0].M, -24);
+});
+
+test('custom ground constraints reproduce a fixed support and a guide allows only tangential translation', () => {
+  const model = example('cantilever');
+  model.supports[0] = { ...model.supports[0], kind: 'custom', fixX: true, fixY: true, fixRotation: true };
+  near(analyse(model).reactions[0].mz, 160);
+  model.supports[0] = { ...model.supports[0], kind: 'guided', angle: 90 };
+  assert.equal(analyse(model).status, 'unstable');
+  model.supports.push({ id: 'horizontal', member: 'AB', t: 1, kind: 'roller', angle: 0 });
+  const result = analyse(model);
+  assert.equal(result.status, 'stable'); near(result.reactions[0].mz, 160);
+});
+
+test('splitting a connected member preserves its remote end connection', () => {
+  const model = example('semi-rigid');
+  const before = analyse(model);
+  splitMember(model, 'BC', 0.5, 'new');
+  const after = analyse(model);
+  near(sampleAt(after, 8).uy, sampleAt(before, 8).uy);
+  near(after.connections[0].relativeRotation, before.connections[0].relativeRotation);
+});
+
+test('automatic tutorial labels remain unique beyond Z without changing model IDs', () => {
+  assert.equal(nodeLabel(0), 'A'); assert.equal(nodeLabel(25), 'Z');
+  assert.equal(nodeLabel(26), 'AA'); assert.equal(nodeLabel(51), 'AZ'); assert.equal(nodeLabel(52), 'BA');
+  const model = example(); model.nodes[0].id = 'uuid-node';
+  assert.equal(nodeLabels(model).get('uuid-node'), 'A');
+  const split = example(); splitMember(split, 'AB', 0.4, 'inserted');
+  assert.equal(nodeLabels(split).get('inserted'), 'B');
+  assert.equal(nodeLabels(split).get('B'), 'C');
+});
+
+test('force arrows keep the exact line of action for all vector quadrants', () => {
+  for (const [fx, fy] of [[3, 4], [-3, 4], [3, -4], [-3, -4], [0, 5], [5, 0]]) {
+    const arrow = forceGeometry(140, 170, fx, fy, 42, 44);
+    for (const point of [arrow.tail, arrow.tip]) {
+      // Convert the screen offset back to physical y-up coordinates.
+      near((point.x - arrow.origin.x) * fy + (point.y - arrow.origin.y) * fx, 0);
+    }
+    assert.ok((arrow.tip.x - arrow.tail.x) * fx - (arrow.tip.y - arrow.tail.y) * fy > 0);
+  }
+});
+
+test('moment arcs are concentric with the application point and their tangents have the correct sense', () => {
+  for (const moment of [-25, 25]) {
+    const arc = momentGeometry(140, 170, moment, 37);
+    near(Math.hypot(arc.start.x - arc.center.x, arc.start.y - arc.center.y), 37);
+    near(Math.hypot(arc.end.x - arc.center.x, arc.end.y - arc.center.y), 37);
+    const cross = -(arc.end.x - arc.center.x) * arc.tangent.y + (arc.end.y - arc.center.y) * arc.tangent.x;
+    assert.equal(Math.sign(cross), Math.sign(moment));
+  }
+});
 
 test('simply supported point load: reactions, moment, and exact deflection',()=>{
   const result=analyse(example()); assert.equal(result.status,'stable'); assert.equal(result.degree,0);

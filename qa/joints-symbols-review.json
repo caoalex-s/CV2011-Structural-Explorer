@@ -1,0 +1,58 @@
+{
+  "date": "2026-11-02",
+  "release": "0.2.0",
+  "reviewer": "authoring agent; self-review, not independent peer review",
+  "scope": "Course symbols, vector geometry, automatic node labels, and physical internal connections and ground constraints",
+  "guidance": "author-style core, language profile, figure style, review checklist, and code-style guidance read on 2026-11-02; SVG retained for the interactive application",
+  "course_sources": [
+    "tutorial-solutions-work/lib/cv2011figures/cv2011figures.sty",
+    "tutorial-solutions-work/lib/cv2011figures/cv2011figures-beams.tex",
+    "tutorial-solutions-work/lib/cv2011figures/cv2011figures-connections.tex",
+    "tutorial-solutions-work/lib/cv2011figures/vendor/stanli.sty: support types 1 and 2",
+    "tutorial-solutions-work/figures/src/supports-and-joints/joints: hinge, pinned T, rigid corner, and roller joint",
+    "tutorial-solutions-work/figures/src/beams/simply-supported-right-half-uniform-load/q3-system.tex"
+  ],
+  "mechanics_review": [
+    "Rigid end directions are imposed exactly; free directions add relative degrees of freedom without artificial penalty stiffness",
+    "Positive finite spring constants add k times relative movement to connection action",
+    "A physical reference member avoids an unused central rotation at a fully pinned joint",
+    "Loads and ground constraints act on the selected member side at a released joint",
+    "Constraint multipliers recover combined ground reactions, including moments",
+    "Static determinacy counts independent spring forces and released relative movements",
+    "Splitting a member preserves the connection at its remote end"
+  ],
+  "validation": {
+    "typescript": "Strict type check passed",
+    "node": "25 tests passed: original 13 benchmarks and 12 additional joint, label, and vector-geometry tests",
+    "python": "8 tests passed, including forty independently compared TypeScript/SymPy mixed-load beams",
+    "formal_scope": "Lean proof source unchanged; joint calculations are explicitly outside the formal and guided symbolic scope"
+  },
+  "browser_checks": [
+    "Semi-rigid example reports relative rotation -0.008 rad at ktheta = 10000 kN m/rad",
+    "Changing that joint to pinned reports a mechanism",
+    "Increasing rotational stiffness reduces the relative rotation",
+    "Entering the custom connection editor preserves the existing spring response",
+    "Mixed T joint shows a pinned branch; making its rotation continuous changes the symbol to rigid and increases static indeterminacy",
+    "Inserting an interior node changes the visible labels to A, B, C and member selections to A-B, B-C",
+    "Desktop rendering inspected for point-centred reaction moments and collinear force arrows",
+    "Phone width checked: document width equals viewport width",
+    "No browser console errors in the inspected session",
+    "The user's existing portal-frame model was exported before testing and restored afterwards"
+  ],
+  "presentation_review": [
+    "Removed hollow circles from ordinary rigid nodes",
+    "Replaced the roller toolbar glyph and roller wheels with the course sliding-bearing symbol",
+    "Corrected sideways reaction offsets and implemented reaction moments",
+    "Kept force and reaction colours semantic when selected",
+    "Used italic capital node labels independently of stable object identifiers",
+    "Labelled rotational-spring and general-constraint glyphs as extensions where the inspected course library supplies no glyph",
+    "Reviewed README and explanatory control text for physical meaning, units, scope, and readable terminology"
+  ],
+  "limits": [
+    "Connections with three or more members form a star relative to the explicitly displayed reference member",
+    "No finite joint offsets, nonlinear connection laws, friction, gaps, or unilateral contact",
+    "New joint mechanics are covered by numerical benchmarks, not by the current Lean proofs",
+    "Guided verification remains limited to one horizontal pin-roller beam",
+    "Private verification and records remain local by user choice"
+  ]
+}

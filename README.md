@@ -2,7 +2,7 @@
 
 [Open the GitHub Pages interface](https://caoalex-s.github.io/CV2011-Structural-Explorer/) · [Build and verification status](https://github.com/caoalex-s/CV2011-Structural-Explorer/actions)
 
-Structural Explorer lets students draw planar beams and rigid-jointed frames, place supports and loads, and inspect the response as the model changes. Its sandbox displays reactions, normal force, shear force, bending moment, and displacement. A separate problem workspace checks supported beam calculations and records submitted steps under pseudonymous course IDs.
+Structural Explorer lets students draw planar beams and frames, place supports and loads, and inspect the response as the model changes. Its sandbox displays reactions, normal force, shear force, bending moment, and displacement. A separate problem workspace checks supported beam calculations and records submitted steps under pseudonymous course IDs.
 
 ## Run the local pilot
 
@@ -23,10 +23,11 @@ For a fresh checkout on Windows, `start-local.ps1` starts the configured local p
 
 1. Choose **Blank canvas**, then **Open example**.
 2. Select **Draw member** and click its start and end positions. A snapped endpoint on an existing member creates a rigid joint. Crossing members remain unconnected unless a joint is explicitly created.
-3. Place pin, roller, or fixed supports on members. Select each support to edit its position and the roller reaction angle.
-4. Place concentrated forces or couples. For a distributed load, click both boundaries on the same member. Select it to edit both intensity values.
-5. Drag joints, supports, and loads in **Select / move** mode. Use numerical properties for precise values. Undo, redo, pan, zoom, model import, and model export are available.
-6. Choose a response layer and move the section slider. The bending-moment display can be placed on the tension or compression side without changing its numerical sign.
+3. Use **Add / edit joint** to insert a joint on a member. Select a joint to choose rigid continuity, a pin, a rotational spring, or member-specific constraints. Node labels follow the tutorial sequence A, B, C, …, Z, AA, … automatically. Inserting a joint places its label between the existing member ends. Model identifiers remain unchanged when the displayed labels update.
+4. Place pin, roller, fixed, or guided supports on members. Select each support to edit its position and constraint direction. **Custom** support properties allow separate restraints of global x, global y, and rotation.
+5. Place concentrated forces or couples. For a distributed load, click both boundaries on the same member. Select it to edit both intensity values. At a joint, **Attached member** identifies the member side receiving the load or ground restraint.
+6. Drag joints, supports, and loads in **Select / move** mode. Use numerical properties for precise values. Undo, redo, pan, zoom, model import, and model export are available.
+7. Choose a response layer and move the section slider. The bending-moment display can be placed on the tension or compression side without changing its numerical sign.
 
 The model uses metres, kilonewtons, and kilonewton metres. Global y is positive upwards and rotation is positive counterclockwise. Normal force is positive in tension. Bending moment is positive when the negative local-y side is in tension, with the local x-axis directed from the first member joint to the second.
 
@@ -34,9 +35,28 @@ The model uses metres, kilonewtons, and kilonewton metres. Global y is positive 
 
 The numerical engine uses linear-elastic, prismatic Euler–Bernoulli frame elements with axial deformation and small displacements. Supports and load boundaries subdivide members while preserving rotational continuity. Linearly varying distributed loads include their consistent nodal loads and polynomial displacement terms. Stability is checked from the rank of the restrained stiffness matrix before solving.
 
-This release supports rigid joints, pins, inclined rollers, fixed supports, point forces, point couples, and vertical distributed loads. It does not yet include internal moment releases, ideal truss elements, shear deformation, buckling, plasticity, or large-displacement mechanisms. The mechanism display shows a linear free motion. Near-singular systems can be reported as unstable or poorly conditioned according to the numerical tolerance.
+This release supports rigid joints, internal hinges, finite connection springs, member-specific releases, inclined rollers, fixed supports, guided supports, point forces, point couples, and vertical distributed loads. Ideal truss elements, shear deformation, buckling, plasticity, and large-displacement mechanisms are outside its scope. The mechanism display shows a linear free motion. Near-singular systems can be reported as unstable or poorly conditioned according to the numerical tolerance.
 
 Section values are interpolated between 41 samples per analysis segment in the browser. The exact guided checker evaluates the requested position directly. Diagram peaks shown in the canvas are sampled peaks, and the displaced shape uses an explicitly displayed magnification.
+
+## Joint connections and course notation
+
+The structural symbols follow the shared CV2011 `cv2011figures` library: navy members, teal applied actions, ochre reactions, hollow hinge circles, the triangular pin support, and the sliding-bearing form of the roller support. Node labels use italic capital letters. Force arrows remain collinear with their application points, including inclined and negative reactions. Applied and reaction moments use point-centred 270° arcs with tangential arrowheads. Moving a label or extending an arrow never changes its moment arm.
+
+Internal connections and ground restraints are separate model objects. A pin support restrains two translations and leaves rotation free at the selected member side. It does not insert an internal hinge into a continuous beam. The new examples show an internal hinge, a semi-rigid connection, a continuous beam with a pinned branch, and an internal sliding joint.
+
+| Internal connection | Relative movement and force transfer |
+| --- | --- |
+| Rigid | Axial translation, transverse translation, and rotation are continuous |
+| Pinned | Translations are continuous; relative rotation is free |
+| Semi-rigid | Translations are continuous; moment follows M = kθ Δθ |
+| Member-specific | Each local axial, local transverse, and rotational direction can be continuous, released, or connected by a positive linear spring |
+
+Connections relate member ends to the displayed **Reference member** at their common node. At a joint with more than two members, each non-reference end has its own connection to that reference. This permits a continuous main beam and a separately pinned branch. Changing the reference changes that connection arrangement and is a modelling choice. A free direction transfers no connection action, while a finite spring adds relative movement according to its stiffness. Translational stiffness is entered in kN/m and rotational stiffness in kN m/rad.
+
+The end movements are represented explicitly and rigid directions are tied exactly. Spring energy is kδ²/2 in each independent relative direction. This uses the same mechanical interpretation as a [zero-length connection between coincident member ends](https://opensees.github.io/OpenSeesDocumentation/user/manual/model/elements/zeroLength.html). The implementation is a separate TypeScript formulation. Numerical tests check analytical spring deflections, hinge equilibrium, rotated local directions, mixed connections, and released mechanisms. These joint calculations remain outside the current SymPy and Lean proof scopes.
+
+A spiral denotes a rotational spring, and a diamond identifies general member-specific constraints. These are labelled extensions to the inspected course library, which supplies no semi-rigid spring glyph. For a sliding joint, the circle and parallel rails indicate the released direction. The properties panel states the actual constraints for every member end. Coincident ground restraints have a unique combined reaction even when its division between duplicate restraints is not unique.
 
 ## Guided solutions and verification
 
@@ -79,7 +99,7 @@ The optional Dockerfile packages the Python service and browser application for 
 
 ## Next releases
 
-- Internal hinges and ideal trusses, with mechanism examples and force-method explanations.
+- Ideal trusses and guided solutions for compound beams and frames, with force-method explanations.
 - A problem catalogue with stable problem versions and instructor-defined tasks.
 - Equation-entry checking and section free-body diagrams, including alternative valid solution paths.
 - Expanded Lean proofs and explicit links from each supported solution step to its checked rule.
