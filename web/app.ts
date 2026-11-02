@@ -910,6 +910,18 @@ for (const kind of ['pin', 'roller', 'fixed', 'guided']) {
     const icon = document.querySelector(`[data-tool="${kind}"] span`)!;
     icon.innerHTML = `<svg class="tool-icon" viewBox="-28 -4 56 44" aria-hidden="true"><g stroke="currentColor" stroke-width="2" fill="none">${supportShape(kind)}</g></svg>`;
 }
+// Reuse the canvas geometry so the menu and drawing show the same action
+// symbols. currentColor keeps the icons legible in the selected button state.
+const loadIcons: Record<string, string> = {
+    force: forceSymbol(20, 35, 0, -1, 'currentColor', '', 30, 0),
+    moment: momentSymbol(20, 20, 1, 'currentColor', '', 14),
+    distributed: '<path d="M 5 5 H 35" fill="none" stroke="currentColor" stroke-width="1.8"/>'
+        + [5, 15, 25, 35].map(x => forceSymbol(x, 35, 0, -1, 'currentColor', '', 30, 0)).join(''),
+};
+for (const [kind, shape] of Object.entries(loadIcons)) {
+    const icon = document.querySelector(`[data-tool="${kind}"] span`)!;
+    icon.innerHTML = `<svg class="tool-icon load-tool-icon" viewBox="0 0 40 40" aria-hidden="true">${shape}</svg>`;
+}
 fit();
 setMode(location.hash.slice(1) || 'sandbox');
 void connect();
