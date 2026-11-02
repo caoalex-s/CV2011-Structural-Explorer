@@ -1,0 +1,10 @@
+.venv/
+.tools/
+.data/
+dist/
+node_modules/
+__pycache__/
+*.pyc
+.env
+.lake/
+qa/local-*

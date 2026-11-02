@@ -1,0 +1,6 @@
+name = "StructuralProofs"
+version = "0.1.0"
+defaultTargets = ["StructuralProofs"]
+
+[[lean_lib]]
+name = "StructuralProofs"

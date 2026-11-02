@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>CV2011 · Structural Explorer</title>
+  <meta name="description" content="Draw a structure, explore its response, and work through structural analysis with verified steps.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar"><a class="brand" href="#sandbox"><span class="brand-mark">⌁</span><span><b>Structural Explorer</b><small>CV2011 · Nanyang Technological University</small></span></a>
+    <nav aria-label="Workspace"><button data-mode="sandbox" class="active">Sandbox</button><button data-mode="practice">Solve a problem</button><button data-mode="insights">Learning insights</button></nav>
+    <button id="settings-button" class="quiet">Connection &amp; ID</button>
+  </header>
+  <main id="workspace">
+    <section class="workspace-heading"><div><div class="eyebrow">STRUCTURAL ANALYSIS 1 / INTERACTIVE LAB</div><h1 id="page-title">Draw. Change. Understand.</h1><p id="page-description">Move a load or change a restraint. Follow the response as it changes.</p></div><span class="version">FIRST RELEASE · 2D BEAMS &amp; FRAMES</span></section>
+    <section class="modelbar" aria-label="Model controls"><label>Start from <select id="preset"><option value="beam">Simply supported beam</option><option value="cantilever">Cantilever</option><option value="udl">Distributed load</option><option value="overhang">Overhanging beam</option><option value="frame">Portal frame</option><option value="empty">Blank canvas</option></select></label><button id="load-preset">Open example</button><span class="spacer"></span><button id="undo" title="Undo (Ctrl+Z)">↶ Undo</button><button id="redo" title="Redo (Ctrl+Y)">↷ Redo</button><button id="export-model">Save model</button><button id="import-model">Open model</button><input type="file" id="model-file" accept="application/json" hidden></section>
+    <div class="work-grid">
+      <aside class="left-panel panel"><div class="panel-label">BUILD YOUR SYSTEM</div><div id="tools" class="tools">
+        <button data-tool="select" class="active"><span>↖</span>Select / move</button><button data-tool="member"><span>╱</span>Draw member</button>
+        <button data-tool="pin"><span>△</span>Pin support</button><button data-tool="roller"><span>♧</span>Roller support</button><button data-tool="fixed"><span>▥</span>Fixed support</button>
+        <button data-tool="force"><span>↓</span>Point force</button><button data-tool="moment"><span>↶</span>Applied moment</button><button data-tool="distributed"><span>↓↓</span>Distributed load</button>
+        <button data-tool="delete"><span>×</span>Delete object</button>
+      </div><label class="check"><input id="snap" type="checkbox" checked> Snap to grid and geometry</label><label class="field">Grid spacing (m)<input id="grid-spacing" type="number" value="0.5" min="0.05" max="5" step="0.05"></label>
+      <div id="inspector" class="inspector"></div>
+      <div class="model-note">Rigid joints · small displacements · linear elasticity. Member crossings connect only when a joint is explicitly added.</div>
+      </aside>
+      <section class="canvas-column">
+        <div class="panel canvas-panel"><div class="canvas-header"><span id="tool-hint">Select an object to edit it. Drag joints, loads, or supports.</span><div><button id="zoom-out" aria-label="Zoom out">−</button><button id="fit">Fit</button><button id="zoom-in" aria-label="Zoom in">+</button></div></div>
+          <svg id="canvas" viewBox="0 0 1000 520" role="img" aria-label="Interactive structural drawing. Use the drawing tools, then click the canvas. Numeric editing is available in the object panel." tabindex="0"></svg>
+          <div class="canvas-footer"><span id="coordinates">x 0.00 m · y 0.00 m</span><span>Drag to move · wheel to zoom · middle/right drag to pan</span></div>
+        </div>
+        <div class="response-toolbar panel"><div class="layer-buttons" id="layers"><button data-layer="M" class="active">Moment M</button><button data-layer="V">Shear V</button><button data-layer="N">Normal N</button><button data-layer="displacement">Displacement</button><button data-layer="none">Structure</button></div><label>Moment plotted on <select id="moment-side"><option value="tension">Tension side</option><option value="compression">Compression side</option></select></label><label class="check"><input id="show-reactions" type="checkbox" checked> Reactions</label></div>
+        <div class="section-strip panel"><label>Inspect member <select id="section-member"></select></label><input id="section-position" aria-label="Section position" type="range" min="0" max="1000" value="500"><span id="section-distance"></span></div>
+        <div id="section-results" class="metric-row"></div>
+        <div id="practice-panel" class="panel practice-panel" hidden></div>
+      </section>
+      <aside class="right-panel"><section class="panel status-panel"><div class="panel-label">SYSTEM CHECK</div><div id="status"></div><div id="reactions"></div></section>
+        <section class="panel explanation"><div class="panel-label">READ THE RESPONSE</div><h2 id="response-title">Bending moment</h2><p id="response-description"></p><div id="legend"></div></section>
+        <section class="panel"><div class="panel-label">YOUR SESSION</div><p id="session-status" class="small"></p><p class="small">Only submitted problem steps, hints, and solution reveals enter the attempt record. Sandbox edits remain exploratory.</p></section>
+      </aside>
+    </div>
+    <section id="insights-panel" class="panel" hidden></section>
+    <footer>CV2011 Structural Analysis 1 · Alex Sixie Cao <span>kN · m · kN m / tension-positive N / sagging-positive M</span></footer>
+  </main>
+  <dialog id="settings"><form method="dialog"><div class="panel-label">SESSION &amp; CONNECTION</div><h2>Connect your learning record</h2><p>The sandbox works without a server. A connected verifier checks expressions and stores submitted problem steps.</p>
+    <label class="field">Verifier URL<input id="api-url" type="url" placeholder="https://your-verifier.example"></label>
+    <label class="field">Pseudonymous course ID<input id="course-id" maxlength="40" placeholder="e.g. CV2011-0042"></label>
+    <label class="field">Personal access token<input id="access-token" type="password" autocomplete="off" placeholder="Issued by your instructor"></label>
+    <label class="field">Instructor token (instructor view only)<input id="instructor-token" type="password" autocomplete="off"></label>
+    <p class="small">Course IDs identify records. Personal tokens control access. Keep your token private.</p><div class="dialog-buttons"><button value="cancel">Close</button><button id="save-settings" value="save" class="primary">Connect</button></div>
+  </form></dialog>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
