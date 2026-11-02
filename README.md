@@ -51,7 +51,7 @@ The verification layers have distinct scopes:
 | Cross-language tests | Forty generated mixed-load beams compared between the independent TypeScript and SymPy formulations |
 | Lean | Reaction-numerator equilibrium identities after clearing input denominators, and inversion of the plotting side |
 
-Lean does not currently certify the drawing-to-model translation, floating-point solver, or displacement derivations. `proofs/StructuralProofs.lean` states the exact theorems and assumptions. The deployment workflow runs the pinned Lean toolchain and audits the reported axioms before marking the published proof metadata as checked. A local checkout retains pending status until its proofs have been checked.
+Lean does not currently certify the drawing-to-model translation, floating-point solver, or displacement derivations. `proofs/StructuralProofs.lean` states the exact theorems and assumptions. The deployment workflow runs the pinned Lean toolchain and audits the reported axioms before marking the published proof metadata as checked. A local build can reuse the committed CI receipt only when its proof-source SHA-256 is unchanged.
 
 ## Learning records
 

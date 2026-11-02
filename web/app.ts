@@ -413,6 +413,12 @@ svg.addEventListener('pointerdown', event => {
             toast('Choose a different end point.');
             return;
         }
+        if (start.member && start.member === snapped.member) {
+            toast('A member already occupies that span.');
+            start = null;
+            renderCanvas();
+            return;
+        }
         commit(() => {
             const a = ensureNode(start!), b = ensureNode(snapped);
             if (model.members.some(m => (m.a === a && m.b === b) || (m.a === b && m.b === a))) {
@@ -471,6 +477,11 @@ svg.addEventListener('pointerdown', event => {
     });
 });
 svg.addEventListener('pointermove', event => {
+    // Re-rendering the SVG can detach the original pointer target. A released
+    // button must end a drag even when the browser omits the expected up event.
+    if (drag && event.buttons === 0) {
+        endDrag();
+    }
     const p = world(event);
     $('coordinates').textContent = `x ${p.x.toFixed(2)} m · y ${p.y.toFixed(2)} m`;
     if (drag?.kind === 'pan') {
@@ -508,13 +519,19 @@ svg.addEventListener('pointermove', event => {
     if (start || tool !== 'select')
         renderCanvas();
 });
-function endDrag() { if (drag?.before && JSON.stringify(drag.before) !== JSON.stringify(model)) {
-    checkpoint(drag.before);
-    solutionRevealed = false;
-    changed();
-} drag = null; }
-svg.addEventListener('pointerup', endDrag);
-svg.addEventListener('pointercancel', endDrag);
+function endDrag() {
+    const completed = drag;
+    drag = null;
+    if (completed?.before && JSON.stringify(completed.before) !== JSON.stringify(model)) {
+        checkpoint(completed.before);
+        solutionRevealed = false;
+        practiceResultsVisible = false;
+        changed();
+    }
+}
+window.addEventListener('pointerup', endDrag, true);
+window.addEventListener('pointercancel', endDrag, true);
+window.addEventListener('blur', endDrag);
 svg.addEventListener('contextmenu', event => event.preventDefault());
 svg.addEventListener('wheel', event => { event.preventDefault(); view.scale = Math.max(10, Math.min(500, view.scale * Math.exp(-event.deltaY * 0.001))); renderCanvas(); }, { passive: false });
 document.querySelectorAll<HTMLButtonElement>('[data-tool]').forEach(button => button.onclick = () => {
@@ -648,6 +665,10 @@ function renderPractice() {
         }
         $<HTMLButtonElement>('check-answer').disabled = true;
         const attempt = await record('submit', answer, units);
+        if (attempt.step !== solutionStep || attempt.section !== sectionT || JSON.stringify(attempt.model) !== JSON.stringify(model) || mode !== 'practice') {
+            toast('The result was recorded for the model and step you submitted.');
+            return;
+        }
         const result = attempt.result!;
         $('step-feedback').innerHTML = `<div class="feedback ${result.status === 'incorrect' ? 'incorrect' : ''}"><b>${escape(result.status === 'correct' ? 'Correct' : result.status === 'incorrect' ? 'Check this step' : 'Awaiting verification')}</b><p>${escape(result.message)}</p><span class="small">${attempt.synced ? 'Recorded by the verifier.' : 'Saved on this device; not yet verified by the server.'}</span></div>`;
         $<HTMLButtonElement>('check-answer').disabled = false;

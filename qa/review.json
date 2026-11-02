@@ -1,0 +1,41 @@
+{
+  "date": "2026-11-02",
+  "release": "0.1.0",
+  "reviewer": "authoring agent; self-review, not independent peer review",
+  "guidance": "author-style 0.26 and code-style 0.2; proportionate teaching text and code review",
+  "scope": "Drawing-based beam/frame sandbox; verified simply supported and overhanging beam practice; local pseudonymous records; GitHub Pages frontend",
+  "mechanics": {
+    "benchmarks": "13 Node tests passed",
+    "symbolic_and_storage": "8 Python tests passed, including forty independently compared mixed-load beams",
+    "formal": "Lean package and axiom checks passed in GitHub Actions run 41409166651",
+    "proof_scope": "Scaled reaction-force and reaction-moment identities; plotting-side inversion"
+  },
+  "browser_checks": [
+    "Created an 8 m beam from a blank canvas using snapping",
+    "Placed a pin, roller, and point force and obtained a stable determinate system",
+    "Dragged a 20 kN load from the centre towards the right support; reactions changed from 10/10 kN to 5/15 kN",
+    "Switched bending moment to compression-side plotting without changing section values",
+    "Submitted -10 kN and received opposite-sign feedback",
+    "Submitted 20*(8-4)/8 and received exact-equivalence acceptance",
+    "Revealed a symbolic equilibrium derivation",
+    "Inspected instructor records: both submissions and the sign-error category were present",
+    "Checked that initial problem mode hides reactions and computed section values",
+    "Checked phone width: no horizontal page overflow",
+    "Corrected a lingering drag and confirmed that resizing after release preserves the load position",
+    "No browser console errors in the inspected session"
+  ],
+  "review_corrections": [
+    "Closed SQLite connections explicitly to release file handles",
+    "Preserved vertical load particular terms in exact segment deflections",
+    "Used SVG screen transformation for pointer coordinates on letterboxed mobile canvases",
+    "Recorded unresolved expressions separately from incorrect mathematical answers",
+    "Prevented stale submitted-step feedback from attaching to a newly edited model",
+    "Kept proof scope distinct from numerical solver and model-translation validation"
+  ],
+  "remaining_scope": [
+    "Private verification and records remain local by user choice",
+    "Guided checking covers one horizontal beam with one pin and one vertical roller",
+    "Internal releases, ideal trusses, equation entry, free-body diagrams, and instructor problem catalogues are later releases",
+    "Browser section readouts and diagram extrema use plotted samples; the exact verifier evaluates the requested section directly"
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "lean": "checked",
+  "source_sha256": "f95b9b8d6cb1ade3e1bfb4a2c12d4328a4b8ee0660e1f8fd28f7688885a1dcce",
+  "toolchain": "leanprover/lean4:v4.19.0",
+  "run_url": "https://github.com/caoalex-s/CV2011-Structural-Explorer/actions/runs/41409166651",
+  "source_commit": "f3594a4"
+}
