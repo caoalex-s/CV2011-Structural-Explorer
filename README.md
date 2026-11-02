@@ -1,5 +1,7 @@
 # CV2011 Structural Explorer
 
+[Open the GitHub Pages interface](https://caoalex-s.github.io/CV2011-Structural-Explorer/) · [Build and verification status](https://github.com/caoalex-s/CV2011-Structural-Explorer/actions)
+
 Structural Explorer lets students draw planar beams and rigid-jointed frames, place supports and loads, and inspect the response as the model changes. Its sandbox displays reactions, normal force, shear force, bending moment, and displacement. A separate problem workspace checks supported beam calculations and records submitted steps under pseudonymous course IDs.
 
 ## Run the local pilot
