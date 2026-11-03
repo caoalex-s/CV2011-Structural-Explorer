@@ -25,7 +25,8 @@
   "validation": {
     "local": "28 Node tests passed; 22 Python tests completed with 21 passing and the local Lean test deliberately skipped. TypeScript type check passed.",
     "benchmarks": "Central force, uniform load, tutorial triangular load with irrational critical position, concentrated couple, unloaded beam, repeated derivative root, and Bernstein reconstruction/coverage",
-    "browser": "Initial beam cards and point table agree with analytical results; both shear limits retained; section changes remove stale results immediately; plain plotting labels and rotation readout present. Further final rendering checks pending.",
-    "linux_ci": "Pending; local Lean executable not run"
+    "browser": "Beam and triangular-load cards, root equations, point substitutions, case-sensitive unit/symbol headers, and live selected-section updates checked. No math-rendering errors, page overflow, or browser errors observed. Problem mode hides quantities until reveal. Tests used a separate service on port 8766 to preserve the user's portal frame on port 8765.",
+    "linux_ci": "Run 41590743783 passed and deployed 432a123. The generated certificates and corruption tests passed, including altered range conversion and incomplete interval coverage. Nine public beam/UDL/overhang examples passed. Local Lean executable not run.",
+    "receipts": "All nine published certificate hashes and theorem counts were compared with regenerated local source before import. Midpoint counts: beam 109, UDL 86, overhang 155."
   }
 }
