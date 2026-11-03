@@ -73,7 +73,21 @@ The verification layers have distinct scopes:
 | Cross-language tests | Forty generated mixed-load beams compared between the independent TypeScript and SymPy formulations |
 | Lean | Reaction-numerator equilibrium identities after clearing input denominators, and inversion of the plotting side |
 
-Lean does not currently certify the drawing-to-model translation, floating-point solver, or displacement derivations. `proofs/StructuralProofs.lean` states the exact theorems and assumptions. The deployment workflow runs the pinned Lean toolchain and audits the reported axioms before marking the published proof metadata as checked. A local build can reuse the committed CI receipt only when its proof-source SHA-256 is unchanged.
+`proofs/StructuralProofs.lean` states the general reaction and plotting identities. The deployment workflow runs the pinned Lean toolchain and audits the reported axioms before marking that library as checked. A local build can reuse its committed CI receipt only when the proof-source SHA-256 is unchanged.
+
+### Read the course-method derivation
+
+Choose **Show worked solution** beneath the section readouts. The five method tabs cover section equilibrium, double integration, moment-area, virtual work, and superposition. Expressions use the current loads and coordinates, including partial linearly varying loads, concentrated couples, and overhangs. The view gives the full piecewise N/V/M functions, slope and vertical displacement functions, boundary and continuity conditions, and values at the selected cut. It refreshes after sandbox edits. Problem mode requires an explicit reveal and records that learning event.
+
+The sequence follows the course beam-force lectures and Part 2 Lectures 2.2–2.6 and 2.9. These derivations cover a single prismatic horizontal beam with one pin and one vertical roller, up to 12 loads, and no internal joint releases or springs. Frames and other support arrangements retain their numerical sandbox response. Horizontal displacement and shear deformation are outside this worked-solution view.
+
+`proofs/BeamCertificate.lean` defines exact rational polynomial operations. For each supported model, the service constructs a downloadable Lean certificate that independently reconstructs section equilibrium from the encoded point and distributed actions. It checks all polynomial coefficients, force and moment jumps, differential polynomial identities, support conditions, displacement and slope continuity, and the displayed moment-area and unit-load calculations. Superposition certifies the sum of the symbolic per-load contributions. It does not certify each contribution's derivation separately.
+
+The certificate uses ordinary `decide`, and the service requires a successful compiler result for every generated theorem. Its axiom audit permits only Lean's standard propositional-extensionality axiom (`propext`) and rejects unproved claims (`sorryAx`) and compiler-trust axioms. Its scope is exact rational polynomial algebra. The physical idealisation, drawing translation, interpretation of formal polynomial differentiation and integration as real calculus, and floating-point canvas solver remain outside the certificate. A successful build of the general library alone does not mark a current worked solution as checked.
+
+Local Lean execution is disabled by default. A security alert occurred when attempting to start the downloaded Windows compiler during development, and no antivirus exception was added. GitHub's Linux runner checks public synthetic examples and publishes receipts keyed by the SHA-256 of each complete certificate. A local pilot can use `proofs/worked-receipts.json` without executing Lean. Receipts cover the unchanged simply supported, distributed-load, and overhanging examples at quarter, midpoint, and three-quarter sections. A changed certificate is labelled **Symbolic result · Lean not checked** unless an explicitly configured compiler checks it. No student model is uploaded to GitHub by this workflow.
+
+On a machine where Lean execution is approved, the service can use a pinned Lean 4.19.0 executable through `EXPLORER_LEAN`. The local pilot does not automatically discover or execute downloaded compilers. Installing a VS Code extension does not establish a successful proof check.
 
 ## Learning records
 
@@ -102,5 +116,5 @@ The optional Dockerfile packages the Python service and browser application for 
 - Ideal trusses and guided solutions for compound beams and frames, with force-method explanations.
 - A problem catalogue with stable problem versions and instructor-defined tasks.
 - Equation-entry checking and section free-body diagrams, including alternative valid solution paths.
-- Expanded Lean proofs and explicit links from each supported solution step to its checked rule.
+- Real-calculus formalisation and wider structural classes for the worked certificates.
 - Cohort analysis of first attempts, later corrections, and hint use across problem versions.

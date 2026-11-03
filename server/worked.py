@@ -144,6 +144,8 @@ def certificate_for(beam, pieces, actions, section):
     cert.prove("conditions", f"{rat(beam.left)} < {rat(beam.right)} ∧ 0 < {rat(beam.rigidity)}")
     for index, piece in enumerate(pieces):
         mid = rat((piece["start"] + piece["end"]) / 2)
+        a, b = rat(piece["start"]), rat(piece["end"])
+        cert.prove("partition", f"{a} < {b} ∧ (actions.all (fun p => !({a} < p.x && p.x < {b}))) = true ∧ (loads.all (fun q => !({a} < q.start && q.start < {b}) && !({a} < q.finish && q.finish < {b}))) = true")
         for field in ("q", "N", "V", "M", "theta", "v"):
             cert.define(f"{field}{index}", piece[field])
         for field, rule in (("q", f"cutQ loads {mid}"), ("N", f"cutN actions {mid}"),
@@ -220,11 +222,13 @@ def verify_source(source):
         except (OSError, subprocess.TimeoutExpired):
             return {**result, "status": "unavailable", "message": "Lean did not complete this certificate. No formal verification is claimed."}
     output = completed.stdout + completed.stderr
-    # Ordinary decide is reduced by the kernel; reject any unexpected axiom.
+    # Propositional extensionality is a standard Lean logical axiom. Reject
+    # every other reported axiom, including sorryAx and compiler-trust axioms.
     audits = [line for line in output.splitlines() if "axioms" in line]
-    passed = completed.returncode == 0 and len(audits) == source.count("#print axioms") and all("does not depend on any axioms" in line for line in audits)
+    allowed_audit = lambda line: ("does not depend on any axioms" in line or line.endswith("depends on axioms: [propext]"))
+    passed = completed.returncode == 0 and len(audits) == source.count("#print axioms") and all(allowed_audit(line) for line in audits)
     return {**result, "status": "checked" if passed else "failed",
-            "message": f"Lean checked {len(audits)} exact statements for this model and section. No axioms were reported." if passed else "Lean rejected this certificate. The derivation is not formally verified.",
+            "message": f"Lean checked {len(audits)} exact statements for this model and section." if passed else "Lean rejected this certificate. The derivation is not formally verified.",
             "audit": output[-12000:], "statements": len(audits)}
 
 
@@ -246,6 +250,10 @@ def worked_solution(payload, verify=True):
     # Moment-area uses the left support tangent. Signed integration also covers
     # a selected point on the left overhang.
     moment_area = []
+    def piece_index(position):
+        return next((i for i, p in enumerate(pieces) if p["start"] <= position < p["end"]), len(pieces) - 1)
+
+    left_index = piece_index(beam.left)
     for target, name in [(beam.right, "between supports"), (section, "to the selected section")]:
         for weighted in (False, True):
             terms = integrate_pieces(pieces, beam.left, target, weighted)
@@ -256,8 +264,12 @@ def worked_solution(payload, verify=True):
                 formal_terms.append(f"{rat(direction)} * integral {polynomial} {rat(a)} {rat(b)} / {rat(beam.rigidity)}")
             formal_sum = " + ".join(formal_terms) or "(0 : Rat)"
             cert.prove("moment_area", f"{formal_sum} = {rat(total)}")
-            expected = (at(pieces,"v",target) - at(pieces,"v",beam.left) - (target-beam.left)*at(pieces,"theta",beam.left)) if weighted else at(pieces,"theta",target)-at(pieces,"theta",beam.left)
-            cert.prove("moment_area", f"{rat(total)} = {rat(expected)}")
+            target_index = piece_index(target)
+            if weighted:
+                identity = f"value v{target_index} {rat(target)} - value v{left_index} {rat(beam.left)} - ({rat(target)} - {rat(beam.left)}) * value theta{left_index} {rat(beam.left)}"
+            else:
+                identity = f"value theta{target_index} {rat(target)} - value theta{left_index} {rat(beam.left)}"
+            cert.prove("moment_area", f"{rat(total)} = {identity}")
             moment_area.append({"title": ("First moment " if weighted else "Area ") + name,
                                 "equation": equation("t" if weighted else "Δθ", total, "m" if weighted else "rad"),
                                 "terms": [equation(f"Interval {i+1}", d*v/beam.rigidity, "m" if weighted else "rad") for i,a,b,d,v in terms]})
@@ -309,6 +321,6 @@ def worked_solution(payload, verify=True):
         "virtual":{"reactions":[equation("Virtual Rₗ",virtual_left,"kN"),equation("Virtual Rᵣ",virtual_right,"kN")],"rows":virtual_rows,"result":equation("v(xₛ)",virtual_total*1000,"mm")},
         "superposition":[equation(c["label"]+" ("+c["kind"]+")",c["value"]*1000,"mm") for c in contributions],
         "proof":{**proof,"groups":cert.groups,"source":source,
-                 "scope":"Lean checks exact rational polynomial coefficients, section equilibrium from the encoded actions, load jumps, boundary and continuity conditions, and the displayed moment-area and unit-load calculations. The superposition check covers the sum of the displayed contributions. The physical laws, drawing translation, interpretation as real derivatives/integrals, and numerical canvas solver are outside this certificate."},
+                 "scope":"Lean checks exact rational polynomial coefficients, section equilibrium from the encoded actions, load jumps, boundary and continuity conditions, and the displayed moment-area and unit-load calculations. The superposition check covers the sum of the displayed contributions. The proof audit permits only Lean’s standard propositional-extensionality axiom. The physical laws, drawing translation, interpretation as real derivatives/integrals, and numerical canvas solver are outside this certificate."},
         "sources":["Beam sign convention and V/M functions (Lectures 8–10)","Integration of Differential Equation (Lectures 2.2–2.3)","Method of Superposition (Lecture 2.4)","Moment-area Method (Lectures 2.5–2.6)","Principle of Virtual Work: Beams/Frames (Lecture 2.9)"]
     }
