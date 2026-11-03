@@ -140,6 +140,10 @@ class WorkedTests(unittest.TestCase):
         self.assertEqual(verify_source(wrong_load)["status"], "failed")
         wrong_virtual = source.replace("def virtualm0 : Poly := [", "def virtualm0 : Poly := [(1 : Rat) + ", 1)
         self.assertEqual(verify_source(wrong_virtual)["status"], "failed")
+        wrong_range = source.replace("affineCompose M0", "affineCompose V0", 1)
+        self.assertEqual(verify_source(wrong_range)["status"], "failed")
+        missing_coverage = source.replace("def M_breaks_0 : List Rat := [", "def M_breaks_0 : List Rat := [(1 : Rat) + ", 1)
+        self.assertEqual(verify_source(missing_coverage)["status"], "failed")
 
 
 if __name__ == "__main__":

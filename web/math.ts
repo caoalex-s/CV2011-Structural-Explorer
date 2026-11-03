@@ -38,7 +38,7 @@ export function equationHtml(row: Equation): string {
     const units: Record<string, string> = {
         'kN': String.raw`\mathrm{kN}`, 'kN m': String.raw`\mathrm{kN}\,\mathrm{m}`,
         'kN/m': String.raw`\mathrm{kN}/\mathrm{m}`, 'm': String.raw`\mathrm{m}`,
-        'mm': String.raw`\mathrm{mm}`, 'rad': String.raw`\mathrm{rad}`,
+        'mm': String.raw`\mathrm{mm}`, 'rad': String.raw`\mathrm{rad}`, 'mrad': String.raw`\mathrm{mrad}`,
         'kN m²': String.raw`\mathrm{kN}\,\mathrm{m}^2`, 'kN m³': String.raw`\mathrm{kN}\,\mathrm{m}^3`,
     };
     const unit = units[row.unit];

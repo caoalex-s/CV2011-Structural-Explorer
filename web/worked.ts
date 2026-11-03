@@ -2,6 +2,8 @@
 import type { Model } from './engine.js';
 import { equationHtml, math, methodRules, rationalLatex } from './math.js';
 import type { Equation } from './math.js';
+import { renderKeyQuantities } from './quantities.js';
+import type { KeyQuantities } from './quantities.js';
 
 interface WorkedResponse {
     title: string;
@@ -20,6 +22,7 @@ interface WorkedResponse {
     thetaLeft: Equation;
     virtual: { reactions: Equation[]; rows: { interval: string; equations: Equation[] }[]; result: Equation };
     superposition: Equation[];
+    quantities: KeyQuantities;
     proof: { status: string; message: string; scope: string; sha256: string; source: string; projectZip: string; groups: Record<string, string[]> };
     sources: string[];
 }
@@ -39,7 +42,7 @@ let expanded = false;
 let response: WorkedResponse | undefined;
 let pending = false;
 let timer: ReturnType<typeof setTimeout>;
-let method = 'sections';
+let method = 'quantities';
 let error = '';
 
 function equations(rows: Equation[]): string {
@@ -54,6 +57,7 @@ function proofLabel(groups: string[]): string {
 
 function steps(): string {
     const data = response!;
+    if (method === 'quantities') return renderKeyQuantities(data.quantities, proofLabel);
     const intervals = (field: 'forces' | 'integrations' | 'displacements') => data.pieces.map((piece, i) => `<details class="worked-interval" ${i === 0 ? 'open' : ''}><summary>Interval ${i + 1}: ${math(piece.interval)} m</summary>${equations(piece[field])}</details>`).join('');
     const selected = `<h3>At the selected section: ${math(`x_s = ${rationalLatex(data.section)}\\,\\mathrm{m}`)}</h3>${equations(data.selected)}`;
     if (method === 'sections') return `
@@ -115,7 +119,7 @@ function draw(): void {
     }
     panel.insertAdjacentHTML('beforeend', `<div class="worked-status ${response.proof.status === 'checked' ? 'checked' : ''}" role="status">${escape(response.proof.message)}</div>
         <details class="worked-assumptions"><summary>Model, signs, and verification scope</summary><p>${escape(response.assumptions)}</p><p>${escape(response.conventions)}</p><p>${escape(response.proof.scope)}</p><p class="small">Course references: ${response.sources.map(escape).join(' · ')}</p><button id="download-proof">Download Lean source</button> <button id="download-proof-project">Download VS Code proof project</button></details>
-        <div class="method-tabs" role="group" aria-label="Solution method">${[['sections', 'Method of sections'], ['integration', 'Double integration'], ['area', 'Moment-area theorems'], ['virtual', 'Principle of virtual work'], ['superposition', 'Method of superposition']].map(([id, label]) => `<button data-method="${id}" class="${id === method ? 'active' : ''}" aria-pressed="${id === method}">${label}</button>`).join('')}</div><article class="worked-steps">${steps()}</article>`);
+        <div class="method-tabs" role="group" aria-label="Solution method">${[['quantities', 'Key quantities'], ['sections', 'Method of sections'], ['integration', 'Double integration'], ['area', 'Moment-area theorems'], ['virtual', 'Principle of virtual work'], ['superposition', 'Method of superposition']].map(([id, label]) => `<button data-method="${id}" class="${id === method ? 'active' : ''}" aria-pressed="${id === method}">${label}</button>`).join('')}</div><article class="worked-steps">${steps()}</article>`);
     panel.querySelectorAll<HTMLButtonElement>('[data-method]').forEach(button => button.onclick = () => { method = button.dataset.method!; draw(); });
     document.getElementById('download-proof')!.onclick = () => {
         download(new Blob([response!.proof.source], { type: 'text/plain' }), 'lean');

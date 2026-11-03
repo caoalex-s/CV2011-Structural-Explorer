@@ -73,4 +73,23 @@ def cutM (actions : List Action) (loads : List Distributed) (cut : Rat) : Poly :
 def cutQ (loads : List Distributed) (cut : Rat) : Poly :=
   sumPolys ((loads.filter fun load => load.start < cut && cut < load.finish).map intensity)
 
+/- Range certificates use t=(x-a)/(b-a) on each covered interval.
+The six basis polynomials are choose(5,i)*t^i*(1-t)^(5-i).
+They are nonnegative for 0 <= t <= 1 and sum to one. Generated
+statements check the exact basis conversion and every coefficient bound.
+The real-domain convex-hull interpretation is stated in the proof scope. -/
+def bernsteinBasis : List Poly := [
+  [1, -5, 10, -10, 5, -1], [0, 5, -20, 30, -20, 5],
+  [0, 0, 10, -30, 30, -10], [0, 0, 0, 10, -20, 10],
+  [0, 0, 0, 0, 5, -5], [0, 0, 0, 0, 0, 1]]
+
+def bernstein5 (weights : List Rat) : Poly :=
+  sumPolys ((List.range 6).map fun i =>
+    scale (coefficient weights i) (bernsteinBasis[i]?.getD []))
+
+def affineCompose (p : Poly) (a b : Rat) : Poly :=
+  p.foldr (fun c rest => add (constant c) (multiply [a, b-a, 0, 0, 0, 0] rest)) (constant 0)
+
+theorem bernstein_partition_of_unity : sumPolys bernsteinBasis = constant 1 := by decide
+
 end BeamCertificate

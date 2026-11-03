@@ -1,0 +1,31 @@
+{
+  "date": "2026-11-03",
+  "scope": "Plain plotting-side labels; key quantities, point substitutions, and polynomial range certificates for the existing worked-beam scope",
+  "reviewer": "Implementation agent; self-review, not independent peer review",
+  "guidance": "author-style 0.27 and code-style 0.2",
+  "course_sources": [
+    "Tutorial 5 solution, Question 1: V=0 gives x=2 sqrt(3) and M=16 sqrt(3)",
+    "Tutorial 8 solution, Questions 4–5: zero physical slope locates displacement extrema; endpoints and curvature establish their interpretation",
+    "Existing course-alignment-review.json: sign, unit, and continuity conventions"
+  ],
+  "meaning_review": [
+    "Both limits are retained at concentrated forces and couples; no average is used at a jump",
+    "Signed extrema are separated from maximum magnitudes",
+    "Point rotations are converted from radians to mrad, and vertical displacement from metres to mm",
+    "Interval coefficients bound the full curve independently of plotted samples or omitted stationary roots",
+    "A nonzero bound width is labelled approximate; exact rational values retain fractions",
+    "The real-domain Bernstein convex-hull theorem and irrational-root isolation are explicitly outside the Lean formalisation",
+    "A constant response is identified as an interval, with a representative position; tied locations are explained"
+  ],
+  "readability_review": [
+    "New pure calculation module separates root isolation, coefficient conversion, coverage refinement, point collection, and certificate generation",
+    "Student explanations follow stationary equations, substitutions, signed comparison, and whole-curve bounds",
+    "Proof exports include the new statements without changing local Lean execution policy"
+  ],
+  "validation": {
+    "local": "28 Node tests passed; 22 Python tests completed with 21 passing and the local Lean test deliberately skipped. TypeScript type check passed.",
+    "benchmarks": "Central force, uniform load, tutorial triangular load with irrational critical position, concentrated couple, unloaded beam, repeated derivative root, and Bernstein reconstruction/coverage",
+    "browser": "Initial beam cards and point table agree with analytical results; both shear limits retained; section changes remove stale results immediately; plain plotting labels and rotation readout present. Further final rendering checks pending.",
+    "linux_ci": "Pending; local Lean executable not run"
+  }
+}

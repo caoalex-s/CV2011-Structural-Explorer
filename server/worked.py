@@ -23,6 +23,7 @@ import zipfile
 import sympy as sp
 
 from server.verifier import rational, reference
+from server.quantities import key_quantities
 
 ROOT = Path(__file__).resolve().parents[1]
 X = sp.Symbol("x")
@@ -451,6 +452,7 @@ def worked_solution(payload, verify=True):
                 equation("Elastic curve", piece["v"], "m", rf"v_{{{index+1}}}(x)"),
             ],
         })
+    quantities = key_quantities(model, beam, pieces, section, cert, equation, lean_number)
     source=cert.source()
     proof=verify_source(source) if verify else {"status":"not_run","sha256":hashlib.sha256(source.encode()).hexdigest()}
     return {
@@ -463,11 +465,12 @@ def worked_solution(payload, verify=True):
         "actions":[{"position":number(a),"fx":number(fx),"fy":number(fy),"couple":number(m),"arm":number(section-a),"included":bool(a<section or (a==section and section!=beam.length))} for a,fx,fy,m in actions],
         "pieces": displayed_pieces,
         "constants": constants,
+        "quantities": quantities,
         "selected":[equation("N",at(pieces,"N",section),"kN"),equation("V",at(pieces,"V",section),"kN"),equation("M",at(pieces,"M",section),"kN m"),equation("θ",at(pieces,"theta",section),"rad"),equation("v",1000*at(pieces,"v",section),"mm")],
         "momentArea":moment_area,"thetaLeft":equation("θ(a)",at(pieces,"theta",beam.left),"rad"),
         "virtual":{"reactions":[equation("Virtual left reaction",virtual_left,"kN",r"\bar{"+left_reaction+"}"),equation("Virtual right reaction",virtual_right,"kN",r"\bar{"+right_reaction+"}")],"rows":virtual_rows,"result":equation("Downward displacement",virtual_total*1000,"mm",r"\Delta_{s\mathrm v}=-v(x_s)")},
         "superposition":[equation(c["label"]+" ("+c["kind"]+")",c["value"]*1000,"mm") for c in contributions],
         "proof":{**proof,"groups":cert.groups,"source":source,"projectZip":vscode_project(source, proof),
-                 "scope":"Lean checks exact rational polynomial coefficients, section equilibrium from the encoded actions, downward-positive load conversion, interval integration constants, load jumps, boundary and continuity conditions, and the displayed moment-area and unit-load calculations. The unit-load check verifies downward-positive Δ=−v. The superposition check covers the sum of the displayed contributions. The proof audit permits only Lean’s standard propositional-extensionality axiom. The physical laws, drawing translation, interpretation as real derivatives/integrals, and numerical canvas solver are outside this certificate."},
+                 "scope":"Lean checks exact rational polynomial coefficients, section equilibrium from the encoded actions, downward-positive load conversion, interval integration constants, load jumps, boundary and continuity conditions, and the displayed moment-area and unit-load calculations. Key quantities add exact point evaluations, interval coverage, Bernstein basis conversions, and coefficient inequalities. Their global-range interpretation uses the real-domain Bernstein convex-hull theorem, which is outside this formalisation, as is isolation of irrational stationary roots. The unit-load check verifies downward-positive Δ=−v. The superposition check covers the sum of the displayed contributions. The proof audit permits only Lean’s standard propositional-extensionality axiom. The physical laws, drawing translation, interpretation as real derivatives/integrals, and numerical canvas solver are outside this certificate."},
         "sources":["Week 4 lecture: beam internal forces and tension-side diagrams", "Tutorial 5: cut-face signs and downward-positive w", "Tutorials 8–9: elastic curve and integration constants", "Tutorial 10: moment-area theorems and tangent deviation", "Tutorial 12: normalised virtual moment and displacement direction", "Part 2 Lectures 2.2–2.6 and 2.9: displacement methods"]
     }

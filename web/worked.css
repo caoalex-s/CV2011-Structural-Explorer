@@ -16,6 +16,16 @@
 .math-error{white-space:pre-wrap;color:#a33333;background:#fff0ef;padding:4px}
 .worked-interval{padding:12px 16px;border:1px solid var(--line);border-radius:8px;margin:10px 0}
 .worked-interval summary{font-weight:600;cursor:pointer}
+.quantity-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0}
+.quantity-card{display:flex;flex-direction:column;gap:9px;padding:15px;background:var(--teal-light);border-radius:8px;min-width:0}
+.quantity-card small{font-size:12px}.quantity-card strong{font-size:20px}.quantity-card>span{font-size:11px;color:var(--muted)}
+.quantity-unit{font-size:12px;font-weight:400;white-space:nowrap}.quantity-result{border-top:1px solid var(--line);padding:8px 0}
+.quantity-result h4{margin:8px 0}.quantity-table td:not(:first-child){white-space:nowrap;font-variant-numeric:tabular-nums}
+.quantity-table th{text-transform:none;letter-spacing:0}
+.quantity-root{border-left:2px solid var(--line);padding-left:12px}
+.quantity-result>.katex-display,.quantity-root>.katex-display{max-width:100%;overflow-x:auto;overflow-y:hidden;padding-bottom:3px}
+#section-results{grid-template-columns:repeat(auto-fit,minmax(115px,1fr))}
+@media(max-width:750px){.quantity-cards{grid-template-columns:1fr}.quantity-table{min-width:640px}}
 .worked-table{overflow:auto}
 .method-proof{display:inline-block;font-size:12px;padding:3px 9px;border-radius:12px;background:#faf5e5;color:#715921}
 .method-proof.checked{background:#eef6f2;color:#2F6F73}

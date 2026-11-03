@@ -34,7 +34,7 @@ The model uses metres, kilonewtons, and kilonewton metres. Global y is positive 
 
 ### Course terminology and conventions
 
-The **Course terminology, definitions, and conventions** panel follows the current Week 2 and Week 4 lectures and Tutorials 2, 5, 8–10, and 12. The plotting selector distinguishes **Tension side (lecture)** from **Compression side (tutorials)**. Both use the same sagging-positive bending moment. Course references and the reviewed source locations are recorded in `qa/course-alignment-review.json`.
+The **Course terminology, definitions, and conventions** panel follows the current Week 2 and Week 4 lectures and Tutorials 2, 5, 8–10, and 12. The plotting selector distinguishes **Tension side** from **Compression side**. Both use the same sagging-positive bending moment. Course references and the reviewed source locations are recorded in `qa/course-alignment-review.json`.
 
 The method of sections uses downward-positive distributed intensity `w`, with `dV/dx = -w` and `dM/dx = V`, as in Tutorial 5. The load editor displays downward-positive start and end intensities. Model files and the numerical solver retain upward-positive global force components, and the editor converts the sign at its boundary. Existing model files and attempt records retain their meaning. Tutorial 9 uses an upward-positive signed load in its load-equation formulation; the course panel explains that contextual difference.
 
@@ -89,7 +89,13 @@ The verification layers have distinct scopes:
 
 ### Read the course-method derivation
 
-Choose **Show worked solution** beneath the section readouts. The five tabs cover the method of sections, double integration, moment-area theorems, principle of virtual work, and method of superposition. Expressions use the current loads and coordinates, including partial linearly varying loads, concentrated couples, and overhangs. The view gives the full piecewise N/V/M functions, physical slope and elastic curve, boundary and continuity conditions, and values at the selected cut. It refreshes after sandbox edits. Problem mode requires an explicit reveal and records that learning event.
+The **Key quantities** tab reports maximum magnitudes of bending moment, physical slope, and vertical displacement. Expand each quantity to see its signed minimum and maximum, stationary equations, candidate substitutions, and range enclosure. Normal-force and shear-force extrema are included in the same derivation list. A table gives N, V, M, slope in mrad, and displacement in mm at supports, load boundaries, midspan, and the selected section, retaining both limits at a discontinuity. The main section readout also includes physical rotation.
+
+Stationary points follow the course relations: V=0 for bending moment, M=0 for physical slope, and theta=0 for displacement. Endpoints and jumps are compared as well. Exact rational extrema are displayed as fractions. Irrational positions use symbolic roots when short expressions are available and otherwise use rational isolating intervals. Approximate extrema carry explicit rational enclosures.
+
+The generated Lean source adds exact point evaluations, interval-coverage statements, Bernstein polynomial basis conversions, and coefficient inequalities for every covered interval. These bounds are independent of canvas samples and of the completeness of the stationary-root search. The global real-domain interpretation uses the Bernstein convex-hull theorem, which is not yet formalised in Lean here. Isolation of irrational stationary roots also remains symbolic. This distinction is shown in the derivation and proof scope. Existing limits to one horizontal beam with a pin and vertical roller remain in force.
+
+Choose **Show worked solution** beneath the section readouts. The method tabs cover the method of sections, double integration, moment-area theorems, principle of virtual work, and method of superposition. Expressions use the current loads and coordinates, including partial linearly varying loads, concentrated couples, and overhangs. The view gives the full piecewise N/V/M functions, physical slope and elastic curve, boundary and continuity conditions, and values at the selected cut. It refreshes after sandbox edits. Problem mode requires an explicit reveal and records that learning event.
 
 Equations are generated as LaTeX and rendered with a pinned, locally bundled KaTeX renderer and fonts. Fractions, subscripts, integral limits, aligned equations, and units use the same rendering path in all five methods. The renderer also supplies MathML for assistive technology. No external rendering service or CDN is needed.
 
