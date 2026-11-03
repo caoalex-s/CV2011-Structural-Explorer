@@ -71,7 +71,8 @@ The verification layers have distinct scopes:
 | TypeScript tests | Numerical beam/frame benchmarks, constraints, sign conventions, and geometry changes |
 | SymPy | Exact two-support beam reactions, section forces, and integrated displacements, including equilibrium and support conditions |
 | Cross-language tests | Forty generated mixed-load beams compared between the independent TypeScript and SymPy formulations |
-| Lean | Reaction-numerator equilibrium identities after clearing input denominators, and inversion of the plotting side |
+| Lean general library | Reaction-numerator equilibrium identities after clearing input denominators, and inversion of the plotting side |
+| Lean worked certificates | Exact polynomial section equilibrium, N/V/M equations, displacement conditions, and moment-area/unit-load calculations for the certified model and section |
 
 `proofs/StructuralProofs.lean` states the general reaction and plotting identities. The deployment workflow runs the pinned Lean toolchain and audits the reported axioms before marking that library as checked. A local build can reuse its committed CI receipt only when the proof-source SHA-256 is unchanged.
 
