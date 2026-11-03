@@ -50,6 +50,8 @@ jobs:
       - name: Record successfully checked proof scope
         run: |
           python -c "import json; from pathlib import Path; p=Path('web/verification.json'); v=json.loads(p.read_text()); v['lean']='checked'; v['commit']='${{ github.sha }}'; p.write_text(json.dumps(v))"
+      - name: Render published symbolic equations
+        run: node scripts/check_published_math.mjs
       - run: npm run build
       - uses: actions/upload-pages-artifact@v3
         with:

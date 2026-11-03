@@ -2,6 +2,9 @@
  * SVG y is down. Labels may move, but action origins and lines never do. */
 export const courseColors = { member: '#16334A', force: '#2F6F73', reaction: '#C9A227', ink: '#202020', muted: '#657177' };
 const escapeText = (value: string) => value.replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]!));
+/** Typeset editable letter subscripts after escaping all user-provided text. */
+export const symbolLabel = (value: string) => escapeText(value).replace(/\b([PFMwq])_([A-Za-z0-9]{1,8})/g,
+    '$1<tspan baseline-shift="sub" font-size="75%">$2</tspan>');
 
 export function forceGeometry(x: number, y: number, fx: number, fy: number, length = 60, gap = 5) {
     const magnitude = Math.hypot(fx, fy);
@@ -18,7 +21,7 @@ export function forceSymbol(x: number, y: number, fx: number, fy: number, color:
     const { tip, tail, ux, uy } = geometry;
     const leader = gap > 8 ? `<path d="M ${tip.x} ${tip.y} L ${x} ${y}" stroke="${color}" stroke-width="0.8" stroke-dasharray="2 3" opacity=".65"/>` : '';
     // Keep the hit region on the actual arrow for forces in every direction.
-    return `<g data-vector="force" data-origin-x="${x}" data-origin-y="${y}">${leader}<path class="hit" d="M ${tail.x} ${tail.y} L ${tip.x} ${tip.y}"/><path d="M ${tail.x} ${tail.y} L ${tip.x} ${tip.y}" stroke="${color}" stroke-width="1.8" fill="none"/>${arrowHead(tip.x, tip.y, ux, uy, color)}${label ? `<text x="${tail.x + 8}" y="${tail.y - 9}" class="svg-label" style="fill:${color}">${escapeText(label)}</text>` : ''}</g>`;
+    return `<g data-vector="force" data-origin-x="${x}" data-origin-y="${y}">${leader}<path class="hit" d="M ${tail.x} ${tail.y} L ${tip.x} ${tip.y}"/><path d="M ${tail.x} ${tail.y} L ${tip.x} ${tip.y}" stroke="${color}" stroke-width="1.8" fill="none"/>${arrowHead(tip.x, tip.y, ux, uy, color)}${label ? `<text x="${tail.x + 8}" y="${tail.y - 9}" class="svg-label" style="fill:${color}">${symbolLabel(label)}</text>` : ''}</g>`;
 }
 export function momentGeometry(x: number, y: number, moment: number, radius = 25) {
     const positive = moment >= 0, startAngle = positive ? -Math.PI / 4 : 5 * Math.PI / 4;
@@ -33,7 +36,7 @@ export function momentSymbol(x: number, y: number, moment: number, color: string
     if (Math.abs(moment) < 1e-12) return '';
     const { start, end, tangent, sweep } = momentGeometry(x, y, moment, radius);
     const arc = `M ${start.x} ${start.y} A ${radius} ${radius} 0 1 ${sweep} ${end.x} ${end.y}`;
-    return `<g data-vector="moment" data-origin-x="${x}" data-origin-y="${y}"><path class="hit" d="${arc}"/><path d="${arc}" fill="none" stroke="${color}" stroke-width="1.8"/>${arrowHead(end.x, end.y, tangent.x, tangent.y, color)}${label ? `<text x="${x}" y="${y - radius - 10}" text-anchor="middle" class="svg-label" style="fill:${color}">${escapeText(label)}</text>` : ''}</g>`;
+    return `<g data-vector="moment" data-origin-x="${x}" data-origin-y="${y}"><path class="hit" d="${arc}"/><path d="${arc}" fill="none" stroke="${color}" stroke-width="1.8"/>${arrowHead(end.x, end.y, tangent.x, tangent.y, color)}${label ? `<text x="${x}" y="${y - radius - 10}" text-anchor="middle" class="svg-label" style="fill:${color}">${symbolLabel(label)}</text>` : ''}</g>`;
 }
 /** A spiral marks a rotational spring. Its centre is the joint itself. */
 export function rotationalSpring(x: number, y: number, color = courseColors.member): string {

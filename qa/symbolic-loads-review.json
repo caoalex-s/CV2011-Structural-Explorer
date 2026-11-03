@@ -1,0 +1,26 @@
+{
+  "date": "2026-11-03",
+  "scope": "Named applied actions and symbolic course-method derivations before numerical substitution",
+  "reviewer": "Implementation agent self-review, not independent review",
+  "guidance": "author-style 0.27 and code-style 0.2",
+  "course_evidence": "Tutorial 8 solution.tex: named clockwise M_0, symbolic equilibrium, M(x), EI-scaled integration constants, and elastic-curve formulas before substitution. Existing course sign conventions are preserved.",
+  "meaning_review": {
+    "labels": "P_1, M_0, and w_1 defaults are distinct and editable. Existing names persist after deletion or insertion. Symbolic notation tokens resolve to the same names in the drawing, action table, and equations. Labels remain separate from physical components and coordinates.",
+    "family": "Load amplitudes, L, and EI remain symbolic. Relative positions x/L follow the current drawing. Single-axis force and couple magnitudes follow their reference directions. Inclined components and downward-positive distributed intensities retain their signed meaning.",
+    "verification": "SymPy checks parametric equilibrium, derivative identities, support conditions, continuity, and exact numerical substitution for every attached expression. Lean continues to check the substituted model. The UI and README explicitly exclude a universal Lean theorem for the symbolic family.",
+    "corrections": [
+      "Symbolic displacement and rotation retain SI units. Numerical conversion is shown separately to preserve the familiar PL^3/(48EI) form.",
+      "The aggregate vertical-force symbol uses F_tot to distinguish it from an applied force named F.",
+      "Extremum coordinates are explicitly specific to the current amplitudes. Symbolic point evaluations do not assert a generic maximum.",
+      "Renamed public examples reuse only the unchanged physical model and section; a physical edit still invalidates the published solution."
+    ]
+  },
+  "readability_review": "Load naming and symbolic derivation generation are separate modules. The symbolic workflow names its normalisation, physical-unit restoration, and course-method stages. Source review and final prose review completed after the unit and symbol-ambiguity corrections.",
+  "validation": {
+    "typescript": "Type check passed; 33 Node tests passed.",
+    "python": "Full suite: 24 passed, one local Lean test skipped. Three symbolic-family tests passed again after final checks and SI display changes.",
+    "public_payload": "All nine certificate hashes retained their checked receipts. 906 equations, including 879 symbolic forms, passed the actual KaTeX renderer. This check is also part of deployment CI.",
+    "browser": "Local derivations and static published derivations displayed. Renaming P_1 to P_A updated the annotation and symbolic equations while retaining the exact-instance certificate. The static page showed M=P_A L/4 and v=-P_A L^3/(48EI), with no math errors or horizontal page overflow. Distributed loading displayed w_1=5 kN/m; an added couple displayed M_0=20 kN m.",
+    "privacy": "QA used a separate local port and data directory. User models and student records were not replaced. Local Lean was not executed."
+  }
+}

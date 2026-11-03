@@ -6,6 +6,7 @@ import { renderKeyQuantities } from './quantities.js';
 import type { KeyQuantities } from './quantities.js';
 import { findPublishedExample, loadPublishedLibrary, publishedSolution } from './published-worked.js';
 import type { PublishedExample } from './published-worked.js';
+import { resolveLoadNotation } from './load-labels.js';
 
 export interface WorkedResponse {
     title: string;
@@ -16,17 +17,19 @@ export interface WorkedResponse {
     supports: { a: string; b: string };
     equilibrium: Equation[];
     equilibriumRule: string;
-    actions: { position: string; fx: string; fy: string; couple: string; arm: string; included: boolean }[];
-    pieces: { interval: string; forces: Equation[]; integrations: Equation[]; displacements: Equation[] }[];
+    actions: { symbol?: string; position: string; fx: string; fy: string; couple: string; arm: string; included: boolean }[];
+    pieces: { interval: string; intervalLatex?: string; forces: Equation[]; integrations: Equation[]; displacements: Equation[] }[];
     constants: Equation[];
     selected: Equation[];
     momentArea: { title: string; equation: Equation; terms: Equation[] }[];
     thetaLeft: Equation;
-    virtual: { reactions: Equation[]; rows: { interval: string; equations: Equation[] }[]; result: Equation };
+    virtual: { reactions: Equation[]; rows: { interval: string; intervalLatex?: string; equations: Equation[] }[]; result: Equation };
     superposition: Equation[];
     quantities: KeyQuantities;
     proof: { status: string; message: string; scope: string; sha256: string; source: string; projectZip: string; groups: Record<string, string[]> };
     sources: string[];
+    parameters?: Equation[];
+    symbolicScope?: string;
 }
 interface Context {
     model: Model;
@@ -63,18 +66,18 @@ function proofLabel(groups: string[]): string {
 function steps(): string {
     const data = response!;
     if (method === 'quantities') return renderKeyQuantities(data.quantities, proofLabel);
-    const intervals = (field: 'forces' | 'integrations' | 'displacements') => data.pieces.map((piece, i) => `<details class="worked-interval" ${i === 0 ? 'open' : ''}><summary>Interval ${i + 1}: ${math(piece.interval)} m</summary>${equations(piece[field])}</details>`).join('');
+    const intervals = (field: 'forces' | 'integrations' | 'displacements') => data.pieces.map((piece, i) => `<details class="worked-interval" ${i === 0 ? 'open' : ''}><summary>Interval ${i + 1}: ${math(piece.intervalLatex || piece.interval)}</summary><p class="small">Current coordinates: ${math(piece.interval)} m.</p>${equations(piece[field])}</details>`).join('');
     const selected = `<h3>At the selected section: ${math(`x_s = ${rationalLatex(data.section)}\\,\\mathrm{m}`)}</h3>${equations(data.selected)}`;
     if (method === 'sections') return `
         ${proofLabel(['equilibrium', 'partition', 'sections', 'conventions', 'diagrams', 'jumps', 'ends', 'readout'])}
         <h3>1. Find the support reactions</h3>
         <p>Replace the supports by their reactions. Keep each force at its application point and each couple at its stated sign. Let ${math(`a=${rationalLatex(data.supports.a)}\\,\\mathrm{m}`)} and ${math(`b=${rationalLatex(data.supports.b)}\\,\\mathrm{m}`)} denote the left and right support coordinates.</p>
-        <p>Reaction symbols follow the labelled points on the drawing. For an interior support without a node label, ${math('R_{1y}')} or ${math('R_{2y}')} identifies its vertical component. Here ${math('F')} is the signed sum of the applied vertical forces and ${math('T')} is their total external moment, including couples, about ${math('x=0')}.</p>
+        <p>Reaction symbols follow the labelled points on the drawing. For an interior support without a node label, ${math('R_{1y}')} or ${math('R_{2y}')} identifies its vertical component. Here ${math(String.raw`F_{\mathrm{tot}}`)} is the signed sum of the applied vertical forces and ${math('T')} is their total external moment, including couples, about ${math('x=0')}.</p>
         <div class="worked-rule">${math(data.equilibriumRule, true)}</div>${equations(data.equilibrium)}
         <h3>2. Cut the beam and balance the left free body</h3>
         <p>For each interval, retain the left portion and show the positive cut actions: normal force ${math('N')} rightward, shear force ${math('V')} downward, and bending moment ${math('M')} counterclockwise. The point-force components ${math('F_{x,i},F_{y,i}')} remain rightward/upward-positive, and the applied couple ${math('C_i')} is counterclockwise-positive. Following Tutorial 5, distributed load intensity ${math('w')} is positive downward. Integrate only the loaded part of this free body and use each force's actual lever arm.</p>
         <div class="worked-rule">${math(methodRules.sections, true)}</div>
-        <details><summary>Point actions on the selected free body, including reactions</summary><div class="worked-table"><table class="data-table"><thead><tr><th>xᵢ (m)</th><th>Fₓ (kN)</th><th>Fᵧ (kN)</th><th>C (kN m)</th><th>Arm (m)</th><th>Included</th></tr></thead><tbody>${data.actions.map(a => `<tr><td>${escape(a.position)}</td><td>${escape(a.fx)}</td><td>${escape(a.fy)}</td><td>${escape(a.couple)}</td><td>${escape(a.arm)}</td><td>${a.included ? 'Yes' : 'No'}</td></tr>`).join('')}</tbody></table></div></details>
+        <details><summary>Point actions on the selected free body, including reactions</summary><div class="worked-table"><table class="data-table"><thead><tr><th>Action</th><th>xᵢ (m)</th><th>Fₓ (kN)</th><th>Fᵧ (kN)</th><th>C (kN m)</th><th>Arm (m)</th><th>Included</th></tr></thead><tbody>${data.actions.map(a => `<tr><td>${a.symbol ? math(a.symbol) : ''}</td><td>${escape(a.position)}</td><td>${escape(a.fx)}</td><td>${escape(a.fy)}</td><td>${escape(a.couple)}</td><td>${escape(a.arm)}</td><td>${a.included ? 'Yes' : 'No'}</td></tr>`).join('')}</tbody></table></div></details>
         <h3>3. Build the diagrams interval by interval</h3>
         <p>The following expressions determine the normal-force, shear-force, and bending-moment diagrams. Between point actions, ${math("V'=-w")} and ${math("M'=V")}. At a point force, ${math(String.raw`\Delta V=F_y`)} and ${math(String.raw`\Delta N=-F_x`)}. A counterclockwise couple gives ${math(String.raw`\Delta M=-C`)}. The superscripts ${math('-')} and ${math('+')} mean immediately before and after a section in increasing ${math('x')}. At the right endpoint, exclude actions at the cut when taking the left-hand limit. Insert ${math('x')} in metres in the numerical polynomials.</p>${intervals('forces')}${selected}`;
     if (method === 'integration') return `
@@ -94,7 +97,7 @@ function steps(): string {
         ${proofLabel(['virtual_work'])}
         <h3>1. Define the virtual system and displacement direction</h3><p>Following Tutorial 12, choose downward-positive displacement ${math(String.raw`\Delta_{s\mathrm v}`)}. Remove the real loads and apply a downward virtual force ${math(String.raw`\bar P=1\,\mathrm{kN}`)} at ${math(`x_s=${rationalLatex(data.section)}\\,\\mathrm{m}`)}. Keep the supports, coordinate origin, and bending-moment sign convention unchanged.</p>${equations(data.virtual.reactions)}
         <h3>2. Normalise the virtual moment and apply virtual work</h3><p>The actual virtual bending moment is ${math(String.raw`\bar M`)} in ${math(String.raw`\mathrm{kN}\,\mathrm m`)}. Divide it by the virtual force to obtain the normalised moment ${math(String.raw`m=\bar M/\bar P`)} in metres. The unit-load expression then gives displacement directly, with no factor ${math('1/2')}.</p><div class="worked-rule">${math(methodRules.virtual, true)}</div><p>Split the integral wherever the real or normalised virtual moment changes. Each contribution below has units of metres. The final displacement is converted to millimetres.</p>
-        ${data.virtual.rows.map(row => `<details class="worked-interval" open><summary>${math(row.interval)} m</summary>${equations(row.equations)}</details>`).join('')}
+        ${data.virtual.rows.map(row => `<details class="worked-interval" open><summary>${math(row.intervalLatex || row.interval)}</summary><p class="small">Current coordinates: ${math(row.interval)} m.</p>${equations(row.equations)}</details>`).join('')}
         <h3>3. Interpret the displacement direction</h3>${equations([data.virtual.result])}<p>A positive result means downward movement in the direction of the virtual force. A negative result means upward movement. The Lean certificate checks ${math(String.raw`\Delta_{s\mathrm v}=-v(x_s)`)} against the upward-positive elastic curve from double integration.</p>`;
     return `${proofLabel(['superposition'])}<h3>1. Keep one real load at a time</h3><p>For this linear beam, each load acts on the same structure with the same supports and stiffness. Calculate the displacement caused by each load separately. Add their signed contributions at the selected position.</p>${equations(data.superposition)}<h3>2. Add the contributions</h3>${equations([data.selected[data.selected.length-1]])}<p>The contribution calculations use the exact symbolic beam reference. The Lean statement for this view checks their sum against the displacement polynomial. Individual contribution derivations are not included in that statement.</p>`;
 }
@@ -130,6 +133,7 @@ function draw(): void {
         return;
     }
     panel.insertAdjacentHTML('beforeend', `<div class="worked-status ${response.proof.status === 'checked' ? 'checked' : ''}" role="status">${escape(response.proof.message)}</div>
+        ${response.parameters ? `<details class="worked-assumptions"><summary>Load symbols, geometry, and current values</summary><p>${escape(response.symbolicScope)}</p>${equations(response.parameters)}</details><p class="small">The derivations show the symbolic formulas first, followed by the current numerical substitutions. Lean badges refer to the substituted model.</p>` : ''}
         <details class="worked-assumptions"><summary>Model, signs, and verification scope</summary><p>${escape(response.assumptions)}</p><p>${escape(response.conventions)}</p><p>${escape(response.proof.scope)}</p><p class="small">Course references: ${response.sources.map(escape).join(' · ')}</p><button id="download-proof">Download Lean source</button> <button id="download-proof-project">Download VS Code proof project</button></details>
         <div class="method-tabs" role="group" aria-label="Solution method">${[['quantities', 'Key quantities'], ['sections', 'Method of sections'], ['integration', 'Double integration'], ['area', 'Moment-area theorems'], ['virtual', 'Principle of virtual work'], ['superposition', 'Method of superposition']].map(([id, label]) => `<button data-method="${id}" class="${id === method ? 'active' : ''}" aria-pressed="${id === method}">${label}</button>`).join('')}</div><article class="worked-steps">${steps()}</article>`);
     panel.querySelectorAll<HTMLButtonElement>('[data-method]').forEach(button => button.onclick = () => { method = button.dataset.method!; draw(); });
@@ -174,12 +178,13 @@ async function fetchSolution(): Promise<void> {
     try {
         if (context.connected) {
             const result = await context.request(payload);
-            if (key === snapshot) response = result;
+            if (key === snapshot) response = resolveLoadNotation(result, payload.model);
         } else {
             const library = await loadPublishedLibrary();
             if (key === snapshot) {
                 publishedExample = findPublishedExample(payload.model, library);
-                response = publishedExample ? publishedSolution(publishedExample, payload.section) : undefined;
+                const published = publishedExample ? publishedSolution(publishedExample, payload.section) : undefined;
+                response = published ? resolveLoadNotation(published, payload.model) : undefined;
                 publishedLoaded = true;
             }
         }

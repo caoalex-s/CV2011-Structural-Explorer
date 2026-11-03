@@ -10,6 +10,9 @@ export interface Equation {
     latex: string;
     exact: string;
     unit: string;
+    symbolicLatex?: string;
+    symbolicLabelLatex?: string;
+    symbolicUnit?: string;
 }
 
 export function math(source: string, display = false): string {
@@ -43,7 +46,9 @@ export function equationHtml(row: Equation): string {
     };
     const unit = units[row.unit];
     const source = `${row.labelLatex} = ${row.latex}${unit ? `\\;${unit}` : ''}`;
-    return `<div class="worked-equation">${math(source, true)}</div>`;
+    const substitution = row.symbolicUnit ? `Substitute the current values and convert ${row.symbolicUnit} to ${row.unit}:` : 'Substitute the current values:';
+    const symbolic = row.symbolicLatex === undefined ? '' : `<div class="symbolic-equation">${math(`${row.symbolicLabelLatex || row.labelLatex} = ${row.symbolicLatex}`, true)}</div><div class="small">${escapeHtml(substitution)}</div>`;
+    return `<div class="worked-equation">${symbolic}${math(source, true)}</div>`;
 }
 
 /** Shared equations remain ordinary LaTeX that an instructor can edit. */

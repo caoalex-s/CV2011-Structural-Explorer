@@ -1,9 +1,10 @@
 import { analyse, example, position, splitMember, nodeLabels, endConnection, referenceMember } from './engine.js';
 import type { Model, Analysis, Point, Member, Support, Load, Sample, Connection, ConnectionRule } from './engine.js';
-import { courseColors, forceSymbol, momentSymbol, rotationalSpring, supportShape } from './symbols.js';
+import { courseColors, forceSymbol, momentSymbol, rotationalSpring, supportShape, symbolLabel } from './symbols.js';
 import { renderWorked, showWorkedSolution } from './worked.js';
 import { renderCourseConventions } from './course.js';
 import { math } from './math.js';
+import { assignLoadLabels, loadLabels, loadLabelText, validLoadLabel } from './load-labels.js';
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const escape = (value: unknown) => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 const number = (value: number, digits = 3) => Math.abs(value) < 1e-8 ? '0' : Number(value.toPrecision(digits)).toString();
@@ -20,6 +21,7 @@ try {
     }
 }
 catch { /* Recover from stale browser storage with the default model. */ }
+assignLoadLabels(model);
 let analysis: Analysis = analyse(model);
 let tool = 'select', layer = 'M', mode = 'sandbox', side = 'tension';
 let selected: {
@@ -82,7 +84,7 @@ function toast(message: string) { $('toast').textContent = message; $('toast').c
 function saveAttempts() { localStorage.setItem('cv2011-attempts', JSON.stringify(attempts)); updateSession(); }
 function checkpoint(before = model) { history.push(clone(before)); if (history.length > 60)
     history.shift(); future.length = 0; }
-function changed() { analysis = analyse(model); localStorage.setItem('cv2011-model', JSON.stringify(model)); render(); }
+function changed() { assignLoadLabels(model); analysis = analyse(model); localStorage.setItem('cv2011-model', JSON.stringify(model)); render(); }
 function commit(action: () => void) { checkpoint(); action(); solutionRevealed = false; hintUsed = false; practiceResultsVisible = false; changed(); }
 function screen(point: {
     x: number;
@@ -177,16 +179,17 @@ function supportDrawing(support: Support) {
 }
 function loadDrawing(load: Load) {
     const p = screen(position(model, load.member, load.t));
+    const label = loadLabelText(loadLabels(model).get(load.id)!);
     const color = courseColors.force;
     const tag = `class="clickable" data-object="load" data-id="${escape(load.id)}"`;
     if (load.kind === 'force' && Math.hypot(load.fx, load.fy) < 1e-12 || load.kind === 'moment' && Math.abs(load.mz) < 1e-12)
-        return `<g ${tag}><circle cx="${p.x}" cy="${p.y}" r="16" class="node-hit"/><text x="${p.x + 8}" y="${p.y - 15}" class="svg-label">0 ${load.kind === 'force' ? 'kN' : 'kN m'}</text></g>`;
+        return `<g ${tag}><circle cx="${p.x}" cy="${p.y}" r="16" class="node-hit"/><text x="${p.x + 8}" y="${p.y - 15}" class="svg-label">${symbolLabel(label)} = 0 ${load.kind === 'force' ? 'kN' : 'kN m'}</text></g>`;
     if (load.kind === 'force') {
         const magnitude = Math.hypot(load.fx, load.fy);
-        return `<g ${tag}>${forceSymbol(p.x, p.y, load.fx, load.fy, color, `${number(magnitude)} kN`)}</g>`;
+        return `<g ${tag}>${forceSymbol(p.x, p.y, load.fx, load.fy, color, `${label} = ${number(magnitude)} kN`)}</g>`;
     }
     if (load.kind === 'moment') {
-        return `<g ${tag}>${momentSymbol(p.x, p.y, load.mz, color, `${number(Math.abs(load.mz))} kN m`)}</g>`;
+        return `<g ${tag}>${momentSymbol(p.x, p.y, load.mz, color, `${label} = ${number(Math.abs(load.mz))} kN m`)}</g>`;
     }
     const end = screen(position(model, load.member, load.end));
     const max = Math.max(Math.abs(load.fy), Math.abs(load.qEnd), 1);
@@ -196,7 +199,8 @@ function loadDrawing(load: Load) {
         const t = i / count, q = load.fy + (load.qEnd - load.fy) * t;
         result += drawArrow(p.x + (end.x - p.x) * t, p.y + (end.y - p.y) * t, 0, -q / max * 53, color);
     }
-    result += `<path d="M ${p.x} ${p.y + load.fy / max * 53} L ${end.x} ${end.y + load.qEnd / max * 53}" stroke="${color}" fill="none"/><text class="svg-label" x="${(p.x + end.x) / 2}" y="${Math.min(p.y, end.y) - 67}" text-anchor="middle">w = ${number(-load.fy)}${load.qEnd !== load.fy ? ' → ' + number(-load.qEnd) : ''} kN/m (↓ +)</text></g>`;
+    const intensityLabel = load.qEnd === load.fy ? `${label} = ${number(-load.fy)}` : `${label}(a) = ${number(-load.fy)} → ${label}(b) = ${number(-load.qEnd)}`;
+    result += `<path d="M ${p.x} ${p.y + load.fy / max * 53} L ${end.x} ${end.y + load.qEnd / max * 53}" stroke="${color}" fill="none"/><text class="svg-label" x="${(p.x + end.x) / 2}" y="${Math.min(p.y, end.y) - 67}" text-anchor="middle">${symbolLabel(intensityLabel)} kN/m (↓ +)</text></g>`;
     return result;
 }
 function memberLabel(member: Member): string {
@@ -388,6 +392,7 @@ function inspector() {
     if (selected.type === 'support')
         html += `<label class="field">Support type<select data-property="kind">${['pin', 'roller', 'fixed', 'guided', 'custom'].map(k => `<option ${item.kind === k ? 'selected' : ''}>${k}</option>`).join('')}</select></label>` + field('t', 'Position / member length', '0.01') + (['roller', 'guided'].includes(String(item.kind)) ? field('angle', 'Restrained translation angle from +x (°)') : '') + (item.kind === 'custom' ? [['fixX', 'Restrain global x'], ['fixY', 'Restrain global y'], ['fixRotation', 'Restrain rotation θ']].map(([key, label]) => `<label class="check"><input type="checkbox" data-property="${key}" ${item[key] ? 'checked' : ''}>${label}</label>`).join('') : '') + '<p class="small">Ground restraints act on the selected member side. A pin support does not release continuity between connected members.</p>';
     if (selected.type === 'load') {
+        html += `<label class="field">Load label<input type="text" data-property="label" maxlength="10" value="${escape(loadLabels(model).get(selected.id))}" placeholder="${item.kind === 'moment' ? 'M_0' : item.kind === 'distributed' ? 'w_1' : 'P_1'}"></label><p class="small">Use P or F for a force, M for a couple, and w or q for distributed loading. An optional subscript uses an underscore, for example P_1 or M_0. Each load has its own label.</p>`;
         html += '<p class="small">The action belongs to this member side at a joint. Arrows retain their physical line of action; moment arcs retain their application centre.</p>';
         html += field('t', 'Start / member length', '0.01');
         if (item.kind === 'force')
@@ -400,7 +405,12 @@ function inspector() {
     container.innerHTML = html + '<button id="delete-selected">Delete selected object</button>';
     container.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-property]').forEach(input => input.addEventListener('change', () => {
         const key = input.dataset.property!;
-        const value = input.type === 'checkbox' ? (input as HTMLInputElement).checked : ['kind', 'joint', 'referenceMember', 'member'].includes(key) ? input.value : Number(input.value) * Number(input.dataset.direction || 1);
+        const value = input.type === 'checkbox' ? (input as HTMLInputElement).checked : ['kind', 'joint', 'referenceMember', 'member', 'label'].includes(key) ? input.value.trim() : Number(input.value) * Number(input.dataset.direction || 1);
+        if (key === 'label' && (!validLoadLabel(String(value), item.kind as Load['kind']) || model.loads.some(load => load.id !== selected!.id && loadLabels(model).get(load.id) === value))) {
+            toast('Enter a unique load symbol, such as P_1, M_0, or w_1.');
+            inspector();
+            return;
+        }
         if (typeof value === 'number' && !Number.isFinite(value)) {
             toast('Enter a finite number.');
             return;

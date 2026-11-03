@@ -24,6 +24,7 @@ import sympy as sp
 
 from server.verifier import rational, reference
 from server.quantities import key_quantities
+from server.symbolic import attach_symbolic_derivation
 
 ROOT = Path(__file__).resolve().parents[1]
 X = sp.Symbol("x")
@@ -61,7 +62,7 @@ def equation(label, expression, unit="", label_latex=None):
     """Return the same exact expression as text, LaTeX, and legacy MathML."""
     labels = {
         "Σ applied Fx": r"\sum F_x^{\mathrm{applied}}",
-        "F = Σ applied Fy": r"F=\sum F_y^{\mathrm{applied}}",
+        "F = Σ applied Fy": r"F_{\mathrm{tot}}=\sum F_y^{\mathrm{applied}}",
         "T = Σ applied moment about x = 0": r"T=\sum M_0^{\mathrm{applied}}",
         "Rᵣ = (aF − T)/(b − a)": r"R_{\mathrm r}=\frac{aF-T}{b-a}",
         "Rₗ = −F − Rᵣ": r"R_{\mathrm l}=-F-R_{\mathrm r}",
@@ -426,9 +427,12 @@ def worked_solution(payload, verify=True):
     require_zero(sum((c["value"] for c in contributions), sp.S.Zero) - at(pieces, "v", section))
     symbols = support_symbols(model, beam)
     left_reaction, right_reaction, horizontal_reaction = (symbols[key] for key in ("left", "right", "horizontal"))
+    action_symbols = [left_reaction, right_reaction, horizontal_reaction]
+    action_symbols += [rf"\loadsymbol{{{index}}}{{}}" for kind in ("force", "moment")
+                       for index, load in enumerate(model.get("loads", [])) if load["kind"] == kind]
     equilibrium_rule = (
-        r"\begin{aligned}\sum F_x&=0,&\sum F_y&=" + left_reaction + "+" + right_reaction + r"+F=0,\\"
-        r"\sum M_a&=" + right_reaction + r"(b-a)+T-aF=0.\end{aligned}"
+        r"\begin{aligned}\sum F_x&=0,&\sum F_y&=" + left_reaction + "+" + right_reaction + r"+F_{\mathrm{tot}}=0,\\"
+        r"\sum M_a&=" + right_reaction + r"(b-a)+T-aF_{\mathrm{tot}}=0.\end{aligned}"
     )
     displayed_pieces, constants = [], []
     for index, piece in enumerate(pieces):
@@ -455,14 +459,14 @@ def worked_solution(payload, verify=True):
     quantities = key_quantities(model, beam, pieces, section, cert, equation, lean_number)
     source=cert.source()
     proof=verify_source(source) if verify else {"status":"not_run","sha256":hashlib.sha256(source.encode()).hexdigest()}
-    return {
+    result = {
         "title":"Internal forces and displacements", "section":number(section), "length":number(beam.length),
         "assumptions":"One horizontal prismatic Euler–Bernoulli beam, linear elasticity, small displacements, constant EI, one pin, and one vertical roller. No internal releases or springs. Shear deformation is neglected.",
         "conventions":"The rightward coordinate x starts at the left member end. External forces are positive rightward/upward and external couples counterclockwise. On the right cut face of the retained left portion, positive N acts rightward, V downward, and M counterclockwise. N is positive in tension and M in sagging. Displacement v is upward-positive and physical slope θ=dv/dx is counterclockwise-positive. The virtual-work tab reports downward-positive Δ, hence Δ=−v. Section diagrams use downward-positive load intensity w, as in Tutorial 5. Interior readouts use the right-hand limit, with the left-hand limit at the right end. Lecture tension-side and tutorial compression-side plotting preserve the same signed M.",
         "supports":{"a":number(beam.left),"b":number(beam.right)},
         "equilibriumRule": equilibrium_rule,
-        "equilibrium":[equation("Σ applied Fx",-beam.reaction_horizontal,"kN"),equation("F = Σ applied Fy",beam.total_vertical,"kN"),equation("T = Σ applied moment about x = 0",beam.total_moment,"kN m"),equation("Right vertical reaction",beam.reaction_right,"kN",right_reaction+r"=\frac{aF-T}{b-a}"),equation("Left vertical reaction",beam.reaction_left,"kN",left_reaction+"=-F-"+right_reaction),equation("Horizontal pin reaction",beam.reaction_horizontal,"kN",horizontal_reaction+r"=-\sum F_x^{\mathrm{applied}}")],
-        "actions":[{"position":number(a),"fx":number(fx),"fy":number(fy),"couple":number(m),"arm":number(section-a),"included":bool(a<section or (a==section and section!=beam.length))} for a,fx,fy,m in actions],
+        "equilibrium":[equation("Σ applied Fx",-beam.reaction_horizontal,"kN"),equation("F = Σ applied Fy",beam.total_vertical,"kN"),equation("T = Σ applied moment about x = 0",beam.total_moment,"kN m"),equation("Right vertical reaction",beam.reaction_right,"kN",right_reaction+r"=\frac{aF_{\mathrm{tot}}-T}{b-a}"),equation("Left vertical reaction",beam.reaction_left,"kN",left_reaction+r"=-F_{\mathrm{tot}}-"+right_reaction),equation("Horizontal pin reaction",beam.reaction_horizontal,"kN",horizontal_reaction+r"=-\sum F_x^{\mathrm{applied}}")],
+        "actions":[{"symbol":symbol,"position":number(a),"fx":number(fx),"fy":number(fy),"couple":number(m),"arm":number(section-a),"included":bool(a<section or (a==section and section!=beam.length))} for (a,fx,fy,m),symbol in zip(actions,action_symbols)],
         "pieces": displayed_pieces,
         "constants": constants,
         "quantities": quantities,
@@ -474,3 +478,5 @@ def worked_solution(payload, verify=True):
                  "scope":"Lean checks exact rational polynomial coefficients, section equilibrium from the encoded actions, downward-positive load conversion, interval integration constants, load jumps, boundary and continuity conditions, and the displayed moment-area and unit-load calculations. Key quantities add exact point evaluations, interval coverage, Bernstein basis conversions, and coefficient inequalities. Their global-range interpretation uses the real-domain Bernstein convex-hull theorem, which is outside this formalisation, as is isolation of irrational stationary roots. The unit-load check verifies downward-positive Δ=−v. The superposition check covers the sum of the displayed contributions. The proof audit permits only Lean’s standard propositional-extensionality axiom. The physical laws, drawing translation, interpretation as real derivatives/integrals, and numerical canvas solver are outside this certificate."},
         "sources":["Week 4 lecture: beam internal forces and tension-side diagrams", "Tutorial 5: cut-face signs and downward-positive w", "Tutorials 8–9: elastic curve and integration constants", "Tutorial 10: moment-area theorems and tangent deviation", "Tutorial 12: normalised virtual moment and displacement direction", "Part 2 Lectures 2.2–2.6 and 2.9: displacement methods"]
     }
+    attach_symbolic_derivation(model, beam, pieces, section, result)
+    return result

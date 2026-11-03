@@ -125,9 +125,10 @@ def point_locations(model, beam, section):
     add(beam.length / 2, "Midspan")
     add(section, "Selected section")
     for index, load in enumerate(model.get("loads", [])):
-        add(sp.Rational(str(load["t"])) * beam.length, f"Load {index+1}" + (" start" if load["kind"] == "distributed" else ""))
+        label = rf"\loadname{{{index}}}"
+        add(sp.Rational(str(load["t"])) * beam.length, label + (" start" if load["kind"] == "distributed" else ""))
         if load["kind"] == "distributed":
-            add(sp.Rational(str(load["end"])) * beam.length, f"Load {index+1} end")
+            add(sp.Rational(str(load["end"])) * beam.length, label + " end")
     return points
 
 

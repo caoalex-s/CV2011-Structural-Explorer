@@ -41,6 +41,7 @@ export interface Support {
 }
 export interface Load {
     id: string;
+    label?: string;
     member: string;
     kind: 'force' | 'moment' | 'distributed';
     t: number;

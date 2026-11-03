@@ -24,8 +24,10 @@ function modelSignature(value: unknown): string {
 }
 
 export function findPublishedExample(model: Model, library: PublishedLibrary): PublishedExample | undefined {
-    const signature = modelSignature(model);
-    return library.examples.find(example => modelSignature(example.model) === signature);
+    // Labels are display metadata. All mechanics, ordering, and IDs still agree.
+    const mechanics = (candidate: Model) => ({ ...candidate, loads: candidate.loads.map(({ label, ...load }) => load) });
+    const signature = modelSignature(mechanics(model));
+    return library.examples.find(example => modelSignature(mechanics(example.model)) === signature);
 }
 
 export function publishedSolution(example: PublishedExample, section: number): WorkedResponse | undefined {

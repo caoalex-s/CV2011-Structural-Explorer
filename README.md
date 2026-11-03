@@ -71,6 +71,8 @@ A spiral denotes a rotational spring, and a diamond identifies general member-sp
 
 ## Guided solutions and verification
 
+Applied forces, couples, and distributed loads carry distinct labels beside their magnitudes. Default labels are `P_1`, `M_0`, and `w_1`, with additional indices for further actions. Select an action to edit its **Load label**. Labels persist in saved models and remain separate from physical force components and application points. A varying distributed load identifies both endpoint intensities. Renaming a load updates its notation throughout a published solution without changing the numerical certificate.
+
 Guided checking covers a single horizontal beam drawn left to right, one pin, and one roller with a vertical reaction. Supports may lie inside the span. The checker handles multiple point forces, applied couples, and partial uniform or linearly varying distributed loads. It checks vertical reactions, section normal force, shear force, bending moment, and vertical displacement.
 
 Computed diagrams and reactions are initially hidden in problem mode. Students can submit arithmetic expressions, request hints, reveal derivations, and reveal the computed response. The symbolic checker accepts exact equivalent arithmetic and compatible unit conversions. Rounded numerical submissions use a 0.1% tolerance with a small absolute floor. An unsupported expression is marked unresolved instead of being treated as an incorrect mathematical result.
@@ -88,6 +90,10 @@ The verification layers have distinct scopes:
 `proofs/StructuralProofs.lean` states the general reaction and plotting identities. The deployment workflow runs the pinned Lean toolchain and audits the reported axioms before marking that library as checked. A local build can reuse its committed CI receipt only when the proof-source SHA-256 is unchanged.
 
 ### Read the course-method derivation
+
+The derivations retain the load symbols, beam length L, and flexural rigidity EI before substituting current values. Relative support and load positions are expressed as fractions of L, defining the family of geometrically similar beams represented by the drawing. Symbolic displacement and rotation use metres and radians, with conversion to millimetres and milliradians shown in the numerical step. Single-axis force and couple symbols denote magnitudes in their drawn directions. Inclined forces use signed Cartesian components, and distributed intensity remains downward-positive. The parameter list records the meaning and current value of every symbol.
+
+SymPy checks the parametric equilibrium, polynomial differential relations, support conditions, and continuity. Every displayed symbolic expression is also checked against its numerical counterpart after substitution. Lean certificates continue to check the current numerical model and selected section. They do not establish a universally quantified theorem for all load amplitudes, lengths, and stiffnesses. Numerical extrema remain specific to the current parameters because changing load amplitudes can change the governing section.
 
 The **Key quantities** tab reports maximum magnitudes of bending moment, physical slope, and vertical displacement. Expand each quantity to see its signed minimum and maximum, stationary equations, candidate substitutions, and range enclosure. Normal-force and shear-force extrema are included in the same derivation list. A table gives N, V, M, slope in mrad, and displacement in mm at supports, load boundaries, midspan, and the selected section, retaining both limits at a discontinuity. The main section readout also includes physical rotation.
 
