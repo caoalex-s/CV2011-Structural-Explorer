@@ -20,6 +20,7 @@ test('force, moment, and intensity symbols remain distinct after editing the mod
     assert.equal(validLoadLabel('P_1<script>','force'), false);
     assert.equal(validLoadLabel('EI','force'), false);
     assert.match(symbolLabel('P_A = 20 kN'), /<tspan baseline-shift="sub"/);
+    assert.match(symbolLabel('w_1,a = 2'), />1,a<\/tspan>/);
     assert.doesNotMatch(symbolLabel('P_A <script>'), /<script>/);
 });
 

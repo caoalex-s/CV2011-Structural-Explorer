@@ -3,8 +3,8 @@
 export const courseColors = { member: '#16334A', force: '#2F6F73', reaction: '#C9A227', ink: '#202020', muted: '#657177' };
 const escapeText = (value: string) => value.replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]!));
 /** Typeset editable letter subscripts after escaping all user-provided text. */
-export const symbolLabel = (value: string) => escapeText(value).replace(/\b([PFMwq])_([A-Za-z0-9]{1,8})/g,
-    '$1<tspan baseline-shift="sub" font-size="75%">$2</tspan>');
+export const symbolLabel = (value: string) => escapeText(value).replace(/\b([PFMwq])_([A-Za-z0-9]{1,8})(,[ab])?/g,
+    '$1<tspan baseline-shift="sub" font-size="75%">$2$3</tspan>');
 
 export function forceGeometry(x: number, y: number, fx: number, fy: number, length = 60, gap = 5) {
     const magnitude = Math.hypot(fx, fy);

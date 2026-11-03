@@ -4,7 +4,7 @@ import { courseColors, forceSymbol, momentSymbol, rotationalSpring, supportShape
 import { renderWorked, showWorkedSolution } from './worked.js';
 import { renderCourseConventions } from './course.js';
 import { math } from './math.js';
-import { assignLoadLabels, loadLabels, loadLabelText, validLoadLabel } from './load-labels.js';
+import { assignLoadLabels, loadLabels, validLoadLabel } from './load-labels.js';
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const escape = (value: unknown) => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 const number = (value: number, digits = 3) => Math.abs(value) < 1e-8 ? '0' : Number(value.toPrecision(digits)).toString();
@@ -179,7 +179,7 @@ function supportDrawing(support: Support) {
 }
 function loadDrawing(load: Load) {
     const p = screen(position(model, load.member, load.t));
-    const label = loadLabelText(loadLabels(model).get(load.id)!);
+    const label = loadLabels(model).get(load.id)!;
     const color = courseColors.force;
     const tag = `class="clickable" data-object="load" data-id="${escape(load.id)}"`;
     if (load.kind === 'force' && Math.hypot(load.fx, load.fy) < 1e-12 || load.kind === 'moment' && Math.abs(load.mz) < 1e-12)
@@ -199,7 +199,8 @@ function loadDrawing(load: Load) {
         const t = i / count, q = load.fy + (load.qEnd - load.fy) * t;
         result += drawArrow(p.x + (end.x - p.x) * t, p.y + (end.y - p.y) * t, 0, -q / max * 53, color);
     }
-    const intensityLabel = load.qEnd === load.fy ? `${label} = ${number(-load.fy)}` : `${label}(a) = ${number(-load.fy)} → ${label}(b) = ${number(-load.qEnd)}`;
+    const endpointLabel = (end: string) => `${label}${label.includes('_') ? ',' : '_'}${end}`;
+    const intensityLabel = load.qEnd === load.fy ? `${label} = ${number(-load.fy)}` : `${endpointLabel('a')} = ${number(-load.fy)} → ${endpointLabel('b')} = ${number(-load.qEnd)}`;
     result += `<path d="M ${p.x} ${p.y + load.fy / max * 53} L ${end.x} ${end.y + load.qEnd / max * 53}" stroke="${color}" fill="none"/><text class="svg-label" x="${(p.x + end.x) / 2}" y="${Math.min(p.y, end.y) - 67}" text-anchor="middle">${symbolLabel(intensityLabel)} kN/m (↓ +)</text></g>`;
     return result;
 }
