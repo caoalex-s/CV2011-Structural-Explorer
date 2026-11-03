@@ -1,0 +1,314 @@
+"""Course beam derivations and per-instance Lean polynomial certificates.
+
+SymPy constructs exact piecewise polynomials. Lean independently reconstructs
+the section equilibrium expressions from the rational actions and checks every
+coefficient, boundary condition, jump, and displayed displacement calculation.
+The idealisation and the calculus-to-polynomial interpretation remain explicit
+assumptions. Neither a successful library build nor SymPy alone earns a Lean
+badge for a student's current model.
+"""
+from functools import lru_cache
+import hashlib
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import tempfile
+import threading
+
+import sympy as sp
+
+from server.verifier import rational, reference
+
+ROOT = Path(__file__).resolve().parents[1]
+X = sp.Symbol("x")
+LEAN_LOCK = threading.Lock()
+MAX_LOADS = 12
+
+
+def number(value):
+    return str(sp.Rational(value))
+
+
+def coefficients(expression):
+    polynomial = sp.Poly(sp.expand(expression), X)
+    if polynomial.degree() > 5:
+        raise ValueError("The formal certificate supports polynomials up to degree five.")
+    return [polynomial.nth(i) for i in range(6)]
+
+
+def lean_number(value):
+    value = sp.Rational(value)
+    return f"({value.p} / {value.q} : Rat)"
+
+
+def lean_poly(expression):
+    return "[" + ", ".join(lean_number(v) for v in coefficients(expression)) + "]"
+
+
+def math_expression(expression):
+    """Presentation MathML is generated from our expressions, never user markup."""
+    from sympy.printing.mathml import mathml
+    return '<math xmlns="http://www.w3.org/1998/Math/MathML">' + mathml(sp.expand(expression), printer="presentation") + '</math>'
+
+
+def equation(label, expression, unit=""):
+    return {"label": label, "mathml": math_expression(expression), "exact": str(sp.expand(expression)), "unit": unit}
+
+
+def build_polynomials(beam):
+    """Integrate separately on every open interval, retaining C0 and C1."""
+    points = {sp.S.Zero, beam.length, beam.left, beam.right}
+    points.update(p[0] for p in beam.forces + beam.couples)
+    for start, end, _, _ in beam.distributions:
+        points.update((start, end))
+    points = sorted(points)
+    actions = [(beam.left, 0, beam.reaction_left, 0),
+               (beam.right, 0, beam.reaction_right, 0),
+               (beam.pin_location, beam.reaction_horizontal, 0, 0)]
+    actions += [(a, fx, fy, 0) for a, fx, fy in beam.forces]
+    actions += [(a, 0, 0, m) for a, m in beam.couples]
+    pieces = []
+    previous_theta = previous_v = sp.S.Zero
+    for start, end in zip(points, points[1:]):
+        mid = (start + end) / 2
+        active = [a for a in actions if a[0] < mid]
+        normal = -sum((a[1] for a in active), sp.S.Zero)
+        shear = sum((a[2] for a in active), sp.S.Zero)
+        moment = sum((a[2] * (X - a[0]) - a[3] for a in active), sp.S.Zero)
+        q = sp.S.Zero
+        for a, b, q0, q1 in beam.distributions:
+            if mid <= a:
+                continue
+            load = q0 + (q1 - q0) * (X - a) / (b - a)
+            upper = X if mid < b else b
+            resultant = sp.integrate(load, (X, a, upper))
+            first_moment = sp.integrate(X * load, (X, a, upper))
+            shear += resultant
+            moment += X * resultant - first_moment
+            if mid < b:
+                q += load
+        theta_base = sp.integrate(sp.expand(moment / beam.rigidity), X)
+        theta_base += previous_theta - theta_base.subs(X, start)
+        v_base = sp.integrate(theta_base, X)
+        v_base += previous_v - v_base.subs(X, start)
+        previous_theta = theta_base.subs(X, end)
+        previous_v = v_base.subs(X, end)
+        pieces.append(dict(start=start, end=end, q=q, N=normal, V=shear, M=moment,
+                           theta_base=theta_base, v_base=v_base))
+    c1 = -(at(pieces, "v_base", beam.right) - at(pieces, "v_base", beam.left)) / (beam.right - beam.left)
+    c0 = -at(pieces, "v_base", beam.left) - c1 * beam.left
+    for piece in pieces:
+        piece["theta"] = sp.expand(piece["theta_base"] + c1)
+        piece["v"] = sp.expand(piece["v_base"] + c1 * X + c0)
+    return pieces, actions, c0, c1
+
+
+def at(pieces, field, position):
+    piece = next((p for p in pieces if p["start"] <= position < p["end"]), pieces[-1])
+    return sp.expand(piece[field]).subs(X, position)
+
+
+class Certificate:
+    """Only bounded rational constants and fixed templates enter Lean source."""
+    def __init__(self):
+        self.lines = [(ROOT / "proofs/BeamCertificate.lean").read_text(encoding="utf-8"),
+                      "open BeamCertificate", "set_option maxRecDepth 8192",
+                      "set_option maxHeartbeats 8000000", "namespace WorkedBeam"]
+        self.groups = {}
+
+    def define(self, name, expression):
+        self.lines.append(f"def {name} : Poly := {lean_poly(expression)}")
+
+    def prove(self, group, expression):
+        name = f"{group}_{len(self.groups.get(group, [])) + 1}"
+        self.groups.setdefault(group, []).append(name)
+        self.lines.extend([f"theorem {name} : {expression} := by decide",
+                           f"#print axioms {name}"])
+
+    def source(self):
+        return "\n".join(self.lines + ["end WorkedBeam", ""])
+
+
+def certificate_for(beam, pieces, actions, section):
+    cert = Certificate()
+    rat = lean_number
+    cert.lines.append("def actions : List Action := [" + ", ".join(
+        "⟨" + ", ".join(rat(v) for v in action) + "⟩" for action in actions) + "]")
+    cert.lines.append("def loads : List Distributed := [" + ", ".join(
+        "⟨" + ", ".join(rat(v) for v in load) + "⟩" for load in beam.distributions) + "]")
+    cert.prove("equilibrium", "(actions.map (fun a => a.fx)).sum = 0")
+    cert.prove("equilibrium", "(actions.map (fun a => a.fy)).sum + (loads.map (fun q => integral (intensity q) q.start q.finish)).sum = 0")
+    cert.prove("equilibrium", "(actions.map (fun a => a.x * a.fy + a.couple)).sum + (loads.map (fun q => integral (multiply [0,1,0,0,0,0] (intensity q)) q.start q.finish)).sum = 0")
+    cert.prove("conditions", f"{rat(beam.left)} < {rat(beam.right)} ∧ 0 < {rat(beam.rigidity)}")
+    for index, piece in enumerate(pieces):
+        mid = rat((piece["start"] + piece["end"]) / 2)
+        for field in ("q", "N", "V", "M", "theta", "v"):
+            cert.define(f"{field}{index}", piece[field])
+        for field, rule in (("q", f"cutQ loads {mid}"), ("N", f"cutN actions {mid}"),
+                            ("V", f"cutV actions loads {mid}"), ("M", f"cutM actions loads {mid}")):
+            cert.prove("sections", f"{field}{index} = {rule}")
+        cert.prove("diagrams", f"D V{index} = q{index} ∧ D M{index} = V{index} ∧ D N{index} = constant 0")
+        cert.prove("integration", f"scale {rat(beam.rigidity)} (D theta{index}) = M{index} ∧ D v{index} = theta{index}")
+        for position in (beam.left, beam.right):
+            if piece["start"] <= position <= piece["end"]:
+                cert.prove("conditions", f"value v{index} {rat(position)} = 0")
+        if index:
+            x = rat(piece["start"])
+            jump = [sum((a[k] for a in actions if a[0] == piece["start"]), sp.S.Zero) for k in (1, 2, 3)]
+            cert.prove("continuity", f"value v{index} {x} = value v{index-1} {x} ∧ value theta{index} {x} = value theta{index-1} {x}")
+            cert.prove("jumps", f"value N{index} {x} - value N{index-1} {x} = {rat(-jump[0])} ∧ value V{index} {x} - value V{index-1} {x} = {rat(jump[1])} ∧ value M{index} {x} - value M{index-1} {x} = {rat(-jump[2])}")
+    # Endpoint force conditions include endpoint actions, even a couple at x=L.
+    for index, position, sign in [(0, sp.S.Zero, 1), (len(pieces)-1, beam.length, -1)]:
+        endpoint = [sum((a[k] for a in actions if a[0] == position), sp.S.Zero) for k in (1, 2, 3)]
+        for field, expected in zip(("N", "V", "M"), (-sign*endpoint[0], sign*endpoint[1], -sign*endpoint[2])):
+            cert.prove("ends", f"value {field}{index} {rat(position)} = {rat(expected)}")
+    selected = next((i for i,p in enumerate(pieces) if p["start"] <= section < p["end"]), len(pieces)-1)
+    for field in ("N", "V", "M", "theta", "v"):
+        cert.prove("readout", f"value {field}{selected} {rat(section)} = {rat(at(pieces, field, section))}")
+    return cert
+
+
+def integrate_pieces(pieces, a, b, weighted=False):
+    """Return signed area terms, with the first-moment arm measured from b."""
+    terms = []
+    direction = 1 if b >= a else -1
+    for index, piece in enumerate(pieces):
+        start, end = max(min(a, b), piece["start"]), min(max(a, b), piece["end"])
+        if end > start:
+            expression = piece["M"] * (b - X if weighted else 1)
+            terms.append((index, start, end, direction, sp.integrate(expression, (X, start, end))))
+    return terms
+
+
+def lean_executable():
+    # Local execution is opt-in. In particular, never automatically run a
+    # downloaded Windows compiler after a protection alert.
+    configured = os.environ.get("EXPLORER_LEAN")
+    if configured:
+        return configured
+    return shutil.which("lean") if os.environ.get("CI") == "true" else None
+
+
+@lru_cache(maxsize=32)
+def verify_source(source):
+    executable = lean_executable()
+    fingerprint = hashlib.sha256(source.encode()).hexdigest()
+    result = {"status": "unavailable", "sha256": fingerprint,
+              "message": "Local Lean execution is disabled or unavailable. These equations have symbolic checks only."}
+    # Receipts are produced only by the pinned Linux CI compiler for public
+    # synthetic examples. A receipt applies only to this exact full source.
+    if not executable:
+        receipt_path = ROOT / "proofs/worked-receipts.json"
+        if receipt_path.exists():
+            receipts = json.loads(receipt_path.read_text(encoding="utf-8"))
+            receipt = receipts.get("certificates", {}).get(fingerprint)
+            if receipt and receipt.get("status") == "checked":
+                return {**receipt, "sha256": fingerprint, "message": "Lean checked this exact certificate in GitHub CI. The model equations and selected section agree with that certificate."}
+    if not executable:
+        return result
+    directory = ROOT / ".data/proof-tmp"
+    directory.mkdir(parents=True, exist_ok=True)
+    # Serialize compiler use to bound local memory. Source files are temporary.
+    with LEAN_LOCK, tempfile.TemporaryDirectory(dir=directory) as temporary:
+        path = Path(temporary) / "WorkedBeam.lean"
+        path.write_text(source, encoding="utf-8")
+        try:
+            completed = subprocess.run([executable, str(path)], capture_output=True, text=True,
+                                       encoding="utf-8", errors="replace", timeout=45, cwd=ROOT / "proofs")
+        except (OSError, subprocess.TimeoutExpired):
+            return {**result, "status": "unavailable", "message": "Lean did not complete this certificate. No formal verification is claimed."}
+    output = completed.stdout + completed.stderr
+    # Ordinary decide is reduced by the kernel; reject any unexpected axiom.
+    audits = [line for line in output.splitlines() if "axioms" in line]
+    passed = completed.returncode == 0 and len(audits) == source.count("#print axioms") and all("does not depend on any axioms" in line for line in audits)
+    return {**result, "status": "checked" if passed else "failed",
+            "message": f"Lean checked {len(audits)} exact statements for this model and section. No axioms were reported." if passed else "Lean rejected this certificate. The derivation is not formally verified.",
+            "audit": output[-12000:], "statements": len(audits)}
+
+
+def worked_solution(payload, verify=True):
+    model = payload["model"]
+    beam = reference(model)
+    member = model["members"][0]
+    if any(member.get(key) for key in ("connectionA", "connectionB")) or any(node.get("joint", "rigid") != "rigid" for node in model["nodes"]):
+        raise ValueError("Worked beam derivations require rigid member continuity without joint releases or springs.")
+    if len(model.get("loads", [])) > MAX_LOADS:
+        raise ValueError(f"Worked Lean solutions currently accept at most {MAX_LOADS} loads.")
+    section_fraction = rational(payload.get("section", 0.5))
+    if not 0 <= section_fraction <= 1:
+        raise ValueError("Section must lie on the beam.")
+    section = section_fraction * beam.length
+    pieces, actions, c0, c1 = build_polynomials(beam)
+    cert = certificate_for(beam, pieces, actions, section)
+    rat = lean_number
+    # Moment-area uses the left support tangent. Signed integration also covers
+    # a selected point on the left overhang.
+    moment_area = []
+    for target, name in [(beam.right, "between supports"), (section, "to the selected section")]:
+        for weighted in (False, True):
+            terms = integrate_pieces(pieces, beam.left, target, weighted)
+            total = sum((direction * value for _,_,_,direction,value in terms), sp.S.Zero) / beam.rigidity
+            formal_terms = []
+            for i,a,b,direction,value in terms:
+                polynomial = f"(multiply M{i} {lean_poly(target-X)})" if weighted else f"M{i}"
+                formal_terms.append(f"{rat(direction)} * integral {polynomial} {rat(a)} {rat(b)} / {rat(beam.rigidity)}")
+            formal_sum = " + ".join(formal_terms) or "(0 : Rat)"
+            cert.prove("moment_area", f"{formal_sum} = {rat(total)}")
+            expected = (at(pieces,"v",target) - at(pieces,"v",beam.left) - (target-beam.left)*at(pieces,"theta",beam.left)) if weighted else at(pieces,"theta",target)-at(pieces,"theta",beam.left)
+            cert.prove("moment_area", f"{rat(total)} = {rat(expected)}")
+            moment_area.append({"title": ("First moment " if weighted else "Area ") + name,
+                                "equation": equation("t" if weighted else "Δθ", total, "m" if weighted else "rad"),
+                                "terms": [equation(f"Interval {i+1}", d*v/beam.rigidity, "m" if weighted else "rad") for i,a,b,d,v in terms]})
+    # Virtual unit force: +1 kN upward at the section. Its moment m is rebuilt
+    # from reactions in Lean before each product integral is checked.
+    virtual_right = (beam.left-section)/(beam.right-beam.left)
+    virtual_left = -1-virtual_right
+    virtual_actions = [(beam.left,0,virtual_left,0),(beam.right,0,virtual_right,0),(section,0,1,0)]
+    cert.lines.append("def virtualActions : List Action := [" + ", ".join("⟨"+", ".join(rat(v) for v in a)+"⟩" for a in virtual_actions) + "]")
+    cert.prove("virtual_work", "(virtualActions.map (fun a => a.fy)).sum = 0 ∧ (virtualActions.map (fun a => a.x * a.fy)).sum = 0")
+    virtual_rows, virtual_terms = [], []
+    virtual_total = sp.S.Zero
+    for i, piece in enumerate(pieces):
+        breaks = sorted({piece["start"],piece["end"],max(piece["start"],min(section,piece["end"]))})
+        for a,b in zip(breaks,breaks[1:]):
+            mid = (a+b)/2
+            m = sum((fy*(X-location) for location,_,fy,_ in virtual_actions if location<mid),sp.S.Zero)
+            value = sp.integrate(sp.expand(m*piece["M"]/beam.rigidity),(X,a,b))
+            name = f"virtualM{len(virtual_rows)}"
+            cert.define(name,m)
+            cert.prove("virtual_work",f"{name} = cutM virtualActions [] {rat(mid)}")
+            term = f"integral (multiply {name} M{i}) {rat(a)} {rat(b)} / {rat(beam.rigidity)}"
+            cert.prove("virtual_work",f"{term} = {rat(value)}")
+            virtual_terms.append(term)
+            virtual_total += value
+            virtual_rows.append({"interval": f"{a} < x < {b}", "equations": [equation("m(x)",m,"kN m"),equation("∫ mM/(EI) dx",value,"kN m")]})
+    cert.prove("virtual_work"," + ".join(virtual_terms)+f" = {rat(at(pieces,'v',section))}")
+    # Show the decomposition numerically and certify its exact sum;
+    # the individual per-load reference computations remain symbolic checks.
+    contributions=[]
+    for i,load in enumerate(model.get("loads",[])):
+        submodel={**model,"loads":[load]}
+        response=reference(submodel).values(section)
+        contributions.append({"label":f"Load {i+1}","kind":load["kind"],"value":response["deflection"]/1000})
+    cert.prove("superposition"," + ".join(rat(c["value"]) for c in contributions)+f" = {rat(at(pieces,'v',section))}" if contributions else f"{rat(at(pieces,'v',section))} = 0")
+    source=cert.source()
+    proof=verify_source(source) if verify else {"status":"not_run","sha256":hashlib.sha256(source.encode()).hexdigest()}
+    return {
+        "title":"Internal forces and displacements", "section":number(section), "length":number(beam.length),
+        "assumptions":"One horizontal prismatic Euler–Bernoulli beam, linear elasticity, small displacements, constant EI, one pin, and one vertical roller. No internal releases or springs. Shear deformation is neglected.",
+        "conventions":"x starts at the left member end. Upward forces and displacements and counterclockwise couples and rotations are positive. N is positive in tension and M is positive in sagging. V acts downward on the right face of the left cut body. Interior readouts use the right-hand limit, with the left-hand limit at the right end.",
+        "supports":{"a":number(beam.left),"b":number(beam.right)},
+        "equilibrium":[equation("Σ applied Fx",-beam.reaction_horizontal,"kN"),equation("F = Σ applied Fy",beam.total_vertical,"kN"),equation("T = Σ applied moment about x = 0",beam.total_moment,"kN m"),equation("Rᵣ = (aF − T)/(b − a)",beam.reaction_right,"kN"),equation("Rₗ = −F − Rᵣ",beam.reaction_left,"kN"),equation("H = −Σ applied Fx",beam.reaction_horizontal,"kN")],
+        "actions":[{"position":number(a),"fx":number(fx),"fy":number(fy),"couple":number(m),"arm":number(section-a),"included":bool(a<section or (a==section and section!=beam.length))} for a,fx,fy,m in actions],
+        "pieces":[{"interval":f"{p['start']} < x < {p['end']}","start":number(p["start"]),"end":number(p["end"]),"forces":[equation(f"{field}(x)",p[field],"kN/m" if field=="q" else "kN m" if field=="M" else "kN") for field in ("q","N","V","M")],"displacements":[equation("B(x)",p["v_base"],"m"),equation("θ(x)",p["theta"],"rad"),equation("v(x)",p["v"],"m")] } for p in pieces],
+        "constants":[equation("C₁",c1,"rad"),equation("C₀",c0,"m")],
+        "selected":[equation("N",at(pieces,"N",section),"kN"),equation("V",at(pieces,"V",section),"kN"),equation("M",at(pieces,"M",section),"kN m"),equation("θ",at(pieces,"theta",section),"rad"),equation("v",1000*at(pieces,"v",section),"mm")],
+        "momentArea":moment_area,"thetaLeft":equation("θ(a)",at(pieces,"theta",beam.left),"rad"),
+        "virtual":{"reactions":[equation("Virtual Rₗ",virtual_left,"kN"),equation("Virtual Rᵣ",virtual_right,"kN")],"rows":virtual_rows,"result":equation("v(xₛ)",virtual_total*1000,"mm")},
+        "superposition":[equation(c["label"]+" ("+c["kind"]+")",c["value"]*1000,"mm") for c in contributions],
+        "proof":{**proof,"groups":cert.groups,"source":source,
+                 "scope":"Lean checks exact rational polynomial coefficients, section equilibrium from the encoded actions, load jumps, boundary and continuity conditions, and the displayed moment-area and unit-load calculations. The superposition check covers the sum of the displayed contributions. The physical laws, drawing translation, interpretation as real derivatives/integrals, and numerical canvas solver are outside this certificate."},
+        "sources":["Beam sign convention and V/M functions (Lectures 8–10)","Integration of Differential Equation (Lectures 2.2–2.3)","Method of Superposition (Lecture 2.4)","Moment-area Method (Lectures 2.5–2.6)","Principle of Virtual Work: Beams/Frames (Lecture 2.9)"]
+    }

@@ -1,6 +1,7 @@
 import { analyse, example, position, splitMember, nodeLabels, endConnection, referenceMember } from './engine.js';
 import type { Model, Analysis, Point, Member, Support, Load, Sample, Connection, ConnectionRule } from './engine.js';
 import { courseColors, forceSymbol, momentSymbol, rotationalSpring, supportShape } from './symbols.js';
+import { renderWorked } from './worked.js';
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const escape = (value: unknown) => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 const number = (value: number, digits = 3) => Math.abs(value) < 1e-8 ? '0' : Number(value.toPrecision(digits)).toString();
@@ -495,6 +496,9 @@ function render() {
     if (mode === 'practice')
         renderPractice();
     updateSession();
+    renderWorked({ model, section: sectionT, practice: mode === 'practice', connected: online,
+        request: payload => api('/api/worked-solution', payload),
+        reveal: () => { solutionRevealed = true; void record('reveal', '', stepDefinitions[solutionStep].units); } });
 }
 svg.addEventListener('pointerdown', event => {
     if (mode === 'insights')
@@ -808,7 +812,7 @@ function expectedValue(p: NonNullable<ReturnType<typeof problem>>) { return { re
 async function api(path: string, payload?: unknown, instructor = false): Promise<any> {
     if (!config.url)
         throw Error('No verifier configured.');
-    const response = await fetch(config.url.replace(/\/$/, '') + path, { method: payload === undefined ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${instructor ? config.instructor : config.token}` }, body: payload === undefined ? undefined : JSON.stringify(payload), signal: AbortSignal.timeout(15000) });
+    const response = await fetch(config.url.replace(/\/$/, '') + path, { method: payload === undefined ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${instructor ? config.instructor : config.token}` }, body: payload === undefined ? undefined : JSON.stringify(payload), signal: AbortSignal.timeout(path === '/api/worked-solution' ? 60000 : 15000) });
     const result = await response.json();
     if (!response.ok)
         throw Error(result.error || 'Request failed');
@@ -859,7 +863,7 @@ async function connect() {
         catch {
             online = false;
         }
-    updateSession();
+    render();
 }
 $('settings-button').onclick = () => { $<HTMLInputElement>('api-url').value = config.url; $<HTMLInputElement>('course-id').value = config.courseId; $<HTMLInputElement>('access-token').value = config.token; $<HTMLInputElement>('instructor-token').value = config.instructor; $<HTMLDialogElement>('settings').showModal(); };
 $('save-settings').onclick = async () => { config = { url: $<HTMLInputElement>('api-url').value.trim(), courseId: $<HTMLInputElement>('course-id').value.trim(), token: $<HTMLInputElement>('access-token').value.trim(), instructor: $<HTMLInputElement>('instructor-token').value.trim() }; localStorage.setItem('cv2011-api', config.url); localStorage.setItem('cv2011-id', config.courseId); sessionStorage.setItem('cv2011-token', config.token); sessionStorage.setItem('cv2011-instructor', config.instructor); await connect(); toast(online ? 'Connected to the verifier.' : 'Connection unavailable. Records remain on this device.'); };

@@ -5,6 +5,7 @@
   <title>CV2011 · Structural Explorer</title>
   <meta name="description" content="Draw a structure, explore its response, and work through structural analysis with verified steps.">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="worked.css">
 </head>
 <body>
   <header class="topbar"><a class="brand" href="#sandbox"><span class="brand-mark">⌁</span><span><b>Structural Explorer</b><small>CV2011 · Nanyang Technological University</small></span></a>
@@ -35,6 +36,7 @@
         <div class="section-strip panel"><label>Inspect member <select id="section-member"></select></label><input id="section-position" aria-label="Section position" type="range" min="0" max="1000" value="500"><span id="section-distance"></span></div>
         <div id="section-results" class="metric-row"></div>
         <div id="practice-panel" class="panel practice-panel" hidden></div>
+        <section id="worked-panel" class="panel worked-panel"></section>
       </section>
       <aside class="right-panel"><section class="panel status-panel"><div class="panel-label">SYSTEM CHECK</div><div id="status"></div><div id="reactions"></div></section>
         <section class="panel explanation"><div class="panel-label">READ THE RESPONSE</div><h2 id="response-title">Bending moment</h2><p id="response-description"></p><div id="legend"></div></section>

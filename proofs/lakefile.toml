@@ -1,6 +1,9 @@
 name = "StructuralProofs"
 version = "0.1.0"
-defaultTargets = ["StructuralProofs"]
+defaultTargets = ["StructuralProofs", "BeamCertificate"]
 
 [[lean_lib]]
 name = "StructuralProofs"
+
+[[lean_lib]]
+name = "BeamCertificate"

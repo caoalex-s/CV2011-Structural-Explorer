@@ -17,6 +17,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit
 
 from server.verifier import VERSION, check, solution
+from server.worked import worked_solution
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = Path(os.environ.get("EXPLORER_DATA", ROOT / ".data"))
@@ -170,6 +171,8 @@ def make_handler(store, instructor_token, origins, local_demo=None):
                 path = urlsplit(self.path).path
                 if path == "/api/solution":
                     self.respond(solution(payload))
+                elif path == "/api/worked-solution":
+                    self.respond(worked_solution(payload))
                 elif path == "/api/attempts":
                     if payload.get("courseId") != identity:
                         raise ValueError("Course ID does not correspond to the authenticated account.")

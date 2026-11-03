@@ -38,6 +38,15 @@ jobs:
           lake env lean StructuralProofs.lean > axioms.log
           cat axioms.log
           if grep -E 'sorryAx|sorry|declaration uses' axioms.log; then exit 1; fi
+      - name: Verify worked beam certificates and rejection tests
+        run: python -m unittest discover -s tests -p 'test_worked.py' -v
+        env:
+          EXPLORER_LEAN: lean
+          REQUIRE_LEAN: '1'
+      - name: Check public course examples
+        run: python -m scripts.check_worked_examples
+        env:
+          EXPLORER_LEAN: lean
       - name: Record successfully checked proof scope
         run: |
           python -c "import json; from pathlib import Path; p=Path('web/verification.json'); v=json.loads(p.read_text()); v['lean']='checked'; v['commit']='${{ github.sha }}'; p.write_text(json.dumps(v))"
