@@ -20,7 +20,7 @@ function axesSvg(cosine: number, sine: number, id: string, labels: [string, stri
 
 export function workspaceConventions(model: Model, memberId: string): string {
     const basis = memberBasis(model, memberId);
-    return `<div class="axis-item">${axesSvg(1, 0, 'global-axis-arrow', ['x', 'y'])}<span><b>Global axes</b><br>+x right · +y up<br>Readouts: +v upward · +θ ↺</span></div>
-        <div class="axis-item">${basis ? axesSvg(basis.cosine, basis.sine, 'local-axis-arrow', ['x', 'y']) : ''}<span><b>Member axes</b><br>${basis ? 'Selected member: x start → end' : 'Select a member'}<br>y: 90° counterclockwise from x</span></div>
-        <div class="axis-item cut-convention"><span><b>Positive cut actions</b><br>Right face of the retained start portion:<br>N along +x · V along −y · M ↺<br><small>Moment plotting side does not change these signs.</small></span></div>`;
+    return `<div class="axis-item" title="Global axes: +x right · +y up. Readouts: +v upward · +θ ↺">${axesSvg(1, 0, 'global-axis-arrow', ['x', 'y'])}<span>Global</span></div>
+        <div class="axis-item" title="Selected member: x start → end; y is 90° counterclockwise from x">${basis ? axesSvg(basis.cosine, basis.sine, 'local-axis-arrow', ['x', 'y']) : ''}<span>${basis ? 'Member' : 'Select a member'}</span></div>
+        <details class="cut-convention"><summary>Signs &amp; axes</summary><div><b>Positive cut actions</b><br>Right face of the retained start portion:<br>N along +x · V along −y · M ↺<br>Readouts: +v upward · +θ ↺<br>Member x: start → end; y: 90° counterclockwise from x.<br><small>Moment plotting side does not change these signs.</small></div></details>`;
 }

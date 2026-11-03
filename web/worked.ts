@@ -104,7 +104,7 @@ function steps(): string {
 
 function draw(): void {
     const panel = document.getElementById('worked-panel')!;
-    panel.innerHTML = `<div class="worked-heading"><div><div class="panel-label">FROM MODEL TO SOLUTION</div><h2>Worked solution</h2></div><button id="toggle-worked" aria-expanded="${expanded}">${expanded ? 'Hide worked solution' : context.practice ? 'Reveal full worked solution' : 'Show worked solution'}</button></div>`;
+    panel.innerHTML = `<div class="worked-heading"><h2>Worked solution</h2><button id="toggle-worked" aria-expanded="${expanded}">${expanded ? 'Collapse' : context.practice ? 'Reveal solution' : 'Show solution'}</button></div>`;
     document.getElementById('toggle-worked')!.onclick = () => {
         expanded = !expanded;
         if (expanded && context.practice) context.reveal();

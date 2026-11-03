@@ -1,0 +1,21 @@
+{
+  "date": "2026-11-03",
+  "reviewer": "Implementation agent self-review; not independent review",
+  "scope": "Colour, typography, reduced workspace clutter and contextual help",
+  "behaviour": {
+    "layout": "Removed the visible introductory heading and empty properties panel. Properties appear only for a selected object. Their desktop overlay does not resize the drawing during a drag.",
+    "context": "Help contains the diagram guide, modelling assumptions and course conventions. Session contains connection settings and learning-record information. Snapping and numerical diagnostics expand on request.",
+    "retained": "Global and selected-member axes, stability and static determinacy remain visible. Sign details, reactions, worked solutions and proof downloads remain accessible. Moment-side controls are shown only for the bending-moment layer.",
+    "drawing": "The shorter SVG viewBox shares its centre with pointer mapping and reserves margins for forces and supports. Right-end vertical-reaction labels move inward; vector origins and directions are unchanged.",
+    "fonts": "Three Source Sans 3 weights and their OFL licence are served locally. Interface results use tabular numerals. KaTeX mathematical fonts are preserved. Removed the Google Fonts request.",
+    "mathematics": "No solver, symbolic derivation, proof source or numerical rounding rule changed. Local Lean execution was not enabled."
+  },
+  "readability": "Presentation rules are organised by navigation, tools, diagram, results, worked solutions, help and responsive behaviour. Existing element IDs and handlers are preserved; new handlers have one purpose each.",
+  "validation": {
+    "automated": "Type check and 35 existing Node tests passed. All 987 published equations, including 960 symbolic forms, rendered successfully with matching certificate hashes.",
+    "desktop": "Reviewed the drawing, properties, help, worked equations, focus and Escape restoration. Dragging the 20 kN force from x=4 m to the snapped x=5 m gave t=0.625 and V=7.5 kN, M=30 kN m at the x=4 m cut. Portal-frame annotations fitted inside the canvas.",
+    "phone": "Reviewed the 390 x 844 layout and equation rendering. Reaction labels fit inside the drawing. Fixed an inherited selector that hid the static-determinacy text. No horizontal page overflow was observed.",
+    "practice": "Results and support reactions remain hidden and the worked solution remains collapsed until reveal.",
+    "privacy": "Interactive checks used synthetic examples on a separate preview origin; student records and the user's stored model were not changed."
+  }
+}

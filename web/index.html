@@ -13,10 +13,10 @@
 <body>
   <header class="topbar"><a class="brand" href="#sandbox"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 40 40"><path d="M7 28V12h26v16M7 12l13 16 13-16M3 32h8m18 0h8"/></svg></span><span><b>Structural Explorer</b><small>CV2011 · Nanyang Technological University</small></span></a>
     <nav aria-label="Workspace"><button data-mode="sandbox" class="active">Sandbox</button><button data-mode="practice">Solve a problem</button><button data-mode="insights">Learning insights</button></nav>
-    <button id="settings-button" class="quiet">Connection &amp; ID</button>
+    <div class="header-actions"><button id="help-button" class="quiet">Help</button><button id="settings-button" class="quiet">Session</button></div>
   </header>
   <main id="workspace">
-    <section class="workspace-heading"><div><div class="eyebrow">STRUCTURAL ANALYSIS 1</div><h1 id="page-title">Explore a structure</h1><p id="page-description">Draw a system. Change a load. Follow the response.</p></div><span class="version">2D BEAMS &amp; FRAMES<span>kN · m · kN m</span></span></section>
+    <section class="workspace-heading visually-hidden"><h1 id="page-title">Explore a structure</h1><p id="page-description">Draw a system. Change a load. Follow the response.</p></section>
     <section class="modelbar" aria-label="Model controls"><label>Start from <select id="preset"><option value="beam">Simply supported beam</option><option value="cantilever">Cantilever</option><option value="udl">Distributed load</option><option value="overhang">Overhanging beam</option><option value="frame">Portal frame</option><option value="hinge">Internal hinge</option><option value="semi-rigid">Semi-rigid connection</option><option value="mixed">Continuous beam with pinned branch</option><option value="sliding">Internal sliding joint</option><option value="empty">Blank canvas</option></select></label><button id="load-preset">Open example</button><span class="spacer"></span><button id="undo" title="Undo (Ctrl+Z)">↶ Undo</button><button id="redo" title="Redo (Ctrl+Y)">↷ Redo</button><button id="export-model">Save model</button><button id="import-model">Open model</button><input type="file" id="model-file" accept="application/json" hidden></section>
     <div class="work-grid">
       <aside class="left-panel panel"><div class="panel-label">DRAWING TOOLS</div><div id="tools" class="tools">
@@ -29,40 +29,45 @@
         <div class="tool-group-label">Loading</div>
         <button data-tool="force"><span aria-hidden="true"></span>Point force</button><button data-tool="moment"><span aria-hidden="true"></span>Applied moment</button><button data-tool="distributed"><span aria-hidden="true"></span>Distributed load</button>
         <button data-tool="delete"><span>×</span>Delete object</button>
-      </div><div class="drawing-settings"><label class="check"><input id="snap" type="checkbox" checked> Snap to grid and geometry</label><label class="field">Grid spacing (m)<input id="grid-spacing" type="number" value="0.5" min="0.05" max="5" step="0.05"></label></div>
-      <details class="model-note"><summary>Modelling notes</summary><p>Small displacements · linear elasticity. Choose a joint to edit continuity, releases, or springs. Member crossings connect only when a joint is explicitly added. Node labels follow A, B, C, …, Z, AA, … automatically.</p></details>
+      </div><details class="drawing-settings"><summary>Snapping</summary><label class="check"><input id="snap" type="checkbox" checked> Snap to grid and geometry</label><label class="field">Grid spacing (m)<input id="grid-spacing" type="number" value="0.5" min="0.05" max="5" step="0.05"></label></details>
       </aside>
       <section class="canvas-column">
         <div class="panel canvas-panel">
-          <div class="response-toolbar"><div class="layer-buttons" id="layers" role="group" aria-label="Displayed response"><button data-layer="M" class="active"><b aria-hidden="true">M</b><span>Bending moment</span></button><button data-layer="V"><b aria-hidden="true">V</b><span>Shear force</span></button><button data-layer="N"><b aria-hidden="true">N</b><span>Normal force</span></button><button data-layer="displacement"><b aria-hidden="true">v</b><span>Deflected shape</span></button><button data-layer="none"><b aria-hidden="true">⌁</b><span>Structure</span></button></div><div class="display-options"><label>Moment plotted on <select id="moment-side"><option value="tension">Tension side</option><option value="compression">Compression side</option></select></label><label class="check"><input id="show-reactions" type="checkbox" checked> Reactions</label></div></div>
-          <div class="canvas-header"><span id="tool-hint">Select an object to edit it. Drag joints, loads, or supports.</span><div class="canvas-actions"><button id="edit-selection" hidden>Properties</button><button id="focus-workspace" aria-pressed="false" title="Hide side panels and enlarge the drawing">Focus view</button><div class="zoom-controls"><button id="zoom-out" aria-label="Zoom out">−</button><button id="fit">Fit</button><button id="zoom-in" aria-label="Zoom in">+</button></div></div></div>
+          <div class="response-toolbar"><div class="layer-buttons" id="layers" role="group" aria-label="Displayed response"><button data-layer="M" class="active"><b aria-hidden="true">M</b><span>Bending moment</span></button><button data-layer="V"><b aria-hidden="true">V</b><span>Shear force</span></button><button data-layer="N"><b aria-hidden="true">N</b><span>Normal force</span></button><button data-layer="displacement"><b aria-hidden="true">v</b><span>Deflected shape</span></button><button data-layer="none"><b aria-hidden="true">⌁</b><span>Structure</span></button></div><div class="display-options"><label id="moment-options">Moment plotted on <select id="moment-side"><option value="tension">Tension side</option><option value="compression">Compression side</option></select></label><label class="check"><input id="show-reactions" type="checkbox" checked> Reactions</label></div></div>
+          <div class="canvas-header"><span id="tool-hint">Select an object to edit. Drag to move.</span><div class="canvas-actions"><button id="edit-selection" hidden>Properties</button><button id="focus-workspace" aria-pressed="false" title="Hide side panels and enlarge the drawing">Focus view</button><div class="zoom-controls"><button id="zoom-out" aria-label="Zoom out">−</button><button id="fit">Fit</button><button id="zoom-in" aria-label="Zoom in">+</button></div></div></div>
           <svg id="canvas" viewBox="0 0 1000 520" role="img" aria-label="Interactive structural drawing. Use the drawing tools, then click the canvas. Numeric editing is available in the object panel." tabindex="0"></svg>
           <div id="workspace-conventions" class="workspace-conventions" aria-label="Axes and positive sign conventions"></div>
-          <div class="canvas-footer"><span id="coordinates">x 0.00 m · y 0.00 m</span><span>Drag to move · wheel to zoom · middle/right drag to pan</span></div>
+          <div class="canvas-footer"><div id="status" aria-live="polite"></div><span id="coordinates">x 0.00 m · y 0.00 m</span></div>
         </div>
+        <details class="support-reactions"><summary>Support reactions</summary><div id="reactions"></div></details>
         <section class="section-response panel" aria-label="Response at the selected section"><div class="section-strip"><label>Inspect member <select id="section-member"></select></label><input id="section-position" aria-label="Section position" type="range" min="0" max="1000" value="500"><span id="section-distance"></span></div>
           <div id="section-results" class="metric-row"></div></section>
         <div id="practice-panel" class="panel practice-panel" hidden></div>
         <section id="worked-panel" class="panel worked-panel"></section>
-        <section id="course-conventions" class="panel worked-panel worked-steps"></section>
       </section>
-      <aside class="right-panel">
-        <section class="panel inspector-panel"><div class="panel-label">OBJECT PROPERTIES</div><div id="inspector" class="inspector"></div></section>
-        <section class="panel status-panel"><div class="panel-label">SYSTEM CHECK</div><div id="status"></div><details class="support-reactions"><summary>Support reactions</summary><div id="reactions"></div></details></section>
-        <details class="panel explanation"><summary>Diagram guide</summary><h2 id="response-title">Bending moment</h2><p id="response-description"></p><div id="legend"></div></details>
-        <details class="panel session-panel"><summary>Your session</summary><p id="session-status" class="small"></p><p class="small">Only submitted problem steps, hints, and solution reveals enter the attempt record. Sandbox edits remain exploratory.</p></details>
+      <aside class="right-panel" hidden>
+        <section class="panel inspector-panel"><div class="inspector-heading"><span>Properties</span><button id="close-inspector" class="quiet" aria-label="Close properties">×</button></div><div id="inspector" class="inspector"></div></section>
       </aside>
     </div>
     <section id="insights-panel" class="panel" hidden></section>
-    <footer>CV2011 Structural Analysis 1 · Alex Sixie Cao <span>kN · m · kN m / tension-positive N / sagging-positive M</span></footer>
+    <footer>CV2011 · Structural Analysis 1 <span>Alex Sixie Cao</span></footer>
   </main>
   <dialog id="settings"><form method="dialog"><div class="panel-label">SESSION &amp; CONNECTION</div><h2>Connect your learning record</h2><p>The sandbox works without a server. A connected verifier checks expressions and stores submitted problem steps.</p>
     <label class="field">Verifier URL<input id="api-url" type="url" placeholder="https://your-verifier.example"></label>
     <label class="field">Pseudonymous course ID<input id="course-id" maxlength="40" placeholder="e.g. CV2011-0042"></label>
     <label class="field">Personal access token<input id="access-token" type="password" autocomplete="off" placeholder="Issued by your instructor"></label>
     <label class="field">Instructor token (instructor view only)<input id="instructor-token" type="password" autocomplete="off"></label>
-    <p class="small">Course IDs identify records. Personal tokens control access. Keep your token private.</p><div class="dialog-buttons"><button value="cancel">Close</button><button id="save-settings" value="save" class="primary">Connect</button></div>
+    <p class="small">Course IDs identify records. Personal tokens control access. Keep your token private.</p>
+    <details class="session-panel"><summary>Learning record</summary><p id="session-status" class="small"></p><p class="small">Only submitted problem steps, hints, and solution reveals enter the attempt record. Sandbox edits remain exploratory.</p></details>
+    <div class="dialog-buttons"><button value="cancel">Close</button><button id="save-settings" value="save" class="primary">Connect</button></div>
   </form></dialog>
+  <dialog id="workspace-help" aria-labelledby="help-title">
+    <div class="help-heading"><h2 id="help-title">Workspace guide</h2><form method="dialog"><button aria-label="Close help">×</button></form></div>
+    <p>Choose a tool, then click the drawing. Select an object to edit its values. Drag to move, scroll to zoom, and drag with the middle or right mouse button to pan.</p>
+    <details class="explanation" open><summary>Reading the diagram</summary><h3 id="response-title">Bending moment</h3><p id="response-description"></p><div id="legend"></div></details>
+    <details class="model-note"><summary>Modelling assumptions</summary><p>Small displacements · linear elasticity. Choose a joint to edit continuity, releases, or springs. Member crossings connect only when a joint is explicitly added. Node labels follow A, B, C, …, Z, AA, … automatically.</p></details>
+    <section id="course-conventions" class="worked-steps"></section>
+  </dialog>
   <div id="toast" role="status" aria-live="polite"></div>
   <script type="module" src="app.js"></script>
 </body>

@@ -47,6 +47,9 @@ let proofStatus = { lean: 'pending', scope: 'Scaled reaction equilibrium identit
 let online = false, localDemo = false;
 let config = { url: localStorage.getItem('cv2011-api') || (['localhost', '127.0.0.1'].includes(location.hostname) ? location.origin : ''), courseId: localStorage.getItem('cv2011-id') || '', token: sessionStorage.getItem('cv2011-token') || '', instructor: sessionStorage.getItem('cv2011-instructor') || '' };
 const svg = $('canvas') as unknown as SVGSVGElement;
+// Shared drawing dimensions keep pointer mapping, fitting and annotations aligned.
+const canvasWidth = 1000, canvasHeight = 400;
+svg.setAttribute('viewBox', `0 0 ${canvasWidth} ${canvasHeight}`);
 interface Snap {
     x: number;
     y: number;
@@ -90,8 +93,8 @@ function commit(action: () => void) { checkpoint(); action(); solutionRevealed =
 function screen(point: {
     x: number;
     y: number;
-}) { return { x: 500 + (point.x - view.cx) * view.scale, y: 260 - (point.y - view.cy) * view.scale }; }
-function world(event: PointerEvent | WheelEvent) { const p = new DOMPoint(event.clientX, event.clientY).matrixTransform(svg.getScreenCTM()!.inverse()); return { x: view.cx + (p.x - 500) / view.scale, y: view.cy - (p.y - 260) / view.scale }; }
+}) { return { x: canvasWidth / 2 + (point.x - view.cx) * view.scale, y: canvasHeight / 2 - (point.y - view.cy) * view.scale }; }
+function world(event: PointerEvent | WheelEvent) { const p = new DOMPoint(event.clientX, event.clientY).matrixTransform(svg.getScreenCTM()!.inverse()); return { x: view.cx + (p.x - canvasWidth / 2) / view.scale, y: view.cy - (p.y - canvasHeight / 2) / view.scale }; }
 function projection(point: {
     x: number;
     y: number;
@@ -135,7 +138,7 @@ function fit() {
     }
     const xs = model.nodes.map(n => n.x), ys = model.nodes.map(n => n.y);
     const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
-    view = { cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, scale: Math.min(100, 760 / Math.max(maxX - minX, 1), 280 / Math.max(maxY - minY, 1)) };
+    view = { cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, scale: Math.min(100, (canvasWidth - 240) / Math.max(maxX - minX, 1), (canvasHeight - 200) / Math.max(maxY - minY, 1)) };
 }
 function ensureNode(point: Snap): string {
     if (point.node)
@@ -250,11 +253,13 @@ function jointDrawing(node: Point) {
     return `<g class="clickable" data-object="node" data-id="${escape(node.id)}" data-joint-symbol="${pinned ? 'pinned' : semiRigid ? 'semi-rigid' : title === 'Rigid joint' ? 'rigid' : 'custom'}"><title>${title} ${nodeLabels(model).get(node.id)}</title><circle cx="${p.x}" cy="${p.y}" r="13" class="node-hit"/>${shape}${selected?.id === node.id ? `<circle cx="${p.x}" cy="${p.y}" r="15" stroke="${courseColors.force}" fill="none" stroke-dasharray="3 3"/>` : ''}<text x="${p.x + offset.x}" y="${p.y + offset.y}" text-anchor="middle" class="node-label">${nodeLabels(model).get(node.id)}</text></g>`;
 }
 function renderCanvas() {
+    const signsExpanded = $('workspace-conventions').querySelector('details')?.open ?? false;
     $('workspace-conventions').innerHTML = workspaceConventions(model, currentMember);
+    $('workspace-conventions').querySelector('details')!.open = signsExpanded;
     const grid = Math.max(0.05, Number($<HTMLInputElement>('grid-spacing').value) || 0.5);
     const spacing = grid * view.scale;
     const origin = screen({ x: 0, y: 0 });
-    let drawing = `<defs><pattern id="grid" width="${spacing}" height="${spacing}" patternUnits="userSpaceOnUse" x="${origin.x % spacing}" y="${origin.y % spacing}"><circle cx="0" cy="0" r="1" fill="#dce5df"/></pattern></defs><rect width="1000" height="520" fill="url(#grid)"/><text x="22" y="29" class="svg-value">${escape(mode === 'practice' ? 'PROBLEM WORKSPACE' : 'EXPLORATION WORKSPACE')}</text>`;
+    let drawing = `<defs><pattern id="grid" width="${spacing}" height="${spacing}" patternUnits="userSpaceOnUse" x="${origin.x % spacing}" y="${origin.y % spacing}"><circle cx="0" cy="0" r="1" fill="#dce5df"/></pattern></defs><rect width="1000" height="400" fill="url(#grid)"/>`;
     const all = analysis.elements.flatMap(e => e.samples);
     if (analysis.status === 'stable' && layer !== 'none' && (mode !== 'practice' || practiceResultsVisible)) {
         if (layer === 'displacement') {
@@ -263,7 +268,7 @@ function renderCanvas() {
                 const path = element.samples.map((p, i) => { const q = screen({ x: p.x + p.ux * magnification, y: p.y + p.uy * magnification }); return `${i ? 'L' : 'M'} ${q.x} ${q.y}`; }).join(' ');
                 drawing += `<path d="${path}" fill="none" stroke="${courseColors.reaction}" stroke-width="2.5"/>`;
             }
-            drawing += `<text x="22" y="495" class="svg-value">Displacement magnification ×${number(magnification)} · values are unscaled</text>`;
+            drawing += `<text x="22" y="375" class="svg-value">Displacement magnification ×${number(magnification)} · values are unscaled</text>`;
         }
         else {
             const field = layer as 'N' | 'V' | 'M', maximum = Math.max(...all.map(p => Math.abs(p[field])), 1e-10), scale = 70 / maximum;
@@ -276,7 +281,7 @@ function renderCanvas() {
             }
             if (maximum > 1e-8) {
                 const peak = all.reduce((a, b) => Math.abs(a[field]) > Math.abs(b[field]) ? a : b);
-                drawing += `<text x="22" y="495" class="svg-value">Peak |${field}| = ${number(Math.abs(peak[field]))} ${field === 'M' ? 'kN m' : 'kN'} · diagrams scaled to fit</text>`;
+                drawing += `<text x="22" y="375" class="svg-value">Peak |${field}| = ${number(Math.abs(peak[field]))} ${field === 'M' ? 'kN m' : 'kN'} · diagrams scaled to fit</text>`;
             }
         }
     }
@@ -295,7 +300,7 @@ function renderCanvas() {
             const node = model.nodes.find(node => Math.hypot(node.x - reaction.x, node.y - reaction.y) < 1e-7);
             const label = node ? nodeLabels(model).get(node.id)! : `R${analysis.reactions.indexOf(reaction) + 1}`;
             if (Math.abs(reaction.fy) > 1e-7)
-                drawing += `<g pointer-events="none">${forceSymbol(p.x, p.y, 0, reaction.fy, courseColors.reaction, `${label}ᵧ = ${number(Math.abs(reaction.fy))} kN`, 42, 44)}</g>`;
+                drawing += `<g pointer-events="none" class="${p.x > canvasWidth * .75 ? 'reaction-label-left' : ''}">${forceSymbol(p.x, p.y, 0, reaction.fy, courseColors.reaction, `${label}ᵧ = ${number(Math.abs(reaction.fy))} kN`, 42, 44)}</g>`;
             if (Math.abs(reaction.fx) > 1e-7)
                 drawing += `<g pointer-events="none">${forceSymbol(p.x, p.y, reaction.fx, 0, courseColors.reaction, `${label}ₓ = ${number(Math.abs(reaction.fx))} kN`, 42, 20)}</g>`;
             if (Math.abs(reaction.mz) > 1e-7)
@@ -320,7 +325,7 @@ function renderCanvas() {
         drawing += `<circle cx="${p.x}" cy="${p.y}" r="8" fill="none" stroke="#087f78" stroke-width="1.5"/>`;
     }
     if (!model.members.length)
-        drawing += `<text x="500" y="235" text-anchor="middle" class="svg-label" style="font-size:23px">Your structure starts here.</text><text x="500" y="265" text-anchor="middle" class="svg-value">Choose Draw member. Click a start point and an end point.</text>`;
+        drawing += `<text x="500" y="180" text-anchor="middle" class="svg-label" style="font-size:23px">Your structure starts here.</text><text x="500" y="215" text-anchor="middle" class="svg-value">Choose Draw member. Click a start point and an end point.</text>`;
     svg.innerHTML = drawing;
 }
 function connectionEditor(member: Member, end: 'a' | 'b'): string {
@@ -494,7 +499,12 @@ function render() {
     const sample = sectionSample();
     const responseFields = ['N', 'V', 'M', 'rotation', 'displacement'];
     $('section-results').innerHTML = [['Normal force N', sample?.N, 'kN'], ['Shear force V', sample?.V, 'kN'], ['Bending moment M', sample?.M, 'kN m'], ['Physical rotation θ (CCW +)', sample ? sample.rotation * 1000 : undefined, 'mrad'], ['Vertical displacement v (upward +)', sample ? sample.uy * 1000 : undefined, 'mm']].map(([label, value, unit], index) => `<div class="metric ${responseFields[index] === layer ? 'is-current' : ''}"><small>${label}</small><strong>${value === undefined ? '—' : number(Number(value), 4)} <em>${unit}</em></strong></div>`).join('');
-    $('status').innerHTML = `<span class="status-pill ${analysis.status}">${analysis.status === 'stable' ? '● Stable' : analysis.status === 'unstable' ? '○ Unstable (mechanism)' : analysis.status === 'empty' ? 'Start drawing' : 'Check model'}</span><p class="small">${escape(analysis.message)}</p>${analysis.status === 'stable' ? `<p class="small">Degree of static indeterminacy: ${analysis.degree}.<br>No free motion in the small-displacement model.</p><details class="small"><summary>Numerical check</summary>Restrained stiffness matrix has full rank.<br>Equilibrium residual: ${analysis.residual!.toExponential(1)}</details>` : ''}`;
+    // Classification stays visible; solver diagnostics are available on demand.
+    const statusExpanded = $('status').querySelector('details')?.open ?? false;
+    const classification = analysis.degree === 0 ? 'Statically determinate' : `Statically indeterminate (${analysis.degree})`;
+    $('status').innerHTML = analysis.status === 'stable'
+        ? `<details class="system-status" ${statusExpanded ? 'open' : ''}><summary><span class="stability-dot" aria-hidden="true"></span>Stable <span class="status-classification">· ${classification}</span></summary><div class="status-diagnostics">Degree of static indeterminacy: ${analysis.degree}. No free motion in the small-displacement model. Restrained stiffness matrix has full rank.<br>Equilibrium residual: ${analysis.residual!.toExponential(1)}</div></details>`
+        : `<span class="status-pill ${analysis.status}">${analysis.status === 'unstable' ? 'Unstable (mechanism)' : analysis.status === 'empty' ? 'Start drawing' : 'Check model'}</span><span class="status-message">${escape(analysis.message)}</span>`;
     $('reactions').innerHTML = analysis.reactions.map((r, i) => {
         const node = model.nodes.find(node => Math.hypot(node.x - r.x, node.y - r.y) < 1e-7);
         const name = node ? `Node ${nodeLabels(model).get(node.id)}` : `Support ${i + 1}`;
@@ -503,6 +513,7 @@ function render() {
         return `<div class="reaction-row"><b>${name} · (${number(r.x)}, ${number(r.y)}) m</b><span>${math(component('x'))}: ${number(r.fx)} · ${math(component('y'))}: ${number(r.fy)} kN</span>${Math.abs(r.mz) > 1e-7 ? `<span>${math(`M_{${node ? label : `R${i+1}`}}`)}: ${number(r.mz)} kN m (CCW +)</span>` : ''}</div>`;
     }).join('');
     $('reactions').hidden = mode === 'practice' && !practiceResultsVisible;
+    (document.querySelector('.support-reactions') as HTMLElement).hidden = analysis.status !== 'stable' || (mode === 'practice' && !practiceResultsVisible);
     $('section-results').hidden = mode === 'practice' && !practiceResultsVisible;
     const descriptions: Record<string, [
         string,
@@ -515,6 +526,8 @@ function render() {
     $<HTMLButtonElement>('redo').disabled = !future.length;
     inspector();
     $('edit-selection').hidden = !selected;
+    (document.querySelector('.right-panel') as HTMLElement).hidden = !selected;
+    $('moment-options').hidden = layer !== 'M';
     renderCanvas();
     if (mode === 'practice')
         renderPractice();
@@ -701,7 +714,7 @@ document.querySelectorAll<HTMLButtonElement>('[data-tool]').forEach(button => bu
         item.classList.toggle('active', active);
         item.setAttribute('aria-pressed', String(active));
     });
-    const hints: Record<string, string> = { select: 'Select an object to edit it. Drag joints, loads, or supports.', member: 'Click the start and end points. Snap to a member to create a rigid joint.', distributed: 'Click the start and end of the loaded interval on one member.', delete: 'Click an object to delete it. Undo restores the previous model.' };
+    const hints: Record<string, string> = { select: 'Select an object to edit. Drag to move.', member: 'Click the start and end points. Snap to a member to create a rigid joint.', distributed: 'Click the start and end of the loaded interval on one member.', delete: 'Click an object to delete it. Undo restores the previous model.' };
     $('tool-hint').textContent = hints[tool] || 'Click a member to place this object. Select it to edit its properties.';
     renderCanvas();
 });
@@ -749,6 +762,8 @@ function setWorkspaceFocus(focused: boolean): void {
     button.title = focused ? 'Restore drawing tools and object properties (Esc)' : 'Hide side panels and enlarge the drawing';
 }
 $('focus-workspace').onclick = () => setWorkspaceFocus($('focus-workspace').getAttribute('aria-pressed') !== 'true');
+$('close-inspector').onclick = () => { selected = null; render(); };
+$('help-button').onclick = () => $<HTMLDialogElement>('workspace-help').showModal();
 $('edit-selection').onclick = () => {
     setWorkspaceFocus(false);
     document.querySelector('.inspector-panel')!.scrollIntoView({ behavior: 'smooth', block: 'start' });
