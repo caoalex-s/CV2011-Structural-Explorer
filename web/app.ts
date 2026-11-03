@@ -2,11 +2,14 @@ import { analyse, example, position, splitMember, nodeLabels, endConnection, ref
 import type { Model, Analysis, Point, Member, Support, Load, Sample, Connection, ConnectionRule } from './engine.js';
 import { courseColors, forceSymbol, momentSymbol, rotationalSpring, supportShape } from './symbols.js';
 import { renderWorked, showWorkedSolution } from './worked.js';
+import { renderCourseConventions } from './course.js';
+import { math } from './math.js';
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const escape = (value: unknown) => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 const number = (value: number, digits = 3) => Math.abs(value) < 1e-8 ? '0' : Number(value.toPrecision(digits)).toString();
 const clone = <T>(value: T): T => structuredClone(value);
 const id = (prefix: string) => `${prefix}${crypto.randomUUID().slice(0, 6)}`;
+renderCourseConventions();
 let model: Model = example();
 try {
     const saved = localStorage.getItem('cv2011-model');
@@ -193,7 +196,7 @@ function loadDrawing(load: Load) {
         const t = i / count, q = load.fy + (load.qEnd - load.fy) * t;
         result += drawArrow(p.x + (end.x - p.x) * t, p.y + (end.y - p.y) * t, 0, -q / max * 53, color);
     }
-    result += `<path d="M ${p.x} ${p.y + load.fy / max * 53} L ${end.x} ${end.y + load.qEnd / max * 53}" stroke="${color}" fill="none"/><text class="svg-label" x="${(p.x + end.x) / 2}" y="${Math.min(p.y, end.y) - 67}" text-anchor="middle">${number(load.fy)}${load.qEnd !== load.fy ? ' → ' + number(load.qEnd) : ''} kN/m</text></g>`;
+    result += `<path d="M ${p.x} ${p.y + load.fy / max * 53} L ${end.x} ${end.y + load.qEnd / max * 53}" stroke="${color}" fill="none"/><text class="svg-label" x="${(p.x + end.x) / 2}" y="${Math.min(p.y, end.y) - 67}" text-anchor="middle">w = ${number(-load.fy)}${load.qEnd !== load.fy ? ' → ' + number(-load.qEnd) : ''} kN/m (↓ +)</text></g>`;
     return result;
 }
 function memberLabel(member: Member): string {
@@ -362,21 +365,24 @@ function inspector() {
         inspector();
         return;
     }
-    const field = (key: string, label: string, step = 'any') => `<label class="field">${label}<input type="number" data-property="${key}" value="${item[key] ?? (key === 'rotationStiffness' ? 20000 : '')}" step="${step}"></label>`;
+    // Load intensity is presented downward-positive as in Tutorial 5. Stored
+    // force components remain upward-positive for model-file compatibility.
+    const field = (key: string, label: string, step = 'any', direction = 1) => `<label class="field">${label}<input type="number" data-property="${key}" data-direction="${direction}" value="${Number(item[key] ?? (key === 'rotationStiffness' ? 20000 : 0)) * direction}" step="${step}"></label>`;
     let html = `<h3>${escape(selected.type[0].toUpperCase() + selected.type.slice(1))} properties</h3>`;
     if (selected.type === 'load' || selected.type === 'support') html += `<label class="field">Attached member<select data-property="member">${model.members.map(member => `<option value="${escape(member.id)}" ${member.id === item.member ? 'selected' : ''}>${memberLabel(member)}</option>`).join('')}</select></label>`;
     if (selected.type === 'node') {
         const node = model.nodes.find(node => node.id === selected!.id)!;
         const connected = jointConnections(node), reference = referenceMember(model, node.id);
         html += `<p class="small">Node <b>${nodeLabels(model).get(node.id)}</b> · labels update automatically when nodes are added or removed.</p>` + field('x', 'x (m)') + field('y', 'y (m)');
-        html += `<label class="field">Joint connection<select data-property="joint">${['rigid', 'pinned', 'semi-rigid', 'custom'].map(kind => `<option value="${kind}" ${kind === (node.joint || 'rigid') ? 'selected' : ''}>${kind === 'custom' ? 'Member-specific constraints' : kind}</option>`).join('')}</select></label>`;
+        const jointNames: Record<string, string> = { rigid: 'Rigid joint', pinned: 'Internal pin / hinge', 'semi-rigid': 'Semi-rigid joint', custom: 'Member-specific constraints' };
+        html += `<label class="field">Joint connection<select data-property="joint">${Object.entries(jointNames).map(([kind, label]) => `<option value="${kind}" ${kind === (node.joint || 'rigid') ? 'selected' : ''}>${label}</option>`).join('')}</select></label>`;
         if (node.joint === 'semi-rigid') html += field('rotationStiffness', 'Rotational stiffness kθ (kN m/rad)');
         if (connected.length > 1) html += `<label class="field">Reference member<select data-property="referenceMember">${connected.map(({ member }) => `<option value="${escape(member.id)}" ${member.id === reference ? 'selected' : ''}>${memberLabel(member)}</option>`).join('')}</select></label><p class="small">Connections relate each other member end to this reference. A pin shares translations and permits relative rotation. A rotational spring transfers moment M = kθ Δθ.</p>${connected.map(({ member, end }) => connectionEditor(member, end)).join('')}`;
         else html += '<p class="small">A joint connection relates two or more members. At a single-member end, use a ground support to constrain movement.</p>';
     }
     if (selected.type === 'member') {
         const member = model.members.find(member => member.id === selected!.id)!;
-        html += `<p class="small">Member <b>${memberLabel(member)}</b></p>` + field('EA', 'Axial rigidity EA (kN)') + field('EI', 'Bending rigidity EI (kN m²)');
+        html += `<p class="small">Member <b>${memberLabel(member)}</b></p>` + field('EA', 'Axial rigidity EA (kN)') + field('EI', 'Flexural rigidity EI (kN m²)');
         html += connectionEditor(member, 'a') + connectionEditor(member, 'b');
     }
     if (selected.type === 'support')
@@ -385,16 +391,16 @@ function inspector() {
         html += '<p class="small">The action belongs to this member side at a joint. Arrows retain their physical line of action; moment arcs retain their application centre.</p>';
         html += field('t', 'Start / member length', '0.01');
         if (item.kind === 'force')
-            html += field('fx', 'Horizontal force (kN)') + field('fy', 'Vertical force (kN)');
+            html += field('fx', 'Horizontal force Fx, rightward + (kN)') + field('fy', 'Vertical force Fy, upward + (kN)');
         if (item.kind === 'moment')
             html += field('mz', 'Moment, CCW + (kN m)');
         if (item.kind === 'distributed')
-            html += field('end', 'End / member length', '0.01') + field('fy', 'Start intensity, upward + (kN/m)') + field('qEnd', 'End intensity (kN/m)');
+            html += field('end', 'End / member length', '0.01') + field('fy', 'Start intensity w, downward + (kN/m)', 'any', -1) + field('qEnd', 'End intensity w, downward + (kN/m)', 'any', -1);
     }
     container.innerHTML = html + '<button id="delete-selected">Delete selected object</button>';
     container.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-property]').forEach(input => input.addEventListener('change', () => {
         const key = input.dataset.property!;
-        const value = input.type === 'checkbox' ? (input as HTMLInputElement).checked : ['kind', 'joint', 'referenceMember', 'member'].includes(key) ? input.value : Number(input.value);
+        const value = input.type === 'checkbox' ? (input as HTMLInputElement).checked : ['kind', 'joint', 'referenceMember', 'member'].includes(key) ? input.value : Number(input.value) * Number(input.dataset.direction || 1);
         if (typeof value === 'number' && !Number.isFinite(value)) {
             toast('Enter a finite number.');
             return;
@@ -473,19 +479,21 @@ function render() {
     const length = member ? Math.hypot(position(model, member.id, 1).x - position(model, member.id, 0).x, position(model, member.id, 1).y - position(model, member.id, 0).y) : 0;
     $('section-distance').textContent = `x = ${number(sectionT * length)} / ${number(length)} m`;
     const sample = sectionSample();
-    $('section-results').innerHTML = [['Normal force N', sample?.N, 'kN'], ['Shear force V', sample?.V, 'kN'], ['Moment M', sample?.M, 'kN m'], ['Vertical displacement', sample ? sample.uy * 1000 : undefined, 'mm']].map(([label, value, unit]) => `<div class="metric"><small>${label}</small><strong>${value === undefined ? '—' : number(Number(value), 4)} <em>${unit}</em></strong></div>`).join('');
-    $('status').innerHTML = `<span class="status-pill ${analysis.status}">${analysis.status === 'stable' ? '● Stable' : analysis.status === 'unstable' ? '○ Mechanism' : analysis.status === 'empty' ? 'Start drawing' : 'Check model'}</span><p class="small">${escape(analysis.message)}</p>${analysis.status === 'stable' ? `<p class="small">Rank check passed.<br>Equilibrium residual: ${analysis.residual!.toExponential(1)}</p>` : ''}`;
+    $('section-results').innerHTML = [['Normal force N', sample?.N, 'kN'], ['Shear force V', sample?.V, 'kN'], ['Bending moment M', sample?.M, 'kN m'], ['Vertical displacement v (upward +)', sample ? sample.uy * 1000 : undefined, 'mm']].map(([label, value, unit]) => `<div class="metric"><small>${label}</small><strong>${value === undefined ? '—' : number(Number(value), 4)} <em>${unit}</em></strong></div>`).join('');
+    $('status').innerHTML = `<span class="status-pill ${analysis.status}">${analysis.status === 'stable' ? '● Stable' : analysis.status === 'unstable' ? '○ Unstable (mechanism)' : analysis.status === 'empty' ? 'Start drawing' : 'Check model'}</span><p class="small">${escape(analysis.message)}</p>${analysis.status === 'stable' ? `<p class="small">Degree of static indeterminacy: ${analysis.degree}.<br>No free motion in the small-displacement model.</p><details class="small"><summary>Numerical check</summary>Restrained stiffness matrix has full rank.<br>Equilibrium residual: ${analysis.residual!.toExponential(1)}</details>` : ''}`;
     $('reactions').innerHTML = analysis.reactions.map((r, i) => {
         const node = model.nodes.find(node => Math.hypot(node.x - r.x, node.y - r.y) < 1e-7);
         const name = node ? `Node ${nodeLabels(model).get(node.id)}` : `Support ${i + 1}`;
-        return `<div class="reaction-row"><b>${name} · (${number(r.x)}, ${number(r.y)}) m</b><span>Rx ${number(r.fx)} · Ry ${number(r.fy)} kN</span>${Math.abs(r.mz) > 1e-7 ? `<span>Moment ${number(r.mz)} kN m</span>` : ''}</div>`;
+        const label = node ? nodeLabels(model).get(node.id)! : 'R';
+        const component = (direction: string) => `${label}_{${node ? '' : i + 1}${direction}}`;
+        return `<div class="reaction-row"><b>${name} · (${number(r.x)}, ${number(r.y)}) m</b><span>${math(component('x'))}: ${number(r.fx)} · ${math(component('y'))}: ${number(r.fy)} kN</span>${Math.abs(r.mz) > 1e-7 ? `<span>${math(`M_{${node ? label : `R${i+1}`}}`)}: ${number(r.mz)} kN m (CCW +)</span>` : ''}</div>`;
     }).join('');
     $('reactions').hidden = mode === 'practice' && !practiceResultsVisible;
     $('section-results').hidden = mode === 'practice' && !practiceResultsVisible;
     const descriptions: Record<string, [
         string,
         string
-    ]> = { M: ['Bending moment', 'Positive bending moment produces tension on the negative local-y side. Switching the plotted side preserves the numerical sign. The dashed cut selects a section.'], V: ['Shear force', 'Positive shear acts downward on the right cut face of the left segment for a member drawn left to right. A point force creates a jump. Between point actions, dM/dx = V.'], N: ['Normal force', 'Positive normal force represents tension. Negative values represent compression. The local member axis runs from the first joint to the second.'], displacement: ['Displaced shape', 'Displacements are magnified to make the shape visible. The numerical values retain their actual magnitude. Bending and axial deformation are included.'], none: ['Structural model', 'Click a joint, support, load, or member to inspect it. Snap to a member interior while drawing to create a rigid connection. Crossing members remain separate.'] };
+    ]> = { M: ['Bending moment', 'For a horizontal member directed rightward, positive M is sagging with tension at the bottom. The Week 4 lecture plots on the tension side; worked tutorials plot on the compression side. Changing the plotting side preserves the signed moment. For an inclined member, use its local axis from the first joint to the second.'], V: ['Shear force', 'Positive V acts downward on the right cut face of the retained left portion. On the opposite cut face its arrow reverses. Between concentrated actions, dM/dx = V and dV/dx = −w for downward-positive distributed intensity w.'], N: ['Normal force', 'Positive normal force N represents tension. Negative values represent compression. The local member axis runs from the first joint to the second.'], displacement: ['Deflected shape and elastic curve', 'The elastic curve gives signed displacement, with vertical v positive upward. Physical slope θ = dv/dx is counterclockwise-positive for rightward x and small rotations. The drawing magnifies displacement; numerical values retain their actual magnitude. The frame solver includes bending and axial deformation.'], none: ['Structural model', 'Click a joint, support, load, or member to inspect it. Snap to a member interior while drawing to create a rigid connection. Crossing members remain separate.'] };
     $('response-title').textContent = descriptions[layer][0];
     $('response-description').textContent = descriptions[layer][1];
     $('legend').innerHTML = `<div class="legend-item"><span class="swatch" style="background:${courseColors.force}"></span>Applied forces and moments</div><div class="legend-item"><span class="swatch" style="background:${courseColors.reaction}"></span>Reactions and displaced shape</div><p class="small">● Rigid continuity · ○ Pin / hinge<br>Spiral: rotational spring<br>Circle between rails: sliding joint<br>◇ Member-specific constraints</p><p class="small">Forces stay on their lines of action. Moment arcs are centred at their application points. A ground pin does not create an internal hinge.</p><p class="small">At a point action the section readout uses the right-hand limit, except at the member end. Values between plotted samples are interpolated.</p>`;
@@ -756,7 +764,7 @@ const stepDefinitions: Record<string, {
     normal: { title: 'Normal force at the cut', units: 'kN', hint: 'Isolate the left segment. Positive normal force acts away from the cut. Resolve all horizontal forces on this segment.' },
     shear: { title: 'Shear force at the cut', units: 'kN', hint: 'For a left segment, positive shear acts downward at its right cut. Include only the portion of each distributed load to the left of the cut.' },
     moment: { title: 'Moment at the cut', units: 'kN m', hint: 'Sum moments about the cut. Keep every load at its own lever arm. A positive applied couple contributes a negative jump in the sagging-positive moment diagram.' },
-    deflection: { title: 'Vertical displacement at the cut', units: 'mm', hint: 'Integrate EI v″ = M on each interval. Enforce zero displacement at both supports and continuity of v and v′ at each interior load position.' },
+    deflection: { title: 'Vertical displacement v at the cut (upward +)', units: 'mm', hint: 'Integrate the moment equation EI v″ = M twice on each interval. Apply the displacement boundary conditions at both supports and continuity of displacement v and physical slope θ = v′ at each continuous section. If using downward-positive virtual-work displacement Δ, enter v = −Δ.' },
 };
 function renderPractice() {
     const p = problem(), panel = $('practice-panel');

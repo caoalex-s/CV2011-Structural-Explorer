@@ -88,6 +88,38 @@ def equation(label, expression, unit="", label_latex=None):
     }
 
 
+def support_symbols(model, beam):
+    """Use the drawing's A, B, ... labels, with R1, R2 for interior supports."""
+    origin = next(node for node in model["nodes"] if node["id"] == model["members"][0]["a"])
+    symbols = {}
+    for support_index, support in enumerate(model["supports"]):
+        location = rational(support["t"]) * beam.length
+        name = None
+        for node_index, node in enumerate(model["nodes"]):
+            if rational(node["x"]) - rational(origin["x"]) == location and rational(node["y"]) == rational(origin["y"]):
+                name, index = "", node_index + 1
+                while index:
+                    index, remainder = divmod(index - 1, 26)
+                    name = chr(65 + remainder) + name
+                break
+        component = lambda direction: f"{name}_{{{direction}}}" if name else f"R_{{{support_index + 1}{direction}}}"
+        symbols["left" if location == beam.left else "right"] = component("y")
+        if support["kind"] == "pin":
+            symbols["horizontal"] = component("x")
+    return symbols
+
+
+def integration_constants(piece, rigidity):
+    """Recover the tutorial constants in EI*theta and EI*v on one interval."""
+    first_primitive = sp.integrate(piece["M"], X)
+    second_primitive = sp.integrate(first_primitive, X)
+    rotation_constant = sp.expand(rigidity * piece["theta"] - first_primitive)
+    displacement_constant = sp.expand(rigidity * piece["v"] - second_primitive - rotation_constant * X)
+    require_zero(sp.diff(rotation_constant, X))
+    require_zero(sp.diff(displacement_constant, X))
+    return first_primitive, second_primitive, rotation_constant, displacement_constant
+
+
 def vscode_project(source, proof):
     """Package generated source and its pinned toolchain; include no binaries."""
     metadata = {key: proof.get(key) for key in ("status", "sha256", "statements", "message")}
@@ -214,11 +246,17 @@ def certificate_for(beam, pieces, actions, section):
         cert.prove("partition", f"{a} < {b} ∧ (actions.all (fun p => !({a} < p.x && p.x < {b}))) = true ∧ (loads.all (fun q => !({a} < q.start && q.start < {b}) && !({a} < q.finish && q.finish < {b}))) = true")
         for field in ("q", "N", "V", "M", "theta", "v"):
             cert.define(f"{field}{index}", piece[field])
+        # Tutorial 5 uses downward-positive w, while stored q is upward-positive.
+        cert.define(f"w{index}", -piece["q"])
+        cert.prove("conventions", f"w{index} = scale (-1) q{index} ∧ D V{index} = scale (-1) w{index}")
         for field, rule in (("q", f"cutQ loads {mid}"), ("N", f"cutN actions {mid}"),
                             ("V", f"cutV actions loads {mid}"), ("M", f"cutM actions loads {mid}")):
             cert.prove("sections", f"{field}{index} = {rule}")
         cert.prove("diagrams", f"D V{index} = q{index} ∧ D M{index} = V{index} ∧ D N{index} = constant 0")
         cert.prove("integration", f"scale {rat(beam.rigidity)} (D theta{index}) = M{index} ∧ D v{index} = theta{index}")
+        _, _, rotation_constant, displacement_constant = integration_constants(piece, beam.rigidity)
+        cert.prove("integration", f"scale {rat(beam.rigidity)} theta{index} = add (primitive M{index}) (constant {rat(rotation_constant)})")
+        cert.prove("integration", f"scale {rat(beam.rigidity)} v{index} = add (primitive (scale {rat(beam.rigidity)} theta{index})) (constant {rat(displacement_constant)})")
         for position in (beam.left, beam.right):
             if piece["start"] <= position <= piece["end"]:
                 cert.prove("conditions", f"value v{index} {rat(position)} = 0")
@@ -310,7 +348,7 @@ def worked_solution(payload, verify=True):
     if not 0 <= section_fraction <= 1:
         raise ValueError("Section must lie on the beam.")
     section = section_fraction * beam.length
-    pieces, actions, c0, c1 = build_polynomials(beam)
+    pieces, actions, _, _ = build_polynomials(beam)
     for piece in pieces:
         require_zero(sp.diff(piece["V"], X) - piece["q"])
         require_zero(sp.diff(piece["M"], X) - piece["V"])
@@ -343,14 +381,18 @@ def worked_solution(payload, verify=True):
             cert.prove("moment_area", f"{rat(total)} = {identity}")
             expected = (at(pieces, "v", target) - at(pieces, "v", beam.left) - (target - beam.left) * at(pieces, "theta", beam.left)) if weighted else at(pieces, "theta", target) - at(pieces, "theta", beam.left)
             require_zero(total - expected)
+            target_label = "b" if name == "between supports" else "s"
+            target_coordinate = "b" if name == "between supports" else "x_s"
+            result_label = rf"t_{{{target_label}/a}}" if weighted else rf"\theta({target_coordinate})-\theta(a)"
             moment_area.append({"title": ("First moment " if weighted else "Area ") + name,
-                                "equation": equation("t" if weighted else "Δθ", total, "m" if weighted else "rad"),
+                                "equation": equation("t" if weighted else "Δθ", total, "m" if weighted else "rad", result_label),
                                 "terms": [equation(f"Interval {i+1}", d*v/beam.rigidity, "m" if weighted else "rad") for i,a,b,d,v in terms]})
-    # Virtual unit force: +1 kN upward at the section. Its moment m is rebuilt
-    # from reactions in Lean before each product integral is checked.
-    virtual_right = (beam.left-section)/(beam.right-beam.left)
-    virtual_left = -1-virtual_right
-    virtual_actions = [(beam.left,0,virtual_left,0),(beam.right,0,virtual_right,0),(section,0,1,0)]
+    # Tutorial 12 measures Delta in the virtual-force direction (downward).
+    # m is moment per unit force, with length units. The numerical unit force
+    # is 1 kN, giving bar(M) = bar(P)*m and Delta_down = -v_up.
+    virtual_right = (section-beam.left)/(beam.right-beam.left)
+    virtual_left = 1-virtual_right
+    virtual_actions = [(beam.left,0,virtual_left,0),(beam.right,0,virtual_right,0),(section,0,-1,0)]
     cert.lines.append("def virtualActions : List Action := [" + ", ".join("⟨"+", ".join(rat(v) for v in a)+"⟩" for a in virtual_actions) + "]")
     cert.prove("virtual_work", "(virtualActions.map (fun a => a.fy)).sum = 0 ∧ (virtualActions.map (fun a => a.x * a.fy)).sum = 0")
     virtual_rows, virtual_terms = [], []
@@ -361,7 +403,7 @@ def worked_solution(payload, verify=True):
             mid = (a+b)/2
             m = sum((fy*(X-location) for location,_,fy,_ in virtual_actions if location<mid),sp.S.Zero)
             value = sp.integrate(sp.expand(m*piece["M"]/beam.rigidity),(X,a,b))
-            name = f"virtualM{len(virtual_rows)}"
+            name = f"virtualm{len(virtual_rows)}"
             cert.define(name,m)
             cert.prove("virtual_work",f"{name} = cutM virtualActions [] {rat(mid)}")
             term = f"integral (multiply {name} M{i}) {rat(a)} {rat(b)} / {rat(beam.rigidity)}"
@@ -369,9 +411,9 @@ def worked_solution(payload, verify=True):
             virtual_terms.append(term)
             virtual_total += value
             integral_latex = rf"\int_{{{sp.latex(a)}}}^{{{sp.latex(b)}}}\frac{{m(x)M(x)}}{{EI}}\,\mathrm{{d}}x"
-            virtual_rows.append({"interval": f"{a} < x < {b}", "equations": [equation("m(x)",m,"kN m"),equation("∫ mM/(EI) dx",value,"kN m", integral_latex)]})
-    cert.prove("virtual_work"," + ".join(virtual_terms)+f" = {rat(at(pieces,'v',section))}")
-    require_zero(virtual_total - at(pieces, "v", section))
+            virtual_rows.append({"interval": f"{a} < x < {b}", "equations": [equation("m(x)",m,"m"),equation("∫ mM/(EI) dx",value,"m", integral_latex)]})
+    cert.prove("virtual_work"," + ".join(virtual_terms)+f" = {rat(-at(pieces,'v',section))}")
+    require_zero(virtual_total + at(pieces, "v", section))
     # Show the decomposition numerically and certify its exact sum;
     # the individual per-load reference computations remain symbolic checks.
     contributions=[]
@@ -381,22 +423,51 @@ def worked_solution(payload, verify=True):
         contributions.append({"label":f"Load {i+1}","kind":load["kind"],"value":response["deflection"]/1000})
     cert.prove("superposition"," + ".join(rat(c["value"]) for c in contributions)+f" = {rat(at(pieces,'v',section))}" if contributions else f"{rat(at(pieces,'v',section))} = 0")
     require_zero(sum((c["value"] for c in contributions), sp.S.Zero) - at(pieces, "v", section))
+    symbols = support_symbols(model, beam)
+    left_reaction, right_reaction, horizontal_reaction = (symbols[key] for key in ("left", "right", "horizontal"))
+    equilibrium_rule = (
+        r"\begin{aligned}\sum F_x&=0,&\sum F_y&=" + left_reaction + "+" + right_reaction + r"+F=0,\\"
+        r"\sum M_a&=" + right_reaction + r"(b-a)+T-aF=0.\end{aligned}"
+    )
+    displayed_pieces, constants = [], []
+    for index, piece in enumerate(pieces):
+        first, second, rotation_constant, displacement_constant = integration_constants(piece, beam.rigidity)
+        c_rotation, c_displacement = sp.symbols(f"C_{2*index+1} C_{2*index+2}")
+        constants.extend([
+            equation(str(c_rotation), rotation_constant, "kN m²", sp.latex(c_rotation)),
+            equation(str(c_displacement), displacement_constant, "kN m³", sp.latex(c_displacement)),
+        ])
+        displayed_pieces.append({
+            "interval": f"{piece['start']} < x < {piece['end']}",
+            "start": number(piece["start"]), "end": number(piece["end"]),
+            "forces": [equation("w(x)", -piece["q"], "kN/m", "w(x)")] + [
+                equation(f"{field}(x)", piece[field], "kN m" if field == "M" else "kN") for field in ("N", "V", "M")],
+            "integrations": [
+                equation("First integration", first + c_rotation, "kN m²", rf"EI\theta_{{{index+1}}}(x)"),
+                equation("Second integration", second + c_rotation * X + c_displacement, "kN m³", rf"EI v_{{{index+1}}}(x)"),
+            ],
+            "displacements": [
+                equation("Slope", piece["theta"], "rad", rf"\theta_{{{index+1}}}(x)"),
+                equation("Elastic curve", piece["v"], "m", rf"v_{{{index+1}}}(x)"),
+            ],
+        })
     source=cert.source()
     proof=verify_source(source) if verify else {"status":"not_run","sha256":hashlib.sha256(source.encode()).hexdigest()}
     return {
         "title":"Internal forces and displacements", "section":number(section), "length":number(beam.length),
         "assumptions":"One horizontal prismatic Euler–Bernoulli beam, linear elasticity, small displacements, constant EI, one pin, and one vertical roller. No internal releases or springs. Shear deformation is neglected.",
-        "conventions":"x starts at the left member end. Upward forces and displacements and counterclockwise couples and rotations are positive. N is positive in tension and M is positive in sagging. V acts downward on the right face of the left cut body. Interior readouts use the right-hand limit, with the left-hand limit at the right end.",
+        "conventions":"The rightward coordinate x starts at the left member end. External forces are positive rightward/upward and external couples counterclockwise. On the right cut face of the retained left portion, positive N acts rightward, V downward, and M counterclockwise. N is positive in tension and M in sagging. Displacement v is upward-positive and physical slope θ=dv/dx is counterclockwise-positive. The virtual-work tab reports downward-positive Δ, hence Δ=−v. Section diagrams use downward-positive load intensity w, as in Tutorial 5. Interior readouts use the right-hand limit, with the left-hand limit at the right end. Lecture tension-side and tutorial compression-side plotting preserve the same signed M.",
         "supports":{"a":number(beam.left),"b":number(beam.right)},
-        "equilibrium":[equation("Σ applied Fx",-beam.reaction_horizontal,"kN"),equation("F = Σ applied Fy",beam.total_vertical,"kN"),equation("T = Σ applied moment about x = 0",beam.total_moment,"kN m"),equation("Rᵣ = (aF − T)/(b − a)",beam.reaction_right,"kN"),equation("Rₗ = −F − Rᵣ",beam.reaction_left,"kN"),equation("H = −Σ applied Fx",beam.reaction_horizontal,"kN")],
+        "equilibriumRule": equilibrium_rule,
+        "equilibrium":[equation("Σ applied Fx",-beam.reaction_horizontal,"kN"),equation("F = Σ applied Fy",beam.total_vertical,"kN"),equation("T = Σ applied moment about x = 0",beam.total_moment,"kN m"),equation("Right vertical reaction",beam.reaction_right,"kN",right_reaction+r"=\frac{aF-T}{b-a}"),equation("Left vertical reaction",beam.reaction_left,"kN",left_reaction+"=-F-"+right_reaction),equation("Horizontal pin reaction",beam.reaction_horizontal,"kN",horizontal_reaction+r"=-\sum F_x^{\mathrm{applied}}")],
         "actions":[{"position":number(a),"fx":number(fx),"fy":number(fy),"couple":number(m),"arm":number(section-a),"included":bool(a<section or (a==section and section!=beam.length))} for a,fx,fy,m in actions],
-        "pieces":[{"interval":f"{p['start']} < x < {p['end']}","start":number(p["start"]),"end":number(p["end"]),"forces":[equation(f"{field}(x)",p[field],"kN/m" if field=="q" else "kN m" if field=="M" else "kN") for field in ("q","N","V","M")],"displacements":[equation("B(x)",p["v_base"],"m"),equation("θ(x)",p["theta"],"rad"),equation("v(x)",p["v"],"m")] } for p in pieces],
-        "constants":[equation("C₁",c1,"rad"),equation("C₀",c0,"m")],
+        "pieces": displayed_pieces,
+        "constants": constants,
         "selected":[equation("N",at(pieces,"N",section),"kN"),equation("V",at(pieces,"V",section),"kN"),equation("M",at(pieces,"M",section),"kN m"),equation("θ",at(pieces,"theta",section),"rad"),equation("v",1000*at(pieces,"v",section),"mm")],
         "momentArea":moment_area,"thetaLeft":equation("θ(a)",at(pieces,"theta",beam.left),"rad"),
-        "virtual":{"reactions":[equation("Virtual Rₗ",virtual_left,"kN"),equation("Virtual Rᵣ",virtual_right,"kN")],"rows":virtual_rows,"result":equation("v(xₛ)",virtual_total*1000,"mm")},
+        "virtual":{"reactions":[equation("Virtual left reaction",virtual_left,"kN",r"\bar{"+left_reaction+"}"),equation("Virtual right reaction",virtual_right,"kN",r"\bar{"+right_reaction+"}")],"rows":virtual_rows,"result":equation("Downward displacement",virtual_total*1000,"mm",r"\Delta_{s\mathrm v}=-v(x_s)")},
         "superposition":[equation(c["label"]+" ("+c["kind"]+")",c["value"]*1000,"mm") for c in contributions],
         "proof":{**proof,"groups":cert.groups,"source":source,"projectZip":vscode_project(source, proof),
-                 "scope":"Lean checks exact rational polynomial coefficients, section equilibrium from the encoded actions, load jumps, boundary and continuity conditions, and the displayed moment-area and unit-load calculations. The superposition check covers the sum of the displayed contributions. The proof audit permits only Lean’s standard propositional-extensionality axiom. The physical laws, drawing translation, interpretation as real derivatives/integrals, and numerical canvas solver are outside this certificate."},
-        "sources":["Beam sign convention and V/M functions (Lectures 8–10)","Integration of Differential Equation (Lectures 2.2–2.3)","Method of Superposition (Lecture 2.4)","Moment-area Method (Lectures 2.5–2.6)","Principle of Virtual Work: Beams/Frames (Lecture 2.9)"]
+                 "scope":"Lean checks exact rational polynomial coefficients, section equilibrium from the encoded actions, downward-positive load conversion, interval integration constants, load jumps, boundary and continuity conditions, and the displayed moment-area and unit-load calculations. The unit-load check verifies downward-positive Δ=−v. The superposition check covers the sum of the displayed contributions. The proof audit permits only Lean’s standard propositional-extensionality axiom. The physical laws, drawing translation, interpretation as real derivatives/integrals, and numerical canvas solver are outside this certificate."},
+        "sources":["Week 4 lecture: beam internal forces and tension-side diagrams", "Tutorial 5: cut-face signs and downward-positive w", "Tutorials 8–9: elastic curve and integration constants", "Tutorial 10: moment-area theorems and tangent deviation", "Tutorial 12: normalised virtual moment and displacement direction", "Part 2 Lectures 2.2–2.6 and 2.9: displacement methods"]
     }

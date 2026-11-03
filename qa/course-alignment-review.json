@@ -1,0 +1,94 @@
+{
+  "date": "2026-11-03",
+  "scope": "Align the explorer interface and supported beam derivations with maintained CV2011 lectures and tutorial worked solutions",
+  "reviewer": "Implementation agent; two self-review passes, not independent peer review",
+  "guidance": "author-style 0.27 and code-style 0.2",
+  "supersedes": "The virtual-work direction and units recorded in worked-methods-review.json describe the earlier implementation. The current convention is downward-positive Delta with normalised m in metres.",
+  "source_repository": "caoalex-s/CV2011_Structural-Analysis-1 (local maintained course checkout; course files were read, not changed)",
+  "sources_inspected": [
+    {
+      "path": "lectures/week-02/lecture.qmd",
+      "lines": "43–109, 170–202, 294–333",
+      "use": "External and internal instability, partial and improper constraints, independence of equilibrium equations, component count"
+    },
+    {
+      "path": "lectures/week-04/lecture.qmd",
+      "lines": "470–588, 759–788",
+      "use": "Normal force N, shear force V, bending moment M, positive cut actions, tension-side bending-moment plotting"
+    },
+    {
+      "path": "tutorials/solutions/tutorial-02/solution.tex",
+      "lines": "17–31",
+      "use": "Definitions of r and n, internal reaction pairs counted once, stability caveat, engaged contacts"
+    },
+    {
+      "path": "tutorials/solutions/tutorial-03/solution.tex",
+      "lines": "35–45",
+      "use": "Truss counting uses different definitions; ideal trusses remain outside the implemented scope"
+    },
+    {
+      "path": "tutorials/solutions/tutorial-05/solution.tex",
+      "lines": "19–22, 64–69 and Question 1",
+      "use": "Global external-force signs, cut-face signs, compression-side plotting, downward-positive w, triangular-load benchmark"
+    },
+    {
+      "path": "tutorials/solutions/tutorial-07/solution.tex",
+      "lines": "246 and surrounding beam discussion",
+      "use": "Compression-side plotting and normal-force terminology"
+    },
+    {
+      "path": "tutorials/solutions/tutorial-08/solution.tex",
+      "lines": "16–80 and Question 1",
+      "use": "Upward-positive elastic curve v, physical slope theta, flexural rigidity EI, EI-scaled integration constants, central clockwise couple benchmark"
+    },
+    {
+      "path": "tutorials/solutions/tutorial-09/solution.tex",
+      "lines": "16–52",
+      "use": "Load-equation formulation uses upward-positive signed w; this contextual difference is stated explicitly"
+    },
+    {
+      "path": "tutorials/solutions/tutorial-10/solution.tex",
+      "lines": "18–45, 378–420",
+      "use": "Signed moment-area theorems, tangent origin and target, tangent deviation, continuity at an internal hinge"
+    },
+    {
+      "path": "tutorials/solutions/tutorial-11/solution.tex",
+      "lines": "Opening conventions",
+      "use": "Displacement component in the requested direction and tension-positive axial force"
+    },
+    {
+      "path": "tutorials/solutions/tutorial-12/question-1.tex",
+      "lines": "Virtual-system definitions and work equation",
+      "use": "Actual virtual moment bar(M), normalised m=bar(M)/bar(P), downward displacement, no factor one-half"
+    }
+  ],
+  "meaning_and_evidence_review": {
+    "result": "Completed after correcting notation, directions, dimensions, and source-specific differences",
+    "corrections": [
+      "Lecture tension-side and tutorial compression-side plotting remain separate labelled choices with identical signed moment values",
+      "Distributed-load editor and drawing labels display downward-positive w; stored upward-positive force components and old model files retain their meaning",
+      "Method-of-sections formulas use V'=-w and M'=V; Lean certificates check w=-q",
+      "Double integration displays C1,C2,... in EI*theta and EI*v, with kN m^2 and kN m^3 units and exact certificate checks",
+      "Virtual work uses a downward 1 kN virtual force; normalised m has length units, integral contributions have displacement units, and Delta=-v is checked",
+      "Reaction symbols use labelled points consistently; unlabelled interior supports use indexed R components",
+      "Tangent deviation is distinguished from absolute displacement, and the moment-area target coordinate is x_s",
+      "Definitions distinguish ground supports, rigid joints, internal hinges, semi-rigid springs, and member-specific constraints",
+      "Stability and static indeterminacy include the course count definitions, geometry caveat, small-motion scope, and engaged-contact assumption"
+    ]
+  },
+  "voice_and_implication_review": {
+    "result": "Completed after the technical corrections; explanations use course method names, define symbols beside the equations, and state direction changes explicitly",
+    "checks": [
+      "No claim that arbitrary frame solutions have Lean certificates",
+      "Formal badges require an exact-source compiler result or corresponding CI receipt",
+      "Physical laws, real-calculus interpretation, drawing translation, and floating-point solver remain outside the polynomial certificate",
+      "Practice still requests upward-positive v and explains the conversion from downward-positive virtual-work Delta"
+    ]
+  },
+  "validation": {
+    "typescript": "Type check and static build passed; 28 Node tests passed",
+    "python": "16 tests: 15 passed and one local Lean test deliberately skipped; includes 40 mixed-load cross-language cases and Tutorial 5/8 analytical benchmarks",
+    "browser": "All five method tabs rendered without KaTeX errors or page overflow at the current 1743 px viewport; browser error log empty. Distributed intensity changed from 5 to 10 kN/m downward: midpoint M doubled from 40 to 80 kN m and v from -13.33 to -26.67 mm. Changing diagram side preserved those readouts. Demo restored to the simply supported example; no practice events submitted.",
+    "linux_ci": "Pending publication; no local Lean executable was run"
+  }
+}

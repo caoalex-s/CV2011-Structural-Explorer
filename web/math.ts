@@ -39,6 +39,7 @@ export function equationHtml(row: Equation): string {
         'kN': String.raw`\mathrm{kN}`, 'kN m': String.raw`\mathrm{kN}\,\mathrm{m}`,
         'kN/m': String.raw`\mathrm{kN}/\mathrm{m}`, 'm': String.raw`\mathrm{m}`,
         'mm': String.raw`\mathrm{mm}`, 'rad': String.raw`\mathrm{rad}`,
+        'kN m²': String.raw`\mathrm{kN}\,\mathrm{m}^2`, 'kN m³': String.raw`\mathrm{kN}\,\mathrm{m}^3`,
     };
     const unit = units[row.unit];
     const source = `${row.labelLatex} = ${row.latex}${unit ? `\\;${unit}` : ''}`;
@@ -47,30 +48,28 @@ export function equationHtml(row: Equation): string {
 
 /** Shared equations remain ordinary LaTeX that an instructor can edit. */
 export const methodRules = {
-    reactions: String.raw`\begin{aligned}
-        \sum F_x &= 0, & R_{\mathrm l}+R_{\mathrm r}+F &= 0,\\
-        \sum M_a &= R_{\mathrm r}(b-a)+T-aF=0.
-        \end{aligned}`,
     sections: String.raw`\begin{aligned}
         N(x)&=-\sum_{x_i\le x}F_{x,i},\\
-        V(x)&=\sum_{x_i\le x}F_{y,i}+\int_0^x q(s)\,\mathrm{d}s,\\
+        V(x)&=\sum_{x_i\le x}F_{y,i}-\int_0^x w(s)\,\mathrm{d}s,\\
         M(x)&=\sum_{x_i\le x}F_{y,i}(x-x_i)-\sum_{x_i\le x}C_i
-            +\int_0^x q(s)(x-s)\,\mathrm{d}s.
+            -\int_0^x w(s)(x-s)\,\mathrm{d}s.
         \end{aligned}`,
     integration: String.raw`\begin{aligned}
-        EI\,v''(x)&=M(x),\\
-        \theta(x)=v'(x)&=\int\frac{M(x)}{EI}\,\mathrm{d}x+C_{1,i},\\
-        v(x)&=\int\theta(x)\,\mathrm{d}x+C_{0,i}.
+        EI\,v_i''(x)&=M_i(x),\\
+        EI\,\theta_i(x)=EI\,v_i'(x)&=\int M_i(x)\,\mathrm{d}x+C_{2i-1},\\
+        EI\,v_i(x)&=\int EI\,\theta_i(x)\,\mathrm{d}x+C_{2i}.
         \end{aligned}`,
     conditions: String.raw`\begin{aligned}
         v(a)&=v(b)=0,\\
-        C_1&=-\frac{B(b)-B(a)}{b-a}, & C_0&=-B(a)-aC_1,\\
         v(x_i^-)&=v(x_i^+), & \theta(x_i^-)&=\theta(x_i^+).
         \end{aligned}`,
     area: String.raw`\begin{aligned}
-        \theta(c)-\theta(a)&=\int_a^c\frac{M(x)}{EI}\,\mathrm{d}x,\\
-        t_{c/a}&=\int_a^c(c-x)\frac{M(x)}{EI}\,\mathrm{d}x,\\
-        v(c)&=v(a)+(c-a)\theta(a)+t_{c/a}.
+        \theta_Q-\theta_P&=\int_{x_P}^{x_Q}\frac{M(x)}{EI}\,\mathrm{d}x,\\
+        t_{Q/P}&=\int_{x_P}^{x_Q}(x_Q-x)\frac{M(x)}{EI}\,\mathrm{d}x,\\
+        v_Q&=v_P+(x_Q-x_P)\theta_P+t_{Q/P}.
         \end{aligned}`,
-    virtual: String.raw`(1\,\mathrm{kN})\,v(x_s)=\sum_i\int_{x_{i,a}}^{x_{i,b}}\frac{m_i(x)M_i(x)}{EI}\,\mathrm{d}x.`,
+    virtual: String.raw`\begin{aligned}
+        \bar P\Delta_{s\mathrm v}&=\sum_i\int\frac{\bar M_i M_i}{EI}\,\mathrm{d}x,&\bar M_i&=\bar Pm_i,\\
+        \Delta_{s\mathrm v}&=\sum_i\int\frac{m_i M_i}{EI}\,\mathrm{d}x=-v(x_s).
+        \end{aligned}`,
 };

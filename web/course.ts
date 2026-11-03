@@ -1,0 +1,24 @@
+/** Course definitions from Weeks 2/4 and Tutorials 2, 5, 8, 10, and 12.
+ * See qa/course-alignment-review.json for the inspected source locations.
+ */
+import { math } from './math.js';
+
+export function renderCourseConventions(): void {
+    document.getElementById('course-conventions')!.innerHTML = `<details>
+        <summary>Course terminology, definitions, and conventions</summary>
+        <h3>Internal forces and diagram sides</h3>
+        <p>A beam section carries normal force ${math('N')}, shear force ${math('V')}, and bending moment ${math('M')}. For a horizontal member directed rightward, the positive actions on the right cut face of a retained left portion point rightward, downward, and counterclockwise, respectively. On the opposite cut face, all three arrows reverse. Positive normal force means tension, and positive bending moment means sagging. For inclined members, apply these directions in the local axes from the first joint to the second.</p>
+        <p>The Week 4 lecture places bending-moment diagrams on the tension side. The worked tutorials place them on the compression side. The menu identifies both conventions explicitly. Switching sides changes the drawing and preserves the signed bending moment and elastic curve.</p>
+        <h3>Loading, elastic curve, and physical slope</h3>
+        <p>External force components are positive rightward and upward. External moments are positive counterclockwise. In the method of sections, distributed load intensity ${math('w')} is positive downward, giving ${math(String.raw`\mathrm dV/\mathrm dx=-w`)} and ${math(String.raw`\mathrm dM/\mathrm dx=V`)} as in Tutorial 5. The load editor uses this downward-positive intensity, while point-force components retain the global directions.</p>
+        <p>The elastic curve ${math('v(x)')} is positive upward. For a rightward coordinate and small rotations, physical slope ${math(String.raw`\theta=\mathrm dv/\mathrm dx`)} is positive counterclockwise and the moment equation is ${math(String.raw`EI\,v''=M`)}. The flexural rigidity is ${math('EI')}, while ${math('EA')} is the axial rigidity. Tutorial 9's load-equation formulation uses a signed upward-positive load; its symbol ${math('w')} has the opposite sign to the downward-positive intensity in Tutorial 5.</p>
+        <p>In the principle of virtual work, displacement is measured in the selected virtual-force direction. This tool follows Tutorial 12's downward unit force and reports ${math(String.raw`\Delta_{s\mathrm v}=-v(x_s)`)}. The normalised virtual moment ${math(String.raw`m=\bar M/\bar P`)} has units of length, while actual virtual moment ${math(String.raw`\bar M`)} has units of force times length.</p>
+        <h3>Supports and internal connections</h3>
+        <p>A pin support restrains two translations and permits rotation. A roller supplies one reaction normal to its permitted motion, while a fixed support also restrains rotation and supplies a reaction moment. The linear model assumes engaged roller restraints. A reaction opposing the assumed contact normal requires a contact or hold-down check.</p>
+        <p>A rigid joint preserves relative translations and rotation. An internal pin or hinge transfers forces and permits relative rotation without transferring a connection couple. It preserves common displacement but can have different member slopes. A semi-rigid joint uses a rotational spring, with transferred moment ${math(String.raw`M=k_\theta\Delta\theta`)}. The properties panel defines the direction of each additional member-specific release or spring.</p>
+        <h3>Stability and static determinacy</h3>
+        <p>Partial constraints provide too few restraints. Improper constraints have a sufficient count but unsuitable positions or directions. A stable structure has no free rigid-body motion or internal mechanism in the small-displacement model. This classification does not assess buckling under increasing load.</p>
+        <p>For the planar component count in Tutorial 2, ${math('n')} counts separated rigid components and ${math('r')} counts external and internal force/couple unknowns, counting each equal-and-opposite internal pair once. Each component supplies three equilibrium equations. For a stable assembly with independent equilibrium equations, the degree of static indeterminacy is ${math('r-3n')}. A zero count alone does not prove stability. Statically indeterminate structures require compatibility and force-displacement relations in addition to equilibrium.</p>
+        <p class="small">Sources: Week 2 lecture and Tutorial 2 (constraints and determinacy); Week 4 lecture and Tutorial 5 (internal-force signs and plotting); Tutorials 8–10 (elastic curve, physical slope, and tangent deviation); Tutorial 12 (virtual-work normalisation and direction).</p>
+    </details>`;
+}

@@ -18,7 +18,7 @@ class WorkedTests(unittest.TestCase):
     def test_point_load_methods_agree(self):
         result = worked_solution({"model": beam(), "section": 0.5}, verify=False)
         self.assertEqual(result["selected"][-1]["exact"], "-32/3")
-        self.assertEqual(result["virtual"]["result"]["exact"], "-32/3")
+        self.assertEqual(result["virtual"]["result"]["exact"], "32/3")
         self.assertEqual(len(result["pieces"]), 2)
         self.assertIn("continuity", result["proof"]["groups"])
         self.assertEqual(result["proof"]["status"], "not_run")
@@ -40,7 +40,7 @@ class WorkedTests(unittest.TestCase):
                 self.assertEqual(at(pieces, field, location), values[key])
             self.assertEqual(at(pieces, "v", location) * 1000, values["deflection"])
         result = worked_solution({"model": model, "section": 0.05}, verify=False)
-        self.assertEqual(result["virtual"]["result"]["exact"], result["selected"][-1]["exact"])
+        self.assertEqual(sp.sympify(result["virtual"]["result"]["exact"]), -sp.sympify(result["selected"][-1]["exact"]))
 
     def test_couple_jump_and_continuous_slope(self):
         model = beam()
@@ -80,6 +80,45 @@ class WorkedTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             worked_solution({"model": model}, verify=False)
 
+    def test_tutorial_load_sign_virtual_units_and_interval_constants(self):
+        model = beam()
+        model["loads"][0].update(kind="distributed", t=0, fy=-5, qEnd=-5)
+        result = worked_solution({"model": model, "section": 0.5}, verify=False)
+        self.assertEqual(result["pieces"][0]["forces"][0]["labelLatex"], "w(x)")
+        self.assertEqual(result["pieces"][0]["forces"][0]["exact"], "5")
+        self.assertEqual(result["virtual"]["rows"][0]["equations"][0]["unit"], "m")
+        self.assertEqual(result["virtual"]["rows"][0]["equations"][1]["unit"], "m")
+        self.assertEqual(result["virtual"]["result"]["exact"], "40/3")
+        self.assertTrue(result["equilibrium"][3]["labelLatex"].startswith("B_{y}"))
+        x = sp.Symbol("x")
+        for index, piece in enumerate(result["pieces"]):
+            constants = {sp.Symbol(f"C_{2*index+1}"): sp.sympify(result["constants"][2*index]["exact"]),
+                         sp.Symbol(f"C_{2*index+2}"): sp.sympify(result["constants"][2*index+1]["exact"])}
+            theta, v = [sp.sympify(row["exact"]) for row in piece["displacements"]]
+            first, second = [sp.sympify(row["exact"]).subs(constants) for row in piece["integrations"]]
+            self.assertEqual(sp.expand(first - model["members"][0]["EI"] * theta), 0)
+            self.assertEqual(sp.expand(second - model["members"][0]["EI"] * v), 0)
+            shear = sp.sympify(piece["forces"][2]["exact"])
+            self.assertEqual(sp.diff(shear, x), -5)
+
+    def test_tutorial_5_triangle_and_tutorial_8_clockwise_couple(self):
+        # Tutorial 5 Q1: L=6 m, downward w=2x kN/m, A_y=12, B_y=24.
+        model = beam()
+        model["nodes"][1]["x"] = 6
+        model["loads"][0].update(kind="distributed", t=0, fy=0, qEnd=-12)
+        result = worked_solution({"model": model, "section": 0.5}, verify=False)
+        self.assertEqual(result["equilibrium"][3]["exact"], "24")
+        self.assertEqual(result["equilibrium"][4]["exact"], "12")
+        x = sp.Symbol("x")
+        self.assertEqual(sp.sympify(result["pieces"][0]["forces"][0]["exact"]), 2*x)
+        self.assertEqual(sp.sympify(result["pieces"][0]["forces"][2]["exact"]), 12-x**2)
+        self.assertEqual(sp.sympify(result["pieces"][0]["forces"][3]["exact"]), 12*x-x**3/3)
+        # Tutorial 8 Q1: clockwise M0 at midspan gives theta_A=M0*L/(24EI).
+        model = beam()
+        model["loads"][0].update(kind="moment", mz=-30)
+        result = worked_solution({"model": model, "section": 0}, verify=False)
+        self.assertEqual(sp.sympify(result["selected"][-2]["exact"]), sp.Rational(30*8, 24*20000))
+
     def test_lean_certificates_and_mutations(self):
         if not lean_executable():
             if os.environ.get("REQUIRE_LEAN"):
@@ -95,6 +134,12 @@ class WorkedTests(unittest.TestCase):
         corrupted = source.replace("def v0 : Poly := [", "def v0 : Poly := [(1 : Rat) + ", 1)
         self.assertEqual(verify_source(corrupted)["status"], "failed")
         self.assertEqual(verify_source(source + "\ntheorem false_claim : (1 : Rat) = 2 := by decide\n")["status"], "failed")
+        # The displayed course load sign and downward virtual displacement
+        # must also be rejected if their generated polynomial signs change.
+        wrong_load = source.replace("def w0 : Poly := [", "def w0 : Poly := [(1 : Rat) + ", 1)
+        self.assertEqual(verify_source(wrong_load)["status"], "failed")
+        wrong_virtual = source.replace("def virtualm0 : Poly := [", "def virtualm0 : Poly := [(1 : Rat) + ", 1)
+        self.assertEqual(verify_source(wrong_virtual)["status"], "failed")
 
 
 if __name__ == "__main__":

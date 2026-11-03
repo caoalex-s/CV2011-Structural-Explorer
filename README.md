@@ -6,11 +6,12 @@ Structural Explorer lets students draw planar beams and frames, place supports a
 
 ## Run the local pilot
 
-Use Node.js 24 or later and Python 3.12. The browser application has no runtime JavaScript dependencies. SymPy supplies the exact checker in the local service.
+Use Node.js 24 or later and Python 3.12. KaTeX renders LaTeX equations in the browser. SymPy supplies the exact checker in the local service.
 
 ```powershell
 python -m venv .venv
 .venv/Scripts/python.exe -m pip install -r requirements.txt
+npm install --ignore-scripts
 node scripts/build.mjs
 .venv/Scripts/python.exe -m server.app
 ```
@@ -30,6 +31,16 @@ For a fresh checkout on Windows, `start-local.ps1` starts the configured local p
 7. Choose a response layer and move the section slider. The bending-moment display can be placed on the tension or compression side without changing its numerical sign.
 
 The model uses metres, kilonewtons, and kilonewton metres. Global y is positive upwards and rotation is positive counterclockwise. Normal force is positive in tension. Bending moment is positive when the negative local-y side is in tension, with the local x-axis directed from the first member joint to the second.
+
+### Course terminology and conventions
+
+The **Course terminology, definitions, and conventions** panel follows the current Week 2 and Week 4 lectures and Tutorials 2, 5, 8–10, and 12. The plotting selector distinguishes **Tension side (lecture)** from **Compression side (tutorials)**. Both use the same sagging-positive bending moment. Course references and the reviewed source locations are recorded in `qa/course-alignment-review.json`.
+
+The method of sections uses downward-positive distributed intensity `w`, with `dV/dx = -w` and `dM/dx = V`, as in Tutorial 5. The load editor displays downward-positive start and end intensities. Model files and the numerical solver retain upward-positive global force components, and the editor converts the sign at its boundary. Existing model files and attempt records retain their meaning. Tutorial 9 uses an upward-positive signed load in its load-equation formulation; the course panel explains that contextual difference.
+
+Double integration uses the tutorial's flexural rigidity `EI`, upward-positive elastic curve `v(x)`, and counterclockwise-positive physical slope `theta = dv/dx`. Each interval introduces two constants in `EI*theta` and `EI*v`, numbered `C1, C2, ...`. The moment-area view distinguishes tangent deviation from absolute displacement. The virtual-work view follows Tutorial 12: `m = bar(M)/bar(P)` is the normalised virtual moment with length units, and a downward virtual force selects `Delta = -v`. Reaction symbols follow the drawing's node labels, with `R1`, `R2`, ... identifying unlabelled interior supports.
+
+The stability classification concerns free motion in the small-displacement model. A sufficient reaction count alone does not establish stability. The degree of static indeterminacy follows the planar component count `r - 3n` only for a stable assembly with independent equilibrium equations. Ideal roller contacts are assumed engaged; unilateral contact and buckling are outside the solver.
 
 ## Supported analysis
 
@@ -78,13 +89,13 @@ The verification layers have distinct scopes:
 
 ### Read the course-method derivation
 
-Choose **Show worked solution** beneath the section readouts. The five method tabs cover section equilibrium, double integration, moment-area, virtual work, and superposition. Expressions use the current loads and coordinates, including partial linearly varying loads, concentrated couples, and overhangs. The view gives the full piecewise N/V/M functions, slope and vertical displacement functions, boundary and continuity conditions, and values at the selected cut. It refreshes after sandbox edits. Problem mode requires an explicit reveal and records that learning event.
+Choose **Show worked solution** beneath the section readouts. The five tabs cover the method of sections, double integration, moment-area theorems, principle of virtual work, and method of superposition. Expressions use the current loads and coordinates, including partial linearly varying loads, concentrated couples, and overhangs. The view gives the full piecewise N/V/M functions, physical slope and elastic curve, boundary and continuity conditions, and values at the selected cut. It refreshes after sandbox edits. Problem mode requires an explicit reveal and records that learning event.
 
 Equations are generated as LaTeX and rendered with a pinned, locally bundled KaTeX renderer and fonts. Fractions, subscripts, integral limits, aligned equations, and units use the same rendering path in all five methods. The renderer also supplies MathML for assistive technology. No external rendering service or CDN is needed.
 
 The sequence follows the course beam-force lectures and Part 2 Lectures 2.2–2.6 and 2.9. These derivations cover a single prismatic horizontal beam with one pin and one vertical roller, up to 12 loads, and no internal joint releases or springs. Frames and other support arrangements retain their numerical sandbox response. Horizontal displacement and shear deformation are outside this worked-solution view.
 
-`proofs/BeamCertificate.lean` defines exact rational polynomial operations. For each supported model, the service constructs a downloadable Lean certificate that independently reconstructs section equilibrium from the encoded point and distributed actions. It checks all polynomial coefficients, force and moment jumps, differential polynomial identities, support conditions, displacement and slope continuity, and the displayed moment-area and unit-load calculations. Superposition certifies the sum of the symbolic per-load contributions. It does not certify each contribution's derivation separately.
+`proofs/BeamCertificate.lean` defines exact rational polynomial operations. For each supported model, the service constructs a downloadable Lean certificate that independently reconstructs section equilibrium from the encoded point and distributed actions. It checks all polynomial coefficients, the downward-positive load conversion, interval integration constants, force and moment jumps, differential polynomial identities, support conditions, displacement and slope continuity, and the displayed moment-area and unit-load calculations. Virtual work checks the downward displacement against the negative of the upward-positive elastic curve. Superposition certifies the sum of the symbolic per-load contributions. It does not certify each contribution's derivation separately.
 
 The certificate uses ordinary `decide`, and the service requires a successful compiler result for every generated theorem. Its axiom audit permits only Lean's standard propositional-extensionality axiom (`propext`) and rejects unproved claims (`sorryAx`) and compiler-trust axioms. Its scope is exact rational polynomial algebra. The physical idealisation, drawing translation, interpretation of formal polynomial differentiation and integration as real calculus, and floating-point canvas solver remain outside the certificate. A successful build of the general library alone does not mark a current worked solution as checked.
 
