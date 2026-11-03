@@ -87,11 +87,11 @@ export function renderKeyQuantities(data: KeyQuantities, proofBadge: (groups: st
             : `<p>Compare the member ends, interval boundaries, and stationary points. ${peak.plateau ? 'This value is constant on the governing interval.' : 'An endpoint or interval boundary governs.'}</p>`;
         return `<details class="quantity-trace" ${index === 0 ? 'open' : ''}>
             <summary><span>Maximum ${math(`|${summary.symbol}|`)}</span><strong>${peak.exact && String(peak.value) === peak.lower ? '' : '≈ '}${number(peak.value)} ${escape(summary.unit)}</strong><span>at x ${peak.xExact ? '=' : '≈'} ${position(peak)} m</span></summary>
-            <div class="quantity-calculation"><h3>1. Derive the response</h3>${method}${peak.governing ? symbolicEquationHtml(peak.governing) : ''}
-            <h3>2. Locate the governing point</h3>${search}<p class="small">Interval ${peak.piece}; location for the current loading.</p>${peak.coordinate ? compactEquationHtml(peak.coordinate) : ''}
-            <h3>3. Substitute and evaluate</h3>${compactEquationHtml(peak.compactSubstitution || peak.substitution)}
+            <div class="quantity-calculation"><section class="derivation-step"><h3>1. Derive the response</h3>${method}${peak.governing ? symbolicEquationHtml(peak.governing) : ''}</section>
+            <section class="derivation-step"><h3>2. Locate the governing point</h3>${search}<p class="small">Interval ${peak.piece}; location for the current loading.</p>${peak.coordinate ? compactEquationHtml(peak.coordinate) : ''}</section>
+            <section class="derivation-step derivation-evaluation"><h3>3. Substitute and evaluate</h3>${compactEquationHtml(peak.compactSubstitution || peak.substitution)}
             ${math(`\\max|${summary.symbol}| ${peak.exact ? '=' : '\\approx'} ${peak.exact ? rationalLatex(peak.lower) : number(peak.value)}\\;\\mathrm{${summary.unit.replaceAll(' ', '\\,')}}`, true)}
-            ${proofBadge([summary.group])}</div></details>`;
+            ${proofBadge([summary.group])}</section></div></details>`;
     }).join('');
     return `<p class="small">Symbols → numbers → result. The governing locations refer to the current loads; changing their relative magnitudes can move an extremum.</p>${traces}
         <details class="worked-interval"><summary>Values at the selected section</summary>${proofBadge(['readout'])}${context.selected.map(compactEquationHtml).join('')}</details>

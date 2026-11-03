@@ -7,44 +7,50 @@
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="worked.css">
   <link rel="stylesheet" href="vendor/katex/katex.min.css">
+  <link rel="stylesheet" href="workspace.css">
   <script type="importmap">{"imports":{"katex":"./vendor/katex/katex.mjs"}}</script>
 </head>
 <body>
-  <header class="topbar"><a class="brand" href="#sandbox"><span class="brand-mark">⌁</span><span><b>Structural Explorer</b><small>CV2011 · Nanyang Technological University</small></span></a>
+  <header class="topbar"><a class="brand" href="#sandbox"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 40 40"><path d="M7 28V12h26v16M7 12l13 16 13-16M3 32h8m18 0h8"/></svg></span><span><b>Structural Explorer</b><small>CV2011 · Nanyang Technological University</small></span></a>
     <nav aria-label="Workspace"><button data-mode="sandbox" class="active">Sandbox</button><button data-mode="practice">Solve a problem</button><button data-mode="insights">Learning insights</button></nav>
     <button id="settings-button" class="quiet">Connection &amp; ID</button>
   </header>
   <main id="workspace">
-    <section class="workspace-heading"><div><div class="eyebrow">STRUCTURAL ANALYSIS 1 / INTERACTIVE LAB</div><h1 id="page-title">Draw. Change. Understand.</h1><p id="page-description">Move a load or change a restraint. Follow the response as it changes.</p></div><span class="version">FIRST RELEASE · 2D BEAMS &amp; FRAMES</span></section>
+    <section class="workspace-heading"><div><div class="eyebrow">STRUCTURAL ANALYSIS 1</div><h1 id="page-title">Explore a structure</h1><p id="page-description">Draw a system. Change a load. Follow the response.</p></div><span class="version">2D BEAMS &amp; FRAMES<span>kN · m · kN m</span></span></section>
     <section class="modelbar" aria-label="Model controls"><label>Start from <select id="preset"><option value="beam">Simply supported beam</option><option value="cantilever">Cantilever</option><option value="udl">Distributed load</option><option value="overhang">Overhanging beam</option><option value="frame">Portal frame</option><option value="hinge">Internal hinge</option><option value="semi-rigid">Semi-rigid connection</option><option value="mixed">Continuous beam with pinned branch</option><option value="sliding">Internal sliding joint</option><option value="empty">Blank canvas</option></select></label><button id="load-preset">Open example</button><span class="spacer"></span><button id="undo" title="Undo (Ctrl+Z)">↶ Undo</button><button id="redo" title="Redo (Ctrl+Y)">↷ Redo</button><button id="export-model">Save model</button><button id="import-model">Open model</button><input type="file" id="model-file" accept="application/json" hidden></section>
     <div class="work-grid">
-      <aside class="left-panel panel"><div class="panel-label">BUILD YOUR SYSTEM</div><div id="tools" class="tools">
+      <aside class="left-panel panel"><div class="panel-label">DRAWING TOOLS</div><div id="tools" class="tools">
+        <div class="tool-group-label">Geometry</div>
         <button data-tool="select" class="active"><span>↖</span>Select / move</button><button data-tool="member"><span>╱</span>Draw member</button>
         <button data-tool="joint"><span>● ○</span>Add / edit joint</button>
+        <div class="tool-group-label">Supports</div>
         <button data-tool="pin"><span>△</span>Pin support</button><button data-tool="roller"><span>♧</span>Roller support</button><button data-tool="fixed"><span>▥</span>Fixed support</button>
         <button data-tool="guided"><span>▤</span>Guided support</button>
+        <div class="tool-group-label">Loading</div>
         <button data-tool="force"><span aria-hidden="true"></span>Point force</button><button data-tool="moment"><span aria-hidden="true"></span>Applied moment</button><button data-tool="distributed"><span aria-hidden="true"></span>Distributed load</button>
         <button data-tool="delete"><span>×</span>Delete object</button>
-      </div><label class="check"><input id="snap" type="checkbox" checked> Snap to grid and geometry</label><label class="field">Grid spacing (m)<input id="grid-spacing" type="number" value="0.5" min="0.05" max="5" step="0.05"></label>
-      <div id="inspector" class="inspector"></div>
-      <div class="model-note">Small displacements · linear elasticity. Choose a joint to edit continuity, releases, or springs. Member crossings connect only when a joint is explicitly added. Node labels follow A, B, C, …, Z, AA, … automatically.</div>
+      </div><div class="drawing-settings"><label class="check"><input id="snap" type="checkbox" checked> Snap to grid and geometry</label><label class="field">Grid spacing (m)<input id="grid-spacing" type="number" value="0.5" min="0.05" max="5" step="0.05"></label></div>
+      <details class="model-note"><summary>Modelling notes</summary><p>Small displacements · linear elasticity. Choose a joint to edit continuity, releases, or springs. Member crossings connect only when a joint is explicitly added. Node labels follow A, B, C, …, Z, AA, … automatically.</p></details>
       </aside>
       <section class="canvas-column">
-        <div class="panel canvas-panel"><div class="canvas-header"><span id="tool-hint">Select an object to edit it. Drag joints, loads, or supports.</span><div><button id="zoom-out" aria-label="Zoom out">−</button><button id="fit">Fit</button><button id="zoom-in" aria-label="Zoom in">+</button></div></div>
+        <div class="panel canvas-panel">
+          <div class="response-toolbar"><div class="layer-buttons" id="layers" role="group" aria-label="Displayed response"><button data-layer="M" class="active"><b aria-hidden="true">M</b><span>Bending moment</span></button><button data-layer="V"><b aria-hidden="true">V</b><span>Shear force</span></button><button data-layer="N"><b aria-hidden="true">N</b><span>Normal force</span></button><button data-layer="displacement"><b aria-hidden="true">v</b><span>Deflected shape</span></button><button data-layer="none"><b aria-hidden="true">⌁</b><span>Structure</span></button></div><div class="display-options"><label>Moment plotted on <select id="moment-side"><option value="tension">Tension side</option><option value="compression">Compression side</option></select></label><label class="check"><input id="show-reactions" type="checkbox" checked> Reactions</label></div></div>
+          <div class="canvas-header"><span id="tool-hint">Select an object to edit it. Drag joints, loads, or supports.</span><div class="canvas-actions"><button id="edit-selection" hidden>Properties</button><button id="focus-workspace" aria-pressed="false" title="Hide side panels and enlarge the drawing">Focus view</button><div class="zoom-controls"><button id="zoom-out" aria-label="Zoom out">−</button><button id="fit">Fit</button><button id="zoom-in" aria-label="Zoom in">+</button></div></div></div>
           <svg id="canvas" viewBox="0 0 1000 520" role="img" aria-label="Interactive structural drawing. Use the drawing tools, then click the canvas. Numeric editing is available in the object panel." tabindex="0"></svg>
           <div id="workspace-conventions" class="workspace-conventions" aria-label="Axes and positive sign conventions"></div>
           <div class="canvas-footer"><span id="coordinates">x 0.00 m · y 0.00 m</span><span>Drag to move · wheel to zoom · middle/right drag to pan</span></div>
         </div>
-        <div class="response-toolbar panel"><div class="layer-buttons" id="layers"><button data-layer="M" class="active">Bending moment M</button><button data-layer="V">Shear force V</button><button data-layer="N">Normal force N</button><button data-layer="displacement">Deflected shape</button><button data-layer="none">Structure</button></div><label>Moment plotted on <select id="moment-side"><option value="tension">Tension side</option><option value="compression">Compression side</option></select></label><label class="check"><input id="show-reactions" type="checkbox" checked> Reactions</label></div>
-        <div class="section-strip panel"><label>Inspect member <select id="section-member"></select></label><input id="section-position" aria-label="Section position" type="range" min="0" max="1000" value="500"><span id="section-distance"></span></div>
-        <div id="section-results" class="metric-row"></div>
+        <section class="section-response panel" aria-label="Response at the selected section"><div class="section-strip"><label>Inspect member <select id="section-member"></select></label><input id="section-position" aria-label="Section position" type="range" min="0" max="1000" value="500"><span id="section-distance"></span></div>
+          <div id="section-results" class="metric-row"></div></section>
         <div id="practice-panel" class="panel practice-panel" hidden></div>
         <section id="worked-panel" class="panel worked-panel"></section>
         <section id="course-conventions" class="panel worked-panel worked-steps"></section>
       </section>
-      <aside class="right-panel"><section class="panel status-panel"><div class="panel-label">SYSTEM CHECK</div><div id="status"></div><div id="reactions"></div></section>
-        <section class="panel explanation"><div class="panel-label">READ THE RESPONSE</div><h2 id="response-title">Bending moment</h2><p id="response-description"></p><div id="legend"></div></section>
-        <section class="panel"><div class="panel-label">YOUR SESSION</div><p id="session-status" class="small"></p><p class="small">Only submitted problem steps, hints, and solution reveals enter the attempt record. Sandbox edits remain exploratory.</p></section>
+      <aside class="right-panel">
+        <section class="panel inspector-panel"><div class="panel-label">OBJECT PROPERTIES</div><div id="inspector" class="inspector"></div></section>
+        <section class="panel status-panel"><div class="panel-label">SYSTEM CHECK</div><div id="status"></div><details class="support-reactions"><summary>Support reactions</summary><div id="reactions"></div></details></section>
+        <details class="panel explanation"><summary>Diagram guide</summary><h2 id="response-title">Bending moment</h2><p id="response-description"></p><div id="legend"></div></details>
+        <details class="panel session-panel"><summary>Your session</summary><p id="session-status" class="small"></p><p class="small">Only submitted problem steps, hints, and solution reveals enter the attempt record. Sandbox edits remain exploratory.</p></details>
       </aside>
     </div>
     <section id="insights-panel" class="panel" hidden></section>

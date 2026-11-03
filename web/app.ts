@@ -395,8 +395,7 @@ function inspector() {
     if (selected.type === 'support')
         html += `<label class="field">Support type<select data-property="kind">${['pin', 'roller', 'fixed', 'guided', 'custom'].map(k => `<option ${item.kind === k ? 'selected' : ''}>${k}</option>`).join('')}</select></label>` + field('t', 'Position / member length', '0.01') + (['roller', 'guided'].includes(String(item.kind)) ? field('angle', 'Restrained translation angle from +x (°)') : '') + (item.kind === 'custom' ? [['fixX', 'Restrain global x'], ['fixY', 'Restrain global y'], ['fixRotation', 'Restrain rotation θ']].map(([key, label]) => `<label class="check"><input type="checkbox" data-property="${key}" ${item[key] ? 'checked' : ''}>${label}</label>`).join('') : '') + '<p class="small">Ground restraints act on the selected member side. A pin support does not release continuity between connected members.</p>';
     if (selected.type === 'load') {
-        html += `<label class="field">Load label<input type="text" data-property="label" maxlength="10" value="${escape(loadLabels(model).get(selected.id))}" placeholder="${item.kind === 'moment' ? 'M_0' : item.kind === 'distributed' ? 'w_1' : 'P_1'}"></label><p class="small">Use P or F for a force, M for a couple, and w or q for distributed loading. An optional subscript uses an underscore, for example P_1 or M_0. Each load has its own label.</p>`;
-        html += '<p class="small">The action belongs to this member side at a joint. Arrows retain their physical line of action; moment arcs retain their application centre.</p>';
+        html += `<label class="field">Load label<input type="text" data-property="label" maxlength="10" value="${escape(loadLabels(model).get(selected.id))}" placeholder="${item.kind === 'moment' ? 'M_0' : item.kind === 'distributed' ? 'w_1' : 'P_1'}"></label>`;
         html += field('t', 'Start / member length', '0.01');
         if (item.kind === 'force')
             html += field('fx', 'Horizontal force Fx, rightward + (kN)') + field('fy', 'Vertical force Fy, upward + (kN)');
@@ -404,6 +403,7 @@ function inspector() {
             html += field('mz', 'Moment, CCW + (kN m)');
         if (item.kind === 'distributed')
             html += field('end', 'End / member length', '0.01') + field('fy', 'Start intensity w, downward + (kN/m)', 'any', -1) + field('qEnd', 'End intensity w, downward + (kN/m)', 'any', -1);
+        html += '<details class="inspector-help"><summary>Load notation and directions</summary><p class="small">Use P or F for a force, M for a couple, and w or q for distributed loading. An optional subscript uses an underscore, for example P_1 or M_0. Each load has its own label.</p><p class="small">The action belongs to this member side at a joint. Arrows retain their physical line of action; moment arcs retain their application centre.</p></details>';
     }
     container.innerHTML = html + '<button id="delete-selected">Delete selected object</button>';
     container.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-property]').forEach(input => input.addEventListener('change', () => {
@@ -492,7 +492,8 @@ function render() {
     const length = member ? Math.hypot(position(model, member.id, 1).x - position(model, member.id, 0).x, position(model, member.id, 1).y - position(model, member.id, 0).y) : 0;
     $('section-distance').textContent = `x = ${number(sectionT * length)} / ${number(length)} m`;
     const sample = sectionSample();
-    $('section-results').innerHTML = [['Normal force N', sample?.N, 'kN'], ['Shear force V', sample?.V, 'kN'], ['Bending moment M', sample?.M, 'kN m'], ['Physical rotation θ (CCW +)', sample ? sample.rotation * 1000 : undefined, 'mrad'], ['Vertical displacement v (upward +)', sample ? sample.uy * 1000 : undefined, 'mm']].map(([label, value, unit]) => `<div class="metric"><small>${label}</small><strong>${value === undefined ? '—' : number(Number(value), 4)} <em>${unit}</em></strong></div>`).join('');
+    const responseFields = ['N', 'V', 'M', 'rotation', 'displacement'];
+    $('section-results').innerHTML = [['Normal force N', sample?.N, 'kN'], ['Shear force V', sample?.V, 'kN'], ['Bending moment M', sample?.M, 'kN m'], ['Physical rotation θ (CCW +)', sample ? sample.rotation * 1000 : undefined, 'mrad'], ['Vertical displacement v (upward +)', sample ? sample.uy * 1000 : undefined, 'mm']].map(([label, value, unit], index) => `<div class="metric ${responseFields[index] === layer ? 'is-current' : ''}"><small>${label}</small><strong>${value === undefined ? '—' : number(Number(value), 4)} <em>${unit}</em></strong></div>`).join('');
     $('status').innerHTML = `<span class="status-pill ${analysis.status}">${analysis.status === 'stable' ? '● Stable' : analysis.status === 'unstable' ? '○ Unstable (mechanism)' : analysis.status === 'empty' ? 'Start drawing' : 'Check model'}</span><p class="small">${escape(analysis.message)}</p>${analysis.status === 'stable' ? `<p class="small">Degree of static indeterminacy: ${analysis.degree}.<br>No free motion in the small-displacement model.</p><details class="small"><summary>Numerical check</summary>Restrained stiffness matrix has full rank.<br>Equilibrium residual: ${analysis.residual!.toExponential(1)}</details>` : ''}`;
     $('reactions').innerHTML = analysis.reactions.map((r, i) => {
         const node = model.nodes.find(node => Math.hypot(node.x - r.x, node.y - r.y) < 1e-7);
@@ -513,6 +514,7 @@ function render() {
     $<HTMLButtonElement>('undo').disabled = !history.length;
     $<HTMLButtonElement>('redo').disabled = !future.length;
     inspector();
+    $('edit-selection').hidden = !selected;
     renderCanvas();
     if (mode === 'practice')
         renderPractice();
@@ -694,16 +696,41 @@ svg.addEventListener('wheel', event => { event.preventDefault(); view.scale = Ma
 document.querySelectorAll<HTMLButtonElement>('[data-tool]').forEach(button => button.onclick = () => {
     tool = button.dataset.tool!;
     start = null;
-    document.querySelectorAll('[data-tool]').forEach(b => b.classList.toggle('active', (b as HTMLElement).dataset.tool === tool));
+    document.querySelectorAll<HTMLElement>('[data-tool]').forEach(item => {
+        const active = item.dataset.tool === tool;
+        item.classList.toggle('active', active);
+        item.setAttribute('aria-pressed', String(active));
+    });
     const hints: Record<string, string> = { select: 'Select an object to edit it. Drag joints, loads, or supports.', member: 'Click the start and end points. Snap to a member to create a rigid joint.', distributed: 'Click the start and end of the loaded interval on one member.', delete: 'Click an object to delete it. Undo restores the previous model.' };
     $('tool-hint').textContent = hints[tool] || 'Click a member to place this object. Select it to edit its properties.';
     renderCanvas();
 });
-document.querySelectorAll<HTMLButtonElement>('[data-layer]').forEach(button => button.onclick = () => { layer = button.dataset.layer!; document.querySelectorAll('[data-layer]').forEach(b => b.classList.toggle('active', (b as HTMLElement).dataset.layer === layer)); render(); });
-function setMode(next: string) { mode = ['sandbox', 'practice', 'insights'].includes(next) ? next : 'sandbox'; location.hash = mode; document.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('active', (b as HTMLElement).dataset.mode === mode)); $('page-title').textContent = mode === 'sandbox' ? 'Draw. Change. Understand.' : mode === 'practice' ? 'Work through the mechanics.' : 'Learn from the attempts.'; $('page-description').textContent = mode === 'sandbox' ? 'Move a load or change a restraint. Follow the response as it changes.' : mode === 'practice' ? 'Build the model, submit a step, and examine the reasoning.' : 'Review submitted steps and the evidence behind recurring errors.'; $('practice-panel').hidden = mode !== 'practice'; $('insights-panel').hidden = mode !== 'insights'; (document.querySelector('.work-grid') as HTMLElement).hidden = mode === 'insights'; (document.querySelector('.modelbar') as HTMLElement).hidden = mode === 'insights'; if (mode === 'insights')
-    void renderInsights();
-else
-    render(); }
+document.querySelectorAll<HTMLButtonElement>('[data-layer]').forEach(button => button.onclick = () => {
+    layer = button.dataset.layer!;
+    document.querySelectorAll<HTMLElement>('[data-layer]').forEach(item => {
+        const active = item.dataset.layer === layer;
+        item.classList.toggle('active', active);
+        item.setAttribute('aria-pressed', String(active));
+    });
+    render();
+});
+function setMode(next: string) {
+    mode = ['sandbox', 'practice', 'insights'].includes(next) ? next : 'sandbox';
+    location.hash = mode;
+    document.querySelectorAll<HTMLElement>('[data-mode]').forEach(button => {
+        const active = button.dataset.mode === mode;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-pressed', String(active));
+    });
+    $('page-title').textContent = mode === 'sandbox' ? 'Explore a structure' : mode === 'practice' ? 'Work through a problem' : 'Review learning progress';
+    $('page-description').textContent = mode === 'sandbox' ? 'Draw a system. Change a load. Follow the response.' : mode === 'practice' ? 'Build the model, submit a step, and examine the reasoning.' : 'Review submitted steps and the evidence behind recurring errors.';
+    $('practice-panel').hidden = mode !== 'practice';
+    $('insights-panel').hidden = mode !== 'insights';
+    (document.querySelector('.work-grid') as HTMLElement).hidden = mode === 'insights';
+    (document.querySelector('.modelbar') as HTMLElement).hidden = mode === 'insights';
+    if (mode === 'insights') void renderInsights();
+    else render();
+}
 document.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach(button => button.onclick = () => setMode(button.dataset.mode!));
 window.addEventListener('hashchange', () => { if (location.hash.slice(1) !== mode)
     setMode(location.hash.slice(1)); });
@@ -713,6 +740,19 @@ $<HTMLInputElement>('grid-spacing').onchange = renderCanvas;
 $('zoom-in').onclick = () => { view.scale = Math.min(500, view.scale * 1.25); renderCanvas(); };
 $('zoom-out').onclick = () => { view.scale = Math.max(10, view.scale / 1.25); renderCanvas(); };
 $('fit').onclick = () => { fit(); renderCanvas(); };
+/** Enlarge the drawing without changing the model, view scale, or selected tool. */
+function setWorkspaceFocus(focused: boolean): void {
+    document.querySelector('.work-grid')!.classList.toggle('is-focused', focused);
+    const button = $('focus-workspace');
+    button.setAttribute('aria-pressed', String(focused));
+    button.textContent = focused ? 'Show side panels' : 'Focus view';
+    button.title = focused ? 'Restore drawing tools and object properties (Esc)' : 'Hide side panels and enlarge the drawing';
+}
+$('focus-workspace').onclick = () => setWorkspaceFocus($('focus-workspace').getAttribute('aria-pressed') !== 'true');
+$('edit-selection').onclick = () => {
+    setWorkspaceFocus(false);
+    document.querySelector('.inspector-panel')!.scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
 $('undo').onclick = () => { if (!history.length)
     return; future.push(clone(model)); model = history.pop()!; selected = null; start = null; changed(); };
 $('redo').onclick = () => { if (!future.length)
@@ -721,6 +761,7 @@ document.addEventListener('keydown', event => { if ((event.target as HTMLElement
     return; if (event.key === 'Escape') {
     start = null;
     drag = null;
+    setWorkspaceFocus(false);
     renderCanvas();
 } if (event.key === 'Delete')
     removeSelected(); if ((event.ctrlKey || event.metaKey) && event.key === 'z') {
@@ -948,6 +989,9 @@ for (const [kind, shape] of Object.entries(loadIcons)) {
     icon.innerHTML = `<svg class="tool-icon load-tool-icon" viewBox="0 0 40 40" aria-hidden="true">${shape}</svg>`;
 }
 fit();
+document.querySelectorAll<HTMLElement>('[data-tool], [data-layer]').forEach(button => {
+    button.setAttribute('aria-pressed', String(button.classList.contains('active')));
+});
 setMode(location.hash.slice(1) || 'sandbox');
 void connect();
 void fetch('verification.json').then(r => r.json()).then(v => { proofStatus = v; }).catch(() => { });

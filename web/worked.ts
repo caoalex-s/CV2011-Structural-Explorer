@@ -104,7 +104,7 @@ function steps(): string {
 
 function draw(): void {
     const panel = document.getElementById('worked-panel')!;
-    panel.innerHTML = `<div class="worked-heading"><div><div class="panel-label">COURSE METHODS</div><h2>How is this response obtained?</h2></div><button id="toggle-worked">${expanded ? 'Hide worked solution' : context.practice ? 'Reveal full worked solution' : 'Show worked solution'}</button></div>`;
+    panel.innerHTML = `<div class="worked-heading"><div><div class="panel-label">FROM MODEL TO SOLUTION</div><h2>Worked solution</h2></div><button id="toggle-worked" aria-expanded="${expanded}">${expanded ? 'Hide worked solution' : context.practice ? 'Reveal full worked solution' : 'Show worked solution'}</button></div>`;
     document.getElementById('toggle-worked')!.onclick = () => {
         expanded = !expanded;
         if (expanded && context.practice) context.reveal();
@@ -115,7 +115,7 @@ function draw(): void {
     if (!context.connected) {
         panel.insertAdjacentHTML('beforeend', '<details class="small"><summary>Using published and edited models</summary><p>Published examples include their derivations and Lean certificates. Edited beams require the <a href="http://localhost:8765/#sandbox" target="_blank" rel="noopener">local workspace</a>. Transfer a drawing with <strong>Save model</strong> here and <strong>Open model</strong> there.</p></details>');
         if (publishedExample) {
-            panel.insertAdjacentHTML('beforeend', `<p class="small">Published solution: ${escape(publishedExample.name)}. Choose a checked section:</p><div class="dialog-buttons">${publishedExample.solutions.map(solution => `<button data-published-section="${solution.section}" aria-pressed="${solution.section === context.section}">${math(`x_s=${solution.section === 0.5 ? 'L/2' : solution.section === 0.25 ? 'L/4' : '3L/4'}`)}</button>`).join('')}</div>`);
+            panel.insertAdjacentHTML('beforeend', `<div class="published-sections"><p class="small">${escape(publishedExample.name)}<br>Choose a checked section:</p><div class="dialog-buttons">${publishedExample.solutions.map(solution => `<button data-published-section="${solution.section}" aria-pressed="${solution.section === context.section}">${math(`x_s=${solution.section === 0.5 ? 'L/2' : solution.section === 0.25 ? 'L/4' : '3L/4'}`)}</button>`).join('')}</div></div>`);
             panel.querySelectorAll<HTMLButtonElement>('[data-published-section]').forEach(button => button.onclick = () => context.selectSection(Number(button.dataset.publishedSection)));
         }
         if (publishedLoaded && !response && !error) {
