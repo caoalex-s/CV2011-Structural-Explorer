@@ -1,0 +1,26 @@
+{
+  "date": "2026-11-03",
+  "scope": "Restore worked-solution visibility on GitHub Pages without requiring the local service for unchanged public beam examples.",
+  "reviewer": "Implementation agent self-review, not independent review",
+  "cause": "The worked panel returned early whenever the verification service was disconnected. The public page had no service URL.",
+  "behaviour_review": {
+    "public_examples_only": "The generator reads the three maintained synthetic models from the browser factory. It does not read student records.",
+    "certificate_scope": "All nine exported source hashes agree with existing checked CI receipts. The full model and exact section must agree before a published response is displayed.",
+    "stale_results": "Browser checks confirmed that changing a load immediately removes the checked badge and derivation. An unlisted section displays a clear message and the available section buttons.",
+    "privacy": "No CORS, credentials, compiler settings, or record-service permissions changed. Transfer to the local workspace uses the existing explicit model export/import controls.",
+    "practice": "The existing reveal gate and recording callback are preserved. Published solutions do not mark queued answers as graded."
+  },
+  "readability_review": {
+    "guide": "author-style code-style.md 0.2; proportionate UI/documentation prose review under author-style 0.27",
+    "result": "Example selection and loading are isolated in a small module. Exact model comparison preserves every field and array order. The existing worked renderer retains all methods and verification-scope text.",
+    "prose": "The panel distinguishes published examples from edited beams and explains the local-workspace route. README documents availability and generation without claiming browser-based Lean execution."
+  },
+  "validation": {
+    "typescript": "Passed",
+    "node_tests": "31 passed, including three new published-solution regression tests",
+    "static_build": "Passed",
+    "browser": "Static preview without API: beam key quantities and double integration displayed, quarter-section selection updated the certificate, unsupported section and edited load cleared the result, distributed-load example displayed.",
+    "equation_rendering": "Double integration rendered 40 KaTeX expressions with zero math errors and no page overflow.",
+    "local_lean": "Not executed. Existing exact-source receipts were reused for local preview. Deployment checks remain on Linux CI."
+  }
+}

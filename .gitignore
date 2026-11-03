@@ -8,3 +8,5 @@ __pycache__/
 .env
 .lake/
 qa/local-*
+web/worked-examples.json
+web/worked-receipts.json

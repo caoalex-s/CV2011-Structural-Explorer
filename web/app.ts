@@ -506,6 +506,11 @@ function render() {
     updateSession();
     renderWorked({ model, section: sectionT, practice: mode === 'practice', connected: online,
         request: payload => api('/api/worked-solution', payload),
+        selectSection: section => {
+            sectionT = section;
+            $<HTMLInputElement>('section-position').value = String(section * 1000);
+            render();
+        },
         reveal: () => { solutionRevealed = true; void record('reveal', '', stepDefinitions[solutionStep].units); } });
 }
 svg.addEventListener('pointerdown', event => {

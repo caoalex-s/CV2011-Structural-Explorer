@@ -4,8 +4,10 @@ import { equationHtml, math, methodRules, rationalLatex } from './math.js';
 import type { Equation } from './math.js';
 import { renderKeyQuantities } from './quantities.js';
 import type { KeyQuantities } from './quantities.js';
+import { findPublishedExample, loadPublishedLibrary, publishedSolution } from './published-worked.js';
+import type { PublishedExample } from './published-worked.js';
 
-interface WorkedResponse {
+export interface WorkedResponse {
     title: string;
     section: string;
     length: string;
@@ -33,6 +35,7 @@ interface Context {
     connected: boolean;
     request: (payload: unknown) => Promise<WorkedResponse>;
     reveal: () => void;
+    selectSection: (section: number) => void;
 }
 
 const escape = (value: unknown) => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
@@ -44,6 +47,8 @@ let pending = false;
 let timer: ReturnType<typeof setTimeout>;
 let method = 'quantities';
 let error = '';
+let publishedExample: PublishedExample | undefined;
+let publishedLoaded = false;
 
 function equations(rows: Equation[]): string {
     return rows.map(equationHtml).join('');
@@ -106,11 +111,18 @@ function draw(): void {
     if (!expanded) return;
     panel.insertAdjacentHTML('beforeend', '<p class="small">Supported: one horizontal beam, one pin, and one vertical roller, including overhangs and up to 12 mixed loads. Frames and joint springs remain available in the numerical sandbox.</p>');
     if (!context.connected) {
-        panel.insertAdjacentHTML('beforeend', '<p>Open the local pilot or connect the course verifier to derive your current model. The GitHub interface does not run Lean in the browser.</p>');
-        return;
+        panel.insertAdjacentHTML('beforeend', '<p class="small">Published examples include their derivations and Lean certificates. Edited beams require the local verifier. <a href="http://localhost:8765/#sandbox" target="_blank" rel="noopener">Open local workspace</a>. To transfer a drawing, use <strong>Save model</strong> here and <strong>Open model</strong> there.</p>');
+        if (publishedExample) {
+            panel.insertAdjacentHTML('beforeend', `<p class="small">Published solution: ${escape(publishedExample.name)}. Choose a checked section:</p><div class="dialog-buttons">${publishedExample.solutions.map(solution => `<button data-published-section="${solution.section}" aria-pressed="${solution.section === context.section}">${math(`x_s=${solution.section === 0.5 ? 'L/2' : solution.section === 0.25 ? 'L/4' : '3L/4'}`)}</button>`).join('')}</div>`);
+            panel.querySelectorAll<HTMLButtonElement>('[data-published-section]').forEach(button => button.onclick = () => context.selectSection(Number(button.dataset.publishedSection)));
+        }
+        if (publishedLoaded && !response && !error) {
+            panel.insertAdjacentHTML('beforeend', `<p role="status">${publishedExample ? 'No published certificate covers the current section. Choose one of the checked sections above or use the local verifier.' : 'This drawing has no published worked solution. The unchanged Simply supported beam, Distributed load, and Overhanging beam examples include solutions at quarter, midpoint, and three-quarter sections. Use Start from and Open example to explore them.'}</p>`);
+            return;
+        }
     }
     if (!response) {
-        panel.insertAdjacentHTML('beforeend', `<p role="status">${escape(error || 'Deriving the current model and checking its certificate…')}</p>`);
+        panel.insertAdjacentHTML('beforeend', `<p role="status">${escape(error || (context.connected ? 'Deriving the current model and checking its certificate…' : 'Loading the published worked solutions…'))}</p>`);
         if (error) {
             panel.insertAdjacentHTML('beforeend', '<button id="retry-worked">Try again</button>');
             document.getElementById('retry-worked')!.onclick = () => { error = ''; schedule(); draw(); };
@@ -150,18 +162,27 @@ export function showWorkedSolution(preferredMethod: 'sections' | 'integration'):
 
 function schedule(): void {
     clearTimeout(timer);
-    if (expanded && context.connected && !pending) timer = setTimeout(() => { void fetchSolution(); }, 650);
+    if (expanded && !pending) timer = setTimeout(() => { void fetchSolution(); }, 650);
 }
 
 async function fetchSolution(): Promise<void> {
-    if (pending || !expanded || !context.connected) return;
+    if (pending || !expanded) return;
     const key = snapshot;
     const payload = { model: structuredClone(context.model), section: context.section };
     pending = true;
     error = '';
     try {
-        const result = await context.request(payload);
-        if (key === snapshot) response = result;
+        if (context.connected) {
+            const result = await context.request(payload);
+            if (key === snapshot) response = result;
+        } else {
+            const library = await loadPublishedLibrary();
+            if (key === snapshot) {
+                publishedExample = findPublishedExample(payload.model, library);
+                response = publishedExample ? publishedSolution(publishedExample, payload.section) : undefined;
+                publishedLoaded = true;
+            }
+        }
     } catch (failure) {
         if (key === snapshot) error = failure instanceof Error ? failure.message : 'The derivation could not be obtained.';
     } finally {
@@ -179,6 +200,8 @@ export function renderWorked(next: Context): void {
     if (key !== snapshot || enteringPractice) {
         snapshot = key;
         response = undefined;
+        publishedExample = undefined;
+        publishedLoaded = false;
         error = '';
         // New practice questions require an explicit reveal. Exploration
         // refreshes automatically after geometry, load, or section edits.

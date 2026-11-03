@@ -97,6 +97,8 @@ The generated Lean source adds exact point evaluations, interval-coverage statem
 
 Choose **Show worked solution** beneath the section readouts. The method tabs cover the method of sections, double integration, moment-area theorems, principle of virtual work, and method of superposition. Expressions use the current loads and coordinates, including partial linearly varying loads, concentrated couples, and overhangs. The view gives the full piecewise N/V/M functions, physical slope and elastic curve, boundary and continuity conditions, and values at the selected cut. It refreshes after sandbox edits. Problem mode requires an explicit reveal and records that learning event.
 
+On GitHub Pages, the unchanged **Simply supported beam**, **Distributed load**, and **Overhanging beam** examples include published worked solutions at quarter, midpoint, and three-quarter sections. These derivations and downloadable certificates are checked in GitHub CI before publication and remain available without a verifier connection. The panel offers the checked sections and clears the published result after any model edit. For an edited beam, open the local workspace linked in the panel and transfer the drawing with **Save model** and **Open model**. Checking student answers and recording verified attempts still require the service.
+
 Equations are generated as LaTeX and rendered with a pinned, locally bundled KaTeX renderer and fonts. Fractions, subscripts, integral limits, aligned equations, and units use the same rendering path in all five methods. The renderer also supplies MathML for assistive technology. No external rendering service or CDN is needed.
 
 The sequence follows the course beam-force lectures and Part 2 Lectures 2.2–2.6 and 2.9. These derivations cover a single prismatic horizontal beam with one pin and one vertical roller, up to 12 loads, and no internal joint releases or springs. Frames and other support arrangements retain their numerical sandbox response. Horizontal displacement and shear deformation are outside this worked-solution view.
@@ -130,6 +132,8 @@ node scripts/build.mjs
 ```
 
 If npm is unavailable but Node and Python are installed, `python scripts/install_math_renderer.py` installs only the pinned renderer after checking the npm archive's SHA-512 integrity, without running package scripts. Then run `node scripts/build.mjs`.
+
+To preview the published examples without a service, run `python -m scripts.check_worked_examples` before building. With local Lean execution disabled, this command requires an existing exact-source receipt for every example. CI runs the same command with the pinned compiler and publishes the generated `worked-examples.json` with the static application. Generated files contain only the three maintained synthetic examples and are excluded from source control.
 
 Run `lake build --wfail` inside `proofs/` to check the formal library with the pinned toolchain. GitHub Actions runs the checks before publishing `dist/` to Pages. The build copies browser sources and the bundled renderer, fonts, and licence into `dist/`; server code, account credentials, and student records are excluded.
 
