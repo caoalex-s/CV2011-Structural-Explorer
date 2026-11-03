@@ -110,6 +110,12 @@ def at(pieces, field, position):
     return sp.expand(piece[field]).subs(X, position)
 
 
+def require_zero(expression):
+    """Refuse to display a derivation if an exact symbolic identity fails."""
+    if sp.expand(expression) != 0:
+        raise ValueError("The exact symbolic consistency check failed. No worked solution is available for this model.")
+
+
 class Certificate:
     """Only bounded rational constants and fixed templates enter Lean source."""
     def __init__(self):
@@ -245,6 +251,11 @@ def worked_solution(payload, verify=True):
         raise ValueError("Section must lie on the beam.")
     section = section_fraction * beam.length
     pieces, actions, c0, c1 = build_polynomials(beam)
+    for piece in pieces:
+        require_zero(sp.diff(piece["V"], X) - piece["q"])
+        require_zero(sp.diff(piece["M"], X) - piece["V"])
+        require_zero(beam.rigidity * sp.diff(piece["v"], X, 2) - piece["M"])
+    require_zero(at(pieces, "v", section) * 1000 - beam.values(section)["deflection"])
     cert = certificate_for(beam, pieces, actions, section)
     rat = lean_number
     # Moment-area uses the left support tangent. Signed integration also covers
@@ -270,6 +281,8 @@ def worked_solution(payload, verify=True):
             else:
                 identity = f"value theta{target_index} {rat(target)} - value theta{left_index} {rat(beam.left)}"
             cert.prove("moment_area", f"{rat(total)} = {identity}")
+            expected = (at(pieces, "v", target) - at(pieces, "v", beam.left) - (target - beam.left) * at(pieces, "theta", beam.left)) if weighted else at(pieces, "theta", target) - at(pieces, "theta", beam.left)
+            require_zero(total - expected)
             moment_area.append({"title": ("First moment " if weighted else "Area ") + name,
                                 "equation": equation("t" if weighted else "Δθ", total, "m" if weighted else "rad"),
                                 "terms": [equation(f"Interval {i+1}", d*v/beam.rigidity, "m" if weighted else "rad") for i,a,b,d,v in terms]})
@@ -297,6 +310,7 @@ def worked_solution(payload, verify=True):
             virtual_total += value
             virtual_rows.append({"interval": f"{a} < x < {b}", "equations": [equation("m(x)",m,"kN m"),equation("∫ mM/(EI) dx",value,"kN m")]})
     cert.prove("virtual_work"," + ".join(virtual_terms)+f" = {rat(at(pieces,'v',section))}")
+    require_zero(virtual_total - at(pieces, "v", section))
     # Show the decomposition numerically and certify its exact sum;
     # the individual per-load reference computations remain symbolic checks.
     contributions=[]
@@ -305,6 +319,7 @@ def worked_solution(payload, verify=True):
         response=reference(submodel).values(section)
         contributions.append({"label":f"Load {i+1}","kind":load["kind"],"value":response["deflection"]/1000})
     cert.prove("superposition"," + ".join(rat(c["value"]) for c in contributions)+f" = {rat(at(pieces,'v',section))}" if contributions else f"{rat(at(pieces,'v',section))} = 0")
+    require_zero(sum((c["value"] for c in contributions), sp.S.Zero) - at(pieces, "v", section))
     source=cert.source()
     proof=verify_source(source) if verify else {"status":"not_run","sha256":hashlib.sha256(source.encode()).hexdigest()}
     return {

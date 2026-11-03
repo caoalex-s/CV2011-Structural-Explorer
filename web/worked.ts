@@ -68,7 +68,7 @@ function steps(): string {
     const intervals = (field: 'forces' | 'displacements') => data.pieces.map((piece, i) => `<details class="worked-interval" ${i === 0 ? 'open' : ''}><summary>Interval ${i + 1}: ${escape(piece.interval)} m</summary>${equations(piece[field])}</details>`).join('');
     const selected = `<h3>At the selected section: xₛ = ${escape(data.section)} m</h3>${equations(data.selected)}`;
     if (method === 'sections') return `
-        ${proofLabel(['equilibrium', 'sections', 'diagrams', 'jumps', 'ends', 'readout'])}
+        ${proofLabel(['equilibrium', 'partition', 'sections', 'diagrams', 'jumps', 'ends', 'readout'])}
         <h3>1. Find the support reactions</h3>
         <p>Replace the supports by their reactions. Keep each force at its application point and each couple at its stated sign. Let a = ${escape(data.supports.a)} m and b = ${escape(data.supports.b)} m denote the left and right support coordinates.</p>
         <div class="worked-rule">ΣFₓ = 0 &nbsp; · &nbsp; Rₗ + Rᵣ + F = 0<br>ΣMₐ = 0: Rᵣ(b − a) + T − aF = 0</div>${equations(data.equilibrium)}
@@ -96,7 +96,7 @@ function steps(): string {
         <h3>1. Apply a virtual unit force</h3><p>Remove the real loads and apply an upward force of 1 kN at xₛ = ${escape(data.section)} m. Keep the support conditions unchanged. Find its reactions and virtual bending moment m using the same x-coordinate as the real moment M.</p>${equations(data.virtual.reactions)}
         <h3>2. Evaluate the internal virtual work</h3><div class="worked-rule">(1 kN) v(xₛ) = ∑ ∫ m(x)M(x)/(EI) dx</div><p>Split the integral wherever the real or virtual moment expression changes. Each integral below has units of kN m. Divide the sum by the virtual force of 1 kN to obtain displacement in metres.</p>
         ${data.virtual.rows.map(row => `<details class="worked-interval" open><summary>${escape(row.interval)} m</summary>${equations(row.equations)}</details>`).join('')}
-        <h3>3. Interpret the sign</h3>${equations([data.virtual.result])}<p>A negative result means displacement opposite to the upward virtual force. Lean checks that this integral equals the displacement obtained by double integration.</p>`;
+        <h3>3. Interpret the sign</h3>${equations([data.virtual.result])}<p>A negative result means displacement opposite to the upward virtual force. The certificate tests whether this integral equals the displacement obtained by double integration.</p>`;
     return `${proofLabel(['superposition'])}<h3>1. Keep one real load at a time</h3><p>For this linear beam, each load acts on the same structure with the same supports and stiffness. Calculate the displacement caused by each load separately. Add their signed contributions at the selected position.</p>${equations(data.superposition)}<h3>2. Add the contributions</h3>${equations([data.selected[data.selected.length-1]])}<p>The contribution calculations use the exact symbolic beam reference. The Lean statement for this view checks their sum against the displacement polynomial. Individual contribution derivations are not included in that statement.</p>`;
 }
 
