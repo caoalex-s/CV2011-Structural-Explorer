@@ -8,6 +8,20 @@ from test_verifier import beam
 
 
 class SymbolicTests(unittest.TestCase):
+    def test_uniform_load_shows_arithmetic_and_short_trace(self):
+        model = beam()
+        model["loads"][0].update(kind="distributed", t=0, fy=-5, qEnd=-5)
+        result = worked_solution({"model": model, "section": 0.5}, verify=False)
+        moment = result["selected"][2]
+        self.assertIn(r"\left(5\right)", moment["substitutionLatex"])
+        self.assertIn(r"\left(8\right)^{2}", moment["substitutionLatex"])
+        self.assertIn(r"\times", moment["substitutionLatex"])
+        self.assertEqual(moment["exact"], "40")
+        peak = next(item for item in result["quantities"]["summaries"][0]["extrema"] if item["kind"] == "absolute")
+        self.assertEqual(peak["coordinate"]["symbolicLatex"], r"\frac{L}{2}")
+        self.assertTrue(peak["isStationary"])
+        self.assertIn(r"\loadsymbol{0}{}", peak["governing"]["symbolicLatex"])
+
     def test_central_force_retains_load_length_and_rigidity(self):
         result = worked_solution({"model": beam(), "section": 0.5}, verify=False)
         load, length, rigidity = sp.symbols("load0 L EI")

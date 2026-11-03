@@ -13,6 +13,8 @@ export interface Equation {
     symbolicLatex?: string;
     symbolicLabelLatex?: string;
     symbolicUnit?: string;
+    substitutionLatex?: string;
+    approximate?: boolean;
 }
 
 export function math(source: string, display = false): string {
@@ -37,6 +39,7 @@ export function rationalLatex(value: string): string {
     return fraction ? `\\frac{${fraction[1]}}{${fraction[2]}}` : value;
 }
 
+/** Show a formula, the inserted parameter values, and its evaluated result. */
 export function equationHtml(row: Equation): string {
     const units: Record<string, string> = {
         'kN': String.raw`\mathrm{kN}`, 'kN m': String.raw`\mathrm{kN}\,\mathrm{m}`,
@@ -45,10 +48,32 @@ export function equationHtml(row: Equation): string {
         'kN m²': String.raw`\mathrm{kN}\,\mathrm{m}^2`, 'kN m³': String.raw`\mathrm{kN}\,\mathrm{m}^3`,
     };
     const unit = units[row.unit];
-    const source = `${row.labelLatex} = ${row.latex}${unit ? `\\;${unit}` : ''}`;
-    const substitution = row.symbolicUnit ? `Substitute the current values and convert ${row.symbolicUnit} to ${row.unit}:` : 'Substitute the current values:';
-    const symbolic = row.symbolicLatex === undefined ? '' : `<div class="symbolic-equation">${math(`${row.symbolicLabelLatex || row.labelLatex} = ${row.symbolicLatex}`, true)}</div><div class="small">${escapeHtml(substitution)}</div>`;
+    const relation = row.approximate ? '\\approx' : '=';
+    const inserted = row.substitutionLatex && row.substitutionLatex !== row.latex
+        ? `= ${row.substitutionLatex}${row.symbolicUnit ? `\\;${units[row.symbolicUnit]}` : ''} ${relation} ` : `${relation} `;
+    const source = `${row.labelLatex} ${inserted}${row.latex}${unit ? `\\;${unit}` : ''}`;
+    const symbolic = row.symbolicLatex === undefined ? '' : `<div class="symbolic-equation">${math(`${row.symbolicLabelLatex || row.labelLatex} = ${row.symbolicLatex}`, true)}</div>`;
     return `<div class="worked-equation">${symbolic}${math(source, true)}</div>`;
+}
+
+/** Round scalar readouts in the short view; the detailed view retains fractions. */
+export function compactEquationHtml(row: Equation): string {
+    const scalar = /^(-?\d+)(?:\/(\d+))?$/.exec(row.exact);
+    if (!scalar) return equationHtml(row);
+    const numerator = Number(scalar[1]);
+    const denominator = Number(scalar[2] || '1');
+    const value = numerator / denominator;
+    if (!Number.isFinite(value)) return equationHtml(row);
+    const rounded = Number(value.toPrecision(6));
+    const displayed = String(rounded).replace(/e([+-]?\d+)/, '\\times10^{$1}');
+    // Integer arithmetic identifies exact terminating displays, including 0.
+    const approximate = rounded * denominator !== numerator;
+    return equationHtml({ ...row, latex: displayed, approximate: row.approximate || approximate });
+}
+
+/** Keep derivation steps symbolic; numerical arithmetic belongs at evaluation. */
+export function symbolicEquationHtml(row: Equation): string {
+    return math(`${row.symbolicLabelLatex || row.labelLatex} = ${row.symbolicLatex ?? row.latex}`, true);
 }
 
 /** Shared equations remain ordinary LaTeX that an instructor can edit. */

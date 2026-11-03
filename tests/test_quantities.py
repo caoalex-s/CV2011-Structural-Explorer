@@ -57,6 +57,9 @@ class QuantityTests(unittest.TestCase):
         self.assertAlmostEqual(peak["xApprox"], float(2*sp.sqrt(3)), places=8)
         self.assertFalse(peak["exact"])
         self.assertEqual(summary(result, "M")["roots"][0]["coordinateLatex"], r"2 \sqrt{3}")
+        self.assertTrue(peak["coordinate"]["approximate"])
+        self.assertTrue(peak["compactSubstitution"]["approximate"])
+        self.assertIn("x_{c}", peak["compactSubstitution"]["symbolicLatex"])
 
     def test_couple_preserves_two_moment_limits_and_common_rotation(self):
         model = beam()

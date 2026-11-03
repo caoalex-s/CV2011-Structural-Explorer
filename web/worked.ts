@@ -65,7 +65,7 @@ function proofLabel(groups: string[]): string {
 
 function steps(): string {
     const data = response!;
-    if (method === 'quantities') return renderKeyQuantities(data.quantities, proofLabel);
+    if (method === 'quantities') return renderKeyQuantities(data.quantities, proofLabel, data);
     const intervals = (field: 'forces' | 'integrations' | 'displacements') => data.pieces.map((piece, i) => `<details class="worked-interval" ${i === 0 ? 'open' : ''}><summary>Interval ${i + 1}: ${math(piece.intervalLatex || piece.interval)}</summary><p class="small">Current coordinates: ${math(piece.interval)} m.</p>${equations(piece[field])}</details>`).join('');
     const selected = `<h3>At the selected section: ${math(`x_s = ${rationalLatex(data.section)}\\,\\mathrm{m}`)}</h3>${equations(data.selected)}`;
     if (method === 'sections') return `
@@ -112,9 +112,8 @@ function draw(): void {
         if (expanded && !response) schedule();
     };
     if (!expanded) return;
-    panel.insertAdjacentHTML('beforeend', '<p class="small">Supported: one horizontal beam, one pin, and one vertical roller, including overhangs and up to 12 mixed loads. Frames and joint springs remain available in the numerical sandbox.</p>');
     if (!context.connected) {
-        panel.insertAdjacentHTML('beforeend', '<p class="small">Published examples include their derivations and Lean certificates. Edited beams require the local verifier. <a href="http://localhost:8765/#sandbox" target="_blank" rel="noopener">Open local workspace</a>. To transfer a drawing, use <strong>Save model</strong> here and <strong>Open model</strong> there.</p>');
+        panel.insertAdjacentHTML('beforeend', '<details class="small"><summary>Using published and edited models</summary><p>Published examples include their derivations and Lean certificates. Edited beams require the <a href="http://localhost:8765/#sandbox" target="_blank" rel="noopener">local workspace</a>. Transfer a drawing with <strong>Save model</strong> here and <strong>Open model</strong> there.</p></details>');
         if (publishedExample) {
             panel.insertAdjacentHTML('beforeend', `<p class="small">Published solution: ${escape(publishedExample.name)}. Choose a checked section:</p><div class="dialog-buttons">${publishedExample.solutions.map(solution => `<button data-published-section="${solution.section}" aria-pressed="${solution.section === context.section}">${math(`x_s=${solution.section === 0.5 ? 'L/2' : solution.section === 0.25 ? 'L/4' : '3L/4'}`)}</button>`).join('')}</div>`);
             panel.querySelectorAll<HTMLButtonElement>('[data-published-section]').forEach(button => button.onclick = () => context.selectSection(Number(button.dataset.publishedSection)));
@@ -132,10 +131,14 @@ function draw(): void {
         }
         return;
     }
-    panel.insertAdjacentHTML('beforeend', `<div class="worked-status ${response.proof.status === 'checked' ? 'checked' : ''}" role="status">${escape(response.proof.message)}</div>
-        ${response.parameters ? `<details class="worked-assumptions"><summary>Load symbols, geometry, and current values</summary><p>${escape(response.symbolicScope)}</p>${equations(response.parameters)}</details><p class="small">The derivations show the symbolic formulas first, followed by the current numerical substitutions. Lean badges refer to the substituted model.</p>` : ''}
-        <details class="worked-assumptions"><summary>Model, signs, and verification scope</summary><p>${escape(response.assumptions)}</p><p>${escape(response.conventions)}</p><p>${escape(response.proof.scope)}</p><p class="small">Course references: ${response.sources.map(escape).join(' · ')}</p><button id="download-proof">Download Lean source</button> <button id="download-proof-project">Download VS Code proof project</button></details>
-        <div class="method-tabs" role="group" aria-label="Solution method">${[['quantities', 'Key quantities'], ['sections', 'Method of sections'], ['integration', 'Double integration'], ['area', 'Moment-area theorems'], ['virtual', 'Principle of virtual work'], ['superposition', 'Method of superposition']].map(([id, label]) => `<button data-method="${id}" class="${id === method ? 'active' : ''}" aria-pressed="${id === method}">${label}</button>`).join('')}</div><article class="worked-steps">${steps()}</article>`);
+    panel.insertAdjacentHTML('beforeend', `<p class="small" role="status">${response.proof.status === 'checked' ? 'Lean checked for the current numerical model.' : 'Symbolic result. Lean has not checked this numerical model.'}</p>
+        ${response.parameters ? `<details class="worked-assumptions"><summary>Input symbols and values</summary>${equations(response.parameters)}</details>` : ''}
+        <article class="worked-steps compact-solution">${renderKeyQuantities(response.quantities, proofLabel, response)}</article>
+        <details class="full-derivations" ${method !== 'quantities' ? 'open' : ''}><summary>Full course-method derivations</summary>
+        <div class="method-tabs" role="group" aria-label="Solution method">${[['sections', 'Method of sections'], ['integration', 'Double integration'], ['area', 'Moment-area theorems'], ['virtual', 'Principle of virtual work'], ['superposition', 'Method of superposition']].map(([id, label]) => `<button data-method="${id}" class="${id === method ? 'active' : ''}" aria-pressed="${id === method}">${label}</button>`).join('')}</div><article class="worked-steps">${method === 'quantities' ? '<p class="small">Choose a method above for its complete interval calculations.</p>' : steps()}</article></details>`);
+    // Keep the full course methods and exact certificate accessible without
+    // placing their explanatory detail ahead of the short calculation.
+    panel.insertAdjacentHTML('beforeend', `<details class="worked-assumptions"><summary>Model, signs, and verification scope</summary><p>${escape(response.proof.message)}</p><p>${escape(response.assumptions)}</p><p>${escape(response.conventions)}</p><p>${escape(response.symbolicScope || '')}</p><p>${escape(response.proof.scope)}</p><p class="small">Course references: ${response.sources.map(escape).join(' · ')}</p><button id="download-proof">Download Lean source</button> <button id="download-proof-project">Download VS Code proof project</button></details>`);
     panel.querySelectorAll<HTMLButtonElement>('[data-method]').forEach(button => button.onclick = () => { method = button.dataset.method!; draw(); });
     document.getElementById('download-proof')!.onclick = () => {
         download(new Blob([response!.proof.source], { type: 'text/plain' }), 'lean');

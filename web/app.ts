@@ -5,6 +5,7 @@ import { renderWorked, showWorkedSolution } from './worked.js';
 import { renderCourseConventions } from './course.js';
 import { math } from './math.js';
 import { assignLoadLabels, loadLabels, validLoadLabel } from './load-labels.js';
+import { workspaceConventions } from './axes.js';
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const escape = (value: unknown) => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 const number = (value: number, digits = 3) => Math.abs(value) < 1e-8 ? '0' : Number(value.toPrecision(digits)).toString();
@@ -249,6 +250,7 @@ function jointDrawing(node: Point) {
     return `<g class="clickable" data-object="node" data-id="${escape(node.id)}" data-joint-symbol="${pinned ? 'pinned' : semiRigid ? 'semi-rigid' : title === 'Rigid joint' ? 'rigid' : 'custom'}"><title>${title} ${nodeLabels(model).get(node.id)}</title><circle cx="${p.x}" cy="${p.y}" r="13" class="node-hit"/>${shape}${selected?.id === node.id ? `<circle cx="${p.x}" cy="${p.y}" r="15" stroke="${courseColors.force}" fill="none" stroke-dasharray="3 3"/>` : ''}<text x="${p.x + offset.x}" y="${p.y + offset.y}" text-anchor="middle" class="node-label">${nodeLabels(model).get(node.id)}</text></g>`;
 }
 function renderCanvas() {
+    $('workspace-conventions').innerHTML = workspaceConventions(model, currentMember);
     const grid = Math.max(0.05, Number($<HTMLInputElement>('grid-spacing').value) || 0.5);
     const spacing = grid * view.scale;
     const origin = screen({ x: 0, y: 0 });

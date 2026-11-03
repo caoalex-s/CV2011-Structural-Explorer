@@ -40,6 +40,17 @@ def attach_symbolic_derivation(model, beam, numeric_pieces, section, result):
         conversion = 1000 if row["unit"] in ("mm", "mrad") else 1
         row["symbolicLatex"] = latex(expression/conversion)
         row["symbolicExact"] = str(expression)
+        # Print the same expression with numbers in place of its parameters.
+        # Substituting with SymPy first would evaluate away the arithmetic that
+        # students need to see. Parentheses preserve signs and rational inputs.
+        numeric_names = {
+            symbol: rf"\left({sp.latex(value)}\right)"
+            for symbol, value in substitutions.items()
+        }
+        row["substitutionLatex"] = sp.latex(
+            sp.factor(expression/conversion),
+            symbol_names=numeric_names, mul_symbol="times",
+        )
         if conversion != 1:
             row["symbolicUnit"] = "m" if row["unit"] == "mm" else "rad"
         if label is not None:
@@ -228,7 +239,38 @@ def attach_symbolic_derivation(model, beam, numeric_pieces, section, result):
         for extremum in summary["extrema"]:
             coordinate = sp.Rational(extremum["x"]) / beam.length * length
             expression = physical_pieces[extremum["piece"]-1][field].subs(X, coordinate) * scale
-            attach(extremum["substitution"], expression, rf"{symbol}\left({latex(coordinate)}\right)")
+            side = rf"^{{{extremum['side']}}}" if extremum["side"] else ""
+            extremum["substitution"]["labelLatex"] = rf"{symbol}\left({sp.latex(sp.Rational(extremum['x']))}{side}\right)"
+            attach(extremum["substitution"], expression, rf"{symbol}\left({latex(coordinate)}{side}\right)")
+            if extremum["kind"] != "absolute" or field not in ("M", "theta", "v"):
+                continue
+            # A compact trace uses the governing interval and a signed value;
+            # the maximum-magnitude readout is explicitly its absolute value.
+            piece = physical_pieces[extremum["piece"]-1]
+            derivative = sp.diff(piece[field], X)
+            location = equation("Comparison point", sp.Rational(extremum["x"]), "m", "x_c")
+            if extremum["xExact"]:
+                attach(location, coordinate)
+            else:
+                location["approximate"] = True
+                # Irrational critical points use a named coordinate in the
+                # short trace. Keep the exact rational witness in the details.
+                critical = sp.Symbol("x_c", real=True)
+                substitutions[critical] = sp.Rational(extremum["x"])
+                evaluation = dict(extremum["substitution"])
+                evaluation["labelLatex"] = rf"{symbol}(x_c)"
+                attach(evaluation, scale * piece[field].subs(X, critical), rf"{symbol}(x_c)")
+                numeric_names = {key: rf"\left({sp.latex(value)}\right)" for key, value in substitutions.items()}
+                numeric_names[critical] = rf"\left({float(extremum['xApprox']):.7g}\right)"
+                evaluation["substitutionLatex"] = sp.latex(sp.factor(piece[field].subs(X, critical)), symbol_names=numeric_names, mul_symbol="times")
+                evaluation["approximate"] = True
+                extremum["compactSubstitution"] = evaluation
+            extremum["coordinate"] = location
+            extremum["governing"] = equation("Governing equation", numeric_pieces[extremum["piece"]-1][field], "", rf"{symbol}(x)")
+            attach(extremum["governing"], piece[field])
+            extremum["stationary"] = equation("Stationary condition", sp.diff(numeric_pieces[extremum["piece"]-1][field], X), "", "0")
+            attach(extremum["stationary"], derivative)
+            extremum["isStationary"] = bool(derivative != 0 and sp.cancel(derivative.subs(X, coordinate).subs(substitutions)) == 0)
 
     result["parameters"] = parameters
     result["symbolicScope"] = (

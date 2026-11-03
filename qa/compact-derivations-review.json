@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-03",
+  "scope": "Compact symbolic derivation, explicit numerical substitution, and workspace axes",
+  "reviewer": "Implementation agent self-review, not independent review",
+  "guidance": "author-style 0.27 and code-style 0.2; existing course-alignment evidence",
+  "meaning_review": {
+    "calculation": "The short view retains the governing polynomial and stationary criterion, followed by parameter arithmetic and the evaluated quantity. Maximum magnitudes are distinguished from signed evaluations. Governing positions apply to the current loading.",
+    "units": "Symbolic rotations and displacements use radians and metres; the arithmetic shows conversion to mrad and mm. Rounded readouts use approximate equality. Full details preserve exact rational witnesses and bounds.",
+    "axes": "Global x points right and y upward. Local x follows member start to end, with local y rotated counterclockwise by 90 degrees. Positive N, V, and M follow the existing retained-start cut convention. The plot-side selector changes no signs.",
+    "verification": "The existing certificate source is unchanged. SymPy checks each new symbolic presentation against the exact numeric expression. Lean badges continue to describe current-instance checks, with the formalisation limits available under verification scope. No local Lean executable is invoked."
+  },
+  "readability_review": "Short traces reuse the existing equation data and renderer. The new member-basis module separates screen-coordinate conversion from structural directions. Full course derivations and certificate downloads remain accessible below the short calculations.",
+  "validation": {
+    "typescript": "Type checking passed. The existing 34 Node tests passed, followed by five targeted axis and math-rendering tests after the rounding changes.",
+    "python": "The full 26-test suite passed with one local Lean test skipped. Targeted quantity tests exercise irrational positions and the short trace; symbolic tests check displayed UDL factors against its exact result.",
+    "browser": "Static preview displayed the UDL arithmetic M(4)=(8^2*5)/8=40 kN m and the displacement arithmetic with metre-to-millimetre conversion. No math errors or horizontal page overflow were found. The axes guide is visible beneath the canvas.",
+    "privacy": "Preview used a separate port. User models and private student records were not replaced."
+  }
+}

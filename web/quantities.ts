@@ -1,5 +1,5 @@
 /** Course extrema and point evaluations from the exact beam service. */
-import { equationHtml, math, rationalLatex } from './math.js';
+import { equationHtml, compactEquationHtml, symbolicEquationHtml, math, rationalLatex } from './math.js';
 import type { Equation } from './math.js';
 
 interface Extremum {
@@ -15,6 +15,11 @@ interface Extremum {
     piece: number;
     plateau: boolean;
     substitution: Equation;
+    coordinate?: Equation;
+    governing?: Equation;
+    stationary?: Equation;
+    isStationary?: boolean;
+    compactSubstitution?: Equation;
 }
 interface QuantitySummary {
     field: string;
@@ -62,7 +67,38 @@ function boundsHtml(extremum: Extremum, symbol: string): string {
     return `<p class="small">The reported value is approximate. Its exact rational enclosure is</p>${math(`${rationalLatex(extremum.lower)}\\le ${symbol}\\le ${rationalLatex(extremum.upper)}.`, true)}`;
 }
 
-export function renderKeyQuantities(data: KeyQuantities, proofBadge: (groups: string[]) => string): string {
+interface DerivationContext {
+    equilibrium: Equation[];
+    selected: Equation[];
+}
+
+/** The first view follows the short calculation a student would write down. */
+export function renderKeyQuantities(data: KeyQuantities, proofBadge: (groups: string[]) => string, context: DerivationContext): string {
+    const highlights = data.summaries.filter(summary => ['M', 'theta', 'v'].includes(summary.field));
+    const traces = highlights.map((summary, index) => {
+        const peak = summary.extrema.find(row => row.kind === 'absolute')!;
+        const stationary = peak.isStationary || summary.roots.some(root =>
+            root.interval === peak.piece && Math.abs(root.approx - peak.xApprox) < 1e-7);
+        const method = summary.field === 'M'
+            ? `<p>Balance the support reactions, then cut the beam.</p>${context.equilibrium.slice(3, 5).map(row => symbolicEquationHtml({ ...row, labelLatex: row.labelLatex.split('=')[0].trim(), symbolicLabelLatex: row.symbolicLabelLatex?.split('=')[0].trim() })).join('')}`
+            : `<p>Integrate the moment equation and apply the support and continuity conditions.</p>${math(String.raw`EI v''=M,\qquad \theta=v',\qquad v(a)=v(b)=0`, true)}`;
+        const search = stationary
+            ? `<p>Solve ${math(summary.stationaryRule)} within the interval, then compare with its endpoint limits.</p>${peak.stationary ? symbolicEquationHtml(peak.stationary) : ''}`
+            : `<p>Compare the member ends, interval boundaries, and stationary points. ${peak.plateau ? 'This value is constant on the governing interval.' : 'An endpoint or interval boundary governs.'}</p>`;
+        return `<details class="quantity-trace" ${index === 0 ? 'open' : ''}>
+            <summary><span>Maximum ${math(`|${summary.symbol}|`)}</span><strong>${peak.exact && String(peak.value) === peak.lower ? '' : '≈ '}${number(peak.value)} ${escape(summary.unit)}</strong><span>at x ${peak.xExact ? '=' : '≈'} ${position(peak)} m</span></summary>
+            <div class="quantity-calculation"><h3>1. Derive the response</h3>${method}${peak.governing ? symbolicEquationHtml(peak.governing) : ''}
+            <h3>2. Locate the governing point</h3>${search}<p class="small">Interval ${peak.piece}; location for the current loading.</p>${peak.coordinate ? compactEquationHtml(peak.coordinate) : ''}
+            <h3>3. Substitute and evaluate</h3>${compactEquationHtml(peak.compactSubstitution || peak.substitution)}
+            ${math(`\\max|${summary.symbol}| ${peak.exact ? '=' : '\\approx'} ${peak.exact ? rationalLatex(peak.lower) : number(peak.value)}\\;\\mathrm{${summary.unit.replaceAll(' ', '\\,')}}`, true)}
+            ${proofBadge([summary.group])}</div></details>`;
+    }).join('');
+    return `<p class="small">Symbols → numbers → result. The governing locations refer to the current loads; changing their relative magnitudes can move an extremum.</p>${traces}
+        <details class="worked-interval"><summary>Values at the selected section</summary>${proofBadge(['readout'])}${context.selected.map(compactEquationHtml).join('')}</details>
+        <details class="worked-interval"><summary>All point values, signed extrema, and proof details</summary>${renderQuantityDetails(data, proofBadge)}</details>`;
+}
+
+function renderQuantityDetails(data: KeyQuantities, proofBadge: (groups: string[]) => string): string {
     const highlights = data.summaries.filter(summary => ['M', 'theta', 'v'].includes(summary.field));
     const cards = highlights.map(summary => {
         const peak = summary.extrema.find(row => row.kind === 'absolute')!;

@@ -32,6 +32,7 @@
       <section class="canvas-column">
         <div class="panel canvas-panel"><div class="canvas-header"><span id="tool-hint">Select an object to edit it. Drag joints, loads, or supports.</span><div><button id="zoom-out" aria-label="Zoom out">−</button><button id="fit">Fit</button><button id="zoom-in" aria-label="Zoom in">+</button></div></div>
           <svg id="canvas" viewBox="0 0 1000 520" role="img" aria-label="Interactive structural drawing. Use the drawing tools, then click the canvas. Numeric editing is available in the object panel." tabindex="0"></svg>
+          <div id="workspace-conventions" class="workspace-conventions" aria-label="Axes and positive sign conventions"></div>
           <div class="canvas-footer"><span id="coordinates">x 0.00 m · y 0.00 m</span><span>Drag to move · wheel to zoom · middle/right drag to pan</span></div>
         </div>
         <div class="response-toolbar panel"><div class="layer-buttons" id="layers"><button data-layer="M" class="active">Bending moment M</button><button data-layer="V">Shear force V</button><button data-layer="N">Normal force N</button><button data-layer="displacement">Deflected shape</button><button data-layer="none">Structure</button></div><label>Moment plotted on <select id="moment-side"><option value="tension">Tension side</option><option value="compression">Compression side</option></select></label><label class="check"><input id="show-reactions" type="checkbox" checked> Reactions</label></div>
