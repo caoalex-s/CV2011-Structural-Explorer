@@ -9,5 +9,6 @@
     "check": "tsc --noEmit"
   },
   "devDependencies": {"typescript": "5.9.3"},
+  "dependencies": {"katex": "0.19.1"},
   "engines": {"node": ">=24"}
 }

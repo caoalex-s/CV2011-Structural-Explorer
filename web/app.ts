@@ -1,7 +1,7 @@
 import { analyse, example, position, splitMember, nodeLabels, endConnection, referenceMember } from './engine.js';
 import type { Model, Analysis, Point, Member, Support, Load, Sample, Connection, ConnectionRule } from './engine.js';
 import { courseColors, forceSymbol, momentSymbol, rotationalSpring, supportShape } from './symbols.js';
-import { renderWorked } from './worked.js';
+import { renderWorked, showWorkedSolution } from './worked.js';
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const escape = (value: unknown) => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 const number = (value: number, digits = 3) => Math.abs(value) < 1e-8 ? '0' : Number(value.toPrecision(digits)).toString();
@@ -775,19 +775,14 @@ function renderPractice() {
     $('hint').onclick = () => { hintUsed = true; $('step-feedback').innerHTML = `<div class="feedback">${escape(step.hint)}</div>`; void record('hint', '', step.units); };
     $('reveal').onclick = async () => {
         solutionRevealed = true;
-        await record('reveal', '', step.units);
+        const attempt = await record('reveal', '', step.units);
+        if (attempt.step !== solutionStep || attempt.section !== sectionT || JSON.stringify(attempt.model) !== JSON.stringify(model) || mode !== 'practice') return;
         if (online) {
-            try {
-                const response = await api('/api/solution', { model, step: solutionStep, section: sectionT });
-                $('step-feedback').innerHTML = `<div class="feedback">${escape(response.verification)}<div class="math">${escape(response.lines.join('\n'))}</div></div>`;
-                return;
-            }
-            catch {
-                toast('The verifier is unavailable. Showing a numerical reference.');
-            }
+            showWorkedSolution(solutionStep === 'deflection' ? 'integration' : 'sections');
+        } else {
+            const expected = expectedValue(p);
+            $('step-feedback').innerHTML = `<div class="feedback">Numerical reference: ${number(expected, 5)} ${step.units}. Connect the verifier for a symbolic derivation.<p>${escape(step.hint)}</p></div>`;
         }
-        const expected = expectedValue(p);
-        $('step-feedback').innerHTML = `<div class="feedback">Numerical reference: ${number(expected, 5)} ${step.units}. Connect the verifier for a symbolic derivation.<p>${escape(step.hint)}</p></div>`;
     };
     $('check-answer').onclick = async () => {
         const answer = $<HTMLInputElement>('answer').value.trim(), units = $<HTMLSelectElement>('answer-units').value;

@@ -1,5 +1,5 @@
 // Build a static Pages artifact without copying server code or student records.
-import { mkdir, readdir, readFile, writeFile, copyFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, writeFile, copyFile, cp } from 'node:fs/promises';
 import { stripTypeScriptTypes } from 'node:module';
 import { createHash } from 'node:crypto';
 await mkdir('dist', { recursive: true });
@@ -12,6 +12,15 @@ for (const name of await readdir('web')) {
   }
 }
 await writeFile('dist/.nojekyll', '');
+// Serve the pinned renderer and fonts from the same origin, including offline
+// local use. The import map resolves the browser's bare `katex` import here.
+const renderer = 'dist/vendor/katex';
+await mkdir(renderer, { recursive: true });
+for (const filename of ['katex.mjs', 'katex.min.css']) {
+  await copyFile(`node_modules/katex/dist/${filename}`, `${renderer}/${filename}`);
+}
+await cp('node_modules/katex/dist/fonts', `${renderer}/fonts`, { recursive: true });
+await copyFile('node_modules/katex/LICENSE', `${renderer}/LICENSE`);
 // Reuse a CI proof receipt locally only while the exact proof source is intact.
 try {
   const receipt = JSON.parse(await readFile('proofs/verification-receipt.json', 'utf8'));

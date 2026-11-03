@@ -1,6 +1,11 @@
 """Verify course methods, concentrated-action limits, and certificate rejection."""
+import base64
+import hashlib
+import io
+import json
 import os
 import unittest
+import zipfile
 
 import sympy as sp
 
@@ -45,6 +50,25 @@ class WorkedTests(unittest.TestCase):
         self.assertEqual((pieces[1]["M"] - pieces[0]["M"]).subs(x, 4), -30)
         for field in ["v", "theta"]:
             self.assertEqual((pieces[1][field] - pieces[0][field]).subs(x, 4), 0)
+
+    def test_latex_and_vscode_project_match_the_generated_solution(self):
+        result = worked_solution({"model": beam(), "section": 0.5}, verify=False)
+        displacement = result["selected"][-1]
+        self.assertEqual(displacement["latex"], r"- \frac{32}{3}")
+        self.assertEqual(result["selected"][-2]["labelLatex"], r"\theta")
+        self.assertIn(r"\int_{0}^{4}", result["virtual"]["rows"][0]["equations"][-1]["labelLatex"])
+        proof = result["proof"]
+        with zipfile.ZipFile(io.BytesIO(base64.b64decode(proof["projectZip"]))) as archive:
+            self.assertEqual(set(archive.namelist()), {
+                "WorkedBeam.lean", "lean-toolchain", "lakefile.toml", "certificate.json", "README.md",
+            })
+            source = archive.read("WorkedBeam.lean")
+            self.assertEqual(source.decode(), proof["source"])
+            self.assertEqual(hashlib.sha256(source).hexdigest(), proof["sha256"])
+            self.assertEqual(archive.read("lean-toolchain").decode().strip(), "leanprover/lean4:v4.19.0")
+            metadata = json.loads(archive.read("certificate.json"))
+            self.assertEqual(metadata["status"], "not_run")
+            self.assertEqual(metadata["sha256"], proof["sha256"])
 
     def test_unsupported_inputs_do_not_get_certificates(self):
         model = beam()

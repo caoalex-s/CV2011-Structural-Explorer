@@ -80,6 +80,8 @@ The verification layers have distinct scopes:
 
 Choose **Show worked solution** beneath the section readouts. The five method tabs cover section equilibrium, double integration, moment-area, virtual work, and superposition. Expressions use the current loads and coordinates, including partial linearly varying loads, concentrated couples, and overhangs. The view gives the full piecewise N/V/M functions, slope and vertical displacement functions, boundary and continuity conditions, and values at the selected cut. It refreshes after sandbox edits. Problem mode requires an explicit reveal and records that learning event.
 
+Equations are generated as LaTeX and rendered with a pinned, locally bundled KaTeX renderer and fonts. Fractions, subscripts, integral limits, aligned equations, and units use the same rendering path in all five methods. The renderer also supplies MathML for assistive technology. No external rendering service or CDN is needed.
+
 The sequence follows the course beam-force lectures and Part 2 Lectures 2.2–2.6 and 2.9. These derivations cover a single prismatic horizontal beam with one pin and one vertical roller, up to 12 loads, and no internal joint releases or springs. Frames and other support arrangements retain their numerical sandbox response. Horizontal displacement and shear deformation are outside this worked-solution view.
 
 `proofs/BeamCertificate.lean` defines exact rational polynomial operations. For each supported model, the service constructs a downloadable Lean certificate that independently reconstructs section equilibrium from the encoded point and distributed actions. It checks all polynomial coefficients, force and moment jumps, differential polynomial identities, support conditions, displacement and slope continuity, and the displayed moment-area and unit-load calculations. Superposition certifies the sum of the symbolic per-load contributions. It does not certify each contribution's derivation separately.
@@ -89,6 +91,8 @@ The certificate uses ordinary `decide`, and the service requires a successful co
 Local Lean execution is disabled by default. GitHub's Linux runner checks public synthetic examples and publishes receipts keyed by the SHA-256 of each complete certificate. A local pilot can use `proofs/worked-receipts.json` without executing Lean. Receipts cover the unchanged simply supported, distributed-load, and overhanging examples at quarter, midpoint, and three-quarter sections. A changed certificate is labelled **Symbolic result · Lean not checked** unless an explicitly configured compiler checks it. No student model is uploaded to GitHub by this workflow.
 
 On a machine where Lean execution is approved, the service can use a pinned Lean 4.19.0 executable through `EXPLORER_LEAN`. The local pilot does not automatically discover or execute downloaded compilers. Installing a VS Code extension does not establish a successful proof check.
+
+Under **Model, signs, and verification scope**, choose **Download VS Code proof project**. Extract the ZIP and open its folder in VS Code with the official Lean 4 extension. The project includes the exact generated source, its SHA-256 and status at export, and a `lean-toolchain` file pinned to 4.19.0. It contains no compiler binaries. Opening the Lean file starts the extension's compiler-backed checking, so use an installation approved for the machine. A later check in VS Code does not automatically update the pilot's recorded verification status.
 
 ## Learning records
 
@@ -108,7 +112,9 @@ npm test
 node scripts/build.mjs
 ```
 
-Run `lake build --wfail` inside `proofs/` to check the formal library with the pinned toolchain. GitHub Actions runs the checks before publishing `dist/` to Pages. The build copies only files from `web/` and excludes server code, account credentials, and student records.
+If npm is unavailable but Node and Python are installed, `python scripts/install_math_renderer.py` installs only the pinned renderer after checking the npm archive's SHA-512 integrity, without running package scripts. Then run `node scripts/build.mjs`.
+
+Run `lake build --wfail` inside `proofs/` to check the formal library with the pinned toolchain. GitHub Actions runs the checks before publishing `dist/` to Pages. The build copies browser sources and the bundled renderer, fonts, and licence into `dist/`; server code, account credentials, and student records are excluded.
 
 The optional Dockerfile packages the Python service and browser application for a later hosted pilot. Hosted mode requires `EXPLORER_INSTRUCTOR_TOKEN`, an explicit `EXPLORER_ORIGINS` allowlist, and persistent `EXPLORER_DATA` storage. Issue each course account with `python -m server.app --issue CV2011-0042` and distribute the returned token privately. Place a hosted service behind HTTPS and apply host-level request limits. No hosted student-record service is configured for this pilot.
 
