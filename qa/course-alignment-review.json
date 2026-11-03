@@ -89,6 +89,7 @@
     "typescript": "Type check and static build passed; 28 Node tests passed",
     "python": "16 tests: 15 passed and one local Lean test deliberately skipped; includes 40 mixed-load cross-language cases and Tutorial 5/8 analytical benchmarks",
     "browser": "All five method tabs rendered without KaTeX errors or page overflow at the current 1743 px viewport; browser error log empty. Distributed intensity changed from 5 to 10 kN/m downward: midpoint M doubled from 40 to 80 kN m and v from -13.33 to -26.67 mm. Changing diagram side preserved those readouts. Demo restored to the simply supported example; no practice events submitted.",
-    "linux_ci": "Pending publication; no local Lean executable was run"
+    "linux_ci": "Run 41572860592 passed and deployed commit 5203fc7, including the Lean library axiom audit, generated-certificate checks, corrupted-polynomial rejection tests, and nine public example certificates. No local Lean executable was run.",
+    "receipts": "Downloaded the published receipts and compared all nine SHA-256 values and theorem counts against locally regenerated sources before copying them to proofs/worked-receipts.json. Midpoint simply supported example: 54 checked statements."
   }
 }
