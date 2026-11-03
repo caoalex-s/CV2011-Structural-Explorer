@@ -66,8 +66,14 @@ export function compactEquationHtml(row: Equation): string {
     if (!Number.isFinite(value)) return equationHtml(row);
     const rounded = Number(value.toPrecision(6));
     const displayed = String(rounded).replace(/e([+-]?\d+)/, '\\times10^{$1}');
-    // Integer arithmetic identifies exact terminating displays, including 0.
-    const approximate = rounded * denominator !== numerator;
+    // Compare decimal and rational values with integers, avoiding a false '='
+    // when binary floating point rounds two distinct rationals to one value.
+    const [coefficient, power = '0'] = String(rounded).split('e');
+    const [whole, fraction = ''] = coefficient.split('.');
+    const exponent = Number(power) - fraction.length;
+    const decimalNumerator = BigInt(whole + fraction) * 10n ** BigInt(Math.max(0, exponent));
+    const decimalDenominator = 10n ** BigInt(Math.max(0, -exponent));
+    const approximate = decimalNumerator * BigInt(scalar[2] || '1') !== BigInt(scalar[1]) * decimalDenominator;
     return equationHtml({ ...row, latex: displayed, approximate: row.approximate || approximate });
 }
 

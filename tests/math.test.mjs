@@ -42,4 +42,9 @@ test('short evaluations retain arithmetic, SI conversion, and approximate equali
     assert.match(rendered, /13\.3333/);
     assert.match(rendered, /\\mathrm\{m\}/);
     assert.match(rendered, /\\mathrm\{mm\}/);
+    const roundedFraction = compactEquationHtml({
+        label:'x', labelLatex:'x', latex:'1/99999999999999999999',
+        exact:'1/99999999999999999999', unit:'m',
+    });
+    assert.match(roundedFraction, /approx/);
 });
