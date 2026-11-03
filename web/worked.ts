@@ -163,6 +163,7 @@ async function fetchSolution(): Promise<void> {
 export function renderWorked(next: Context): void {
     const key = JSON.stringify([next.model, next.section, next.connected]);
     const enteringPractice = next.practice && context && !context.practice;
+    const modeChanged = context && next.practice !== context.practice;
     context = next;
     if (key !== snapshot || enteringPractice) {
         snapshot = key;
@@ -173,5 +174,5 @@ export function renderWorked(next: Context): void {
         if (next.practice) expanded = false;
         draw();
         schedule();
-    } else if (!document.getElementById('toggle-worked')) draw();
+    } else if (modeChanged || !document.getElementById('toggle-worked')) draw();
 }
