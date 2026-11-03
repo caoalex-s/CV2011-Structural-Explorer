@@ -20,8 +20,19 @@ test('force, moment, and intensity symbols remain distinct after editing the mod
     assert.equal(validLoadLabel('P_1<script>','force'), false);
     assert.equal(validLoadLabel('EI','force'), false);
     assert.match(symbolLabel('P_A = 20 kN'), /<tspan baseline-shift="sub"/);
-    assert.match(symbolLabel('w_1,a = 2'), />1,a<\/tspan>/);
+    assert.match(symbolLabel('w_1,a = 2'), /font-size="75%">1,<tspan class="svg-variable">a<\/tspan><\/tspan>/);
     assert.doesNotMatch(symbolLabel('P_A <script>'), /<script>/);
+});
+
+test('diagram annotations distinguish mathematical symbols from prose and units', () => {
+    const reaction = symbolLabel('AAᵧ = 20 kN');
+    assert.match(reaction, /class="svg-variable">AA<\/tspan>/);
+    assert.match(reaction, /baseline-shift="sub".*class="svg-variable">y<\/tspan>/);
+    assert.doesNotMatch(reaction, /ᵧ/);
+    const peak = symbolLabel('Peak |M| = 40 kN m');
+    assert.match(peak, /^Peak \|<tspan class="svg-variable">M<\/tspan>\| = 40 kN m$/);
+    assert.match(symbolLabel('M(A) = 10 kN m'), /class="svg-variable">A<\/tspan>/);
+    assert.doesNotMatch(symbolLabel('P_A <script>alert(1)</script> & "x"'), /<script>|& "/);
 });
 
 test('renaming a load preserves the public solution and updates all notation safely', () => {

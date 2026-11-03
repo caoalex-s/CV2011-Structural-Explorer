@@ -2,9 +2,28 @@
  * SVG y is down. Labels may move, but action origins and lines never do. */
 export const courseColors = { member: '#16334A', force: '#2F6F73', reaction: '#C9A227', ink: '#202020', muted: '#657177' };
 const escapeText = (value: string) => value.replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]!));
-/** Typeset editable letter subscripts after escaping all user-provided text. */
-export const symbolLabel = (value: string) => escapeText(value).replace(/\b([PFMwq])_([A-Za-z0-9]{1,8})(,[ab])?/g,
-    '$1<tspan baseline-shift="sub" font-size="75%">$2$3</tspan>');
+/** Use the equation renderer's math italic for letters, with upright digits. */
+function variableText(value: string): string {
+    return escapeText(value).replace(/[A-Za-zθ]+/g,
+        letters => `<tspan class="svg-variable">${letters}</tspan>`);
+}
+
+/** Typeset diagram notation without changing its SVG anchor or vector geometry.
+ * Only standalone symbols are italicised: words, numbers and units stay upright.
+ * Tokenise before escaping so editable labels can never introduce SVG markup.
+ */
+export function symbolLabel(value: string): string {
+    const symbols = /(?<![A-Za-z0-9_])([A-Z]+\d*|[wqxyvθ])(?:_([A-Za-z0-9]{1,8}(?:,[ab])?)|([ₓᵧ]))?(?![A-Za-z0-9_])/g;
+    let result = '', previousEnd = 0;
+    for (const match of value.matchAll(symbols)) {
+        result += escapeText(value.slice(previousEnd, match.index));
+        result += variableText(match[1]);
+        const subscript = match[2] || (match[3] === 'ₓ' ? 'x' : match[3] === 'ᵧ' ? 'y' : '');
+        if (subscript) result += `<tspan baseline-shift="sub" font-size="75%">${variableText(subscript)}</tspan>`;
+        previousEnd = match.index + match[0].length;
+    }
+    return result + escapeText(value.slice(previousEnd));
+}
 
 export function forceGeometry(x: number, y: number, fx: number, fy: number, length = 60, gap = 5) {
     const magnitude = Math.hypot(fx, fy);

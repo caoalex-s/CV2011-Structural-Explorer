@@ -91,15 +91,17 @@ footer { font-size: 12px; border: 0; margin-top: 24px; padding-top: 0; }
 #focus-workspace[aria-pressed="true"] { background: var(--teal-light); color: var(--teal); }
 #canvas { height: auto; min-height: 280px; aspect-ratio: 1000 / 400; background: white; }
 #canvas:focus:not(:focus-visible) { outline: none; }
-#canvas .svg-label { font-family: var(--font-ui); font-size: 16px; stroke: white; }
-#canvas .svg-value { font-family: var(--font-ui); font-size: 13px; stroke: white; font-variant-numeric: tabular-nums; }
+/* Match KaTeX equations: italic variables; upright prose, digits and SI units. */
+#canvas .svg-label { font-family: KaTeX_Main, 'Times New Roman', serif; font-style: normal; font-size: 16px; stroke: white; }
+#canvas .svg-value { font-family: KaTeX_Main, 'Times New Roman', serif; font-style: normal; font-size: 13px; stroke: white; font-variant-numeric: normal; }
+#canvas .svg-variable { font-family: KaTeX_Math, 'Times New Roman', serif; font-style: italic; }
 #canvas .node-label { font-family: KaTeX_Math, Georgia, serif; font-size: 19px; stroke: white; }
 #canvas .svg-label[style*="#C9A227"] { fill: #896512 !important; }
 /* Only the text moves inward; the reaction vector remains at its support. */
 #canvas .reaction-label-left text { text-anchor: end; transform: translateX(-16px); }
 .workspace-conventions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 20px; padding: 3px 18px; background: white; border-top: 1px solid #edf0eb; font-size: 13px; }
 .axis-item { gap: 0; }
-.axis-item svg { width: 48px; height: 48px; font-family: KaTeX_Math, Georgia, serif; font-size: 18px; }
+.axis-item svg { width: 48px; height: 48px; font-family: KaTeX_Math, Georgia, serif; font-style: italic; font-size: 18px; }
 .cut-convention { margin-left: auto; }
 .cut-convention > div { padding: 10px 0; font-size: 14px; line-height: 1.6; }
 .cut-convention[open] { flex-basis: 100%; }

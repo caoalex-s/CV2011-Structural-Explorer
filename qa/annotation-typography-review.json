@@ -1,0 +1,13 @@
+{
+  "date": "2026-11-03",
+  "reviewer": "Implementation agent self-review; not independent review",
+  "scope": "Mathematical typography for canvas annotations",
+  "behaviour": "Force, moment, distributed-load, reaction, peak-response and magnification annotations use the KaTeX font family already bundled for equations. Mathematical letters are italic; prose, digits and units remain upright. Letter and numeric subscripts share the same typesetting. Only text positions are adjusted to avoid canvas-edge clipping; vector origins, arrows, moment arcs, values and proofs are unchanged.",
+  "readability": "One documented SVG formatter handles notation and escapes text. Canvas annotation fitting separates measurements from position writes and reruns after font loading or viewport resizing.",
+  "validation": {
+    "automated": "Type checking and all 36 Node tests passed, including annotation escaping and the existing force/moment geometry checks.",
+    "desktop": "Reviewed point-force, reaction, reaction-moment, distributed-load and peak-value annotations. Computed styles confirm KaTeX_Main for values and KaTeX_Math italic for variables.",
+    "phone": "At 390 x 844, the cantilever end-force and reaction-moment labels stay inside the canvas after the new fitting pass. No page overflow was observed. Restored the default viewport afterwards.",
+    "preserved": "No solver or proof source changed; local Lean execution remained disabled. Preview checks used synthetic examples on a separate local origin."
+  }
+}

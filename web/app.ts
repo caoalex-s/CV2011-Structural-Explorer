@@ -281,7 +281,7 @@ function renderCanvas() {
             }
             if (maximum > 1e-8) {
                 const peak = all.reduce((a, b) => Math.abs(a[field]) > Math.abs(b[field]) ? a : b);
-                drawing += `<text x="22" y="375" class="svg-value">Peak |${field}| = ${number(Math.abs(peak[field]))} ${field === 'M' ? 'kN m' : 'kN'} · diagrams scaled to fit</text>`;
+                drawing += `<text x="22" y="375" class="svg-value">${symbolLabel(`Peak |${field}| = ${number(Math.abs(peak[field]))} ${field === 'M' ? 'kN m' : 'kN'} · diagrams scaled to fit`)}</text>`;
             }
         }
     }
@@ -327,7 +327,29 @@ function renderCanvas() {
     if (!model.members.length)
         drawing += `<text x="500" y="180" text-anchor="middle" class="svg-label" style="font-size:23px">Your structure starts here.</text><text x="500" y="215" text-anchor="middle" class="svg-value">Choose Draw member. Click a start point and an end point.</text>`;
     svg.innerHTML = drawing;
+    fitCanvasAnnotations();
 }
+
+/** Keep labels legible at the canvas edges without moving their force vectors.
+ * Measure all labels before writing positions to avoid repeated layout passes.
+ */
+function fitCanvasAnnotations(): void {
+    const bounds = svg.getBoundingClientRect();
+    const pixelScale = svg.getScreenCTM()?.a;
+    if (!pixelScale || bounds.width === 0) return;
+    const adjustments = Array.from(svg.querySelectorAll<SVGTextElement>('.svg-label, .svg-value')).map(label => {
+        const box = label.getBoundingClientRect();
+        const shift = box.left < bounds.left + 8 ? bounds.left + 8 - box.left
+            : box.right > bounds.right - 8 ? bounds.right - 8 - box.right : 0;
+        return { label, x: Number(label.getAttribute('x')) + shift / pixelScale, shift };
+    });
+    for (const { label, x, shift } of adjustments) {
+        if (shift) label.setAttribute('x', String(x));
+    }
+}
+// Re-establish original label anchors after a viewport or font-metric change.
+window.addEventListener('resize', renderCanvas);
+void document.fonts.ready.then(renderCanvas);
 function connectionEditor(member: Member, end: 'a' | 'b'): string {
     const node = model.nodes.find(node => node.id === member[end])!;
     const label = `${memberLabel(member)} at ${nodeLabels(model).get(node.id)}`;
