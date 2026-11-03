@@ -28,8 +28,9 @@
   },
   "validation": {
     "local": "25 existing engine tests pass; exact-reference tests and 40 cross-language mixed-load cases pass; four new worked-method tests pass; local Lean test deliberately skipped",
-    "linux_ci": "Run 41557293748 passed, including three load-type certificates, rejection of an altered displacement polynomial and a false equation, and nine public example certificates",
-    "browser": "Double-integration and virtual-work tabs inspected; current section readout and formula fractions agree; moving the section clears stale results immediately"
+    "linux_ci": "Release run 41559436422 passed, including three load-type certificates, rejection of an altered displacement polynomial and a false equation, and nine public example certificates",
+    "browser": "Double-integration and virtual-work tabs inspected; current section readout and formula fractions agree; moving the section clears stale results immediately; entering problem mode hides unrevealed methods; no browser errors observed",
+    "receipt": "The local pilot recognised the CI receipt for the simply supported midpoint certificate with 48 checked statements, without executing Lean"
   },
   "limits": ["Single prismatic horizontal beam with pin and vertical roller; at most 12 loads", "Frames, joint releases, springs, horizontal displacement, and shear deformation outside the worked view", "Per-load superposition derivations symbolic; their sum is formally checked"]
 }
