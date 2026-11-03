@@ -1,4 +1,7 @@
 import Std
+import Std.Internal.Rat
+
+abbrev Rat := Std.Internal.Rat
 
 /-!
 Exact polynomial certificates for the course beam methods.
@@ -22,9 +25,10 @@ def scale (a : Rat) (p : Poly) : Poly := polynomial fun i => a * coefficient p i
 def multiply (p q : Poly) : Poly := polynomial fun i =>
   ((List.range (i + 1)).map fun j => coefficient p j * coefficient q (i - j)).sum
 def value (p : Poly) (x : Rat) : Rat := p.foldr (fun a v => a + x * v) 0
-def D (p : Poly) : Poly := polynomial fun i => (i + 1 : Nat) * coefficient p (i + 1)
+def D (p : Poly) : Poly := polynomial fun i =>
+  Std.Internal.mkRat (Int.ofNat (i + 1)) 1 * coefficient p (i + 1)
 def primitive (p : Poly) : Poly := polynomial fun i =>
-  if i == 0 then 0 else coefficient p (i - 1) / (i : Rat)
+  if i == 0 then 0 else coefficient p (i - 1) / Std.Internal.mkRat (Int.ofNat i) 1
 def integral (p : Poly) (a b : Rat) : Rat := value (primitive p) b - value (primitive p) a
 
 structure Action where
