@@ -1,5 +1,5 @@
 /** Course SVG symbols and concise formula/substitution views for the first unit. */
-import { forceSymbol, supportShape, symbolLabel, courseColors } from './symbols.js';
+import { forceSymbol, momentSymbol, supportShape, symbolLabel, courseColors } from './symbols.js';
 import { beamValues, lessonBeam } from './lesson-beam.js';
 import type { BeamInputs, SupportCase } from './lesson-beam.js';
 import { math } from './math.js';
@@ -8,21 +8,24 @@ const number = (value: number) => Number(value.toPrecision(5)).toString();
 function label(x: number, y: number, text: string, anchor = 'middle'): string {
     // Here a is the load coordinate. Keep the shared prose-aware formatter from
     // treating every standalone English article "a" as a mathematical variable.
-    const notation = text.startsWith('a = ')
-        ? `<tspan class="svg-variable">a</tspan>${symbolLabel(text.slice(1))}`
-        : symbolLabel(text);
+    const notation = symbolLabel(text).replace(/(?<![A-Za-z0-9])a(?![A-Za-z0-9])/g,
+        '<tspan class="svg-variable">a</tspan>');
     return `<text x="${x}" y="${y}" text-anchor="${anchor}" class="svg-label">${notation}</text>`;
 }
 const support = (x: number, kind: string) =>
     `<g transform="translate(${x} 120)" class="support-stroke">${supportShape(kind)}</g>`;
 
-export function beamDrawing(inputs: BeamInputs, section = 0.5, compression = false, supports: SupportCase = 'pin-roller', diagrams = true): string {
+export type DiagramScale = 'constant' | 'automatic';
+
+export function beamDrawing(inputs: BeamInputs, section = 0.5, compression = false, supports: SupportCase = 'pin-roller', diagrams: boolean | 'reactions' = true, scale: DiagramScale = 'constant'): string {
     const values = beamValues(inputs, section);
     const model = lessonBeam(inputs, supports);
     const leftX = 100, rightX = 660, loadX = leftX + 560 * inputs.position, cutX = leftX + 560 * section;
-    const forceScale = 65 / inputs.load;
+    // Constant scales fit the entire allowed input range: |V| <= 45 kN,
+    // M_max <= 150 kN m. Automatic scales remain useful for small responses.
+    const forceScale = scale === 'automatic' ? 65 / inputs.load : 1.3;
     const leftShearY = 285 - forceScale * values.left, rightShearY = 285 + forceScale * values.right;
-    const momentBaseline = 450, momentHeight = 55;
+    const momentBaseline = 450, momentHeight = scale === 'automatic' ? 55 : values.peak * 0.5;
     const momentY = momentBaseline + (compression ? -1 : 1) * momentHeight;
     // Force symbols share the insertion points used by the workspace. Labels
     // move into free space without moving arrows away from their lines of action.
@@ -40,8 +43,10 @@ export function beamDrawing(inputs: BeamInputs, section = 0.5, compression = fal
     drawing += `${forceSymbol(leftX, 120, 0, values.left, courseColors.reaction, '', 46, 30)}
         ${forceSymbol(rightX, 120, 0, values.right, courseColors.reaction, '', 46, 30)}
         ${label(leftX + 12, 180, `A_y = ${number(values.left)} kN`, 'start')}
-        ${label(rightX - 12, 180, `B_y = ${number(values.right)} kN`, 'end')}
-        <path d="M${leftX} 285H${rightX}M${leftX} ${momentBaseline}H${rightX}" class="axis-stroke"/>
+        ${label(rightX - 12, 180, `B_y = ${number(values.right)} kN`, 'end')}`;
+    const handle = `<rect x="${loadX - 22}" y="30" width="44" height="98" fill="transparent" class="load-handle" data-drag-load="true"><title>Drag the force horizontally, or use the load-position slider</title></rect>`;
+    if (diagrams === 'reactions') return drawing + handle;
+    drawing += `<path d="M${leftX} 285H${rightX}M${leftX} ${momentBaseline}H${rightX}" class="axis-stroke"/>
         <path d="M${leftX} 285V${leftShearY}H${loadX}V${rightShearY}H${rightX}V285Z" class="shear-fill"/>
         <path d="M${leftX} ${momentBaseline}L${loadX} ${momentY}L${rightX} ${momentBaseline}Z" class="moment-fill"/>
         ${label(48, 289, 'V (kN)')}${label(48, momentBaseline + 4, 'M (kN m)')}
@@ -51,8 +56,45 @@ export function beamDrawing(inputs: BeamInputs, section = 0.5, compression = fal
         <path d="M${cutX} 249V535" class="section-line"/>
         <circle cx="${cutX}" cy="${285 - forceScale * values.shear}" r="4" class="section-dot"/>
         <circle cx="${cutX}" cy="${momentBaseline + (compression ? -1 : 1) * momentHeight * values.moment / values.peak}" r="4" class="section-dot"/>
-        <rect x="${loadX - 22}" y="30" width="44" height="98" fill="transparent" class="load-handle" data-drag-load="true"><title>Drag the force horizontally, or use the load-position slider</title></rect>`;
+        ${handle}`;
     return drawing;
+}
+
+/** The retained free body uses the same section and one-sided rule as the readout.
+ * Geometry is fitted to the retained length; action points remain exact.
+ * Cut actions are assumed positive, even when their calculated values are negative.
+ */
+export function cutDrawing(inputs: BeamInputs, section: number): string {
+    const { a, x } = beamValues(inputs, section);
+    const includesLoad = section >= inputs.position;
+    const atLoad = Math.abs(section - inputs.position) < 1e-9;
+    const leftX = 100, cutX = 620, beamY = 100;
+    const loadX = leftX + (cutX - leftX) * a / x;
+    const condition = atLoad ? 'x = a (right-hand cut)' : includesLoad ? 'x > a' : 'x < a';
+    return `<title>Retained left free body: ${condition}. Positive cut actions are assumed.</title>
+        <path d="M${leftX} ${beamY}H${cutX}" class="beam-stroke"/>
+        ${forceSymbol(leftX, beamY, 0, 1, courseColors.reaction, '', 48, 0)}
+        ${label(leftX - 18, 143, 'A_y', 'end')}${label(leftX, 86, 'A')}
+        ${includesLoad ? `<g data-cut-load="P">${forceSymbol(loadX, beamY, 0, -1, courseColors.force, '', 48, 0)}${label(loadX - 12, 45, 'P', 'end')}</g>` : ''}
+        <path d="M${cutX} 40V168" class="section-line"/>
+        <g data-cut-action="N" data-origin-x="${cutX}" data-origin-y="${beamY}"><path d="M${cutX} ${beamY}h90m-9-5 9 5-9 5" class="load-stroke"/></g>
+        <g data-cut-action="V" data-origin-x="${cutX}" data-origin-y="${beamY}"><path d="M${cutX} ${beamY}v65m-5-9 5 9 5-9" class="load-stroke"/></g>
+        ${momentSymbol(cutX, beamY, 1, courseColors.force, '', 30)}
+        ${label(cutX + 102, 105, 'N')}${label(cutX + 17, 169, 'V')}${label(cutX + 42, 58, 'M')}
+        <path d="M${leftX} 197H${cutX}M${leftX} 192V202M${cutX} 192V202" class="dimension-stroke"/>
+        ${label((leftX + cutX) / 2, 220, `x = ${number(x)} m`)}
+        ${includesLoad ? `<path d="M${loadX} 178H${cutX}M${loadX} 173V183M${cutX} 173V183" class="dimension-stroke"/>${label((loadX + cutX) / 2, 192, `x − a = ${number(x - a)} m`)}` : ''}
+        ${label(100, 24, condition, 'start')}`;
+}
+
+/** Equilibrium precedes substitution, with the same retained loads as the figure. */
+export function cutEquations(inputs: BeamInputs, section: number): string {
+    const after = section >= inputs.position;
+    return math(String.raw`\begin{aligned}
+        \sum F_x=0:&\quad N=0,\\
+        \sum F_y=0:&\quad A_y${after ? '-P' : ''}-V=0,\\
+        \sum M_{\mathrm{cut}}=0:&\quad M-A_yx${after ? '+P(x-a)' : ''}=0.
+        \end{aligned}`, true);
 }
 
 /** Substitution follows each generic equation and keeps rounded outputs explicit. */

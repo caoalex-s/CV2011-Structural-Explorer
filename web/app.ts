@@ -25,11 +25,12 @@ renderCourseConventions();
 const lesson = lessonContext(location.search);
 const modelStorageKey = lesson?.storageKey || 'cv2011-model';
 if (lesson) {
-    $('workspace').insertAdjacentHTML('afterbegin', '<p class="lesson-banner"><a href="learn/beam-basics/">← Back to the beam lesson</a> · Lesson workspace · <a href="./#sandbox">Return to your saved sandbox</a></p>');
+    $('workspace').insertAdjacentHTML('afterbegin', '<p class="lesson-banner"><a href="learn/beam-basics/">← Back to the beam lesson</a> · Lesson workspace · <a href="./#sandbox">Return to your saved sandbox</a> · <button id="restart-lesson" class="quiet">Restart lesson example</button></p>');
+    $('restart-lesson').onclick = () => { commit(() => { model = clone(lesson.model); }); fit(); render(); };
 }
 let model: Model = lesson?.model || example();
 try {
-    const saved = lesson ? null : localStorage.getItem(modelStorageKey);
+    const saved = localStorage.getItem(modelStorageKey);
     if (saved) {
         const candidate = JSON.parse(saved);
         if (analyse(candidate).status !== 'invalid')

@@ -10,7 +10,8 @@ registerHooks({ resolve(specifier, context, next) {
         return next(specifier.replace(/\.js$/, '.ts'), context);
     return next(specifier, context);
 } });
-const { beamDrawing, reactionEquations, sectionEquations } = await import('../web/lesson-view.ts');
+const { beamDrawing, cutDrawing, cutEquations, reactionEquations, sectionEquations } = await import('../web/lesson-view.ts');
+const { lessonText } = await import('../web/lesson-content.ts');
 const near = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-7 * Math.max(1, Math.abs(expected)), `${actual} != ${expected}`);
 
 test('lesson formulas agree with the frame engine across the activity range', () => {
@@ -45,8 +46,43 @@ test('lesson handoff is bounded and does not reuse the sandbox storage key', () 
     const valid = lessonContext('?lesson=beam-basics&load=30&span=8&position=0.25');
     assert.equal(valid.model.loads[0].fy, -30); assert.equal(valid.model.loads[0].t, 0.25);
     assert.notEqual(valid.storageKey, 'cv2011-model');
+    assert.equal(lessonContext('?position=0.25&span=8&load=30&lesson=beam-basics').storageKey, valid.storageKey);
+    assert.notEqual(lessonContext('?lesson=beam-basics').storageKey, valid.storageKey);
     for (const load of ['NaN', 'Infinity', '-4', '99999', ''])
         assert.equal(lessonContext(`?lesson=beam-basics&load=${load}`).model.loads[0].fy, -20);
+});
+
+test('retained free bodies include the load only after it and agree with the equilibrium branch', () => {
+    const inputs = {load: 20, span: 8, position: 0.5};
+    assert.doesNotMatch(cutDrawing(inputs, 0.25), /data-cut-load/);
+    for (const section of [0.5, 0.75]) {
+        const drawing = cutDrawing(inputs, section);
+        assert.match(drawing, /data-cut-load="P"/);
+        assert.doesNotMatch(drawing, /support-stroke/);
+        assert.match(cutEquations(inputs, section), /P\(x-a\)/);
+        assert.doesNotMatch(cutEquations(inputs, section), /math-error/);
+    }
+    assert.match(cutDrawing(inputs, 0.5), /right-hand cut/);
+});
+
+test('constant diagram scales expose load and span changes while automatic fitting remains optional', () => {
+    const heights = (load, span, scale) => {
+        const svg = beamDrawing({load, span, position: 0.5}, 0.5, false, 'pin-roller', true, scale);
+        const peakY = Number(/M100 450L380 ([\d.]+)/.exec(svg)[1]);
+        const shearY = Number(/M100 285V([\d.]+)/.exec(svg)[1]);
+        return [peakY - 450, 285 - shearY];
+    };
+    const baseline = heights(20, 8, 'constant');
+    assert.deepEqual(heights(40, 8, 'constant'), baseline.map(value => value * 2));
+    assert.deepEqual(heights(20, 4, 'constant'), [baseline[0] / 2, baseline[1]]);
+    assert.deepEqual(heights(20, 8, 'automatic'), heights(40, 8, 'automatic'));
+});
+
+test('authored prediction math is typeset while prose markup is escaped', () => {
+    const rendered = lessonText('Reaction $A_y = P(L-a)/L$ <script>unsafe</script>');
+    assert.match(rendered, /class="katex"/);
+    assert.match(rendered, /&lt;script&gt;/);
+    assert.doesNotMatch(rendered, /math-error|<script>/);
 });
 
 test('lesson equations render and diagram-side changes preserve vector origins', () => {

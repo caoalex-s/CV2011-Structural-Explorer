@@ -1,0 +1,6 @@
+---
+import Math from './Math.astro';
+interface Props { id: string; }
+const { id } = Astro.props;
+---
+<label class="section-control">Section <Math tex="x/L" /><input id={id} data-section-input type="range" min="0.05" max="0.95" step="0.05" value="0.5" /><output for={id} data-section-output>0.50</output></label>

@@ -1,6 +1,8 @@
 /** Verifier connection and pseudonymous records. Sandbox edits never enter this queue. */
 import type { Model } from './engine.js';
 import { element as $, escapeHtml as escape, downloadJson as download } from './ui.js';
+import { conceptWasAssisted, selectSubmissions } from './learning-progress.js';
+import type { SubmissionGroup } from './learning-progress.js';
 
 export interface Attempt {
     id: string;
@@ -41,6 +43,7 @@ interface SessionOptions {
 export function createLearningSession({ notify: toast, onConnectionChange }: SessionOptions) {
     let online = false;
     let localDemo = false;
+    let insightGroup: SubmissionGroup = 'first';
     const loopback = ['localhost', '127.0.0.1'].includes(location.hostname);
     let config = {
         url: localStorage.getItem('cv2011-api') || (loopback ? location.origin : ''),
@@ -99,6 +102,10 @@ export function createLearningSession({ notify: toast, onConnectionChange }: Ses
                 message: 'This submission will be checked after you connect to the verifier. You can export your local records.',
             },
         };
+        // Persist before the request so an immediate refresh or another answer
+        // retains the submission and its exposure history while the service waits.
+        attempts.push(attempt);
+        saveAttempts();
         if (online)
             try {
                 const response = await api('/api/attempts', attempt);
@@ -108,7 +115,6 @@ export function createLearningSession({ notify: toast, onConnectionChange }: Ses
             catch (error) {
                 toast(`Record retained locally: ${String(error)}`);
             }
-        attempts.push(attempt);
         saveAttempts();
         return attempt;
     }
@@ -176,7 +182,8 @@ export function createLearningSession({ notify: toast, onConnectionChange }: Ses
             catch (error) {
                 toast(String(error));
             }
-        const submissions = records.filter(attempt => attempt.event === 'submit');
+        const rows = selectSubmissions(records, insightGroup);
+        const submissions = rows.map(row => row.attempt);
         const checked = submissions.filter(attempt => ['correct', 'incorrect'].includes(attempt.result?.status || ''));
         const wrong = checked.filter(attempt => attempt.result?.status === 'incorrect');
         const categories: Record<string, number> = {};
@@ -184,7 +191,24 @@ export function createLearningSession({ notify: toast, onConnectionChange }: Ses
             const category = attempt.result?.category || 'unclassified';
             categories[category] = (categories[category] || 0) + 1;
         }
-        panel.innerHTML = `<div class="panel-label">LEARNING INSIGHTS</div><h2>${escape(scope)}</h2><p>Counts describe submitted concept answers and problem steps. Exploration edits are excluded. An error category describes the observed answer pattern and can require instructor interpretation.</p><div class="insights-cards"><div class="panel"><div class="insight-number">${submissions.length}</div><p>Submitted steps</p></div><div class="panel"><div class="insight-number">${checked.length ? Math.round(100 * (checked.length - wrong.length) / checked.length) + '%' : '—'}</div><p>Correct among checked submissions</p></div><div class="panel"><div class="insight-number">${new Set(records.map(a => a.courseId)).size}</div><p>Pseudonymous IDs</p></div></div><h2>Observed answer patterns</h2>${Object.keys(categories).length ? `<table class="data-table"><thead><tr><th>Pattern</th><th>Occurrences</th></tr></thead><tbody>${Object.entries(categories).map(([name, count]) => `<tr><td>${escape(name.replaceAll('_', ' '))}</td><td>${count}</td></tr>`).join('')}</tbody></table>` : '<p class="small">No checked incorrect submissions in this view.</p>'}<h2>Recent attempts</h2><div style="overflow:auto"><table class="data-table"><thead><tr><th>Course ID</th><th>Step</th><th>Answer</th><th>Result</th><th>Hints / revealed</th></tr></thead><tbody>${submissions.slice(-30).reverse().map(a => `<tr><td>${escape(a.courseId)}</td><td>${escape(a.step.replaceAll('_', ' '))}</td><td>${escape(a.answer)} ${escape(a.units)}</td><td>${escape(a.result?.status || 'unresolved')}</td><td>${a.hintUsed ? 'Hint' : ''} ${a.solutionRevealed ? 'Solution shown' : ''}</td></tr>`).join('')}</tbody></table></div><div class="dialog-buttons"><button id="refresh-insights">Refresh</button><button id="export-attempts">Export these records</button></div>`;
+        panel.innerHTML = `<div class="panel-label">LEARNING INSIGHTS</div><h2>${escape(scope)}</h2>
+            <p>Compare first recorded answers with retries and answers after recorded hints or explanations. These flags describe use of this tool, not independent understanding. Exploration edits are excluded.</p>
+            <label>Show submissions <select id="submission-group">
+                <option value="first">First recorded · no recorded aid</option><option value="retry">Retries</option>
+                <option value="assisted">After recorded aid</option><option value="all">All submissions</option>
+            </select></label>
+            <div class="insights-cards"><div class="panel"><div class="insight-number">${submissions.length}</div><p>Submissions in this view</p></div>
+            <div class="panel"><div class="insight-number">${checked.length ? Math.round(100 * (checked.length - wrong.length) / checked.length) + '%' : '—'}</div><p>Correct among ${checked.length} checked submissions in this view</p></div>
+            <div class="panel"><div class="insight-number">${new Set(submissions.map(a => a.courseId)).size}</div><p>Pseudonymous IDs in this view</p></div></div>
+            <h2>Observed answer patterns</h2>${Object.keys(categories).length ? `<table class="data-table"><thead><tr><th>Pattern</th><th>Occurrences</th></tr></thead><tbody>${Object.entries(categories).map(([name, count]) => `<tr><td>${escape(name.replaceAll('_', ' '))}</td><td>${count}</td></tr>`).join('')}</tbody></table>` : '<p class="small">No checked incorrect submissions in this view.</p>'}
+            <h2>Recent attempts</h2><div style="overflow:auto"><table class="data-table"><thead><tr><th>Course ID</th><th>Step</th><th>Attempt</th><th>Answer</th><th>Result</th><th>Recorded aid</th></tr></thead><tbody>${rows.slice(-30).reverse().map(({attempt: a, ordinal, assisted}) => `<tr><td>${escape(a.courseId)}</td><td>${escape(a.step.replaceAll('_', ' '))}</td><td>${ordinal === 1 ? 'First' : `Retry ${ordinal - 1}`}</td><td>${escape(a.answer)} ${escape(a.units)}</td><td>${escape(a.result?.status || 'unresolved')}</td><td>${assisted ? 'Hint / explanation shown' : 'None recorded'}</td></tr>`).join('')}</tbody></table></div>
+            <p class="small">First and retry counts use the records available in this view. Concepts are grouped by question; numerical steps are grouped by model and section. Error categories describe answer patterns and require instructor interpretation.</p>
+            <div class="dialog-buttons"><button id="refresh-insights">Refresh</button><button id="export-attempts">Export all available records</button></div>`;
+        $<HTMLSelectElement>('submission-group').value = insightGroup;
+        $('submission-group').onchange = () => {
+            insightGroup = $<HTMLSelectElement>('submission-group').value as SubmissionGroup;
+            void renderInsights();
+        };
         $('export-attempts').onclick = () => download('cv2011-attempts.json', { exportedAt: new Date().toISOString(), scope, attempts: records });
         $('refresh-insights').onclick = () => void renderInsights();
         panel.insertAdjacentHTML('beforeend', '<button id="sync-attempts">Verify and upload queued attempts for my ID</button>');
@@ -217,6 +241,7 @@ export function createLearningSession({ notify: toast, onConnectionChange }: Ses
         get connected() { return online; },
         request: api,
         record,
+        conceptWasAssisted: (step: string) => conceptWasAssisted(attempts, config.courseId || 'local-unassigned', step),
         connect,
         updateStatus: updateSession,
         renderInsights,

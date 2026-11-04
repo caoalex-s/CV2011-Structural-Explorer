@@ -1,13 +1,14 @@
 ---
 import questions from '../data/questions.json';
+import { lessonText } from '../../web/lesson-content';
 interface Props { index: number; }
 const question = questions[Astro.props.index];
 ---
 <form class="prediction" data-question={question.id}>
   <p class="eyebrow">{question.title}</p>
   <fieldset>
-    <legend>{question.prompt}</legend>
-    {question.choices.map(choice => <label><input type="radio" name={question.id} value={choice.id} required /><span>{choice.label}</span></label>)}
+    <legend set:html={lessonText(question.prompt)} />
+    {question.choices.map(choice => <label><input type="radio" name={question.id} value={choice.id} required /><span set:html={lessonText(choice.label)} /></label>)}
   </fieldset>
   <button type="submit">Check prediction</button>
   <p class="feedback" role="status" hidden></p>

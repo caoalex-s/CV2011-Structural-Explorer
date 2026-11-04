@@ -1,7 +1,9 @@
 import { analyse } from '../../web/engine.js';
 import { initialBeam, lessonBeam } from '../../web/lesson-beam.js';
 import type { BeamInputs, SupportCase } from '../../web/lesson-beam.js';
-import { beamDrawing, reactionEquations, sectionEquations } from '../../web/lesson-view.js';
+import { beamDrawing, cutDrawing, cutEquations, reactionEquations, sectionEquations } from '../../web/lesson-view.js';
+import type { DiagramScale } from '../../web/lesson-view.js';
+import { lessonText } from '../../web/lesson-content.js';
 import { createLearningSession } from '../../web/learning-session.js';
 import { element as $, escapeHtml } from '../../web/ui.js';
 import questions from '../data/questions.json' with { type: 'json' };
@@ -26,56 +28,73 @@ function context(step: string, revealed = false) {
 
 function renderBeam() {
     const compression = $<HTMLSelectElement>('lesson-moment-side').value === 'compression';
-    $('beam-drawing').innerHTML = beamDrawing(inputs, section, compression);
+    const scale = $<HTMLSelectElement>('diagram-scale').value as DiagramScale;
+    $('reaction-drawing').innerHTML = beamDrawing(inputs, section, false, 'pin-roller', 'reactions');
+    $('beam-drawing').innerHTML = beamDrawing(inputs, section, compression, 'pin-roller', true, scale);
+    $('cut-drawing').innerHTML = cutDrawing(inputs, section);
+    $('cut-equations').innerHTML = cutEquations(inputs, section);
     $('reaction-equations').innerHTML = reactionEquations(inputs);
     $('section-equations').innerHTML = sectionEquations(inputs, section);
-    $('load-value').textContent = `${inputs.load} kN`;
-    $('span-value').textContent = `${inputs.span} m`;
-    $('position-value').textContent = inputs.position.toFixed(2);
-    $('section-value').textContent = section.toFixed(2);
+    for (const control of document.querySelectorAll<HTMLInputElement>('[data-beam-input]')) {
+        control.value = String(inputs[control.dataset.beamInput as keyof BeamInputs]);
+    }
+    for (const output of document.querySelectorAll<HTMLOutputElement>('[data-beam-output]')) {
+        const key = output.dataset.beamOutput as keyof BeamInputs;
+        output.textContent = key === 'load' ? `${inputs.load} kN` : key === 'span' ? `${inputs.span} m` : inputs.position.toFixed(2);
+    }
+    document.querySelectorAll<HTMLInputElement>('[data-section-input]').forEach(control => { control.value = String(section); });
+    document.querySelectorAll('[data-section-output]').forEach(output => { output.textContent = section.toFixed(2); });
+    $('scale-note').textContent = scale === 'constant'
+        ? 'Scales stay constant as the inputs change. Doubling the force doubles both diagram heights.'
+        : 'Each diagram is fitted separately. Compare the annotated values when the inputs change.';
     const parameters = new URLSearchParams({ lesson: 'beam-basics', load: String(inputs.load), span: String(inputs.span), position: String(inputs.position) });
     $<HTMLAnchorElement>('explore-current').href = `${base}?${parameters}#sandbox`;
 }
-for (const [id, key] of [['beam-load', 'load'], ['beam-span', 'span'], ['beam-position', 'position']] as const) {
-    $<HTMLInputElement>(id).addEventListener('input', event => {
+for (const control of document.querySelectorAll<HTMLInputElement>('[data-beam-input]')) {
+    control.addEventListener('input', event => {
+        const key = control.dataset.beamInput as keyof BeamInputs;
         inputs[key] = Number((event.target as HTMLInputElement).value);
         renderBeam();
     });
 }
-$('lesson-section').addEventListener('input', event => {
-    section = Number((event.target as HTMLInputElement).value);
-    renderBeam();
-});
+for (const control of document.querySelectorAll<HTMLInputElement>('[data-section-input]')) {
+    control.addEventListener('input', () => { section = Number(control.value); renderBeam(); });
+}
 $('lesson-moment-side').addEventListener('change', renderBeam);
+$('diagram-scale').addEventListener('change', renderBeam);
+$('zoom-diagrams').onclick = () => {
+    const enlarged = $('section-drawing-scroll').classList.toggle('enlarged');
+    $('zoom-diagrams').setAttribute('aria-pressed', String(enlarged));
+    $('zoom-diagrams').textContent = enlarged ? 'Fit whole span' : 'Enlarge drawing';
+};
 $('reset-beam').onclick = () => {
     inputs = { ...initialBeam }; section = 0.5;
-    $<HTMLInputElement>('beam-load').value = String(inputs.load);
-    $<HTMLInputElement>('beam-span').value = String(inputs.span);
-    $<HTMLInputElement>('beam-position').value = String(inputs.position);
-    $<HTMLInputElement>('lesson-section').value = String(section);
     renderBeam();
 };
 
 // Capture on the persistent SVG element: replacing its child paths during a
 // drag must not lose pointer capture. Sliders provide keyboard equivalents.
-const drawing = $('beam-drawing') as unknown as SVGSVGElement;
-let dragging: number | null = null;
-function moveForce(event: PointerEvent) {
-    const transform = drawing.getScreenCTM();
-    if (!transform) return;
-    const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(transform.inverse());
-    inputs.position = Math.max(0.1, Math.min(0.9, Math.round((point.x - 100) / 560 * 20) / 20));
-    $<HTMLInputElement>('beam-position').value = String(inputs.position);
-    renderBeam();
-}
-drawing.addEventListener('pointerdown', event => {
-    if (!(event.target instanceof Element) || !event.target.closest('[data-drag-load]')) return;
-    event.preventDefault(); dragging = event.pointerId;
-    drawing.setPointerCapture(event.pointerId); moveForce(event);
-});
-drawing.addEventListener('pointermove', event => { if (dragging === event.pointerId) moveForce(event); });
-for (const name of ['pointerup', 'pointercancel', 'lostpointercapture']) {
-    drawing.addEventListener(name, () => { dragging = null; });
+for (const id of ['reaction-drawing', 'beam-drawing']) {
+    const drawing = $(id) as unknown as SVGSVGElement;
+    let dragging: number | null = null;
+    function moveForce(event: PointerEvent) {
+        const transform = drawing.getScreenCTM();
+        if (!transform) return;
+        const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(transform.inverse());
+        inputs.position = Math.max(0.1, Math.min(0.9, Math.round((point.x - 100) / 560 * 20) / 20));
+        renderBeam();
+    }
+    drawing.addEventListener('pointerdown', event => {
+        if (!(event.target instanceof Element) || !event.target.closest('[data-drag-load]')) return;
+        event.preventDefault();
+        dragging = event.pointerId;
+        drawing.setPointerCapture(event.pointerId);
+        moveForce(event);
+    });
+    drawing.addEventListener('pointermove', event => { if (dragging === event.pointerId) moveForce(event); });
+    for (const name of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+        drawing.addEventListener(name, () => { dragging = null; });
+    }
 }
 
 const supportMessages: Record<SupportCase, string> = {
@@ -103,9 +122,9 @@ for (const form of document.querySelectorAll<HTMLFormElement>('[data-question]')
         if (!choice) return;
         submit.disabled = true;
         feedback.hidden = false;
-        feedback.textContent = `${answer === question.correct ? 'Correct.' : 'Review the free body.'} ${question.explanation}`;
+        feedback.innerHTML = lessonText(`${answer === question.correct ? 'Correct.' : 'Review the free body.'} ${question.explanation}`);
         try {
-            const attemptContext = context(question.id, feedbackSeen);
+            const attemptContext = context(question.id, feedbackSeen || session.conceptWasAssisted(question.id));
             feedbackSeen = true;
             if (question.id === 'concept_parallel_restraints_v1')
                 attemptContext.model = lessonBeam(initialBeam, 'three-rollers');
@@ -136,12 +155,15 @@ window.addEventListener('afterprint', () => {
     setTimeout(() => { printing = false; }, 0);
 });
 $('print-lesson').onclick = () => window.print();
+for (const link of document.querySelectorAll<HTMLAnchorElement>('.proof-link')) {
+    link.addEventListener('click', () => { $<HTMLDetailsElement>('lesson-proofs').open = true; });
+}
 fetch(`${base}verification.json`).then(response => {
     if (!response.ok) throw Error('No receipt');
     return response.json();
 }).then(receipt => {
     $('lesson-proof-status').textContent = receipt.lean === 'checked'
-        ? 'Published library: Lean checked. Scope: scaled reaction-equilibrium identities and plotting-side inversion.'
+        ? 'Published generic theorems: Lean checked. Scope: scaled reaction and section equilibrium, shear jump, moment continuity, maximum moment, and plotting-side inversion.'
         : 'Proof source available. No successful Lean check is recorded in this build.';
 }).catch(() => { $('lesson-proof-status').textContent = 'Proof source available. The check status could not be loaded.'; });
 renderBeam();

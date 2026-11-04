@@ -80,7 +80,8 @@ p + p { margin-top: 16px; }
 .activity-header label { display: grid; gap: 6px; font-size: .85rem; color: var(--muted); }
 .activity-result { padding-top: 18px; border-top: 1px solid var(--line); }
 .drawing-scroll { overflow-x: auto; margin: 18px -12px 0; }
-.drawing-scroll svg { width: 100%; min-width: 580px; display: block; }
+.drawing-scroll svg { width: 100%; display: block; }
+.drawing-scroll.enlarged svg { min-width: 800px; }
 .drawing-hint { display: none; }
 .beam-controls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; margin-top: 26px; }
 .beam-controls label { display: grid; grid-template-columns: auto 1fr; gap: 8px; font-size: .92rem; }
@@ -88,7 +89,7 @@ p + p { margin-top: 16px; }
 .beam-controls output { grid-column: 1 / -1; color: var(--muted); font-size: .88rem; }
 .diagram-options { display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap; margin-top: 18px; }
 .diagram-options label { display: grid; gap: 6px; font-size: .85rem; }
-.section-control { display: grid; grid-template-columns: auto auto minmax(70px, 1fr) 42px; gap: 16px; align-items: center; }
+.section-control { display: grid; grid-template-columns: auto auto minmax(70px, 1fr) 42px; gap: 16px; align-items: center; margin-top: 24px; }
 .section-control input { width: 100%; }
 .equation-panel { border-top: 1px solid var(--line); margin-top: 22px; padding-top: 16px; overflow-x: auto; }
 .section-readout { padding-bottom: 12px; }
@@ -103,6 +104,11 @@ p + p { margin-top: 16px; }
 .derivation[open] { padding-bottom: 22px; }
 .cut-figure { background: white; border-radius: 12px; padding: 12px; margin: 24px 0; }
 .cut-figure svg { display: block; max-width: 560px; width: 100%; margin: auto; }
+.cut-panel { margin-top: 28px; border-top: 1px solid var(--line); padding-top: 22px; }
+.cut-panel summary { cursor: pointer; font-weight: 600; color: var(--teal); }
+.proof-link { display: inline-block; margin-top: 16px; font-size: .85rem; }
+.proof-scope h3 { margin-top: 22px; }
+.proof-scope code { overflow-wrap: anywhere; font-size: .85em; }
 .beam-stroke { stroke: var(--ink); stroke-width: 4; fill: none; }
 .support-stroke { stroke: var(--ink); stroke-width: 1.6; fill: white; }
 .load-stroke { stroke: #2f6f73; stroke-width: 1.8; fill: none; }
@@ -166,7 +172,7 @@ dialog .actions { margin: 22px 0; }
     h2 { font-size: 17pt; }
     .lesson-section { margin-top: 24px; padding-top: 16px; }
     .drawing-scroll, .equation-panel, .equation.display { overflow: visible; }
-    .drawing-scroll svg { min-width: 0; max-height: 110mm; }
+    .drawing-scroll svg, .drawing-scroll.enlarged svg { min-width: 0; max-height: 110mm; }
     .activity, .prediction, .cut-figure { break-inside: avoid; background: white; }
     .derivation::details-content { display: block; }
     a { color: black; }

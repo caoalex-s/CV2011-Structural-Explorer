@@ -49,6 +49,11 @@ export function lessonContext(search: string): { model: Model; storageKey: strin
     for (const key of ['load', 'span', 'position'] as const) {
         if (params.has(key)) inputs[key] = Number(params.get(key));
     }
-    try { return { model: lessonBeam(inputs), storageKey: 'cv2011-model-lesson-beam' }; }
-    catch { return { model: lessonBeam(), storageKey: 'cv2011-model-lesson-beam' }; }
+    let model: Model;
+    try { model = lessonBeam(inputs); }
+    catch { Object.assign(inputs, initialBeam); model = lessonBeam(inputs); }
+    // Each starting example has its own resumable workspace. Refreshing never
+    // discards edits; the workspace offers an explicit restart action instead.
+    const exampleKey = [inputs.load, inputs.span, inputs.position].join(':');
+    return { model, storageKey: `cv2011-model-lesson-beam:${exampleKey}` };
 }

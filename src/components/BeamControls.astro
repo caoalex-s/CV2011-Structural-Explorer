@@ -1,0 +1,10 @@
+---
+import Math from './Math.astro';
+interface Props { prefix: string; }
+const { prefix } = Astro.props;
+---
+<div class="beam-controls">
+  <label>Force <Math tex="P\;(\mathrm{kN})" /><input id={`${prefix}-load`} data-beam-input="load" type="range" min="5" max="50" step="5" value="20" /><output for={`${prefix}-load`} data-beam-output="load">20 kN</output></label>
+  <label>Span <Math tex="L\;(\mathrm{m})" /><input id={`${prefix}-span`} data-beam-input="span" type="range" min="4" max="12" step="1" value="8" /><output for={`${prefix}-span`} data-beam-output="span">8 m</output></label>
+  <label>Load position <Math tex="a/L" /><input id={`${prefix}-position`} data-beam-input="position" type="range" min="0.1" max="0.9" step="0.05" value="0.5" /><output for={`${prefix}-position`} data-beam-output="position">0.50</output></label>
+</div>

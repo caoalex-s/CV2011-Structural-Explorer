@@ -1,0 +1,90 @@
+{
+  "date": "2026-11-04",
+  "reviewed_commit": "a46d5b5",
+  "scope": "Published Learn course map, first beam unit, lesson-to-workspace handoff, and supporting calculation, proof, and attempt-recording code",
+  "review_type": "Review only, followed by a separate evidence and counterevidence pass. Same agent as the implementation, not independent peer review.",
+  "guidance": {
+    "author_style": "0.28",
+    "language_profile": "0.29",
+    "review_checklist": "0.29",
+    "figure_style": "0.7",
+    "code_style": "0.2"
+  },
+  "course_reference": "Maintained Week 4 lecture, lines 470-590: internal actions, positive cut-face directions, and segment equilibrium. Its concise physical explanations were also the prose comparison reference.",
+  "assessment": "The first unit has correct reaction and internal-force formulas for its declared beam model. It is a useful pilot. The cut illustration and interaction layout require revision before use as primary teaching material.",
+  "findings": [
+    {
+      "id": "R1",
+      "priority": "high",
+      "kind": "teaching inconsistency",
+      "source": "src/pages/learn/beam-basics.astro:53-56; src/scripts/beam-lesson.ts:27-47",
+      "finding": "The cut drawing always shows a left segment with x < a and no applied point force, while the adjacent slider and equations also cover x >= a.",
+      "evidence": "On the published page, P=20 kN, L=8 m, a=4 m, and x/L=0.75 gave x=6 m, V=10-20=-10 kN, and M=10(6)-20(6-4)=20 kN m. The adjacent drawing still read x < a and contained only the reaction and cut actions.",
+      "counterevidence": "The static drawing is labelled x < a and the surrounding prose correctly explains both branches. The calculated equations are correct. The problem is the visual association with the live section control.",
+      "recommendation": "Update the retained free body with the selected cut, including P and its lever arm when x > a. Replace the support by its reactions in the free-body view and show the short equilibrium step that leads to each formula."
+    },
+    {
+      "id": "R2",
+      "priority": "medium",
+      "kind": "interaction and responsive layout",
+      "source": "src/pages/learn/beam-basics.astro:44-54; src/styles/learn.css:82-83",
+      "finding": "The section control is separated from the diagrams it changes. Phone users also need to pan horizontally to see both supports and the complete diagram.",
+      "evidence": "At 1440 by 1000, with the section control visible at about y=506, the bottom of the main diagram was about 388 px above the viewport. At 390 by 844, the fixed minimum SVG width clipped the right support and part of the load annotation from the initial view.",
+      "counterevidence": "Horizontal panning is provided and explained. There is no claim that the hidden portion is missing from the model.",
+      "recommendation": "Place the section control, changing free body, equations, and diagrams together. Provide a whole-span mobile view with optional zoom or expanded drawing."
+    },
+    {
+      "id": "R3",
+      "priority": "medium",
+      "kind": "teaching design",
+      "source": "web/lesson-view.ts:22-26,44-53",
+      "finding": "Automatic normalization hides the visual effect of load magnitude and span on the response. Shear heights divide by P, while the peak moment always has a height of 55 SVG units.",
+      "evidence": "Doubling P from 20 to 40 kN doubles the numerical reactions and maximum moment but leaves diagram heights unchanged. At a constant a/L, changing L also leaves the moment triangle height unchanged.",
+      "counterevidence": "The page explicitly discloses separate automatic scales, and the numerical labels are correct. This is a learning-design limitation, not an incorrect result.",
+      "recommendation": "Offer a common scale across successive states or an optional reference diagram so that students can see how response magnitudes change."
+    },
+    {
+      "id": "R4",
+      "priority": "medium",
+      "kind": "workspace persistence",
+      "source": "web/app.ts:25-39,73",
+      "finding": "Lesson model edits are written to a lesson storage key but never restored. Reloading a URL with lesson=beam-basics initializes from its query parameters again.",
+      "evidence": "The initialization sets saved to null whenever lesson context exists. changed() nevertheless writes every edit to that lesson's modelStorageKey. This finding is established from the control flow; no student model was edited during review.",
+      "counterevidence": "The main saved sandbox remains separate and protected. Explicit model export is available, and opening a new lesson link may intentionally start a fresh example.",
+      "recommendation": "Distinguish starting a fresh lesson example from resuming or refreshing its workspace, or explicitly explain that lesson exploration is temporary."
+    },
+    {
+      "id": "R5",
+      "priority": "medium",
+      "kind": "remaining verification scope",
+      "source": "src/pages/learn/beam-basics.astro:64; proofs/StructuralProofs.lean; proofs/BeamCertificate.lean; server/worked.py",
+      "finding": "The lesson does not yet connect every generic diagram derivation and maximum-moment claim to a corresponding generic Lean theorem. The shared lesson link establishes scaled reaction equilibrium identities and plotting-side inversion. Live slider values are substitutions without new certificates.",
+      "counterevidence": "The page states this limitation accurately. The separate worked-solution system already generates exact polynomial certificates for supported individual beam cases. Those certificates do not establish an unrestricted generic derivation or all real-calculus interpretations.",
+      "recommendation": "Keep the concise derivation visible and attach a small proof-scope link to each supported result. Add parameterized theorems for the piecewise force/moment laws and the maximum claim before presenting this unit as fully Lean-verified."
+    },
+    {
+      "id": "R6",
+      "priority": "low",
+      "kind": "notation rendering",
+      "source": "src/data/questions.json; src/scripts/beam-lesson.ts:106",
+      "finding": "Prediction feedback uses textContent, so expressions including A_y L = P(L - a) and A_y a remain plain text instead of the established mathematical typography.",
+      "counterevidence": "The main derivations and numerical substitution panels use KaTeX correctly.",
+      "recommendation": "Render trusted authored mathematical fragments through the shared math renderer in prompts, choices, and feedback."
+    }
+  ],
+  "additional_recommendation": {
+    "topic": "Interpretation of learning records",
+    "source": "src/scripts/beam-lesson.ts:94-121; web/learning-session.ts:179-187",
+    "observation": "The insights percentage correctly labels its denominator as checked submissions, but it pools repeated and assisted answers. Per-question feedback exposure is tracked in memory and resets on reload; opening an earlier derivation is recorded separately but is not reflected in the subsequent concept submission's solutionRevealed flag.",
+    "recommendation": "Before using the dashboard to infer independent understanding, distinguish first attempts, retries, and attempts after relevant explanations. Retain the current raw counts as descriptive submission statistics."
+  },
+  "verification": {
+    "mathematics": "Inspected equilibrium, piecewise N/V/M, load jump, continuity, and maximum formula for P > 0 and 0 < a < L against the stated course conventions.",
+    "tests": "Ran tests/lesson-beam.test.mjs: all four tests passed, including 36 load/span/position cases compared with the existing frame engine. Numerical agreement is not a formal proof.",
+    "browser": "Inspected the published unit at 1440 by 1000 and 390 by 844, changed the section and load controls, and followed the 30 kN practice handoff. Practice opened at the specified model with answers concealed. Viewport override was reset.",
+    "records": "No predictions or problem answers submitted, no derivation reveals triggered, and no student records or sandbox models changed.",
+    "limits": "No new Lean execution, full CI rerun, or print-pagination verification. Local lean.exe was not run.",
+    "second_pass": "Rechecked all findings against source and visible behavior. Distinguished incorrect visual association, persistence behavior, pedagogical recommendations, and honestly disclosed proof limitations. Rejected a claim that the core formulas or proof-status wording were mathematically incorrect."
+  },
+  "changes": "Added this review record only. No implementation, lesson prose, lecture/tutorial source, or deployment changes."
+}
