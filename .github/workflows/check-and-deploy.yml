@@ -48,6 +48,8 @@ jobs:
           build-args: '--wfail'
           test: 'false'
           use-mathlib-cache: 'true'
+      - name: Confirm pinned dependency lock is unchanged
+        run: git diff --exit-code -- proofs/lake-manifest.json
       - name: Audit formal proof axioms
         if: ${{ inputs.proof_only != true }}
         working-directory: proofs
@@ -84,6 +86,9 @@ jobs:
         if: ${{ inputs.proof_only != true }}
         run: |
           python -c "import json; from pathlib import Path; p=Path('web/verification.json'); v=json.loads(p.read_text()); v['lean']='checked'; v['commit']='${{ github.sha }}'; p.write_text(json.dumps(v))"
+      - name: Record real-beam proof bundle
+        if: ${{ inputs.proof_only != true }}
+        run: node scripts/record-real-proof.mjs
       - name: Render published symbolic equations
         if: ${{ inputs.proof_only != true }}
         run: node scripts/check_published_math.mjs

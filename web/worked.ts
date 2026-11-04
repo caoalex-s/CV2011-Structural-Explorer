@@ -9,6 +9,8 @@ import type { PublishedExample } from './published-worked.js';
 import { resolveLoadNotation } from './load-labels.js';
 import { pointForceRules } from './point-force-rules.js';
 import { pointForceWorked } from './point-force-worked.js';
+import { realPointForceApplies } from './real-beam-status.js';
+import type { RealBeamReceipt } from './real-beam-status.js';
 
 export interface WorkedResponse {
     title: string;
@@ -55,10 +57,14 @@ let error = '';
 let publishedExample: PublishedExample | undefined;
 let publishedLoaded = false;
 let genericProofStatus = 'loading';
+let realBeamReceipt: RealBeamReceipt | undefined;
 void fetch('verification.json').then(result => {
     if (!result.ok) throw Error('Proof receipt unavailable');
     return result.json();
-}).then(receipt => { genericProofStatus = receipt.lean === 'checked' ? 'checked' : 'pending'; })
+}).then(receipt => {
+    genericProofStatus = receipt.lean === 'checked' ? 'checked' : 'pending';
+    realBeamReceipt = receipt.realBeam;
+})
     .catch(() => { genericProofStatus = 'pending'; })
     .finally(() => { if (context && expanded) draw(); });
 
@@ -72,7 +78,7 @@ function genericRules(): string {
     const moment = rule.after ? `A_y x-${P}(x-a)` : 'A_y x';
     const elastic = pointForceWorked(context.model, context.section);
     const offlineDerivation = !context.connected && !response && elastic
-        ? pointForceDerivation(elastic) : '';
+        ? pointForceDerivation(elastic, realPointForceApplies(context.model, context.section, realBeamReceipt)) : '';
     if (response) return `<p class="small">${genericProofStatus === 'checked' ? 'Lean checked generic equilibrium and section rules apply.' : 'Generic equilibrium and section proof status pending.'} These rules are distinct from the numerical certificate below. ${rule.maximum ? '' : 'The nonnegative-load maximum rule does not apply.'}</p>`;
     return `<details class="worked-assumptions" open><summary>Parameterized point-force rules and worked derivation</summary>
         <p class="small">${genericProofStatus === 'checked' ? 'Lean checked generic rules' : 'Generic proof status pending'}: reaction equilibrium, section equilibrium, shear jump and moment continuity. These are parameterized rules, not a certificate for this numerical model. ${rule.maximum ? 'The nonnegative-load maximum-moment rule also applies.' : 'The maximum-moment rule requires a nonnegative downward load and does not apply.'}</p>
@@ -83,7 +89,7 @@ function genericRules(): string {
 }
 
 /** Offline course methods for the same bounded family, without an instance certificate. */
-export function pointForceDerivation(rule: NonNullable<ReturnType<typeof pointForceWorked>>): string {
+export function pointForceDerivation(rule: NonNullable<ReturnType<typeof pointForceWorked>>, realChecked = false): string {
     const n = numberLatex;
     const P = rule.label;
     const slopeBranch = rule.after ? `-${P}(x-a)^2` : '';
@@ -91,7 +97,7 @@ export function pointForceDerivation(rule: NonNullable<ReturnType<typeof pointFo
     const slopeNumbers = `${n(rule.leftReaction)}(${n(rule.x)})^2${rule.after ? `-(${n(rule.P)})(${n(rule.x)}-${n(rule.a)})^2` : ''}`;
     const displacementNumbers = `${n(rule.leftReaction)}(${n(rule.x)})^3${rule.after ? `-(${n(rule.P)})(${n(rule.x)}-${n(rule.a)})^3` : ''}`;
     return `<h3>Double integration</h3>
-        <p class="small">Symbolic elastic derivation; no Lean certificate is claimed for the current numerical instance. The beam is prismatic, linearly elastic and has constant positive EI. Positive slope is counterclockwise and positive displacement is upward.</p>
+        <p class="small">${realChecked ? 'Lean checked the generic real-field derivative and branch-continuity rules for this beam family.' : 'Symbolic elastic derivation; generic real-field proof status is pending.'} No Lean certificate is claimed for the current numerical instance. The beam is prismatic, linearly elastic and has constant positive EI. Positive slope is counterclockwise and positive displacement is upward.</p>
         ${math(`EI=${n(rule.EI)}\\,\\mathrm{kN}\\,\\mathrm m^2,\\quad EI v''=M,\\quad v(0)=v(L)=0`, true)}
         ${math(`\\theta(0)=-\\frac{${P}(L-a)\\left[L^2-(L-a)^2\\right]}{6LEI}=-\\frac{(${n(rule.P)})(${n(rule.L)}-${n(rule.a)})[(${n(rule.L)})^2-(${n(rule.L)}-${n(rule.a)})^2]}{6(${n(rule.L)})(${n(rule.EI)})}\\approx ${n(rule.thetaLeft)}\\,\\mathrm{rad}`, true)}
         ${math(`\\theta(x)=\\theta(0)+\\frac{A_yx^2${slopeBranch}}{2EI}=(${n(rule.thetaLeft)})+\\frac{${slopeNumbers}}{2(${n(rule.EI)})}\\approx ${n(rule.theta)}\\,\\mathrm{rad}`, true)}

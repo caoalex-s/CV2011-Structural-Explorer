@@ -23,6 +23,9 @@ import RealBeamFields
 #print axioms RealBeamFields.point_moment_derivative_after
 #print axioms RealBeamFields.point_curvature_before
 #print axioms RealBeamFields.point_curvature_after
+#print axioms RealBeamFields.splice_derivative_before
+#print axioms RealBeamFields.splice_derivative_after
+#print axioms RealBeamFields.splice_derivative_at
 #print axioms RealBeamFields.point_piece_slope_before
 #print axioms RealBeamFields.point_piece_slope_after
 #print axioms RealBeamFields.point_piece_slope_at_load
@@ -38,3 +41,6 @@ import RealBeamFields
 #print axioms RealBeamFields.cubic_constitutive
 #print axioms RealBeamFields.cantilever_real_slope
 #print axioms RealBeamFields.affine_boundary_uniqueness
+#print axioms RealBeamFields.affine_of_second_derivative_zero
+#print axioms RealBeamFields.piecewise_curvature_uniqueness
+#print axioms RealBeamFields.point_selected_supports

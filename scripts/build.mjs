@@ -3,6 +3,7 @@ import { mkdir, readdir, readFile, writeFile, copyFile, cp } from 'node:fs/promi
 import { stripTypeScriptTypes } from 'node:module';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
+import { currentRealBeamReceipt, proofBundleHash } from './proof-bundle.mjs';
 
 // Build lessons first, then supply the workspace, fonts, and proof receipts.
 const lessons = spawnSync(process.execPath, ['node_modules/astro/bin/astro.mjs', 'build'], {
@@ -49,6 +50,18 @@ try {
   }
 } catch {
   // A missing receipt leaves the explicitly pending source status unchanged.
+}
+// A checked generic receipt covers every local Lean source and the pinned
+// dependency manifest. A stale or incomplete bundle never retains its badge.
+const verificationPath = 'dist/verification.json';
+const verification = JSON.parse(await readFile(verificationPath, 'utf8'));
+if (verification.realBeam?.status === 'checked') {
+  try {
+    if (!currentRealBeamReceipt(verification.realBeam, await proofBundleHash())) verification.realBeam.status = 'pending';
+  } catch {
+    verification.realBeam.status = 'pending';
+  }
+  await writeFile(verificationPath, JSON.stringify(verification));
 }
 await import('./check_lessons.mjs');
 console.log('Built static application in dist/');

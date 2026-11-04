@@ -6,8 +6,8 @@ import sys
 ALLOWED = {"propext", "Classical.choice", "Quot.sound"}
 text = Path(sys.argv[1]).read_text(encoding="utf-8")
 lines = [line for line in text.splitlines() if "RealBeamFields." in line]
-if len(lines) != 38:
-    raise SystemExit(f"Expected 38 axiom reports, got {len(lines)}.")
+if len(lines) != 44:
+    raise SystemExit(f"Expected 44 axiom reports, got {len(lines)}.")
 for line in lines:
     if "does not depend on any axioms" in line:
         continue

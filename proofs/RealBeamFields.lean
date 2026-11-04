@@ -183,6 +183,44 @@ theorem point_curvature_after (P a L EI x : ℝ) (hEI : EI ≠ 0) :
   field_simp
   ring
 
+/-- Select the left or right polynomial at an action coordinate. -/
+def splice (left right : Field) (a x : ℝ) : ℝ :=
+  if x < a then left.eval x else right.eval x
+
+theorem splice_derivative_before (left right : Field) (a x : ℝ) (hx : x < a) :
+    HasDerivAt (splice left right a) (left.derivative.eval x) x := by
+  apply (left.hasDerivAt x).congr_of_eventuallyEq
+  filter_upwards [eventually_lt_nhds hx] with t ht
+  simp [splice, ht]
+
+theorem splice_derivative_after (left right : Field) (a x : ℝ) (hx : a < x) :
+    HasDerivAt (splice left right a) (right.derivative.eval x) x := by
+  apply (right.hasDerivAt x).congr_of_eventuallyEq
+  filter_upwards [eventually_gt_nhds hx] with t ht
+  simp [splice, not_lt.mpr ht.le]
+
+/-- Matching values and slopes give an actual derivative at the join. -/
+theorem splice_derivative_at (left right : Field) (a : ℝ)
+    (hvalue : left.eval a = right.eval a)
+    (hslope : left.derivative.eval a = right.derivative.eval a) :
+    HasDerivAt (splice left right a) (right.derivative.eval a) a := by
+  have hleft : HasDerivWithinAt (splice left right a) (right.derivative.eval a) (Set.Iio a) a := by
+    apply ((left.hasDerivAt a).congr_deriv hslope).hasDerivWithinAt.congr
+    · intro t ht
+      change t < a at ht
+      simp [splice, ht]
+    · simp [splice, ← hvalue]
+  have hright : HasDerivWithinAt (splice left right a) (right.derivative.eval a) (Set.Ici a) a := by
+    apply (right.hasDerivAt a).hasDerivWithinAt.congr
+    · intro t ht
+      change a ≤ t at ht
+      simp [splice, not_lt.mpr ht]
+    · simp [splice]
+  have h := hleft.union hright
+  have hunion : Set.Iio a ∪ Set.Ici a = Set.univ := Set.Iio_union_Ici
+  rw [hunion, hasDerivWithinAt_univ] at h
+  exact h
+
 /-- A physical beam chooses its polynomial on the appropriate side of the load. -/
 def pointDisplacement (P a L EI x : ℝ) : ℝ :=
   if x < a then (deflectionBefore P a L EI).eval x else (deflectionAfter P a L EI).eval x
@@ -252,6 +290,20 @@ theorem point_right_support (P a L EI : ℝ) (hL : L ≠ 0) (hEI : EI ≠ 0) :
   ring
 
 
+/-- The selected displacement satisfies endpoint support values when the
+load coordinate lies on the span. Endpoint loads use the joined value. -/
+theorem point_selected_supports (P a L EI : ℝ) (hL : 0 < L) (hEI : 0 < EI)
+    (ha₀ : 0 ≤ a) (haL : a ≤ L) :
+    pointDisplacement P a L EI 0 = 0 ∧ pointDisplacement P a L EI L = 0 := by
+  constructor
+  · by_cases ha : 0 < a
+    · simpa [pointDisplacement, ha] using point_left_support P a L EI
+    · have haeq : a = 0 := le_antisymm (le_of_not_gt ha) ha₀
+      subst a
+      simpa [pointDisplacement, ← point_displacement_continuity] using point_left_support P 0 L EI
+  · simpa [pointDisplacement, not_lt.mpr haL] using
+      point_right_support P a L EI (ne_of_gt hL) (ne_of_gt hEI)
+
 /-- For a fixed moment field, the two integration constants in each
 interval are unique if their difference is affine, displacement and slope are
 continuous at the load, and both endpoint displacements are prescribed. -/
@@ -264,6 +316,61 @@ theorem affine_boundary_uniqueness (L a c₀ c₁ d₀ d₁ : ℝ) (hL : L ≠ 0
   have hproduct : d₁*L = 0 := by linarith
   have hd₁ : d₁ = 0 := (mul_eq_zero.mp hproduct).resolve_right hL
   exact ⟨hleft, hd₁, hd₀, hd₁⟩
+
+/-- A real polynomial with zero second derivative is affine. This supplies,
+rather than assumes, the integration-constant form used in uniqueness. -/
+theorem affine_of_second_derivative_zero (p : Field) (h : p.derivative.derivative = 0) :
+    ∃ c₀ c₁ : ℝ, p = C c₀ + C c₁ * X := by
+  let c₁ : ℝ := p.derivative.coeff 0
+  have hslope : p.derivative = C c₁ := Polynomial.eq_C_of_derivative_eq_zero h
+  let remainder : Field := p - C c₁ * X
+  have hzero : remainder.derivative = 0 := by
+    simp [remainder, Polynomial.derivative_mul, hslope]
+  have hconstant : remainder = C (remainder.coeff 0) := Polynomial.eq_C_of_derivative_eq_zero hzero
+  refine ⟨remainder.coeff 0, c₁, ?_⟩
+  dsimp [remainder] at hconstant ⊢
+  linear_combination hconstant
+
+/-- Two polynomial elastic-curve branches with the same curvature, endpoint
+values and compatible value/slope joins have the same displacement fields. -/
+theorem piecewise_curvature_uniqueness (left right otherLeft otherRight : Field) (a L : ℝ)
+    (hL : L ≠ 0)
+    (hcurvatureLeft : left.derivative.derivative = otherLeft.derivative.derivative)
+    (hcurvatureRight : right.derivative.derivative = otherRight.derivative.derivative)
+    (hleft : left.eval 0 = otherLeft.eval 0) (hright : right.eval L = otherRight.eval L)
+    (hjoin : left.eval a - otherLeft.eval a = right.eval a - otherRight.eval a)
+    (hslope : left.derivative.eval a - otherLeft.derivative.eval a =
+              right.derivative.eval a - otherRight.derivative.eval a) :
+    left = otherLeft ∧ right = otherRight := by
+  have hlzero : (left - otherLeft).derivative.derivative = 0 := by
+    simp [Polynomial.derivative_sub, hcurvatureLeft]
+  have hrzero : (right - otherRight).derivative.derivative = 0 := by
+    simp [Polynomial.derivative_sub, hcurvatureRight]
+  obtain ⟨c₀, c₁, hc⟩ := affine_of_second_derivative_zero _ hlzero
+  obtain ⟨d₀, d₁, hd⟩ := affine_of_second_derivative_zero _ hrzero
+  have h₀ : c₀ = 0 := by
+    have h := congrArg (Polynomial.eval (0 : ℝ)) hc
+    simpa [hleft] using h.symm
+  have hLvalue : d₀ + d₁*L = 0 := by
+    have h := congrArg (Polynomial.eval L) hd
+    simpa [hright] using h.symm
+  have hv : c₀ + c₁*a = d₀ + d₁*a := by
+    have hleftEval := congrArg (Polynomial.eval a) hc
+    have hrightEval := congrArg (Polynomial.eval a) hd
+    simp only [Polynomial.eval_sub, Polynomial.eval_add, Polynomial.eval_mul,
+      Polynomial.eval_C, Polynomial.eval_X] at hleftEval hrightEval
+    linarith
+  have ht : c₁ = d₁ := by
+    have hleftDeriv := congrArg (fun p : Field => p.derivative.eval a) hc
+    have hrightDeriv := congrArg (fun p : Field => p.derivative.eval a) hd
+    simp [Polynomial.derivative_sub, Polynomial.derivative_mul] at hleftDeriv hrightDeriv
+    linarith
+  obtain ⟨hc₀, hc₁, hd₀, hd₁⟩ := affine_boundary_uniqueness L a c₀ c₁ d₀ d₁ hL h₀ hLvalue hv ht
+  constructor
+  · have : left - otherLeft = 0 := by simpa [hc₀, hc₁] using hc
+    exact sub_eq_zero.mp this
+  · have : right - otherRight = 0 := by simpa [hd₀, hd₁] using hd
+    exact sub_eq_zero.mp this
 
 /-! A cantilever with downward end force P, counterclockwise end couple T,
 and downward intensity w(x) = w₀ + w₁ x. These fields share the same

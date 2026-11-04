@@ -22,7 +22,7 @@ test('offline derivation renders both branches and a renamed action', () => {
         assert.doesNotMatch(html, /math-error/);
         assert.match(html, /Double integration/);
         assert.match(html, /Moment-area and virtual work/);
-        assert.match(html, /no Lean certificate/);
+        assert.match(html, /no Lean certificate/i);
         assert.match(html, /F_\{A\}/);
     }
 });
