@@ -50,26 +50,32 @@ def endActions (d : LocalDofs) (L EA EI p₀ p₁ q₀ q₁ : ℝ) : LocalAction
 
 /-- The imposed axial coordinates are recovered at both member ends. -/
 theorem axial_end_kinematics (d : LocalDofs) (L EA p₀ p₁ : ℝ)
-    (hL : L ≠ 0) (hEA : EA ≠ 0) :
+    (hL : L ≠ 0) (_hEA : EA ≠ 0) :
     (axialDisplacement d L EA p₀ p₁).eval 0 = d 0 ∧
     (axialDisplacement d L EA p₀ p₁).eval L = d 3 := by
-  constructor <;> simp [axialDisplacement, coordinate] <;> field_simp <;> ring
+  constructor <;> simp [axialDisplacement, coordinate]
+  all_goals field_simp
+  all_goals ring
 
 /-- The imposed transverse translations are recovered at both member ends. -/
 theorem transverse_end_kinematics (d : LocalDofs) (L EI q₀ q₁ : ℝ)
-    (hL : L ≠ 0) (hEI : EI ≠ 0) :
+    (hL : L ≠ 0) (_hEI : EI ≠ 0) :
     (transverseDisplacement d L EI q₀ q₁).eval 0 = d 1 ∧
     (transverseDisplacement d L EI q₀ q₁).eval L = d 4 := by
-  constructor <;> simp [transverseDisplacement, coordinate] <;> field_simp <;> ring
+  constructor <;> simp [transverseDisplacement, coordinate]
+  all_goals field_simp
+  all_goals ring
 
 /-- The imposed physical end rotations are recovered from v′. -/
 theorem rotation_end_kinematics (d : LocalDofs) (L EI q₀ q₁ : ℝ)
-    (hL : L ≠ 0) (hEI : EI ≠ 0) :
+    (hL : L ≠ 0) (_hEI : EI ≠ 0) :
     (rotation d L EI q₀ q₁).eval 0 = d 2 ∧
     (rotation d L EI q₀ q₁).eval L = d 5 := by
   constructor <;>
     simp [rotation, transverseDisplacement, coordinate, Polynomial.derivative_mul,
-      Polynomial.derivative_pow, Polynomial.C_eq_natCast] <;> field_simp <;> ring
+      Polynomial.derivative_pow, Polynomial.C_eq_natCast]
+  all_goals field_simp
+  all_goals ring
 
 /-- The field derivatives are derivatives of real functions. -/
 theorem real_rotation (d : LocalDofs) (L EI q₀ q₁ x : ℝ) :
