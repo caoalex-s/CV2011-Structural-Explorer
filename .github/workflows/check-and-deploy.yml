@@ -4,6 +4,12 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      proof_only:
+        description: Run only Lean foundation checks
+        required: false
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -15,19 +21,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
+        if: ${{ inputs.proof_only != true }}
         with:
           node-version: '24'
       - uses: pnpm/action-setup@v4
+        if: ${{ inputs.proof_only != true }}
         with:
           version: '11.25.0'
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - run: pnpm install --frozen-lockfile --ignore-scripts
+        if: ${{ inputs.proof_only != true }}
       - run: pnpm run check
+        if: ${{ inputs.proof_only != true }}
       - run: pnpm test
+        if: ${{ inputs.proof_only != true }}
       - run: python -m pip install -r requirements.txt
+        if: ${{ inputs.proof_only != true }}
       - run: mkdir -p .data && python -m unittest discover -s tests -p 'test_*.py' -v
+        if: ${{ inputs.proof_only != true }}
       - uses: leanprover/lean-action@v1
         with:
           lake-package-directory: proofs
@@ -36,17 +49,20 @@ jobs:
           test: 'false'
           use-mathlib-cache: 'true'
       - name: Audit formal proof axioms
+        if: ${{ inputs.proof_only != true }}
         working-directory: proofs
         run: |
           lake env lean StructuralProofs.lean > axioms.log
           cat axioms.log
           if grep -E 'sorryAx|sorry|declaration uses' axioms.log; then exit 1; fi
       - name: Verify worked beam certificates and rejection tests
+        if: ${{ inputs.proof_only != true }}
         run: python -m unittest discover -s tests -p 'test_worked.py' -v
         env:
           EXPLORER_LEAN: lean
           REQUIRE_LEAN: '1'
       - name: Check lesson theorem examples and reject false claims
+        if: ${{ inputs.proof_only != true }}
         run: python -m unittest discover -s tests -p 'test_lesson_proofs.py' -v
         env:
           REQUIRE_LEAN: '1'
@@ -55,22 +71,27 @@ jobs:
         env:
           REQUIRE_LEAN: '1'
       - name: Check public course examples
+        if: ${{ inputs.proof_only != true }}
         run: python -m scripts.check_worked_examples
         env:
           EXPLORER_LEAN: lean
       - name: Record successfully checked proof scope
+        if: ${{ inputs.proof_only != true }}
         run: |
           python -c "import json; from pathlib import Path; p=Path('web/verification.json'); v=json.loads(p.read_text()); v['lean']='checked'; v['commit']='${{ github.sha }}'; p.write_text(json.dumps(v))"
       - name: Render published symbolic equations
+        if: ${{ inputs.proof_only != true }}
         run: node scripts/check_published_math.mjs
       - run: pnpm run build
+        if: ${{ inputs.proof_only != true }}
         env:
           EXPLORER_BASE: /CV2011-Structural-Explorer/
       - uses: actions/upload-pages-artifact@v3
+        if: ${{ inputs.proof_only != true }}
         with:
           path: dist
   deploy:
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && inputs.proof_only != true
     needs: verify
     permissions:
       pages: write

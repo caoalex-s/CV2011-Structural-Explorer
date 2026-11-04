@@ -12,6 +12,8 @@ open Polynomial MeasureTheory intervalIntegral
 
 namespace RealBeamFields
 
+noncomputable section
+
 abbrev Field := Polynomial ℝ
 
 /-- Formal polynomial differentiation agrees with the real derivative. -/
@@ -28,8 +30,8 @@ theorem real_integral (p : Field) (a b : ℝ) :
   · exact p.derivative.continuous.intervalIntegrable a b
 
 /-- On a smooth interval, polynomial balance gives the real shear derivative. -/
-theorem shear_balance (V q : Field) (h : V.derivative = -q) (x : ℝ) :
-    HasDerivAt (fun t : ℝ => V.eval t) (-q.eval x) x := by
+theorem shear_balance (V w : Field) (h : V.derivative = -w) (x : ℝ) :
+    HasDerivAt (fun t : ℝ => V.eval t) (-w.eval x) x := by
   simpa [h] using V.hasDerivAt x
 
 /-- On a smooth interval, the real moment derivative equals shear. -/
@@ -85,13 +87,13 @@ def deflectionAfter (P a L EI : ℝ) : Field :=
 /-- Before the point force, the elastic-curve derivative is physical slope. -/
 theorem point_before_derivative (P a L EI : ℝ) :
     (deflectionBefore P a L EI).derivative = slopeBefore P a L EI := by
-  simp [deflectionBefore, slopeBefore]
+  simp [deflectionBefore, slopeBefore, Polynomial.derivative_mul, Polynomial.derivative_pow, Polynomial.C_eq_natCast]
   ring
 
 /-- After the point force, the elastic-curve derivative is physical slope. -/
 theorem point_after_derivative (P a L EI : ℝ) :
     (deflectionAfter P a L EI).derivative = slopeAfter P a L EI := by
-  simp [deflectionAfter, slopeAfter, point_before_derivative]
+  simp [deflectionAfter, slopeAfter, point_before_derivative, Polynomial.derivative_mul, Polynomial.derivative_pow, Polynomial.C_eq_natCast]
   ring
 
 /-- These are derivatives of actual real functions, not formal symbols alone. -/
@@ -126,5 +128,7 @@ theorem point_right_support (P a L EI : ℝ) (hL : L ≠ 0) (hEI : EI ≠ 0) :
   simp [deflectionAfter, deflectionBefore, leftReaction, leftSlope]
   field_simp
   ring
+
+end
 
 end RealBeamFields
