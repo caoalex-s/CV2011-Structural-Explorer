@@ -1,45 +1,271 @@
-.worked-panel{padding:24px;min-width:0}
-.worked-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
-.worked-heading h2{margin:6px 0}
-.worked-status{padding:12px 16px;border-left:3px solid #C9A227;background:#faf5e5;margin:18px 0;line-height:1.6}
-.worked-status.checked{border-color:#2F6F73;background:#eef6f2}
-.worked-assumptions{margin:16px 0;font-size:13px;line-height:1.65}
-.method-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:20px 0;padding-bottom:14px;border-bottom:1px solid var(--line)}
-.worked-steps{max-width:850px;line-height:1.7;font-size:14px}
-.worked-steps h3{margin:24px 0 8px;font-size:17px;color:#16334A}
-.worked-rule{padding:16px 20px;background:#f1f5f3;border-radius:8px;font-size:15px;overflow-x:auto}
-.worked-equation{padding:5px 4px;overflow-x:auto;min-height:40px;color:#16334A}
-.worked-panel .katex-display{text-align:left;margin:.55em 0}
-.worked-panel .katex-display>.katex{text-align:left}
-.worked-panel .katex{font-size:1.12em}
-.worked-panel p .katex{white-space:nowrap}
-.workspace-conventions{display:grid;grid-template-columns:1fr 1.25fr 1.4fr;gap:10px;padding:9px 16px;border-top:1px solid var(--line);background:#f5f8f6;color:#16334A;font-size:11px;line-height:1.6}
-.axis-item{display:flex;align-items:center;gap:5px;min-width:0}
-.axis-item svg{width:62px;height:62px;flex:none;font:13px Georgia,serif}
-.cut-convention small{color:var(--muted)}
-@media(max-width:750px){.workspace-conventions{grid-template-columns:1fr 1fr}.cut-convention{grid-column:1 / -1}}
-.quantity-trace{border:1px solid var(--line);border-radius:8px;margin:12px 0;overflow:hidden}
-.quantity-trace>summary{display:flex;flex-wrap:wrap;align-items:center;gap:6px 18px;padding:14px 16px;background:var(--teal-light);cursor:pointer}
-.quantity-trace>summary:before{content:'▸'}.quantity-trace[open]>summary:before{content:'▾'}
-.quantity-trace>summary strong{margin-left:auto}.quantity-trace>summary>span:last-child{font-size:12px}
-.quantity-calculation{padding:0 18px 16px}.quantity-calculation>p{margin:5px 0}
-.quantity-calculation>.katex-display{overflow-x:auto;overflow-y:hidden;padding-bottom:4px}
-.full-derivations{margin:18px 0}.full-derivations>summary{font-weight:600;cursor:pointer}
-.compact-solution .worked-equation{min-height:0}
-.math-error{white-space:pre-wrap;color:#a33333;background:#fff0ef;padding:4px}
-.worked-interval{padding:12px 16px;border:1px solid var(--line);border-radius:8px;margin:10px 0}
-.worked-interval summary{font-weight:600;cursor:pointer}
-.quantity-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0}
-.quantity-card{display:flex;flex-direction:column;gap:9px;padding:15px;background:var(--teal-light);border-radius:8px;min-width:0}
-.quantity-card small{font-size:12px}.quantity-card strong{font-size:20px}.quantity-card>span{font-size:11px;color:var(--muted)}
-.quantity-unit{font-size:12px;font-weight:400;white-space:nowrap}.quantity-result{border-top:1px solid var(--line);padding:8px 0}
-.quantity-result h4{margin:8px 0}.quantity-table td:not(:first-child){white-space:nowrap;font-variant-numeric:tabular-nums}
-.quantity-table th{text-transform:none;letter-spacing:0}
-.quantity-root{border-left:2px solid var(--line);padding-left:12px}
-.quantity-result>.katex-display,.quantity-root>.katex-display{max-width:100%;overflow-x:auto;overflow-y:hidden;padding-bottom:3px}
-#section-results{grid-template-columns:repeat(auto-fit,minmax(115px,1fr))}
-@media(max-width:750px){.quantity-cards{grid-template-columns:1fr}.quantity-table{min-width:640px}}
-.worked-table{overflow:auto}
-.method-proof{display:inline-block;font-size:12px;padding:3px 9px;border-radius:12px;background:#faf5e5;color:#715921}
-.method-proof.checked{background:#eef6f2;color:#2F6F73}
-@media(max-width:600px){.worked-panel{padding:16px}.worked-rule{font-size:15px}.worked-equation{gap:8px}}
+/* Worked equations, quantities, and proof details. */
+.worked-panel {
+    min-width: 0;
+}
+
+.worked-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+}
+
+.worked-status {
+    padding: 12px 16px;
+    border-left: 3px solid #C9A227;
+    background: #faf5e5;
+    margin: 18px 0;
+    line-height: 1.6;
+}
+
+.worked-status.checked {
+    border-color: #2F6F73;
+    background: #eef6f2;
+}
+
+.worked-assumptions {
+    line-height: 1.65;
+}
+
+.method-tabs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin: 20px 0;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--line);
+}
+
+.worked-steps {
+    line-height: 1.7;
+}
+
+.worked-steps h3 {
+    margin: 24px 0 8px;
+    font-size: 17px;
+    color: #16334A;
+}
+
+.worked-rule {
+    padding: 16px 20px;
+    background: #f1f5f3;
+    border-radius: 8px;
+    font-size: 15px;
+    overflow-x: auto;
+}
+
+.worked-equation {
+    padding: 5px 4px;
+    overflow-x: auto;
+    min-height: 40px;
+    color: #16334A;
+}
+
+.worked-panel .katex-display {
+    text-align: left;
+    margin: .55em 0;
+}
+
+.worked-panel .katex-display>.katex {
+    text-align: left;
+}
+
+.worked-panel .katex {
+    font-size: 1.12em;
+}
+
+.worked-panel p .katex {
+    white-space: nowrap;
+}
+
+.workspace-conventions {
+    grid-template-columns: 1fr 1.25fr 1.4fr;
+    color: #16334A;
+    line-height: 1.6;
+}
+
+.axis-item {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+
+.axis-item svg {
+    flex: none;
+    font: 13px Georgia,serif;
+}
+
+.cut-convention small {
+    color: var(--muted);
+}
+
+@media(max-width:750px) {
+    .workspace-conventions {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .cut-convention {
+        grid-column: 1 / -1;
+    }
+}
+
+.quantity-trace {
+    overflow: hidden;
+}
+
+.quantity-trace>summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    cursor: pointer;
+}
+
+.quantity-trace>summary:before {
+    content: '▸';
+}
+
+.quantity-trace[open]>summary:before {
+    content: '▾';
+}
+
+.quantity-trace>summary strong {
+    margin-left: auto;
+}
+
+.quantity-calculation>p {
+    margin: 5px 0;
+}
+
+.quantity-calculation>.katex-display {
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 4px;
+}
+
+.full-derivations {
+    margin: 18px 0;
+}
+
+.full-derivations>summary {
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.compact-solution .worked-equation {
+    min-height: 0;
+}
+
+.math-error {
+    white-space: pre-wrap;
+    color: #a33333;
+    background: #fff0ef;
+    padding: var(--space-1);
+}
+
+.worked-interval {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    margin: 10px 0;
+}
+
+.worked-interval summary {
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.quantity-cards {
+    display: grid;
+    grid-template-columns: repeat(3,minmax(0,1fr));
+    gap: 10px;
+    margin: 12px 0;
+}
+
+.quantity-card {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    padding: 15px;
+    background: var(--teal-light);
+    border-radius: 8px;
+    min-width: 0;
+}
+
+.quantity-card small {
+    font-size: 12px;
+}
+
+.quantity-card strong {
+    font-size: 20px;
+}
+
+.quantity-card>span {
+    font-size: 11px;
+    color: var(--muted);
+}
+
+.quantity-unit {
+    font-size: 12px;
+    font-weight: 400;
+    white-space: nowrap;
+}
+
+.quantity-result {
+    border-top: 1px solid var(--line);
+    padding: 8px 0;
+}
+
+.quantity-result h4 {
+    margin: 8px 0;
+}
+
+.quantity-table td:not(:first-child) {
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.quantity-table th {
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+.quantity-root {
+    border-left: 2px solid var(--line);
+    padding-left: 12px;
+}
+
+.quantity-result>.katex-display,.quantity-root>.katex-display {
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 3px;
+}
+
+@media(max-width:750px) {
+    .quantity-cards {
+        grid-template-columns: 1fr;
+    }
+
+    .quantity-table {
+        min-width: 640px;
+    }
+}
+
+.worked-table {
+    overflow: auto;
+}
+
+.method-proof {
+    display: inline-block;
+    background: #faf5e5;
+    color: #715921;
+}
+
+@media(max-width:600px) {
+    .worked-rule {
+        font-size: 15px;
+    }
+
+    .worked-equation {
+        gap: var(--space-2);
+    }
+}

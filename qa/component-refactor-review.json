@@ -1,0 +1,25 @@
+{
+  "date": "2026-11-04",
+  "baseline": "b5a8e77",
+  "reviewer": "Implementation agent self-review; not independent review",
+  "scope": "Separate workspace presentation and learning records, and consolidate the existing design theme",
+  "boundaries": {
+    "app.ts": "Owns the current model, history, selection, pointer interaction, and canvas drawing",
+    "inspector.ts": "Renders object and joint properties from an explicit model snapshot; edits use the existing commit callback",
+    "responses.ts": "Presents the selected section, support reactions, stability, and response explanations",
+    "workspace-controls.ts": "Binds tool, response, and mode choices with accessible pressed state and shared course symbol geometry",
+    "learning-session.ts": "Owns verifier configuration, pseudonymous attempt queue, connection checks, and insights",
+    "worked.ts": "Existing solution renderer retains its model, section, request, and reveal interface",
+    "theme.css": "Owns font faces and shared colour, font, spacing, focus, and radius variables"
+  },
+  "behaviour_review": {
+    "preserved": "Solver, proof sources, scientific conventions, load metadata, API endpoints, record fields, browser storage keys, and undo checkpoint ownership",
+    "corrections": "Removed a duplicate return introduced during extraction. Expanded connection and recording code into readable steps. Attempt fields remain explicit and the model is cloned before awaiting a request.",
+    "automated": "Type checking and all 38 Node tests passed. New tests exercise offline snapshot retention, asynchronous record isolation, and credential exclusion from recorded attempts.",
+    "browser": "Verified load editing (29 kN gives 58 kN m at midspan), undo/redo, response-layer selection, published symbolic solutions and KaTeX rendering, an offline submission and its insights row, and a rotational-spring constraint edit followed by undo restoring 10000 kN m/rad.",
+    "visual": "Compared computed styles and dimensions for 24 workspace selectors at 1440 x 1000 and 390 x 844 against the baseline. No differences were found. Inspected both viewport screenshots.",
+    "data": "Browser checks used synthetic examples on a separate static-preview origin. No private pilot database was changed. Local Lean execution remained disabled."
+  },
+  "readability_review": "Checked module inputs and callbacks against engine.ts, worked.ts, and existing tests. Kept dependencies explicit, consolidated escaping/number formatting/download helpers, and formatted the stylesheets. Removed 162 declarations superseded later in the same cascade without reordering retained rules.",
+  "scope_limit": "No course curriculum was migrated and no new framework was installed. The proposed Learn area and Astro content layer remain a teaching-platform recommendation."
+}

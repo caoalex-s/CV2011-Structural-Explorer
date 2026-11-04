@@ -1,14 +1,23 @@
-import { analyse, example, position, splitMember, nodeLabels, endConnection, referenceMember } from './engine.js';
-import type { Model, Analysis, Point, Member, Support, Load, Sample, Connection, ConnectionRule } from './engine.js';
+/** Workspace controller: model/history ownership, pointer interaction, and canvas drawing.
+ * Presentation is delegated to inspector.ts, responses.ts, workspace-controls.ts,
+ * and worked.ts. learning-session.ts owns connection settings and submitted records.
+ * New lesson pages can supply models through this boundary without changing engine.ts.
+ */
+import { analyse, example, position, splitMember, nodeLabels, referenceMember } from './engine.js';
+import type { Model, Analysis, Point, Member, Support, Load, Sample } from './engine.js';
 import { courseColors, forceSymbol, momentSymbol, rotationalSpring, supportShape, symbolLabel } from './symbols.js';
 import { renderWorked, showWorkedSolution } from './worked.js';
 import { renderCourseConventions } from './course.js';
-import { math } from './math.js';
-import { assignLoadLabels, loadLabels, validLoadLabel } from './load-labels.js';
+import { assignLoadLabels, loadLabels } from './load-labels.js';
 import { workspaceConventions } from './axes.js';
-const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
-const escape = (value: unknown) => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
-const number = (value: number, digits = 3) => Math.abs(value) < 1e-8 ? '0' : Number(value.toPrecision(digits)).toString();
+import { element as $, escapeHtml as escape, formatNumber as number, downloadJson as download } from './ui.js';
+import { jointConnections } from './model-view.js';
+import type { Selection } from './model-view.js';
+import { renderInspector } from './inspector.js';
+import { renderResponses, sampleSection } from './responses.js';
+import { createWorkspaceControls } from './workspace-controls.js';
+import { createLearningSession } from './learning-session.js';
+import type { Attempt } from './learning-session.js';
 const clone = <T>(value: T): T => structuredClone(value);
 const id = (prefix: string) => `${prefix}${crypto.randomUUID().slice(0, 6)}`;
 renderCourseConventions();
@@ -25,10 +34,7 @@ catch { /* Recover from stale browser storage with the default model. */ }
 assignLoadLabels(model);
 let analysis: Analysis = analyse(model);
 let tool = 'select', layer = 'M', mode = 'sandbox', side = 'tension';
-let selected: {
-    type: string;
-    id: string;
-} | null = null;
+let selected: Selection | null = null;
 let start: Snap | null = null, hover: Snap | null = null;
 let view = { scale: 85, cx: 4, cy: 0 };
 let drag: {
@@ -44,8 +50,6 @@ const history: Model[] = [], future: Model[] = [];
 let currentMember = model.members[0]?.id || '', sectionT = 0.5;
 let solutionStep = 'reaction_left', solutionRevealed = false, hintUsed = false, practiceResultsVisible = false;
 let proofStatus = { lean: 'pending', scope: 'Scaled reaction equilibrium identities and plotting-side inversion.' };
-let online = false, localDemo = false;
-let config = { url: localStorage.getItem('cv2011-api') || (['localhost', '127.0.0.1'].includes(location.hostname) ? location.origin : ''), courseId: localStorage.getItem('cv2011-id') || '', token: sessionStorage.getItem('cv2011-token') || '', instructor: sessionStorage.getItem('cv2011-instructor') || '' };
 const svg = $('canvas') as unknown as SVGSVGElement;
 // Shared drawing dimensions keep pointer mapping, fitting and annotations aligned.
 const canvasWidth = 1000, canvasHeight = 400;
@@ -57,35 +61,7 @@ interface Snap {
     member?: string;
     t?: number;
 }
-interface Attempt {
-    id: string;
-    timestamp: string;
-    courseId: string;
-    event: string;
-    model: Model;
-    section: number;
-    step: string;
-    answer: string;
-    units: string;
-    side: string;
-    hintUsed: boolean;
-    solutionRevealed: boolean;
-    result?: {
-        status: string;
-        category: string;
-        message: string;
-    };
-    synced?: boolean;
-}
-let attempts: Attempt[] = [];
-try {
-    attempts = JSON.parse(localStorage.getItem('cv2011-attempts') || '[]');
-}
-catch {
-    attempts = [];
-}
 function toast(message: string) { $('toast').textContent = message; $('toast').classList.add('show'); setTimeout(() => $('toast').classList.remove('show'), 4200); }
-function saveAttempts() { localStorage.setItem('cv2011-attempts', JSON.stringify(attempts)); updateSession(); }
 function checkpoint(before = model) { history.push(clone(before)); if (history.length > 60)
     history.shift(); future.length = 0; }
 function changed() { assignLoadLabels(model); analysis = analyse(model); localStorage.setItem('cv2011-model', JSON.stringify(model)); render(); }
@@ -208,18 +184,8 @@ function loadDrawing(load: Load) {
     result += `<path d="M ${p.x} ${p.y + load.fy / max * 53} L ${end.x} ${end.y + load.qEnd / max * 53}" stroke="${color}" fill="none"/><text class="svg-label" x="${(p.x + end.x) / 2}" y="${Math.min(p.y, end.y) - 67}" text-anchor="middle">${symbolLabel(intensityLabel)} kN/m (↓ +)</text></g>`;
     return result;
 }
-function memberLabel(member: Member): string {
-    const labels = nodeLabels(model);
-    return `${labels.get(member.a)}–${labels.get(member.b)}`;
-}
-function jointConnections(node: Point) {
-    return model.members.filter(member => member.a === node.id || member.b === node.id).map(member => {
-        const end = member.a === node.id ? 'a' : 'b';
-        return { member, end: end as 'a' | 'b', rule: endConnection(model, member, end) };
-    });
-}
 function jointDrawing(node: Point) {
-    const p = screen(node), connected = jointConnections(node);
+    const p = screen(node), connected = jointConnections(model, node);
     const others = connected.filter(item => item.member.id !== referenceMember(model, node.id));
     const pinned = others.length > 0 && others.every(item => item.rule.axial === 'rigid' && item.rule.transverse === 'rigid' && item.rule.rotation === 'free');
     const semiRigid = others.length > 0 && others.every(item => item.rule.axial === 'rigid' && item.rule.transverse === 'rigid' && typeof item.rule.rotation === 'number');
@@ -350,130 +316,13 @@ function fitCanvasAnnotations(): void {
 // Re-establish original label anchors after a viewport or font-metric change.
 window.addEventListener('resize', renderCanvas);
 void document.fonts.ready.then(renderCanvas);
-function connectionEditor(member: Member, end: 'a' | 'b'): string {
-    const node = model.nodes.find(node => node.id === member[end])!;
-    const label = `${memberLabel(member)} at ${nodeLabels(model).get(node.id)}`;
-    if (referenceMember(model, node.id) === member.id) return `<p class="small"><b>${label}</b>: reference side</p>`;
-    const connection = endConnection(model, member, end);
-    const rows = (['axial', 'transverse', 'rotation'] as const).map(direction => {
-        const value = connection[direction], name = direction === 'axial' ? 'Axial N / local x' : direction === 'transverse' ? 'Shear V / local y' : 'Moment M / rotation';
-        const attributes = `data-connection-member="${escape(member.id)}" data-end="${end}" data-direction="${direction}"`;
-        return `<label class="field">${name}<select ${attributes} aria-label="${name}: ${label}">${[['rigid', 'Continuous'], ['free', 'Released'], ['spring', 'Elastic spring']].map(([key, caption]) => `<option value="${key}" ${key === (typeof value === 'number' ? 'spring' : value) ? 'selected' : ''}>${caption}</option>`).join('')}</select></label>${typeof value === 'number' ? `<label class="field">Stiffness (${direction === 'rotation' ? 'kN m/rad' : 'kN/m'})<input type="number" min="0" step="any" value="${value}" ${attributes} data-stiffness="true" aria-label="${direction} stiffness: ${label}"></label>` : ''}`;
-    }).join('');
-    const result = analysis.connections?.find(item => item.member === member.id && item.end === end);
-    const response = result && (mode !== 'practice' || practiceResultsVisible) ? `<p class="small">Relative rotation Δθ = ${number(result.relativeRotation)} rad<br>Axial slip = ${number(result.axialSlip * 1000)} mm<br>Transverse slip = ${number(result.transverseSlip * 1000)} mm</p>` : '';
-    return `<details class="connection-editor" open><summary>${label}</summary>${rows}${response}</details>`;
-}
-function bindConnectionEditors(container: HTMLElement) {
-    container.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-connection-member]').forEach(input => input.onchange = () => {
-        const member = model.members.find(member => member.id === input.dataset.connectionMember)!;
-        const end = input.dataset.end as 'a' | 'b', direction = input.dataset.direction as keyof Connection;
-        const node = model.nodes.find(node => node.id === member[end])!;
-        let value: ConnectionRule = input.value === 'spring' ? (direction === 'rotation' ? 20000 : 100000) : input.value as ConnectionRule;
-        if (input.dataset.stiffness) {
-            value = Number(input.value);
-            if (!Number.isFinite(value) || value <= 0) { toast('Use a positive spring stiffness, or choose Released.'); inspector(); return; }
-        }
-        commit(() => {
-            // Preserve every other end when converting a preset to a mixed joint.
-            for (const item of jointConnections(node)) {
-                if (item.member.id === referenceMember(model, node.id)) continue;
-                if (item.end === 'a') item.member.connectionA = { ...item.rule }; else item.member.connectionB = { ...item.rule };
-            }
-            node.joint = 'custom';
-            const rule = { ...endConnection(model, member, end), [direction]: value };
-            if (end === 'a') member.connectionA = rule; else member.connectionB = rule;
-        });
+function inspector(): void {
+    renderInspector({
+        container: $('inspector'), model, analysis, selected,
+        resultsVisible: mode !== 'practice' || practiceResultsVisible,
+        commit, clearSelection: () => { selected = null; inspector(); },
+        removeSelected, projectToMember: projection, notify: toast,
     });
-}
-function inspector() {
-    const container = $('inspector');
-    if (!selected) {
-        container.innerHTML = '<p class="small">Select an object to edit its position, loading, or stiffness.</p>';
-        return;
-    }
-    const collection = selected.type === 'node' ? model.nodes : selected.type === 'member' ? model.members : selected.type === 'support' ? model.supports : model.loads;
-    const item = collection.find(i => i.id === selected!.id) as unknown as Record<string, string | number>;
-    if (!item) {
-        selected = null;
-        inspector();
-        return;
-    }
-    // Load intensity is presented downward-positive as in Tutorial 5. Stored
-    // force components remain upward-positive for model-file compatibility.
-    const field = (key: string, label: string, step = 'any', direction = 1) => `<label class="field">${label}<input type="number" data-property="${key}" data-direction="${direction}" value="${Number(item[key] ?? (key === 'rotationStiffness' ? 20000 : 0)) * direction}" step="${step}"></label>`;
-    let html = `<h3>${escape(selected.type[0].toUpperCase() + selected.type.slice(1))} properties</h3>`;
-    if (selected.type === 'load' || selected.type === 'support') html += `<label class="field">Attached member<select data-property="member">${model.members.map(member => `<option value="${escape(member.id)}" ${member.id === item.member ? 'selected' : ''}>${memberLabel(member)}</option>`).join('')}</select></label>`;
-    if (selected.type === 'node') {
-        const node = model.nodes.find(node => node.id === selected!.id)!;
-        const connected = jointConnections(node), reference = referenceMember(model, node.id);
-        html += `<p class="small">Node <b>${nodeLabels(model).get(node.id)}</b> · labels update automatically when nodes are added or removed.</p>` + field('x', 'x (m)') + field('y', 'y (m)');
-        const jointNames: Record<string, string> = { rigid: 'Rigid joint', pinned: 'Internal pin / hinge', 'semi-rigid': 'Semi-rigid joint', custom: 'Member-specific constraints' };
-        html += `<label class="field">Joint connection<select data-property="joint">${Object.entries(jointNames).map(([kind, label]) => `<option value="${kind}" ${kind === (node.joint || 'rigid') ? 'selected' : ''}>${label}</option>`).join('')}</select></label>`;
-        if (node.joint === 'semi-rigid') html += field('rotationStiffness', 'Rotational stiffness kθ (kN m/rad)');
-        if (connected.length > 1) html += `<label class="field">Reference member<select data-property="referenceMember">${connected.map(({ member }) => `<option value="${escape(member.id)}" ${member.id === reference ? 'selected' : ''}>${memberLabel(member)}</option>`).join('')}</select></label><p class="small">Connections relate each other member end to this reference. A pin shares translations and permits relative rotation. A rotational spring transfers moment M = kθ Δθ.</p>${connected.map(({ member, end }) => connectionEditor(member, end)).join('')}`;
-        else html += '<p class="small">A joint connection relates two or more members. At a single-member end, use a ground support to constrain movement.</p>';
-    }
-    if (selected.type === 'member') {
-        const member = model.members.find(member => member.id === selected!.id)!;
-        html += `<p class="small">Member <b>${memberLabel(member)}</b></p>` + field('EA', 'Axial rigidity EA (kN)') + field('EI', 'Flexural rigidity EI (kN m²)');
-        html += connectionEditor(member, 'a') + connectionEditor(member, 'b');
-    }
-    if (selected.type === 'support')
-        html += `<label class="field">Support type<select data-property="kind">${['pin', 'roller', 'fixed', 'guided', 'custom'].map(k => `<option ${item.kind === k ? 'selected' : ''}>${k}</option>`).join('')}</select></label>` + field('t', 'Position / member length', '0.01') + (['roller', 'guided'].includes(String(item.kind)) ? field('angle', 'Restrained translation angle from +x (°)') : '') + (item.kind === 'custom' ? [['fixX', 'Restrain global x'], ['fixY', 'Restrain global y'], ['fixRotation', 'Restrain rotation θ']].map(([key, label]) => `<label class="check"><input type="checkbox" data-property="${key}" ${item[key] ? 'checked' : ''}>${label}</label>`).join('') : '') + '<p class="small">Ground restraints act on the selected member side. A pin support does not release continuity between connected members.</p>';
-    if (selected.type === 'load') {
-        html += `<label class="field">Load label<input type="text" data-property="label" maxlength="10" value="${escape(loadLabels(model).get(selected.id))}" placeholder="${item.kind === 'moment' ? 'M_0' : item.kind === 'distributed' ? 'w_1' : 'P_1'}"></label>`;
-        html += field('t', 'Start / member length', '0.01');
-        if (item.kind === 'force')
-            html += field('fx', 'Horizontal force Fx, rightward + (kN)') + field('fy', 'Vertical force Fy, upward + (kN)');
-        if (item.kind === 'moment')
-            html += field('mz', 'Moment, CCW + (kN m)');
-        if (item.kind === 'distributed')
-            html += field('end', 'End / member length', '0.01') + field('fy', 'Start intensity w, downward + (kN/m)', 'any', -1) + field('qEnd', 'End intensity w, downward + (kN/m)', 'any', -1);
-        html += '<details class="inspector-help"><summary>Load notation and directions</summary><p class="small">Use P or F for a force, M for a couple, and w or q for distributed loading. An optional subscript uses an underscore, for example P_1 or M_0. Each load has its own label.</p><p class="small">The action belongs to this member side at a joint. Arrows retain their physical line of action; moment arcs retain their application centre.</p></details>';
-    }
-    container.innerHTML = html + '<button id="delete-selected">Delete selected object</button>';
-    container.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-property]').forEach(input => input.addEventListener('change', () => {
-        const key = input.dataset.property!;
-        const value = input.type === 'checkbox' ? (input as HTMLInputElement).checked : ['kind', 'joint', 'referenceMember', 'member', 'label'].includes(key) ? input.value.trim() : Number(input.value) * Number(input.dataset.direction || 1);
-        if (key === 'label' && (!validLoadLabel(String(value), item.kind as Load['kind']) || model.loads.some(load => load.id !== selected!.id && loadLabels(model).get(load.id) === value))) {
-            toast('Enter a unique load symbol, such as P_1, M_0, or w_1.');
-            inspector();
-            return;
-        }
-        if (typeof value === 'number' && !Number.isFinite(value)) {
-            toast('Enter a finite number.');
-            return;
-        }
-        if ((key === 't' || key === 'end') && (Number(value) < 0 || Number(value) > 1)) {
-            toast('Member positions range from 0 to 1.');
-            inspector();
-            return;
-        }
-        commit(() => {
-            const previousConnections = selected?.type === 'node' && key === 'joint' ? jointConnections(model.nodes.find(node => node.id === selected!.id)!) : [];
-            if (key === 'member') {
-                const point = position(model, String(item.member), Number(item.t));
-                const next = model.members.find(member => member.id === value)!;
-                const projected = projection(point, next);
-                item.t = projected.t;
-            }
-            (item as Record<string, unknown>)[key] = value;
-            if (selected?.type === 'node' && key === 'joint') {
-                const node = model.nodes.find(node => node.id === selected!.id)!;
-                if (value === 'semi-rigid' && !node.rotationStiffness) node.rotationStiffness = 20000;
-                // Physical presets replace the connections. Entering the custom
-                // editor retains the existing behaviour until a direction changes.
-                for (const { member, end, rule } of previousConnections) {
-                    if (value === 'custom') {
-                        if (end === 'a') member.connectionA = { ...rule }; else member.connectionB = { ...rule };
-                    } else if (end === 'a') delete member.connectionA; else delete member.connectionB;
-                }
-            }
-        });
-    }));
-    bindConnectionEditors(container);
-    $('delete-selected').onclick = () => removeSelected();
 }
 function removeSelected() {
     if (!selected)
@@ -499,53 +348,14 @@ function removeSelected() {
     });
 }
 function sectionSample(): Sample | undefined {
-    const elements = analysis.elements.filter(e => e.member === currentMember);
-    // At a point action use the right-hand section, except at the member end.
-    const element = elements.find(e => sectionT >= e.t0 - 1e-9 && sectionT < e.t1 - 1e-9) || elements.at(-1);
-    if (!element)
-        return;
-    const u = Math.max(0, Math.min(40, (sectionT - element.t0) / (element.t1 - element.t0) * 40));
-    const left = element.samples[Math.floor(u)], right = element.samples[Math.min(40, Math.ceil(u))], fraction = u - Math.floor(u);
-    const sample = { ...left };
-    for (const key of ['N', 'V', 'M', 'ux', 'uy', 'rotation'] as const)
-        sample[key] = left[key] + fraction * (right[key] - left[key]);
-    return sample;
+    return sampleSection(analysis, currentMember, sectionT);
 }
 function render() {
     if (!model.members.some(m => m.id === currentMember))
         currentMember = model.members[0]?.id || '';
-    $<HTMLSelectElement>('section-member').innerHTML = model.members.map(m => `<option value="${escape(m.id)}" ${m.id === currentMember ? 'selected' : ''}>${memberLabel(m)}</option>`).join('');
-    const member = model.members.find(m => m.id === currentMember);
-    const length = member ? Math.hypot(position(model, member.id, 1).x - position(model, member.id, 0).x, position(model, member.id, 1).y - position(model, member.id, 0).y) : 0;
-    $('section-distance').textContent = `x = ${number(sectionT * length)} / ${number(length)} m`;
-    const sample = sectionSample();
-    const responseFields = ['N', 'V', 'M', 'rotation', 'displacement'];
-    $('section-results').innerHTML = [['Normal force N', sample?.N, 'kN'], ['Shear force V', sample?.V, 'kN'], ['Bending moment M', sample?.M, 'kN m'], ['Physical rotation θ (CCW +)', sample ? sample.rotation * 1000 : undefined, 'mrad'], ['Vertical displacement v (upward +)', sample ? sample.uy * 1000 : undefined, 'mm']].map(([label, value, unit], index) => `<div class="metric ${responseFields[index] === layer ? 'is-current' : ''}"><small>${label}</small><strong>${value === undefined ? '—' : number(Number(value), 4)} <em>${unit}</em></strong></div>`).join('');
-    // Classification stays visible; solver diagnostics are available on demand.
-    const statusExpanded = $('status').querySelector('details')?.open ?? false;
-    const classification = analysis.degree === 0 ? 'Statically determinate' : `Statically indeterminate (${analysis.degree})`;
-    $('status').innerHTML = analysis.status === 'stable'
-        ? `<details class="system-status" ${statusExpanded ? 'open' : ''}><summary><span class="stability-dot" aria-hidden="true"></span>Stable <span class="status-classification">· ${classification}</span></summary><div class="status-diagnostics">Degree of static indeterminacy: ${analysis.degree}. No free motion in the small-displacement model. Restrained stiffness matrix has full rank.<br>Equilibrium residual: ${analysis.residual!.toExponential(1)}</div></details>`
-        : `<span class="status-pill ${analysis.status}">${analysis.status === 'unstable' ? 'Unstable (mechanism)' : analysis.status === 'empty' ? 'Start drawing' : 'Check model'}</span><span class="status-message">${escape(analysis.message)}</span>`;
-    $('reactions').innerHTML = analysis.reactions.map((r, i) => {
-        const node = model.nodes.find(node => Math.hypot(node.x - r.x, node.y - r.y) < 1e-7);
-        const name = node ? `Node ${nodeLabels(model).get(node.id)}` : `Support ${i + 1}`;
-        const label = node ? nodeLabels(model).get(node.id)! : 'R';
-        const component = (direction: string) => `${label}_{${node ? '' : i + 1}${direction}}`;
-        return `<div class="reaction-row"><b>${name} · (${number(r.x)}, ${number(r.y)}) m</b><span>${math(component('x'))}: ${number(r.fx)} · ${math(component('y'))}: ${number(r.fy)} kN</span>${Math.abs(r.mz) > 1e-7 ? `<span>${math(`M_{${node ? label : `R${i+1}`}}`)}: ${number(r.mz)} kN m (CCW +)</span>` : ''}</div>`;
-    }).join('');
-    $('reactions').hidden = mode === 'practice' && !practiceResultsVisible;
-    (document.querySelector('.support-reactions') as HTMLElement).hidden = analysis.status !== 'stable' || (mode === 'practice' && !practiceResultsVisible);
-    $('section-results').hidden = mode === 'practice' && !practiceResultsVisible;
-    const descriptions: Record<string, [
-        string,
-        string
-    ]> = { M: ['Bending moment', 'For a horizontal member directed rightward, positive M is sagging with tension at the bottom. The Week 4 lecture plots on the tension side; worked tutorials plot on the compression side. Changing the plotting side preserves the signed moment. For an inclined member, use its local axis from the first joint to the second.'], V: ['Shear force', 'Positive V acts downward on the right cut face of the retained left portion. On the opposite cut face its arrow reverses. Between concentrated actions, dM/dx = V and dV/dx = −w for downward-positive distributed intensity w.'], N: ['Normal force', 'Positive normal force N represents tension. Negative values represent compression. The local member axis runs from the first joint to the second.'], displacement: ['Deflected shape and elastic curve', 'The elastic curve gives signed displacement, with vertical v positive upward. Physical slope θ = dv/dx is counterclockwise-positive for rightward x and small rotations. The drawing magnifies displacement; numerical values retain their actual magnitude. The frame solver includes bending and axial deformation.'], none: ['Structural model', 'Click a joint, support, load, or member to inspect it. Snap to a member interior while drawing to create a rigid connection. Crossing members remain separate.'] };
-    $('response-title').textContent = descriptions[layer][0];
-    $('response-description').textContent = descriptions[layer][1];
-    $('legend').innerHTML = `<div class="legend-item"><span class="swatch" style="background:${courseColors.force}"></span>Applied forces and moments</div><div class="legend-item"><span class="swatch" style="background:${courseColors.reaction}"></span>Reactions and displaced shape</div><p class="small">● Rigid continuity · ○ Pin / hinge<br>Spiral: rotational spring<br>Circle between rails: sliding joint<br>◇ Member-specific constraints</p><p class="small">Forces stay on their lines of action. Moment arcs are centred at their application points. A ground pin does not create an internal hinge.</p><p class="small">At a point action the section readout uses the right-hand limit, except at the member end. Values between plotted samples are interpolated.</p>`;
-    $<HTMLButtonElement>('undo').disabled = !history.length;
-    $<HTMLButtonElement>('redo').disabled = !future.length;
+    renderResponses({ model, analysis, currentMember, sectionT, layer,
+        resultsVisible: mode !== 'practice' || practiceResultsVisible });
+    controls.setHistory(history.length > 0, future.length > 0);
     inspector();
     $('edit-selection').hidden = !selected;
     (document.querySelector('.right-panel') as HTMLElement).hidden = !selected;
@@ -553,9 +363,9 @@ function render() {
     renderCanvas();
     if (mode === 'practice')
         renderPractice();
-    updateSession();
-    renderWorked({ model, section: sectionT, practice: mode === 'practice', connected: online,
-        request: payload => api('/api/worked-solution', payload),
+    session.updateStatus();
+    renderWorked({ model, section: sectionT, practice: mode === 'practice', connected: session.connected,
+        request: payload => session.request('/api/worked-solution', payload),
         selectSection: section => {
             sectionT = section;
             $<HTMLInputElement>('section-position').value = String(section * 1000);
@@ -728,45 +538,19 @@ window.addEventListener('pointercancel', endDrag, true);
 window.addEventListener('blur', endDrag);
 svg.addEventListener('contextmenu', event => event.preventDefault());
 svg.addEventListener('wheel', event => { event.preventDefault(); view.scale = Math.max(10, Math.min(500, view.scale * Math.exp(-event.deltaY * 0.001))); renderCanvas(); }, { passive: false });
-document.querySelectorAll<HTMLButtonElement>('[data-tool]').forEach(button => button.onclick = () => {
-    tool = button.dataset.tool!;
-    start = null;
-    document.querySelectorAll<HTMLElement>('[data-tool]').forEach(item => {
-        const active = item.dataset.tool === tool;
-        item.classList.toggle('active', active);
-        item.setAttribute('aria-pressed', String(active));
-    });
-    const hints: Record<string, string> = { select: 'Select an object to edit. Drag to move.', member: 'Click the start and end points. Snap to a member to create a rigid joint.', distributed: 'Click the start and end of the loaded interval on one member.', delete: 'Click an object to delete it. Undo restores the previous model.' };
-    $('tool-hint').textContent = hints[tool] || 'Click a member to place this object. Select it to edit its properties.';
-    renderCanvas();
-});
-document.querySelectorAll<HTMLButtonElement>('[data-layer]').forEach(button => button.onclick = () => {
-    layer = button.dataset.layer!;
-    document.querySelectorAll<HTMLElement>('[data-layer]').forEach(item => {
-        const active = item.dataset.layer === layer;
-        item.classList.toggle('active', active);
-        item.setAttribute('aria-pressed', String(active));
-    });
-    render();
-});
 function setMode(next: string) {
     mode = ['sandbox', 'practice', 'insights'].includes(next) ? next : 'sandbox';
     location.hash = mode;
-    document.querySelectorAll<HTMLElement>('[data-mode]').forEach(button => {
-        const active = button.dataset.mode === mode;
-        button.classList.toggle('active', active);
-        button.setAttribute('aria-pressed', String(active));
-    });
+    controls.showMode(mode);
     $('page-title').textContent = mode === 'sandbox' ? 'Explore a structure' : mode === 'practice' ? 'Work through a problem' : 'Review learning progress';
     $('page-description').textContent = mode === 'sandbox' ? 'Draw a system. Change a load. Follow the response.' : mode === 'practice' ? 'Build the model, submit a step, and examine the reasoning.' : 'Review submitted steps and the evidence behind recurring errors.';
     $('practice-panel').hidden = mode !== 'practice';
     $('insights-panel').hidden = mode !== 'insights';
     (document.querySelector('.work-grid') as HTMLElement).hidden = mode === 'insights';
     (document.querySelector('.modelbar') as HTMLElement).hidden = mode === 'insights';
-    if (mode === 'insights') void renderInsights();
+    if (mode === 'insights') void session.renderInsights();
     else render();
 }
-document.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach(button => button.onclick = () => setMode(button.dataset.mode!));
 window.addEventListener('hashchange', () => { if (location.hash.slice(1) !== mode)
     setMode(location.hash.slice(1)); });
 $<HTMLSelectElement>('moment-side').onchange = () => { side = $<HTMLSelectElement>('moment-side').value; renderCanvas(); };
@@ -775,19 +559,11 @@ $<HTMLInputElement>('grid-spacing').onchange = renderCanvas;
 $('zoom-in').onclick = () => { view.scale = Math.min(500, view.scale * 1.25); renderCanvas(); };
 $('zoom-out').onclick = () => { view.scale = Math.max(10, view.scale / 1.25); renderCanvas(); };
 $('fit').onclick = () => { fit(); renderCanvas(); };
-/** Enlarge the drawing without changing the model, view scale, or selected tool. */
-function setWorkspaceFocus(focused: boolean): void {
-    document.querySelector('.work-grid')!.classList.toggle('is-focused', focused);
-    const button = $('focus-workspace');
-    button.setAttribute('aria-pressed', String(focused));
-    button.textContent = focused ? 'Show side panels' : 'Focus view';
-    button.title = focused ? 'Restore drawing tools and object properties (Esc)' : 'Hide side panels and enlarge the drawing';
-}
-$('focus-workspace').onclick = () => setWorkspaceFocus($('focus-workspace').getAttribute('aria-pressed') !== 'true');
+$('focus-workspace').onclick = () => controls.setFocus($('focus-workspace').getAttribute('aria-pressed') !== 'true');
 $('close-inspector').onclick = () => { selected = null; render(); };
 $('help-button').onclick = () => $<HTMLDialogElement>('workspace-help').showModal();
 $('edit-selection').onclick = () => {
-    setWorkspaceFocus(false);
+    controls.setFocus(false);
     document.querySelector('.inspector-panel')!.scrollIntoView({ behavior: 'smooth', block: 'start' });
 };
 $('undo').onclick = () => { if (!history.length)
@@ -798,7 +574,7 @@ document.addEventListener('keydown', event => { if ((event.target as HTMLElement
     return; if (event.key === 'Escape') {
     start = null;
     drag = null;
-    setWorkspaceFocus(false);
+    controls.setFocus(false);
     renderCanvas();
 } if (event.key === 'Delete')
     removeSelected(); if ((event.ctrlKey || event.metaKey) && event.key === 'z') {
@@ -811,7 +587,6 @@ document.addEventListener('keydown', event => { if ((event.target as HTMLElement
 $('load-preset').onclick = () => commit(() => { const preset = $<HTMLSelectElement>('preset').value; model = preset === 'empty' ? { nodes: [], members: [], supports: [], loads: [] } : example(preset); selected = null; start = null; currentMember = model.members[0]?.id || ''; fit(); });
 $<HTMLSelectElement>('section-member').onchange = () => { currentMember = $<HTMLSelectElement>('section-member').value; render(); };
 $<HTMLInputElement>('section-position').oninput = () => { sectionT = Number($<HTMLInputElement>('section-position').value) / 1000; render(); };
-function download(name: string, data: unknown) { const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })); const anchor = document.createElement('a'); anchor.href = url; anchor.download = name; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
 $('export-model').onclick = () => download('cv2011-model.json', { version: 2, model });
 $('import-model').onclick = () => $('model-file').click();
 $<HTMLInputElement>('model-file').onchange = async () => { try {
@@ -881,7 +656,7 @@ function renderPractice() {
         solutionRevealed = true;
         const attempt = await record('reveal', '', step.units);
         if (attempt.step !== solutionStep || attempt.section !== sectionT || JSON.stringify(attempt.model) !== JSON.stringify(model) || mode !== 'practice') return;
-        if (online) {
+        if (session.connected) {
             showWorkedSolution(solutionStep === 'deflection' ? 'integration' : 'sections');
         } else {
             const expected = expectedValue(p);
@@ -908,127 +683,18 @@ function renderPractice() {
         $('check-answer').click(); };
 }
 function expectedValue(p: NonNullable<ReturnType<typeof problem>>) { return { reaction_left: p.left.fy, reaction_right: p.right.fy, normal: p.N, shear: p.V, moment: p.M, deflection: p.deflection }[solutionStep]!; }
-async function api(path: string, payload?: unknown, instructor = false): Promise<any> {
-    if (!config.url)
-        throw Error('No verifier configured.');
-    const response = await fetch(config.url.replace(/\/$/, '') + path, { method: payload === undefined ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${instructor ? config.instructor : config.token}` }, body: payload === undefined ? undefined : JSON.stringify(payload), signal: AbortSignal.timeout(path === '/api/worked-solution' ? 60000 : 15000) });
-    const result = await response.json();
-    if (!response.ok)
-        throw Error(result.error || 'Request failed');
-    return result;
+function record(event: string, answer: string, units: string): Promise<Attempt> {
+    return session.record({ model, section: sectionT, step: solutionStep, side, hintUsed,
+        solutionRevealed: solutionRevealed || practiceResultsVisible }, event, answer, units);
 }
-async function record(event: string, answer: string, units: string): Promise<Attempt> {
-    const attempt: Attempt = { id: crypto.randomUUID(), timestamp: new Date().toISOString(), courseId: config.courseId || 'local-unassigned', event, model: clone(model), section: sectionT, step: solutionStep, answer, units, side, hintUsed, solutionRevealed: solutionRevealed || practiceResultsVisible };
-    attempt.result = { status: 'unresolved', category: 'pending_verification', message: 'This submission will be checked after you connect to the verifier. You can export your local records.' };
-    if (online)
-        try {
-            const response = await api('/api/attempts', attempt);
-            attempt.result = response.result;
-            attempt.synced = true;
-        }
-        catch (error) {
-            toast(`Record retained locally: ${String(error)}`);
-        }
-    attempts.push(attempt);
-    saveAttempts();
-    return attempt;
-}
-function updateSession() {
-    $('session-status').textContent = online ? `${localDemo ? 'Local verification service' : 'Connected verifier'} · ${config.courseId}. ${attempts.filter(a => a.synced).length} recorded events on this device.` : `Local exploration · ${attempts.filter(a => !a.synced).length} events awaiting verification. Connect your course verifier to record class results.`;
-}
-async function connect() {
-    online = false;
-    localDemo = false;
-    if (config.url)
-        try {
-            const response = await fetch(config.url.replace(/\/$/, '') + '/api/health', { signal: AbortSignal.timeout(3000) });
-            const health = await response.json();
-            if (health.localDemo && !config.token) {
-                config.courseId = health.localDemo.courseId;
-                config.token = health.localDemo.token;
-                config.instructor = health.localDemo.instructor;
-                sessionStorage.setItem('cv2011-token', config.token);
-                sessionStorage.setItem('cv2011-instructor', config.instructor);
-            }
-            localDemo = !!health.localDemo;
-            online = health.sympy === true && !!config.token;
-            if (online) {
-                const identity = await api('/api/me');
-                if (identity.courseId !== config.courseId && config.courseId)
-                    throw Error('Course ID does not correspond to this access token.');
-                config.courseId = identity.courseId;
-            }
-        }
-        catch {
-            online = false;
-        }
-    render();
-}
-$('settings-button').onclick = () => { $<HTMLInputElement>('api-url').value = config.url; $<HTMLInputElement>('course-id').value = config.courseId; $<HTMLInputElement>('access-token').value = config.token; $<HTMLInputElement>('instructor-token').value = config.instructor; $<HTMLDialogElement>('settings').showModal(); };
-$('save-settings').onclick = async () => { config = { url: $<HTMLInputElement>('api-url').value.trim(), courseId: $<HTMLInputElement>('course-id').value.trim(), token: $<HTMLInputElement>('access-token').value.trim(), instructor: $<HTMLInputElement>('instructor-token').value.trim() }; localStorage.setItem('cv2011-api', config.url); localStorage.setItem('cv2011-id', config.courseId); sessionStorage.setItem('cv2011-token', config.token); sessionStorage.setItem('cv2011-instructor', config.instructor); await connect(); toast(online ? 'Connected to the verifier.' : 'Connection unavailable. Records remain on this device.'); };
-async function renderInsights() {
-    const panel = $('insights-panel');
-    let records: Attempt[] = attempts, scope = 'Records from this browser';
-    if (online && config.instructor)
-        try {
-            const response = await api('/api/instructor/attempts', undefined, true);
-            records = response.attempts;
-            scope = 'Instructor view · all records from the connected course service';
-        }
-        catch (error) {
-            toast(String(error));
-        }
-    const submissions = records.filter(a => a.event === 'submit'), checked = submissions.filter(a => ['correct', 'incorrect'].includes(a.result?.status || ''));
-    const wrong = checked.filter(a => a.result?.status === 'incorrect'), categories: Record<string, number> = {};
-    wrong.forEach(a => { const category = a.result?.category || 'unclassified'; categories[category] = (categories[category] || 0) + 1; });
-    panel.innerHTML = `<div class="panel-label">LEARNING INSIGHTS</div><h2>${escape(scope)}</h2><p>Counts describe submitted problem steps. Exploration edits are excluded. An error category describes the observed answer pattern and can require instructor interpretation.</p><div class="insights-cards"><div class="panel"><div class="insight-number">${submissions.length}</div><p>Submitted steps</p></div><div class="panel"><div class="insight-number">${checked.length ? Math.round(100 * (checked.length - wrong.length) / checked.length) + '%' : '—'}</div><p>Correct among verified submissions</p></div><div class="panel"><div class="insight-number">${new Set(records.map(a => a.courseId)).size}</div><p>Pseudonymous IDs</p></div></div><h2>Observed answer patterns</h2>${Object.keys(categories).length ? `<table class="data-table"><thead><tr><th>Pattern</th><th>Occurrences</th></tr></thead><tbody>${Object.entries(categories).map(([name, count]) => `<tr><td>${escape(name.replaceAll('_', ' '))}</td><td>${count}</td></tr>`).join('')}</tbody></table>` : '<p class="small">No verified incorrect submissions in this view.</p>'}<h2>Recent attempts</h2><div style="overflow:auto"><table class="data-table"><thead><tr><th>Course ID</th><th>Step</th><th>Answer</th><th>Result</th><th>Hints / revealed</th></tr></thead><tbody>${submissions.slice(-30).reverse().map(a => `<tr><td>${escape(a.courseId)}</td><td>${escape(a.step.replaceAll('_', ' '))}</td><td>${escape(a.answer)} ${escape(a.units)}</td><td>${escape(a.result?.status || 'unresolved')}</td><td>${a.hintUsed ? 'Hint' : ''} ${a.solutionRevealed ? 'Solution shown' : ''}</td></tr>`).join('')}</tbody></table></div><div class="dialog-buttons"><button id="refresh-insights">Refresh</button><button id="export-attempts">Export these records</button></div>`;
-    $('export-attempts').onclick = () => download('cv2011-attempts.json', { exportedAt: new Date().toISOString(), scope, attempts: records });
-    $('refresh-insights').onclick = () => void renderInsights();
-    panel.insertAdjacentHTML('beforeend', '<button id="sync-attempts">Verify and upload queued attempts for my ID</button>');
-    $('sync-attempts').onclick = async () => {
-        if (!online) {
-            toast('Connect your course verifier first.');
-            return;
-        }
-        let count = 0;
-        for (const attempt of attempts.filter(a => !a.synced && (a.courseId === config.courseId || a.courseId === 'local-unassigned'))) {
-            try {
-                const response = await api('/api/attempts', { ...attempt, courseId: config.courseId, section: attempt.section ?? 0.5 });
-                attempt.courseId = config.courseId;
-                attempt.result = response.result;
-                attempt.synced = true;
-                count++;
-            }
-            catch (error) {
-                toast(String(error));
-                break;
-            }
-        }
-        saveAttempts();
-        toast(`${count} queued events verified and recorded.`);
-        void renderInsights();
-    };
-}
-for (const kind of ['pin', 'roller', 'fixed', 'guided']) {
-    const icon = document.querySelector(`[data-tool="${kind}"] span`)!;
-    icon.innerHTML = `<svg class="tool-icon" viewBox="-28 -4 56 44" aria-hidden="true"><g stroke="currentColor" stroke-width="2" fill="none">${supportShape(kind)}</g></svg>`;
-}
-// Reuse the canvas geometry so the menu and drawing show the same action
-// symbols. currentColor keeps the icons legible in the selected button state.
-const loadIcons: Record<string, string> = {
-    force: forceSymbol(20, 35, 0, -1, 'currentColor', '', 30, 0),
-    moment: momentSymbol(20, 20, 1, 'currentColor', '', 14),
-    distributed: '<path d="M 5 5 H 35" fill="none" stroke="currentColor" stroke-width="1.8"/>'
-        + [5, 15, 25, 35].map(x => forceSymbol(x, 35, 0, -1, 'currentColor', '', 30, 0)).join(''),
-};
-for (const [kind, shape] of Object.entries(loadIcons)) {
-    const icon = document.querySelector(`[data-tool="${kind}"] span`)!;
-    icon.innerHTML = `<svg class="tool-icon load-tool-icon" viewBox="0 0 40 40" aria-hidden="true">${shape}</svg>`;
-}
-fit();
-document.querySelectorAll<HTMLElement>('[data-tool], [data-layer]').forEach(button => {
-    button.setAttribute('aria-pressed', String(button.classList.contains('active')));
+// Components bind once. Model edits and navigation still share this controller.
+const controls = createWorkspaceControls({
+    selectTool: next => { tool = next; start = null; renderCanvas(); },
+    selectLayer: next => { layer = next; render(); },
+    selectMode: setMode,
 });
+const session = createLearningSession({ notify: toast, onConnectionChange: render });
+fit();
 setMode(location.hash.slice(1) || 'sandbox');
-void connect();
+void session.connect();
 void fetch('verification.json').then(r => r.json()).then(v => { proofStatus = v; }).catch(() => { });

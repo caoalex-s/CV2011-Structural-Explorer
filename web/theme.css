@@ -1,0 +1,34 @@
+/* Shared theme. Engineering colours and geometry are defined in symbols.ts. */
+@font-face { font-family: 'Source Sans 3'; font-style: normal; font-weight: 400; font-display: swap; src: url('source-sans-3-regular.ttf') format('truetype'); }
+@font-face { font-family: 'Source Sans 3'; font-style: normal; font-weight: 600; font-display: swap; src: url('source-sans-3-semibold.ttf') format('truetype'); }
+@font-face { font-family: 'Source Sans 3'; font-style: normal; font-weight: 700; font-display: swap; src: url('source-sans-3-bold.ttf') format('truetype'); }
+:root {
+    --font-ui: 'Source Sans 3', 'Segoe UI', sans-serif;
+    --font-math: KaTeX_Math, 'Times New Roman', serif;
+    --font-math-roman: KaTeX_Main, 'Times New Roman', serif;
+    --font-code: 'IBM Plex Mono', monospace;
+    --ink: #16334a;
+    --muted: #56656e;
+    --paper: #f4f5f2;
+    --surface: white;
+    --line: #dce2dc;
+    --teal: #126e68;
+    --teal-light: #e9f3ee;
+    --orange: #c87538;
+    --red: #b44b4b;
+    --blue: #3673a0;
+    --focus: #94681a;
+    --radius-control: 7px;
+    --radius-panel: 12px;
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-6: 24px;
+    --shadow: none;
+    font-family: var(--font-ui);
+    font-size: 16px;
+    font-synthesis: none;
+    color: var(--ink);
+    background: var(--paper);
+}
