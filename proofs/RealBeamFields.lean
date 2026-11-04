@@ -89,14 +89,14 @@ theorem point_before_derivative (P a L EI : ℝ) :
     (deflectionBefore P a L EI).derivative = slopeBefore P a L EI := by
   simp [deflectionBefore, slopeBefore, Polynomial.derivative_mul, Polynomial.derivative_pow, Polynomial.C_eq_natCast]
   ring
-  all_goals first | (left; left; norm_num [Polynomial.C_1, ← Polynomial.C_add]) | (left; norm_num [Polynomial.C_1, ← Polynomial.C_add])
+  all_goals first | (left; left; exact map_natCast (Polynomial.C : ℝ →+* Field) 3) | (left; exact map_natCast (Polynomial.C : ℝ →+* Field) 3)
 
 /-- After the point force, the elastic-curve derivative is physical slope. -/
 theorem point_after_derivative (P a L EI : ℝ) :
     (deflectionAfter P a L EI).derivative = slopeAfter P a L EI := by
   simp [deflectionAfter, slopeAfter, point_before_derivative, Polynomial.derivative_mul, Polynomial.derivative_pow, Polynomial.C_eq_natCast]
   ring
-  all_goals first | (left; left; norm_num [Polynomial.C_1, ← Polynomial.C_add]) | (left; norm_num [Polynomial.C_1, ← Polynomial.C_add])
+  all_goals first | (left; left; exact map_natCast (Polynomial.C : ℝ →+* Field) 3) | (left; exact map_natCast (Polynomial.C : ℝ →+* Field) 3)
 
 /-- These are derivatives of actual real functions, not formal symbols alone. -/
 theorem point_real_slope_before (P a L EI x : ℝ) :
