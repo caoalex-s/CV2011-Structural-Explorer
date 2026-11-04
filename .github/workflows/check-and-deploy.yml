@@ -34,7 +34,7 @@ jobs:
           build: 'true'
           build-args: '--wfail'
           test: 'false'
-          use-mathlib-cache: 'false'
+          use-mathlib-cache: 'true'
       - name: Audit formal proof axioms
         working-directory: proofs
         run: |
@@ -48,6 +48,10 @@ jobs:
           REQUIRE_LEAN: '1'
       - name: Check lesson theorem examples and reject false claims
         run: python -m unittest discover -s tests -p 'test_lesson_proofs.py' -v
+        env:
+          REQUIRE_LEAN: '1'
+      - name: Check real-field theorem examples and reject false claims
+        run: python -m unittest discover -s tests -p 'test_real_field_proofs.py' -v
         env:
           REQUIRE_LEAN: '1'
       - name: Check public course examples
