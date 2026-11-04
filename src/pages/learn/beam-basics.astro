@@ -5,7 +5,7 @@ import Prediction from '../../components/Prediction.astro';
 import BeamControls from '../../components/BeamControls.astro';
 import SectionControl from '../../components/SectionControl.astro';
 import { initialBeam } from '../../../web/lesson-beam';
-import { beamDrawing, cutDrawing, cutEquations, reactionEquations, sectionEquations } from '../../../web/lesson-view';
+import { beamDrawing, cutDrawing, cutEquations, diagramReadout, reactionEquations, sectionEquations } from '../../../web/lesson-view';
 const base = import.meta.env.BASE_URL;
 const workspace = `${base}?lesson=beam-basics`;
 ---
@@ -53,6 +53,7 @@ const workspace = `${base}?lesson=beam-basics`;
           <div class="diagram-options"><label>Moment plotted on<select id="lesson-moment-side"><option value="tension">Tension side</option><option value="compression">Compression side</option></select></label><label>Diagram scale<select id="diagram-scale"><option value="constant">Keep scales constant</option><option value="automatic">Fit each diagram</option></select></label><button class="quiet" id="zoom-diagrams" aria-pressed="false">Enlarge drawing</button></div>
           <SectionControl id="lesson-section" />
           <div class="drawing-scroll" id="section-drawing-scroll" tabindex="0" aria-label="Beam and internal-force diagrams"><svg id="beam-drawing" viewBox="0 0 800 560" role="img" aria-label="Beam, shear-force diagram, and bending-moment diagram" set:html={beamDrawing(initialBeam)} /></div>
+          <div class="section-values" id="diagram-values" aria-live="polite" set:html={diagramReadout(initialBeam, 0.5)} />
           <p class="small" id="scale-note">Scales stay constant as the inputs change. Doubling the force doubles both diagram heights.</p>
           <details class="cut-panel" data-reveal="cut">
             <summary>Balance the retained free body</summary>

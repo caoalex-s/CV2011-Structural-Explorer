@@ -1,0 +1,27 @@
+{
+  "date": "2026-11-04",
+  "review": "learn-draft-review-2026-11-04.json",
+  "scope": "Revise the first Learn unit and the related persistence, records, and proof connections",
+  "guidance": "author-style 0.28, language-profile 0.29, review-checklist 0.29, figure-style 0.7, code-style 0.2",
+  "review_process": "Implementation agent performed meaning/evidence review and a separate rendered/readability review. This is not independent peer review.",
+  "course_reference": "Week 4 lecture internal actions, positive cut-face directions, and retained-segment equilibrium, lines 470-590. No lecture or tutorial source changed.",
+  "resolutions": {
+    "R1": "The free body follows x, includes P only for x >= a, replaces the support with its reaction, and shows x and x-a at their actual action points. Positive cut arrows and negative evaluated values are distinguished. Short equilibrium equations precede substitution.",
+    "R2": "Reaction and section activities each have adjacent controls. The section slider is repeated beside the retained free body and stays synchronized. The phone overview fits the full span, provides readable scalar values, and offers optional enlargement.",
+    "R3": "Constant shear and moment scales are the default across the allowed inputs. Automatic fitting remains an explicit alternative. Changing P or L changes the constant-scale response geometry.",
+    "R4": "A canonical starting-example key isolates each lesson workspace. Saved edits are restored on refresh. An explicit restart returns to the original query model through the undo boundary.",
+    "R5": "Parameterized Lean theorems cover horizontal equilibrium, retained-segment balances, shear jump, moment-branch agreement, finite-increment identities, and the attained maximum. Proof links disclose integer representations after clearing denominators and exclude physical idealisation, real calculus, input conversion, and browser rendering.",
+    "R6": "Trusted authored $LaTeX$ fragments use the shared KaTeX renderer in prompts, choices, and feedback. Ordinary text is escaped.",
+    "records": "Insights filters separate first recorded submissions with no recorded aid, retries, submissions after recorded aid, and all submissions. Prior concept feedback and relevant reveals are recovered from saved history. The interface avoids calling these records independent mastery."
+  },
+  "validation": {
+    "typescript": "Type checks passed. All 48 Node tests passed; the seven affected lesson tests were rerun after follow-up display changes.",
+    "python": "28 tests passed; three local Lean tests were intentionally skipped. The sandbox initially blocked one temporary SQLite database; the three concept tests passed when rerun outside the sandbox.",
+    "lean": "Linux run 41803549396 succeeded on a5e0db9. It built the generic proofs, audited their axioms, checked concrete lesson examples, rejected deliberately wrong shear and moment claims, verified existing worked certificates, and checked public examples. No local lean.exe was executed.",
+    "build": "Static build checked both Learn routes and 32 local references. Branch CI also built under the GitHub Pages base path.",
+    "browser": "Inspected at 1440x1000 and 390x844. Confirmed the load appears in the cut after a and disappears before a, synchronized sliders, full-span mobile overview, optional enlargement, mathematical feedback, proof disclosure navigation, and zero rendered math errors. A changed lesson model survived refresh, and explicit restart restored the 30 kN practice example.",
+    "recording": "Browser submissions and reveals used only port 8766 and .data/qa-revision. Repeated concept feedback remained flagged after reload. The all-submissions insight view showed first/retry order and the expected 50 percent result for the two synthetic answers. Existing browser history from earlier QA correctly marked prior aid; first-attempt classification was separately checked with isolated unit-test records.",
+    "limits": "Print pagination was not visually verified. Generic proofs do not certify arbitrary frames, the physical idealisation, real calculus, browser input conversion, or rendering. No student records are published."
+  },
+  "second_review": "Checked free-body geometry against both equation branches, compared UI and proof scopes, reviewed signs and mathematical typography, verified the build artifact in the browser, and reviewed the new state and record logic for readability. Compact captions and controls retain their instructional purpose without prose padding."
+}

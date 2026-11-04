@@ -97,6 +97,16 @@ export function cutEquations(inputs: BeamInputs, section: number): string {
         \end{aligned}`, true);
 }
 
+/** Readable values beside the full-span overview, including on a phone. */
+export function diagramReadout(inputs: BeamInputs, section: number): string {
+    const { x, shear, moment, peak } = beamValues(inputs, section);
+    return [String.raw`x=${number(x)}\;\mathrm m`,
+        String.raw`V=${number(shear)}\;\mathrm{kN}`,
+        String.raw`M=${number(moment)}\;\mathrm{kN}\,\mathrm m`,
+        String.raw`M_{\max}=${number(peak)}\;\mathrm{kN}\,\mathrm m`]
+        .map(expression => `<span>${math(expression)}</span>`).join('');
+}
+
 /** Substitution follows each generic equation and keeps rounded outputs explicit. */
 export function reactionEquations(inputs: BeamInputs): string {
     const { load: P, span: L } = inputs;

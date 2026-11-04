@@ -1,7 +1,7 @@
 import { analyse } from '../../web/engine.js';
 import { initialBeam, lessonBeam } from '../../web/lesson-beam.js';
 import type { BeamInputs, SupportCase } from '../../web/lesson-beam.js';
-import { beamDrawing, cutDrawing, cutEquations, reactionEquations, sectionEquations } from '../../web/lesson-view.js';
+import { beamDrawing, cutDrawing, cutEquations, diagramReadout, reactionEquations, sectionEquations } from '../../web/lesson-view.js';
 import type { DiagramScale } from '../../web/lesson-view.js';
 import { lessonText } from '../../web/lesson-content.js';
 import { createLearningSession } from '../../web/learning-session.js';
@@ -33,6 +33,7 @@ function renderBeam() {
     $('beam-drawing').innerHTML = beamDrawing(inputs, section, compression, 'pin-roller', true, scale);
     $('cut-drawing').innerHTML = cutDrawing(inputs, section);
     $('cut-equations').innerHTML = cutEquations(inputs, section);
+    $('diagram-values').innerHTML = diagramReadout(inputs, section);
     $('reaction-equations').innerHTML = reactionEquations(inputs);
     $('section-equations').innerHTML = sectionEquations(inputs, section);
     for (const control of document.querySelectorAll<HTMLInputElement>('[data-beam-input]')) {

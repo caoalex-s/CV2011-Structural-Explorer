@@ -28,6 +28,11 @@ beam. Students make predictions, vary the load and span, read symbolic formulas
 with numerical substitutions, and open a separate practice problem. The course
 map follows the Week 1 roadmap and marks the remaining teaching units as planned.
 
+The section activity keeps its controls beside the diagrams and includes a
+changing retained free body with explicit equilibrium equations. Diagram scales
+remain constant by default, with automatic fitting available for small responses.
+Phones show the whole span with readable section values and optional enlargement.
+
 Astro builds the static lesson pages. The existing TypeScript workspace and
 solver retain their interfaces. `src/pages/learn/` holds the content, while
 `web/lesson-beam.ts` defines the bounded teaching example. Both interfaces use
@@ -41,13 +46,20 @@ questions in `src/data/questions.json` supply the browser feedback and server
 answer key. The authenticated server overrides client grade claims and records
 the observed choice category. These are course concept checks, not Lean proofs.
 Disconnected submissions remain queued for explicit upload through Learning
-insights. Lesson links use a separate model storage key and preserve the saved
-sandbox. Print view expands the derivations without recording those automatic
+insights. Each lesson starting example uses its own model storage key and resumes
+saved edits after a refresh. **Restart lesson example** restores that example
+through the undo history. The main saved sandbox remains separate.
+Print view expands the derivations without recording those automatic
 expansions as student reveals.
 
-The lesson links to the existing Lean library and worked example certificates.
-Live slider substitutions do not create new certificates. The course source
-files remain unchanged. Local Lean execution remains disabled by default.
+The lesson links each short derivation to its generic Lean theorem scope. The
+library includes section equilibrium, the shear jump, agreement of moment
+branches at the load, finite-increment identities, and the attained maximum
+moment for the single point-force beam. These statements use integer
+representations after clearing decimal denominators. The physical idealisation,
+input conversion, real-calculus interpretation, and browser rendering remain
+outside the proofs. Live substitutions do not create new instance certificates.
+The course source files remain unchanged. Local Lean execution remains disabled.
 
 ## Use the drawing workspace
 
@@ -116,7 +128,7 @@ The verification layers have distinct scopes:
 | Lean general library | Reaction-numerator equilibrium identities after clearing input denominators, and inversion of the plotting side |
 | Lean worked certificates | Exact polynomial section equilibrium, N/V/M equations, displacement conditions, and moment-area/unit-load calculations for the certified model and section |
 
-`proofs/StructuralProofs.lean` states the general reaction and plotting identities. The deployment workflow runs the pinned Lean toolchain and audits the reported axioms before marking that library as checked. A local build can reuse its committed CI receipt only when the proof-source SHA-256 is unchanged.
+`proofs/StructuralProofs.lean` states the general reaction and plotting identities and the parameterized point-force beam theorems described above. The deployment workflow runs the pinned Lean toolchain, audits the reported axioms, and rejects deliberately incorrect lesson claims before publication. A local build can reuse its committed CI receipt only when the proof-source SHA-256 is unchanged.
 
 ### Read the course-method derivation
 
@@ -155,6 +167,12 @@ Under **Model, signs, and verification scope**, choose **Download VS Code proof 
 The pilot records submissions, hints, solution reveals, model snapshots, section positions, units, selected diagram side, server verification results, and server timestamps. Sandbox edits are excluded. Tokens authenticate accounts independently of their pseudonymous course IDs. The instructor view aggregates verified submissions and shows the evidence behind broad answer patterns such as opposite signs or a factor of 1000. These patterns do not establish a unique misconception from a numerical answer alone.
 
 When the verifier is unavailable, events remain in browser storage with unresolved status. **Learning insights → Verify and upload queued attempts for my ID** submits these records after a connection is established. Export is available for both model files and learning records. Published GitHub files contain application code and synthetic test cases; the private database remains local.
+
+Learning insights separates first recorded submissions with no recorded aid,
+retries, submissions after recorded aid, and all submissions. Percentages and
+error categories use the selected group. Related lesson reveals and prior
+prediction feedback remain identifiable after reload from saved events. These
+flags describe recorded tool usage and do not establish independent mastery.
 
 The agreed pilot uses a local verification and record service. GitHub Pages hosts the sandbox interface and local record queue. A Pages visitor needs a reachable verifier to receive server-verified grades and contribute to a shared class record. For the local pilot, use the local application URL to access the complete workflow.
 

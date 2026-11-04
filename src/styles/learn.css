@@ -91,6 +91,7 @@ p + p { margin-top: 16px; }
 .diagram-options label { display: grid; gap: 6px; font-size: .85rem; }
 .section-control { display: grid; grid-template-columns: auto auto minmax(70px, 1fr) 42px; gap: 16px; align-items: center; margin-top: 24px; }
 .section-control input { width: 100%; }
+.section-values { display: flex; flex-wrap: wrap; gap: 10px 24px; padding-block: 12px 18px; font-size: .95rem; }
 .equation-panel { border-top: 1px solid var(--line); margin-top: 22px; padding-top: 16px; overflow-x: auto; }
 .section-readout { padding-bottom: 12px; }
 .peak-readout { border-top: 1px dashed var(--line); padding-top: 12px; }
@@ -158,6 +159,10 @@ dialog .actions { margin: 22px 0; }
     .section-control { grid-template-columns: auto auto 1fr; gap: 10px; }
     .section-control output { grid-column: 3; text-align: right; }
     .drawing-scroll { margin-inline: -6px; }
+    .drawing-scroll .svg-label { font-size: 24px; }
+    .diagram-options { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+    .diagram-options select { width: 100%; min-width: 0; font-size: .8rem; }
+    .diagram-options button { grid-column: 1 / -1; justify-self: end; padding: 5px 10px; font-size: .8rem; }
     .drawing-hint { display: block; margin-top: 12px; }
     .equation-panel { font-size: .9rem; }
 }
