@@ -89,14 +89,14 @@ theorem point_before_derivative (P a L EI : ℝ) :
     (deflectionBefore P a L EI).derivative = slopeBefore P a L EI := by
   simp [deflectionBefore, slopeBefore, Polynomial.derivative_mul, Polynomial.derivative_pow, Polynomial.C_eq_natCast]
   ring
-  all_goals norm_num
+  all_goals first | (left; left; norm_num [Polynomial.C_1, ← Polynomial.C_add]) | (left; norm_num [Polynomial.C_1, ← Polynomial.C_add])
 
 /-- After the point force, the elastic-curve derivative is physical slope. -/
 theorem point_after_derivative (P a L EI : ℝ) :
     (deflectionAfter P a L EI).derivative = slopeAfter P a L EI := by
   simp [deflectionAfter, slopeAfter, point_before_derivative, Polynomial.derivative_mul, Polynomial.derivative_pow, Polynomial.C_eq_natCast]
   ring
-  all_goals norm_num
+  all_goals first | (left; left; norm_num [Polynomial.C_1, ← Polynomial.C_add]) | (left; norm_num [Polynomial.C_1, ← Polynomial.C_add])
 
 /-- These are derivatives of actual real functions, not formal symbols alone. -/
 theorem point_real_slope_before (P a L EI x : ℝ) :
@@ -193,6 +193,29 @@ theorem point_displacement_continuity (P a L EI : ℝ) :
 theorem point_slope_continuity (P a L EI : ℝ) :
     (slopeBefore P a L EI).eval a = (slopeAfter P a L EI).eval a := by
   simp [slopeAfter]
+
+/-- The selected displacement is differentiable through the load: the
+left and right field values and their physical slopes agree at the join. -/
+theorem point_piece_slope_at_load (P a L EI : ℝ) :
+    HasDerivAt (pointDisplacement P a L EI) (pointSlope P a L EI a) a := by
+  rw [pointSlope, if_neg (lt_irrefl a)]
+  have leftSlopeEq := point_slope_continuity P a L EI
+  have hleft : HasDerivWithinAt (pointDisplacement P a L EI)
+      ((slopeAfter P a L EI).eval a) (Set.Iio a) a := by
+    apply ((point_real_slope_before P a L EI a).congr_deriv leftSlopeEq).hasDerivWithinAt.congr
+    · intro t ht
+      simp [pointDisplacement, ht]
+    · simp [pointDisplacement, ← point_displacement_continuity]
+  have hright : HasDerivWithinAt (pointDisplacement P a L EI)
+      ((slopeAfter P a L EI).eval a) (Set.Ici a) a := by
+    apply (point_real_slope_after P a L EI a).hasDerivWithinAt.congr
+    · intro t ht
+      simp [pointDisplacement, not_lt.mpr ht]
+    · simp [pointDisplacement]
+  have h := hleft.union hright
+  have hunion : Set.Iio a ∪ Set.Ici a = Set.univ := Set.Iio_union_Ici
+  rw [hunion, hasDerivWithinAt_univ] at h
+  exact h
 
 /-- Left support displacement is zero. -/
 theorem point_left_support (P a L EI : ℝ) :

@@ -22,6 +22,7 @@ import RealBeamFields
 #print axioms RealBeamFields.point_curvature_after
 #print axioms RealBeamFields.point_piece_slope_before
 #print axioms RealBeamFields.point_piece_slope_after
+#print axioms RealBeamFields.point_piece_slope_at_load
 #print axioms RealBeamFields.point_displacement_continuity
 #print axioms RealBeamFields.point_slope_continuity
 #print axioms RealBeamFields.point_left_support
