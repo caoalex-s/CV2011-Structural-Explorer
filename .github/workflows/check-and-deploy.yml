@@ -86,6 +86,11 @@ jobs:
         run: |
           lake env lean LocalFrameAudit.lean > frame-axioms.log
           python ../scripts/audit_real_axioms.py frame-axioms.log LocalFrameFields
+      - name: Audit coordinate and connection theorem axioms
+        working-directory: proofs
+        run: |
+          lake env lean FrameTransformAudit.lean > transform-axioms.log
+          python ../scripts/audit_real_axioms.py transform-axioms.log FrameTransform
       - name: Check public course examples
         if: ${{ inputs.proof_only != true }}
         run: python -m scripts.check_worked_examples

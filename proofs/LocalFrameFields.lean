@@ -126,5 +126,38 @@ theorem right_end_action_signs (d : LocalDofs) (L EA EI p₀ p₁ q₀ q₁ : �
     (moment d L EI q₀ q₁).eval L = (endActions d L EA EI p₀ p₁ q₀ q₁) 5 := by
   simp [endActions]
 
+
+/-- Standard local six-degree stiffness in the documented end-action order. -/
+def stiffness (L EA EI : ℝ) : Fin 6 → Fin 6 → ℝ :=
+  ![![EA/L, 0, 0, -EA/L, 0, 0],
+    ![0, 12*EI/L^3, 6*EI/L^2, 0, -12*EI/L^3, 6*EI/L^2],
+    ![0, 6*EI/L^2, 4*EI/L, 0, -6*EI/L^2, 2*EI/L],
+    ![-EA/L, 0, 0, EA/L, 0, 0],
+    ![0, -12*EI/L^3, -6*EI/L^2, 0, 12*EI/L^3, -6*EI/L^2],
+    ![0, 6*EI/L^2, 2*EI/L, 0, -6*EI/L^2, 4*EI/L]]
+
+/-- Consistent nodal actions for affine local distributed intensities. -/
+def consistentLoad (L p₀ p₁ q₀ q₁ : ℝ) : LocalActions :=
+  ![L*(2*p₀+p₁)/6, L*(7*q₀+3*q₁)/20, L^2*(3*q₀+2*q₁)/60,
+    L*(p₀+2*p₁)/6, L*(3*q₀+7*q₁)/20, -L^2*(2*q₀+3*q₁)/60]
+
+/-- Stiffness symmetry is independent of the applied loading. -/
+theorem stiffness_symmetric (L EA EI : ℝ) (i j : Fin 6) :
+    stiffness L EA EI i j = stiffness L EA EI j i := by
+  fin_cases i <;> fin_cases j <;> simp [stiffness]
+
+/-- Recover the endpoint actions from the exact fields and compare them with
+K d − f. This algebraic identity alone is not a virtual-work derivation. -/
+theorem end_actions_from_fields (d : LocalDofs) (L EA EI p₀ p₁ q₀ q₁ : ℝ)
+    (hL : L ≠ 0) (hEA : EA ≠ 0) (hEI : EI ≠ 0) (i : Fin 6) :
+    endActions d L EA EI p₀ p₁ q₀ q₁ i =
+      (∑ j : Fin 6, stiffness L EA EI i j * d j) - consistentLoad L p₀ p₁ q₀ q₁ i := by
+  fin_cases i <;>
+    simp [endActions, normal, shear, moment, rotation, axialDisplacement,
+      transverseDisplacement, coordinate, stiffness, consistentLoad,
+      Polynomial.derivative_mul, Polynomial.derivative_pow, Polynomial.C_eq_natCast,
+      Fin.sum_univ_succ] <;> field_simp <;> ring
+
+
 end
 end LocalFrameFields

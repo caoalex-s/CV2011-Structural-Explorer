@@ -11,3 +11,5 @@ import LocalFrameFields
 #print axioms LocalFrameFields.transverse_balance
 #print axioms LocalFrameFields.left_end_action_signs
 #print axioms LocalFrameFields.right_end_action_signs
+#print axioms LocalFrameFields.stiffness_symmetric
+#print axioms LocalFrameFields.end_actions_from_fields

@@ -5,7 +5,8 @@ import sys
 
 ALLOWED = {"propext", "Classical.choice", "Quot.sound"}
 module = sys.argv[2] if len(sys.argv) > 2 else "RealBeamFields"
-audit_module = "RealBeamAudit" if module == "RealBeamFields" else "LocalFrameAudit"
+audit_module = {"RealBeamFields": "RealBeamAudit", "LocalFrameFields": "LocalFrameAudit",
+                "FrameTransform": "FrameTransformAudit"}[module]
 source = Path(module + ".lean").read_text(encoding="utf-8")
 audit_source = Path(audit_module + ".lean").read_text(encoding="utf-8")
 expected = set(re.findall(r"^theorem\s+(\w+)", source, flags=re.MULTILINE))

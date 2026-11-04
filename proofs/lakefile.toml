@@ -1,6 +1,6 @@
 name = "StructuralProofs"
 version = "0.1.0"
-defaultTargets = ["StructuralProofs", "BeamCertificate", "RealBeamFields", "FrameInterfaces", "LocalFrameFields"]
+defaultTargets = ["StructuralProofs", "BeamCertificate", "RealBeamFields", "FrameInterfaces", "LocalFrameFields", "FrameTransform"]
 
 [[require]]
 name = "mathlib"
@@ -21,3 +21,6 @@ name = "FrameInterfaces"
 
 [[lean_lib]]
 name = "LocalFrameFields"
+
+[[lean_lib]]
+name = "FrameTransform"
