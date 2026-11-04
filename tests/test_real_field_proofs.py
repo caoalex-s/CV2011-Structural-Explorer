@@ -25,6 +25,14 @@ example : (deflectionAfter 20 4 8 20000).eval 8 = 0 :=
   point_right_support 20 4 8 20000 (by norm_num) (by norm_num)
 example : HasDerivAt (fun t : ℝ => (deflectionAfter 20 4 8 20000).eval t)
     ((slopeAfter 20 4 8 20000).eval 6) 6 := point_real_slope_after 20 4 8 20000 6
+example : HasDerivAt (pointDisplacement 20 4 8 20000) (pointSlope 20 4 8 20000 4) 4 :=
+  point_piece_slope_at_load 20 4 8 20000
+example : (cantileverMoment 20 0 5 1 8).eval 8 = 0 :=
+  cantilever_end_moment 20 0 5 1 8
+example : (cantileverMoment 20 0 5 1 8).derivative.eval 8 = 20 :=
+  cantilever_end_shear 20 0 5 1 8
+example : HasDerivAt (fun t : ℝ => (cantileverDisplacement 20 0 5 1 8 20000).eval t)
+    ((cantileverSlope 20 0 5 1 8 20000).eval 2) 2 := cantilever_real_slope 20 0 5 1 8 20000 2
 """)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 

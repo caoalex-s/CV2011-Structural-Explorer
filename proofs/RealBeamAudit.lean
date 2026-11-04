@@ -27,3 +27,10 @@ import RealBeamFields
 #print axioms RealBeamFields.point_slope_continuity
 #print axioms RealBeamFields.point_left_support
 #print axioms RealBeamFields.point_right_support
+#print axioms RealBeamFields.cantilever_fixed_end
+#print axioms RealBeamFields.cantilever_end_moment
+#print axioms RealBeamFields.cantilever_end_shear
+#print axioms RealBeamFields.cantilever_load_balance
+#print axioms RealBeamFields.cubic_displacement_derivative
+#print axioms RealBeamFields.cubic_constitutive
+#print axioms RealBeamFields.cantilever_real_slope

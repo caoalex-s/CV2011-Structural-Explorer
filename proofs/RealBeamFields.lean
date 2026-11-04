@@ -204,12 +204,14 @@ theorem point_piece_slope_at_load (P a L EI : ℝ) :
       ((slopeAfter P a L EI).eval a) (Set.Iio a) a := by
     apply ((point_real_slope_before P a L EI a).congr_deriv leftSlopeEq).hasDerivWithinAt.congr
     · intro t ht
+      change t < a at ht
       simp [pointDisplacement, ht]
     · simp [pointDisplacement, ← point_displacement_continuity]
   have hright : HasDerivWithinAt (pointDisplacement P a L EI)
       ((slopeAfter P a L EI).eval a) (Set.Ici a) a := by
     apply (point_real_slope_after P a L EI a).hasDerivWithinAt.congr
     · intro t ht
+      change a ≤ t at ht
       simp [pointDisplacement, not_lt.mpr ht]
     · simp [pointDisplacement]
   have h := hleft.union hright
@@ -228,6 +230,75 @@ theorem point_right_support (P a L EI : ℝ) (hL : L ≠ 0) (hEI : EI ≠ 0) :
   simp [deflectionAfter, deflectionBefore, leftReaction, leftSlope]
   field_simp
   ring
+
+
+/-! A cantilever with downward end force P, counterclockwise end couple T,
+and downward intensity w(x) = w₀ + w₁ x. These fields share the same
+real-polynomial calculus as the point-force beam above. -/
+def cantileverM0 (P T w₀ w₁ L : ℝ) : ℝ := T - P*L - w₀*L^2/2 - w₁*L^3/3
+def cantileverM1 (P w₀ w₁ L : ℝ) : ℝ := P + w₀*L + w₁*L^2/2
+
+def cubicMoment (m₀ m₁ m₂ m₃ : ℝ) : Field :=
+  C m₀ + C m₁*X + C m₂*X^2 + C m₃*X^3
+
+def cubicSlope (m₀ m₁ m₂ m₃ EI : ℝ) : Field :=
+  C (1/(60*EI)) * (C m₀*(60*X) + C m₁*(30*X^2) + C m₂*(20*X^3) + C m₃*(15*X^4))
+
+def cubicDisplacement (m₀ m₁ m₂ m₃ EI : ℝ) : Field :=
+  C (1/(60*EI)) * (C m₀*(30*X^2) + C m₁*(10*X^3) + C m₂*(5*X^4) + C m₃*(3*X^5))
+
+def cantileverMoment (P T w₀ w₁ L : ℝ) : Field :=
+  cubicMoment (cantileverM0 P T w₀ w₁ L) (cantileverM1 P w₀ w₁ L) (-w₀/2) (-w₁/6)
+
+def cantileverSlope (P T w₀ w₁ L EI : ℝ) : Field :=
+  cubicSlope (cantileverM0 P T w₀ w₁ L) (cantileverM1 P w₀ w₁ L) (-w₀/2) (-w₁/6) EI
+
+def cantileverDisplacement (P T w₀ w₁ L EI : ℝ) : Field :=
+  cubicDisplacement (cantileverM0 P T w₀ w₁ L) (cantileverM1 P w₀ w₁ L) (-w₀/2) (-w₁/6) EI
+
+/-- Fixity applies to rotation and transverse displacement at the left end. -/
+theorem cantilever_fixed_end (P T w₀ w₁ L EI : ℝ) :
+    (cantileverSlope P T w₀ w₁ L EI).eval 0 = 0 ∧
+    (cantileverDisplacement P T w₀ w₁ L EI).eval 0 = 0 := by
+  simp [cantileverSlope, cantileverDisplacement, cubicSlope, cubicDisplacement]
+
+/-- Free-end actions agree with the end force and counterclockwise couple. -/
+theorem cantilever_end_moment (P T w₀ w₁ L : ℝ) :
+    (cantileverMoment P T w₀ w₁ L).eval L = T := by
+  simp [cantileverMoment, cubicMoment, cantileverM0, cantileverM1]
+  ring
+
+theorem cantilever_end_shear (P T w₀ w₁ L : ℝ) :
+    (cantileverMoment P T w₀ w₁ L).derivative.eval L = P := by
+  simp [cantileverMoment, cubicMoment, cantileverM0, cantileverM1,
+    Polynomial.derivative_mul, Polynomial.derivative_pow, Polynomial.C_eq_natCast]
+  ring
+
+/-- The beam's actual downward intensity determines the curvature of M. -/
+theorem cantilever_load_balance (P T w₀ w₁ L x : ℝ) :
+    (cantileverMoment P T w₀ w₁ L).derivative.derivative.eval x = -(w₀ + w₁*x) := by
+  simp [cantileverMoment, cubicMoment, cantileverM0, cantileverM1,
+    Polynomial.derivative_mul, Polynomial.derivative_pow, Polynomial.C_eq_natCast]
+  ring
+
+/-- Deflection and rotation derive from the same polynomial moment field. -/
+theorem cubic_displacement_derivative (m₀ m₁ m₂ m₃ EI : ℝ) :
+    (cubicDisplacement m₀ m₁ m₂ m₃ EI).derivative = cubicSlope m₀ m₁ m₂ m₃ EI := by
+  simp [cubicDisplacement, cubicSlope, Polynomial.derivative_mul, Polynomial.derivative_pow, Polynomial.C_eq_natCast]
+  ring
+
+theorem cubic_constitutive (m₀ m₁ m₂ m₃ EI x : ℝ) (hEI : EI ≠ 0) :
+    EI * (cubicSlope m₀ m₁ m₂ m₃ EI).derivative.eval x = (cubicMoment m₀ m₁ m₂ m₃).eval x := by
+  simp [cubicSlope, cubicMoment, Polynomial.derivative_mul, Polynomial.derivative_pow, Polynomial.C_eq_natCast]
+  field_simp
+  ring
+
+theorem cantilever_real_slope (P T w₀ w₁ L EI x : ℝ) :
+    HasDerivAt (fun t : ℝ => (cantileverDisplacement P T w₀ w₁ L EI).eval t)
+      ((cantileverSlope P T w₀ w₁ L EI).eval x) x := by
+  apply displacement_slope
+  exact cubic_displacement_derivative _ _ _ _ _
+
 
 end
 
