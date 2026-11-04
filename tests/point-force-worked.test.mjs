@@ -52,3 +52,10 @@ test('offline derivation survives failure to load published examples', async () 
     assert.match(panel.innerHTML, /\\times10\^\{-7\}/);
     assert.doesNotMatch(panel.innerHTML, /math-error/);
 });
+
+
+test('checked generic derivatives remain distinct from a numerical certificate', () => {
+    const html = pointForceDerivation(pointForceWorked(example('beam'), 0.5), true);
+    assert.match(html, /Lean checked the generic real-field derivative/);
+    assert.match(html, /No Lean certificate is claimed for the current numerical instance/);
+});

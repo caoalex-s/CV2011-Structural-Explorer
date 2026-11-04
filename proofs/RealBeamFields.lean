@@ -463,7 +463,7 @@ theorem point_solution_exists (P a L EI : ℝ) (hL : 0 < L) (hEI : 0 < EI)
   · simp [pointShearAfter, pointShearBefore, shearAfterForce]
   · simp [pointMomentBefore]
   · simp [pointMomentAfter, pointMomentBefore, momentAfterActions, leftReaction]
-    field_simp <;> ring
+    field_simp
 
 /-- Two solutions of the loaded point-force predicate have the same fields.
 The proof first fixes moment by equilibrium and jump conditions, then fixes

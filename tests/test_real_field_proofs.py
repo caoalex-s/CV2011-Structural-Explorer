@@ -37,6 +37,10 @@ example : Nonempty (PointBeamSolution 20 4 8 20000) :=
   point_solution_exists 20 4 8 20000 (by norm_num) (by norm_num) (by norm_num) (by norm_num)
 example : Nonempty (PointBeamSolution 20 0 8 20000) :=
   point_solution_exists 20 0 8 20000 (by norm_num) (by norm_num) (by norm_num) (by norm_num)
+example : Nonempty (PointBeamSolution (-15) 8 8 20000) :=
+  point_solution_exists (-15) 8 8 20000 (by norm_num) (by norm_num) (by norm_num) (by norm_num)
+example : Nonempty (CantileverSolution 20 (-7) 5 1 8 20000) :=
+  cantilever_solution_exists 20 (-7) 5 1 8 20000 (by norm_num) (by norm_num)
 example : Nonempty (CantileverSolution 20 7 5 1 8 20000) :=
   cantilever_solution_exists 20 7 5 1 8 20000 (by norm_num) (by norm_num)
 example : (cantileverMoment 20 7 5 1 8).eval 8 = 7 :=
