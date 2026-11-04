@@ -21,6 +21,8 @@ test('real-field label follows the checked theorem set and physical family', () 
         assert.equal(realPointForceApplies(model, 0.5, changed), false);
     const edits = [m => m.supports[1].t = 0.8, m => m.loads[0].kind = 'moment',
         m => m.loads[0].fx = 1, m => m.members[0].EI = 0, m => m.nodes[1].y = 1,
-        m => m.nodes[0].joint = 'pinned'];
+        m => m.nodes[0].joint = 'pinned', m => m.members[0].EA = 0,
+        m => m.loads[0].qEnd = Number.NaN, m => m.supports[0].angle = Number.NaN,
+        m => m.nodes[1].x = 0.01];
     for (const edit of edits) { const altered = structuredClone(model); edit(altered); assert.equal(realPointForceApplies(altered, 0.5, receipt), false); }
 });
