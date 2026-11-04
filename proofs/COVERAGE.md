@@ -17,6 +17,16 @@ The current application models planar, linear Euler–Bernoulli members with axi
 
 A polynomial field theorem does not establish that a drawing was translated correctly, that a system is stable, or that the TypeScript floating-point solver returned the mathematical solution. Assumed idealisation and boundary conditions must remain visible. Every numerical instance certificate remains tied to its exact source snapshot. Load-position changes can change the piecewise interval order and require the appropriate branch and a fresh instance certificate.
 
+## Phase 1 theorem scope and receipt
+
+The point-force solution predicate uses positive span and flexural rigidity with the load coordinate between the supports, including the endpoints. The signed force parameter is downward-positive. Its field obligations include reaction equilibrium, zero distributed intensity between actions, the shear jump, moment and displacement continuity, slope continuity, support conditions, and the Euler–Bernoulli curvature relation. The existence and uniqueness theorems concern these mathematical fields. The separate splice theorem establishes the displacement derivative on each side and at the join.
+
+The cantilever predicate uses positive span and rigidity, a signed downward end force, a counterclockwise end couple, and a downward intensity that varies linearly over the full span. The associated moment, shear, slope, and displacement polynomials are subject to the free-end actions and fixed-end displacement and slope. The existence and uniqueness statements do not yet cover partial-load boundaries or arbitrary multi-member frames. Axial-field lemmas currently connect conditional polynomial balance and constitutive equations to real derivatives; a loaded axial solution is not yet established.
+
+The real-polynomial derivative and interval-integral lemmas link formal polynomial operations to Mathlib's real calculus. The course-method identities and global real-domain extrema for arbitrary piecewise loads remain separate obligations. `RealBeamAudit.lean` enumerates each real-field theorem and CI rejects omitted reports and dependencies beyond `propext`, `Classical.choice`, and `Quot.sound`. No project-specific axiom or admitted proof is permitted.
+
+CI records a separate real-field status only after the proof build, regression fixtures, and axiom audit succeed. Its SHA-256 digest covers all local Lean sources, the Lean toolchain, the Lake configuration, and the dependency lock that pins Mathlib and its transitive imports. The static build clears a checked status when that bundle changes. The workspace applies the status only to the eligible point-force family and identifies it as a generic derivative and continuity result. It does not reuse a numerical instance certificate.
+
 ## Later phases
 
 1. Establish generic local six-degree-of-freedom element stiffness and consistent load relations, including axial and bending fields and endpoint force conventions.
