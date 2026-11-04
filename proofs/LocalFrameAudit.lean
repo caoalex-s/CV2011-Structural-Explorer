@@ -1,0 +1,13 @@
+import LocalFrameFields
+
+#print axioms LocalFrameFields.axial_end_kinematics
+#print axioms LocalFrameFields.transverse_end_kinematics
+#print axioms LocalFrameFields.rotation_end_kinematics
+#print axioms LocalFrameFields.real_rotation
+#print axioms LocalFrameFields.real_axial_constitutive
+#print axioms LocalFrameFields.real_bending_constitutive
+#print axioms LocalFrameFields.real_moment_balance
+#print axioms LocalFrameFields.axial_balance
+#print axioms LocalFrameFields.transverse_balance
+#print axioms LocalFrameFields.left_end_action_signs
+#print axioms LocalFrameFields.right_end_action_signs

@@ -4,16 +4,18 @@ import re
 import sys
 
 ALLOWED = {"propext", "Classical.choice", "Quot.sound"}
-source = Path("RealBeamFields.lean").read_text(encoding="utf-8")
-audit_source = Path("RealBeamAudit.lean").read_text(encoding="utf-8")
+module = sys.argv[2] if len(sys.argv) > 2 else "RealBeamFields"
+audit_module = "RealBeamAudit" if module == "RealBeamFields" else "LocalFrameAudit"
+source = Path(module + ".lean").read_text(encoding="utf-8")
+audit_source = Path(audit_module + ".lean").read_text(encoding="utf-8")
 expected = set(re.findall(r"^theorem\s+(\w+)", source, flags=re.MULTILINE))
-printed = re.findall(r"^#print axioms RealBeamFields\.(\w+)", audit_source, flags=re.MULTILINE)
+printed = re.findall(r"^#print axioms " + re.escape(module) + r"\.(\w+)", audit_source, flags=re.MULTILINE)
 if not expected or set(printed) != expected or len(printed) != len(expected):
     raise SystemExit("Axiom audit must list every real-field theorem exactly once.")
 reports = Path(sys.argv[1]).read_text(encoding="utf-8").splitlines()
 seen = set()
 for line in reports:
-    name = re.search(r"RealBeamFields\.(\w+)", line)
+    name = re.search(re.escape(module) + r"\.(\w+)", line)
     if not name:
         continue
     name = name.group(1)
