@@ -4,6 +4,9 @@ import RealBeamFields
 #print axioms RealBeamFields.real_integral
 #print axioms RealBeamFields.shear_balance
 #print axioms RealBeamFields.moment_balance
+#print axioms RealBeamFields.axial_balance
+#print axioms RealBeamFields.axial_constitutive
+#print axioms RealBeamFields.shear_balance_superposition
 #print axioms RealBeamFields.displacement_slope
 #print axioms RealBeamFields.force_jump
 #print axioms RealBeamFields.couple_jump

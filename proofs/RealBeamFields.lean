@@ -39,6 +39,24 @@ theorem moment_balance (M V : Field) (h : M.derivative = V) (x : ℝ) :
     HasDerivAt (fun t : ℝ => M.eval t) (V.eval x) x := by
   simpa [h] using M.hasDerivAt x
 
+/-- Distributed axial force is positive in the local positive-x direction. -/
+theorem axial_balance (N p : Field) (h : N.derivative = -p) (x : ℝ) :
+    HasDerivAt (fun t : ℝ => N.eval t) (-p.eval x) x := by
+  simpa [h] using N.hasDerivAt x
+
+/-- An axial field satisfying EA u′ = N has the corresponding real derivative. -/
+theorem axial_constitutive (u N : Field) (EA x : ℝ)
+    (h : C EA * u.derivative = N) :
+    EA * deriv (fun t : ℝ => u.eval t) x = N.eval x := by
+  have evaluated := congrArg (Polynomial.eval x) h
+  simpa using evaluated
+
+/-- Equilibrium equations are linear in the fields and downward intensity. -/
+theorem shear_balance_superposition (V₁ V₂ w₁ w₂ : Field)
+    (h₁ : V₁.derivative = -w₁) (h₂ : V₂.derivative = -w₂) :
+    (V₁ + V₂).derivative = -(w₁ + w₂) := by
+  simp [h₁, h₂]
+
 /-- Polynomial slope and displacement fields represent real derivatives. -/
 theorem displacement_slope (v theta : Field) (h : v.derivative = theta) (x : ℝ) :
     HasDerivAt (fun t : ℝ => v.eval t) (theta.eval x) x := by
@@ -285,6 +303,10 @@ theorem cantilever_load_balance (P T w₀ w₁ L x : ℝ) :
 theorem cubic_displacement_derivative (m₀ m₁ m₂ m₃ EI : ℝ) :
     (cubicDisplacement m₀ m₁ m₂ m₃ EI).derivative = cubicSlope m₀ m₁ m₂ m₃ EI := by
   simp [cubicDisplacement, cubicSlope, Polynomial.derivative_mul, Polynomial.derivative_pow, Polynomial.C_eq_natCast]
+  simp only [show C (2 : ℝ) = (2 : Field) from map_natCast (Polynomial.C : ℝ →+* Field) 2,
+    show C (3 : ℝ) = (3 : Field) from map_natCast (Polynomial.C : ℝ →+* Field) 3,
+    show C (4 : ℝ) = (4 : Field) from map_natCast (Polynomial.C : ℝ →+* Field) 4,
+    show C (5 : ℝ) = (5 : Field) from map_natCast (Polynomial.C : ℝ →+* Field) 5]
   ring
 
 theorem cubic_constitutive (m₀ m₁ m₂ m₃ EI x : ℝ) (hEI : EI ≠ 0) :

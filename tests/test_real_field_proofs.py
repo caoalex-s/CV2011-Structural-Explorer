@@ -25,6 +25,12 @@ example : (deflectionAfter 20 4 8 20000).eval 8 = 0 :=
   point_right_support 20 4 8 20000 (by norm_num) (by norm_num)
 example : HasDerivAt (fun t : ℝ => (deflectionAfter 20 4 8 20000).eval t)
     ((slopeAfter 20 4 8 20000).eval 6) 6 := point_real_slope_after 20 4 8 20000 6
+example : 20000 * (slopeBefore 20 4 8 20000).derivative.eval 2 = (pointMomentBefore 20 4 8).eval 2 :=
+  point_curvature_before 20 4 8 20000 2 (by norm_num)
+example : HasDerivAt (pointDisplacement 20 4 8 20000) (pointSlope 20 4 8 20000 2) 2 :=
+  point_piece_slope_before 20 4 8 20000 2 (by norm_num)
+example : HasDerivAt (pointDisplacement 20 4 8 20000) (pointSlope 20 4 8 20000 6) 6 :=
+  point_piece_slope_after 20 4 8 20000 6 (by norm_num)
 example : HasDerivAt (pointDisplacement 20 4 8 20000) (pointSlope 20 4 8 20000 4) 4 :=
   point_piece_slope_at_load 20 4 8 20000
 example : (cantileverMoment 20 0 5 1 8).eval 8 = 0 :=
@@ -40,6 +46,8 @@ example : HasDerivAt (fun t : ℝ => (cantileverDisplacement 20 0 5 1 8 20000).e
         for statement in (
             "example : (shearAfterForce (0 : Field) 3).eval 2 = -3 := by norm_num [shearAfterForce]",
             "example : (deflectionAfter 20 4 8 20000).eval 8 = 1 := by norm_num [deflectionAfter, deflectionBefore, leftReaction, leftSlope]",
+            "example : (pointShearAfter 20 4 8).eval 4 - (pointShearBefore 20 4 8).eval 4 = 20 := by norm_num [pointShearAfter, pointShearBefore, shearAfterForce, leftReaction]",
+            "example : 20000 * (slopeBefore 20 4 8 20000).derivative.eval 2 = (pointMomentBefore 20 4 8).eval 2 + 1 := by norm_num [slopeBefore, pointMomentBefore, leftReaction, Polynomial.derivative_mul, Polynomial.derivative_pow]",
         ):
             with self.subTest(statement=statement):
                 result = self.compile_example(statement)
