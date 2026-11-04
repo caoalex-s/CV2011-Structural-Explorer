@@ -108,6 +108,7 @@ theorem point_before_derivative (P a L EI : ℝ) :
   simp [deflectionBefore, slopeBefore, Polynomial.derivative_mul, Polynomial.derivative_pow, Polynomial.C_eq_natCast]
   simp only [show C (3 : ℝ) = (3 : Field) from map_natCast (Polynomial.C : ℝ →+* Field) 3]
   ring
+  all_goals simp
 
 /-- After the point force, the elastic-curve derivative is physical slope. -/
 theorem point_after_derivative (P a L EI : ℝ) :
@@ -115,6 +116,7 @@ theorem point_after_derivative (P a L EI : ℝ) :
   simp [deflectionAfter, slopeAfter, point_before_derivative, Polynomial.derivative_mul, Polynomial.derivative_pow, Polynomial.C_eq_natCast]
   simp only [show C (3 : ℝ) = (3 : Field) from map_natCast (Polynomial.C : ℝ →+* Field) 3]
   ring
+  all_goals simp
 
 /-- These are derivatives of actual real functions, not formal symbols alone. -/
 theorem point_real_slope_before (P a L EI x : ℝ) :
@@ -257,10 +259,11 @@ theorem affine_boundary_uniqueness (L a c₀ c₁ d₀ d₁ : ℝ) (hL : L ≠ 0
     (hleft : c₀ = 0) (hright : d₀ + d₁*L = 0)
     (hdisplacement : c₀ + c₁*a = d₀ + d₁*a) (hslope : c₁ = d₁) :
     c₀ = 0 ∧ c₁ = 0 ∧ d₀ = 0 ∧ d₁ = 0 := by
-  have hd₀ : d₀ = 0 := by nlinarith
-  have hproduct : d₁*L = 0 := by nlinarith
+  subst c₁
+  have hd₀ : d₀ = 0 := by linarith
+  have hproduct : d₁*L = 0 := by linarith
   have hd₁ : d₁ = 0 := (mul_eq_zero.mp hproduct).resolve_right hL
-  exact ⟨hleft, by linarith, hd₀, hd₁⟩
+  exact ⟨hleft, hd₁, hd₀, hd₁⟩
 
 /-! A cantilever with downward end force P, counterclockwise end couple T,
 and downward intensity w(x) = w₀ + w₁ x. These fields share the same
