@@ -89,12 +89,14 @@ theorem point_before_derivative (P a L EI : ℝ) :
     (deflectionBefore P a L EI).derivative = slopeBefore P a L EI := by
   simp [deflectionBefore, slopeBefore, Polynomial.derivative_mul, Polynomial.derivative_pow, Polynomial.C_eq_natCast]
   ring
+  all_goals norm_num
 
 /-- After the point force, the elastic-curve derivative is physical slope. -/
 theorem point_after_derivative (P a L EI : ℝ) :
     (deflectionAfter P a L EI).derivative = slopeAfter P a L EI := by
   simp [deflectionAfter, slopeAfter, point_before_derivative, Polynomial.derivative_mul, Polynomial.derivative_pow, Polynomial.C_eq_natCast]
   ring
+  all_goals norm_num
 
 /-- These are derivatives of actual real functions, not formal symbols alone. -/
 theorem point_real_slope_before (P a L EI x : ℝ) :
@@ -106,6 +108,81 @@ theorem point_real_slope_after (P a L EI x : ℝ) :
     HasDerivAt (fun t : ℝ => (deflectionAfter P a L EI).eval t)
       ((slopeAfter P a L EI).eval x) x :=
   displacement_slope _ _ (point_after_derivative P a L EI) x
+
+/-- The right reaction for the same endpoint-supported point-force system. -/
+def rightReaction (P a L : ℝ) : ℝ := P * a / L
+
+def pointShearBefore (P a L : ℝ) : Field := C (leftReaction P a L)
+def pointShearAfter (P a L : ℝ) : Field := shearAfterForce (pointShearBefore P a L) (-P)
+def pointMomentBefore (P a L : ℝ) : Field := C (leftReaction P a L) * X
+def pointMomentAfter (P a L : ℝ) : Field := momentAfterActions (pointMomentBefore P a L) (-P) 0 a
+
+/-- The named reactions balance a downward load of signed magnitude P. -/
+theorem point_reaction_force (P a L : ℝ) (hL : L ≠ 0) :
+    leftReaction P a L + rightReaction P a L - P = 0 := by
+  simp [leftReaction, rightReaction]
+  field_simp
+  ring
+
+theorem point_reaction_moment (P a L : ℝ) (hL : L ≠ 0) :
+    rightReaction P a L * L - P * a = 0 := by
+  simp [rightReaction]
+  field_simp
+
+/-- The named shear fields jump by the upward-positive applied force -P. -/
+theorem point_shear_jump (P a L : ℝ) :
+    (pointShearAfter P a L).eval a - (pointShearBefore P a L).eval a = -P := by
+  exact force_jump _ _ _
+
+theorem point_moment_continuity (P a L : ℝ) :
+    (pointMomentAfter P a L).eval a = (pointMomentBefore P a L).eval a := by
+  simp [pointMomentAfter, momentAfterActions]
+
+/-- The moment and shear branches satisfy the same equilibrium equations. -/
+theorem point_moment_derivative_before (P a L : ℝ) :
+    (pointMomentBefore P a L).derivative = pointShearBefore P a L := by
+  simp [pointMomentBefore, pointShearBefore, Polynomial.derivative_mul]
+
+theorem point_moment_derivative_after (P a L : ℝ) :
+    (pointMomentAfter P a L).derivative = pointShearAfter P a L := by
+  simp [pointMomentAfter, pointMomentBefore, pointShearAfter, pointShearBefore,
+    shearAfterForce, momentAfterActions, Polynomial.derivative_mul]
+
+/-- The named elastic and equilibrium fields obey the same constitutive law. -/
+theorem point_curvature_before (P a L EI x : ℝ) (hEI : EI ≠ 0) :
+    EI * (slopeBefore P a L EI).derivative.eval x = (pointMomentBefore P a L).eval x := by
+  simp [slopeBefore, pointMomentBefore, Polynomial.derivative_mul,
+    Polynomial.derivative_pow, Polynomial.C_eq_natCast]
+  field_simp
+  ring
+
+theorem point_curvature_after (P a L EI x : ℝ) (hEI : EI ≠ 0) :
+    EI * (slopeAfter P a L EI).derivative.eval x = (pointMomentAfter P a L).eval x := by
+  simp [slopeAfter, slopeBefore, pointMomentAfter, pointMomentBefore, momentAfterActions,
+    Polynomial.derivative_mul, Polynomial.derivative_pow, Polynomial.C_eq_natCast]
+  field_simp
+  ring
+
+/-- A physical beam chooses its polynomial on the appropriate side of the load. -/
+def pointDisplacement (P a L EI x : ℝ) : ℝ :=
+  if x < a then (deflectionBefore P a L EI).eval x else (deflectionAfter P a L EI).eval x
+
+def pointSlope (P a L EI x : ℝ) : ℝ :=
+  if x < a then (slopeBefore P a L EI).eval x else (slopeAfter P a L EI).eval x
+
+theorem point_piece_slope_before (P a L EI x : ℝ) (hx : x < a) :
+    HasDerivAt (pointDisplacement P a L EI) (pointSlope P a L EI x) x := by
+  rw [pointSlope, if_pos hx]
+  apply (point_real_slope_before P a L EI x).congr_of_eventuallyEq
+  filter_upwards [eventually_lt_nhds hx] with t ht
+  simp [pointDisplacement, ht]
+
+theorem point_piece_slope_after (P a L EI x : ℝ) (hx : a < x) :
+    HasDerivAt (pointDisplacement P a L EI) (pointSlope P a L EI x) x := by
+  rw [pointSlope, if_neg (not_lt.mpr hx.le)]
+  apply (point_real_slope_after P a L EI x).congr_of_eventuallyEq
+  filter_upwards [eventually_gt_nhds hx] with t ht
+  simp [pointDisplacement, not_lt.mpr ht.le]
 
 /-- The two displacement branches agree at the action. -/
 theorem point_displacement_continuity (P a L EI : ℝ) :

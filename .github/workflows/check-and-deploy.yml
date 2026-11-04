@@ -70,6 +70,11 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_real_field_proofs.py' -v
         env:
           REQUIRE_LEAN: '1'
+      - name: Audit real-field theorem axioms
+        working-directory: proofs
+        run: |
+          lake env lean RealBeamAudit.lean > real-axioms.log
+          python ../scripts/audit_real_axioms.py real-axioms.log
       - name: Check public course examples
         if: ${{ inputs.proof_only != true }}
         run: python -m scripts.check_worked_examples

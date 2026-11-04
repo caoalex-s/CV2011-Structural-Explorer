@@ -34,7 +34,11 @@ example : HasDerivAt (fun t : ℝ => (deflectionAfter 20 4 8 20000).eval t)
             "example : (deflectionAfter 20 4 8 20000).eval 8 = 1 := by norm_num [deflectionAfter, deflectionBefore, leftReaction, leftSlope]",
         ):
             with self.subTest(statement=statement):
-                self.assertNotEqual(self.compile_example(statement).returncode, 0)
+                result = self.compile_example(statement)
+                output = result.stdout + result.stderr
+                self.assertNotEqual(result.returncode, 0)
+                self.assertRegex(output, r"unsolved goals|tactic .*failed")
+                self.assertNotIn("unknown identifier", output)
 
 
 if __name__ == "__main__":

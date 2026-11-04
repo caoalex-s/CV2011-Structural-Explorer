@@ -1,0 +1,28 @@
+import RealBeamFields
+
+#print axioms RealBeamFields.real_derivative
+#print axioms RealBeamFields.real_integral
+#print axioms RealBeamFields.shear_balance
+#print axioms RealBeamFields.moment_balance
+#print axioms RealBeamFields.displacement_slope
+#print axioms RealBeamFields.force_jump
+#print axioms RealBeamFields.couple_jump
+#print axioms RealBeamFields.slope_superposition
+#print axioms RealBeamFields.point_before_derivative
+#print axioms RealBeamFields.point_after_derivative
+#print axioms RealBeamFields.point_real_slope_before
+#print axioms RealBeamFields.point_real_slope_after
+#print axioms RealBeamFields.point_reaction_force
+#print axioms RealBeamFields.point_reaction_moment
+#print axioms RealBeamFields.point_shear_jump
+#print axioms RealBeamFields.point_moment_continuity
+#print axioms RealBeamFields.point_moment_derivative_before
+#print axioms RealBeamFields.point_moment_derivative_after
+#print axioms RealBeamFields.point_curvature_before
+#print axioms RealBeamFields.point_curvature_after
+#print axioms RealBeamFields.point_piece_slope_before
+#print axioms RealBeamFields.point_piece_slope_after
+#print axioms RealBeamFields.point_displacement_continuity
+#print axioms RealBeamFields.point_slope_continuity
+#print axioms RealBeamFields.point_left_support
+#print axioms RealBeamFields.point_right_support
