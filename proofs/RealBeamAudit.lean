@@ -44,3 +44,5 @@ import RealBeamFields
 #print axioms RealBeamFields.affine_of_second_derivative_zero
 #print axioms RealBeamFields.piecewise_curvature_uniqueness
 #print axioms RealBeamFields.point_selected_supports
+#print axioms RealBeamFields.point_solution_exists
+#print axioms RealBeamFields.point_solution_unique

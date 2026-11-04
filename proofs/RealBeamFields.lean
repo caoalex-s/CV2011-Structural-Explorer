@@ -372,6 +372,140 @@ theorem piecewise_curvature_uniqueness (left right otherLeft otherRight : Field)
   · have : right - otherRight = 0 := by simpa [hd₀, hd₁] using hd
     exact sub_eq_zero.mp this
 
+/-- A loaded point-force beam solution records the actual polynomial fields
+and their balance, elastic, boundary and jump obligations. The predicate is
+not a certificate until a theorem constructs an inhabitant or an independent
+checker proves these obligations for a specific model. -/
+structure PointBeamSolution (P a L EI : ℝ) where
+  vLeft : Field
+  vRight : Field
+  thetaLeft : Field
+  thetaRight : Field
+  momentLeft : Field
+  momentRight : Field
+  shearLeft : Field
+  shearRight : Field
+  spanPositive : 0 < L
+  rigidityPositive : 0 < EI
+  loadAfterLeft : 0 ≤ a
+  loadBeforeRight : a ≤ L
+  leftKinematics : vLeft.derivative = thetaLeft
+  rightKinematics : vRight.derivative = thetaRight
+  leftConstitutive : ∀ x, EI * thetaLeft.derivative.eval x = momentLeft.eval x
+  rightConstitutive : ∀ x, EI * thetaRight.derivative.eval x = momentRight.eval x
+  leftMomentBalance : momentLeft.derivative = shearLeft
+  rightMomentBalance : momentRight.derivative = shearRight
+  leftShearBalance : shearLeft.derivative = 0
+  rightShearBalance : shearRight.derivative = 0
+  forceJump : shearRight.eval a - shearLeft.eval a = -P
+  momentJoin : momentRight.eval a = momentLeft.eval a
+  leftMomentSupport : momentLeft.eval 0 = 0
+  rightMomentSupport : momentRight.eval L = 0
+  leftDisplacementSupport : vLeft.eval 0 = 0
+  rightDisplacementSupport : vRight.eval L = 0
+  displacementJoin : vRight.eval a = vLeft.eval a
+  slopeJoin : thetaRight.eval a = thetaLeft.eval a
+
+/-- The prescribed endpoint-supported point-force fields satisfy the complete
+loaded-beam predicate under positive span and rigidity and an on-span load. -/
+theorem point_solution_exists (P a L EI : ℝ) (hL : 0 < L) (hEI : 0 < EI)
+    (ha₀ : 0 ≤ a) (haL : a ≤ L) : Nonempty (PointBeamSolution P a L EI) := by
+  refine ⟨{
+    vLeft := deflectionBefore P a L EI
+    vRight := deflectionAfter P a L EI
+    thetaLeft := slopeBefore P a L EI
+    thetaRight := slopeAfter P a L EI
+    momentLeft := pointMomentBefore P a L
+    momentRight := pointMomentAfter P a L
+    shearLeft := pointShearBefore P a L
+    shearRight := pointShearAfter P a L
+    spanPositive := hL
+    rigidityPositive := hEI
+    loadAfterLeft := ha₀
+    loadBeforeRight := haL
+    leftKinematics := point_before_derivative P a L EI
+    rightKinematics := point_after_derivative P a L EI
+    leftConstitutive := point_curvature_before P a L EI · (ne_of_gt hEI)
+    rightConstitutive := point_curvature_after P a L EI · (ne_of_gt hEI)
+    leftMomentBalance := point_moment_derivative_before P a L
+    rightMomentBalance := point_moment_derivative_after P a L
+    leftShearBalance := ?_
+    rightShearBalance := ?_
+    forceJump := point_shear_jump P a L
+    momentJoin := point_moment_continuity P a L
+    leftMomentSupport := ?_
+    rightMomentSupport := ?_
+    leftDisplacementSupport := point_left_support P a L EI
+    rightDisplacementSupport := point_right_support P a L EI (ne_of_gt hL) (ne_of_gt hEI)
+    displacementJoin := (point_displacement_continuity P a L EI).symm
+    slopeJoin := (point_slope_continuity P a L EI).symm
+  }⟩
+  · simp [pointShearBefore]
+  · simp [pointShearAfter, pointShearBefore, shearAfterForce]
+  · simp [pointMomentBefore]
+  · simp [pointMomentAfter, pointMomentBefore, momentAfterActions, leftReaction]
+    field_simp
+    ring
+
+/-- Two solutions of the loaded point-force predicate have the same fields.
+The proof first fixes moment by equilibrium and jump conditions, then fixes
+displacement by constitutive, support, and compatibility conditions. -/
+theorem point_solution_unique (P a L EI : ℝ) (A B : PointBeamSolution P a L EI) :
+    A.vLeft = B.vLeft ∧ A.vRight = B.vRight ∧
+    A.thetaLeft = B.thetaLeft ∧ A.thetaRight = B.thetaRight ∧
+    A.momentLeft = B.momentLeft ∧ A.momentRight = B.momentRight ∧
+    A.shearLeft = B.shearLeft ∧ A.shearRight = B.shearRight := by
+  have hML : A.momentLeft.derivative.derivative = B.momentLeft.derivative.derivative := by
+    rw [A.leftMomentBalance, B.leftMomentBalance, A.leftShearBalance, B.leftShearBalance]
+  have hMR : A.momentRight.derivative.derivative = B.momentRight.derivative.derivative := by
+    rw [A.rightMomentBalance, B.rightMomentBalance, A.rightShearBalance, B.rightShearBalance]
+  have hmJoin : A.momentLeft.eval a - B.momentLeft.eval a =
+      A.momentRight.eval a - B.momentRight.eval a := by
+    rw [A.momentJoin, B.momentJoin]
+  have hmSlope : A.momentLeft.derivative.eval a - B.momentLeft.derivative.eval a =
+      A.momentRight.derivative.eval a - B.momentRight.derivative.eval a := by
+    rw [A.leftMomentBalance, B.leftMomentBalance, A.rightMomentBalance, B.rightMomentBalance]
+    have hA := A.forceJump
+    have hB := B.forceJump
+    linarith
+  obtain ⟨hmLeft, hmRight⟩ := piecewise_curvature_uniqueness
+    A.momentLeft A.momentRight B.momentLeft B.momentRight a L (ne_of_gt A.spanPositive)
+    hML hMR (by rw [A.leftMomentSupport, B.leftMomentSupport])
+    (by rw [A.rightMomentSupport, B.rightMomentSupport]) hmJoin hmSlope
+  have htLeft : A.thetaLeft.derivative = B.thetaLeft.derivative := by
+    apply Polynomial.funext
+    intro x
+    apply mul_left_cancel₀ (ne_of_gt A.rigidityPositive)
+    rw [A.leftConstitutive x, B.leftConstitutive x, hmLeft]
+  have htRight : A.thetaRight.derivative = B.thetaRight.derivative := by
+    apply Polynomial.funext
+    intro x
+    apply mul_left_cancel₀ (ne_of_gt A.rigidityPositive)
+    rw [A.rightConstitutive x, B.rightConstitutive x, hmRight]
+  have hvL : A.vLeft.derivative.derivative = B.vLeft.derivative.derivative := by
+    rw [A.leftKinematics, B.leftKinematics, htLeft]
+  have hvR : A.vRight.derivative.derivative = B.vRight.derivative.derivative := by
+    rw [A.rightKinematics, B.rightKinematics, htRight]
+  have hvJoin : A.vLeft.eval a - B.vLeft.eval a = A.vRight.eval a - B.vRight.eval a := by
+    rw [A.displacementJoin, B.displacementJoin]
+  have hvSlope : A.vLeft.derivative.eval a - B.vLeft.derivative.eval a =
+      A.vRight.derivative.eval a - B.vRight.derivative.eval a := by
+    rw [A.leftKinematics, B.leftKinematics, A.rightKinematics, B.rightKinematics,
+      A.slopeJoin, B.slopeJoin]
+  obtain ⟨hvLeft, hvRight⟩ := piecewise_curvature_uniqueness
+    A.vLeft A.vRight B.vLeft B.vRight a L (ne_of_gt A.spanPositive)
+    hvL hvR (by rw [A.leftDisplacementSupport, B.leftDisplacementSupport])
+    (by rw [A.rightDisplacementSupport, B.rightDisplacementSupport]) hvJoin hvSlope
+  have hsLeft : A.thetaLeft = B.thetaLeft := by
+    rw [← A.leftKinematics, ← B.leftKinematics, hvLeft]
+  have hsRight : A.thetaRight = B.thetaRight := by
+    rw [← A.rightKinematics, ← B.rightKinematics, hvRight]
+  have hfLeft : A.shearLeft = B.shearLeft := by
+    rw [← A.leftMomentBalance, ← B.leftMomentBalance, hmLeft]
+  have hfRight : A.shearRight = B.shearRight := by
+    rw [← A.rightMomentBalance, ← B.rightMomentBalance, hmRight]
+  exact ⟨hvLeft, hvRight, hsLeft, hsRight, hmLeft, hmRight, hfLeft, hfRight⟩
+
 /-! A cantilever with downward end force P, counterclockwise end couple T,
 and downward intensity w(x) = w₀ + w₁ x. These fields share the same
 real-polynomial calculus as the point-force beam above. -/
