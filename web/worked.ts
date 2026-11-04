@@ -1,6 +1,6 @@
 /** Human-readable course methods, tied to an exact model/section snapshot. */
 import type { Model } from './engine.js';
-import { equationHtml, math, methodRules, rationalLatex } from './math.js';
+import { equationHtml, math, methodRules, numberLatex, rationalLatex } from './math.js';
 import type { Equation } from './math.js';
 import { renderKeyQuantities } from './quantities.js';
 import type { KeyQuantities } from './quantities.js';
@@ -66,12 +66,12 @@ void fetch('verification.json').then(result => {
 function genericRules(): string {
     const rule = pointForceRules(context.model, context.section);
     if (!rule) return '<p class="small">The single point-force generic rules do not apply to this drawing. Other worked methods may have separate instance certificates.</p>';
-    const n = (value: number) => Number(value.toPrecision(6)).toString();
+    const n = numberLatex;
     const P = rule.label, force = `(${n(rule.P)})`, left = `(${n(rule.leftReaction)})`;
     const shear = rule.after ? `A_y-${P}` : 'A_y';
     const moment = rule.after ? `A_y x-${P}(x-a)` : 'A_y x';
     const elastic = pointForceWorked(context.model, context.section);
-    const offlineDerivation = !context.connected && publishedLoaded && !response && elastic
+    const offlineDerivation = !context.connected && !response && elastic
         ? pointForceDerivation(elastic) : '';
     if (response) return `<p class="small">${genericProofStatus === 'checked' ? 'Lean checked generic equilibrium and section rules apply.' : 'Generic equilibrium and section proof status pending.'} These rules are distinct from the numerical certificate below. ${rule.maximum ? '' : 'The nonnegative-load maximum rule does not apply.'}</p>`;
     return `<details class="worked-assumptions" open><summary>Parameterized point-force rules and worked derivation</summary>
@@ -84,7 +84,7 @@ function genericRules(): string {
 
 /** Offline course methods for the same bounded family, without an instance certificate. */
 export function pointForceDerivation(rule: NonNullable<ReturnType<typeof pointForceWorked>>): string {
-    const n = (value: number) => Number(value.toPrecision(6)).toString();
+    const n = numberLatex;
     const P = rule.label;
     const slopeBranch = rule.after ? `-${P}(x-a)^2` : '';
     const deflectionBranch = rule.after ? `-${P}(x-a)^3` : '';

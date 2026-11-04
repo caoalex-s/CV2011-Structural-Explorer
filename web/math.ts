@@ -39,6 +39,12 @@ export function rationalLatex(value: string): string {
     return fraction ? `\\frac{${fraction[1]}}{${fraction[2]}}` : value;
 }
 
+/** Format a rounded number as LaTeX, including powers of ten. */
+export function numberLatex(value: number, significantDigits = 6): string {
+    const rounded = Number(value.toPrecision(significantDigits));
+    return String(rounded).replace(/e([+-]?\d+)/, (_, exponent: string) => `\\times10^{${Number(exponent)}}`);
+}
+
 /** Show a formula, the inserted parameter values, and its evaluated result. */
 export function equationHtml(row: Equation): string {
     const units: Record<string, string> = {
@@ -65,7 +71,7 @@ export function compactEquationHtml(row: Equation): string {
     const value = numerator / denominator;
     if (!Number.isFinite(value)) return equationHtml(row);
     const rounded = Number(value.toPrecision(6));
-    const displayed = String(rounded).replace(/e([+-]?\d+)/, '\\times10^{$1}');
+    const displayed = numberLatex(rounded, 7);
     // Compare decimal and rational values with integers, avoiding a false '='
     // when binary floating point rounds two distinct rationals to one value.
     const [coefficient, power = '0'] = String(rounded).split('e');

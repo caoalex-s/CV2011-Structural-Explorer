@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { compactEquationHtml, equationHtml, math, methodRules, rationalLatex } from '../web/math.ts';
+import { compactEquationHtml, equationHtml, math, methodRules, numberLatex, rationalLatex } from '../web/math.ts';
 
 test('all course method rules render as accessible LaTeX', () => {
     for (const [name, source] of Object.entries(methodRules)) {
@@ -47,4 +47,14 @@ test('short evaluations retain arithmetic, SI conversion, and approximate equali
         exact:'1/99999999999999999999', unit:'m',
     });
     assert.match(roundedFraction, /approx/);
+});
+
+
+test('numeric substitutions use LaTeX powers of ten, including signed exponents', () => {
+    assert.equal(numberLatex(-4e-7), String.raw`-4\times10^{-7}`);
+    assert.equal(numberLatex(3e21), String.raw`3\times10^{21}`);
+    assert.equal(numberLatex(0), '0');
+    assert.equal(numberLatex(-12.34567), '-12.3457');
+    for (const value of [-4e-7, 3e21, 0, -12.34567])
+        assert.doesNotMatch(math(numberLatex(value)), /math-error/);
 });
