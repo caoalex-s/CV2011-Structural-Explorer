@@ -33,6 +33,12 @@ example : HasDerivAt (pointDisplacement 20 4 8 20000) (pointSlope 20 4 8 20000 6
   point_piece_slope_after 20 4 8 20000 6 (by norm_num)
 example : HasDerivAt (pointDisplacement 20 4 8 20000) (pointSlope 20 4 8 20000 4) 4 :=
   point_piece_slope_at_load 20 4 8 20000
+example : Nonempty (PointBeamSolution 20 4 8 20000) :=
+  point_solution_exists 20 4 8 20000 (by norm_num) (by norm_num) (by norm_num) (by norm_num)
+example : Nonempty (PointBeamSolution 20 0 8 20000) :=
+  point_solution_exists 20 0 8 20000 (by norm_num) (by norm_num) (by norm_num) (by norm_num)
+example : Nonempty (CantileverSolution 20 7 5 1 8 20000) :=
+  cantilever_solution_exists 20 7 5 1 8 20000 (by norm_num) (by norm_num)
 example : (cantileverMoment 20 7 5 1 8).eval 8 = 7 :=
   cantilever_end_moment 20 7 5 1 8
 example : (cantileverMoment 20 0 5 1 8).derivative.eval 8 = 20 :=

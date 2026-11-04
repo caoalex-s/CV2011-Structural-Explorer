@@ -46,3 +46,6 @@ import RealBeamFields
 #print axioms RealBeamFields.point_selected_supports
 #print axioms RealBeamFields.point_solution_exists
 #print axioms RealBeamFields.point_solution_unique
+#print axioms RealBeamFields.polynomial_curvature_end_unique
+#print axioms RealBeamFields.cantilever_solution_exists
+#print axioms RealBeamFields.cantilever_solution_unique

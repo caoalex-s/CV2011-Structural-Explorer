@@ -372,6 +372,25 @@ theorem piecewise_curvature_uniqueness (left right otherLeft otherRight : Field)
   · have : right - otherRight = 0 := by simpa [hd₀, hd₁] using hd
     exact sub_eq_zero.mp this
 
+/-- Equal curvature, value and slope at one end determine a polynomial. -/
+theorem polynomial_curvature_end_unique (p q : Field) (x₀ : ℝ)
+    (hcurvature : p.derivative.derivative = q.derivative.derivative)
+    (hvalue : p.eval x₀ = q.eval x₀)
+    (hslope : p.derivative.eval x₀ = q.derivative.eval x₀) : p = q := by
+  have hzero : (p-q).derivative.derivative = 0 := by
+    simp [Polynomial.derivative_sub, hcurvature]
+  obtain ⟨c₀, c₁, hc⟩ := affine_of_second_derivative_zero _ hzero
+  have hc₁ : c₁ = 0 := by
+    have h := congrArg (fun field : Field => field.derivative.eval x₀) hc
+    simp [Polynomial.derivative_sub, Polynomial.derivative_mul, hslope] at h
+    exact h.symm
+  have hc₀ : c₀ = 0 := by
+    have h := congrArg (Polynomial.eval x₀) hc
+    simp [hvalue, hc₁] at h
+    exact h.symm
+  have hdiff : p-q = 0 := by simpa [hc₀, hc₁] using hc
+  exact sub_eq_zero.mp hdiff
+
 /-- A loaded point-force beam solution records the actual polynomial fields
 and their balance, elastic, boundary and jump obligations. The predicate is
 not a certificate until a theorem constructs an inhabitant or an independent
@@ -425,8 +444,8 @@ theorem point_solution_exists (P a L EI : ℝ) (hL : 0 < L) (hEI : 0 < EI)
     loadBeforeRight := haL
     leftKinematics := point_before_derivative P a L EI
     rightKinematics := point_after_derivative P a L EI
-    leftConstitutive := point_curvature_before P a L EI · (ne_of_gt hEI)
-    rightConstitutive := point_curvature_after P a L EI · (ne_of_gt hEI)
+    leftConstitutive := fun x => point_curvature_before P a L EI x (ne_of_gt hEI)
+    rightConstitutive := fun x => point_curvature_after P a L EI x (ne_of_gt hEI)
     leftMomentBalance := point_moment_derivative_before P a L
     rightMomentBalance := point_moment_derivative_after P a L
     leftShearBalance := ?_
@@ -444,8 +463,7 @@ theorem point_solution_exists (P a L EI : ℝ) (hL : 0 < L) (hEI : 0 < EI)
   · simp [pointShearAfter, pointShearBefore, shearAfterForce]
   · simp [pointMomentBefore]
   · simp [pointMomentAfter, pointMomentBefore, momentAfterActions, leftReaction]
-    field_simp
-    ring
+    field_simp <;> ring
 
 /-- Two solutions of the loaded point-force predicate have the same fields.
 The proof first fixes moment by equilibrium and jump conditions, then fixes
@@ -577,6 +595,81 @@ theorem cantilever_real_slope (P T w₀ w₁ L EI x : ℝ) :
       ((cantileverSlope P T w₀ w₁ L EI).eval x) x := by
   apply displacement_slope
   exact cubic_displacement_derivative _ _ _ _ _
+
+
+
+/-- The common cantilever load intensity is downward-positive. -/
+def cantileverIntensity (w₀ w₁ : ℝ) : Field := C w₀ + C w₁ * X
+
+def cantileverShear (P T w₀ w₁ L : ℝ) : Field :=
+  (cantileverMoment P T w₀ w₁ L).derivative
+
+/-- This predicate records a loaded cantilever bending solution. Axial response,
+frame assembly and the numerical solver remain separate obligations. -/
+structure CantileverSolution (P T w₀ w₁ L EI : ℝ) where
+  v : Field
+  theta : Field
+  moment : Field
+  shear : Field
+  spanPositive : 0 < L
+  rigidityPositive : 0 < EI
+  kinematics : v.derivative = theta
+  constitutive : ∀ x, EI * theta.derivative.eval x = moment.eval x
+  momentBalance : moment.derivative = shear
+  shearBalance : shear.derivative = -cantileverIntensity w₀ w₁
+  endMoment : moment.eval L = T
+  endShear : shear.eval L = P
+  fixedSlope : theta.eval 0 = 0
+  fixedDisplacement : v.eval 0 = 0
+
+/-- The explicit mixed-load polynomial fields solve the cantilever predicate. -/
+theorem cantilever_solution_exists (P T w₀ w₁ L EI : ℝ) (hL : 0 < L) (hEI : 0 < EI) :
+    Nonempty (CantileverSolution P T w₀ w₁ L EI) := by
+  refine ⟨{
+    v := cantileverDisplacement P T w₀ w₁ L EI
+    theta := cantileverSlope P T w₀ w₁ L EI
+    moment := cantileverMoment P T w₀ w₁ L
+    shear := cantileverShear P T w₀ w₁ L
+    spanPositive := hL
+    rigidityPositive := hEI
+    kinematics := ?_
+    constitutive := ?_
+    momentBalance := rfl
+    shearBalance := ?_
+    endMoment := cantilever_end_moment P T w₀ w₁ L
+    endShear := cantilever_end_shear P T w₀ w₁ L
+    fixedSlope := (cantilever_fixed_end P T w₀ w₁ L EI).1
+    fixedDisplacement := (cantilever_fixed_end P T w₀ w₁ L EI).2
+  }⟩
+  · exact cubic_displacement_derivative _ _ _ _ _
+  · intro x
+    exact cubic_constitutive _ _ _ _ _ x (ne_of_gt hEI)
+  · apply Polynomial.funext
+    intro x
+    simpa [cantileverShear, cantileverIntensity] using cantilever_load_balance P T w₀ w₁ L x
+
+/-- A polynomial cantilever solution is unique under the same applied loads. -/
+theorem cantilever_solution_unique (P T w₀ w₁ L EI : ℝ)
+    (A B : CantileverSolution P T w₀ w₁ L EI) :
+    A.v = B.v ∧ A.theta = B.theta ∧ A.moment = B.moment ∧ A.shear = B.shear := by
+  have hmomentCurvature : A.moment.derivative.derivative = B.moment.derivative.derivative := by
+    rw [A.momentBalance, B.momentBalance, A.shearBalance, B.shearBalance]
+  have hmoment : A.moment = B.moment := polynomial_curvature_end_unique A.moment B.moment L
+    hmomentCurvature (by rw [A.endMoment, B.endMoment])
+    (by rw [A.momentBalance, B.momentBalance, A.endShear, B.endShear])
+  have hthetaCurvature : A.theta.derivative = B.theta.derivative := by
+    apply Polynomial.funext
+    intro x
+    apply mul_left_cancel₀ (ne_of_gt A.rigidityPositive)
+    rw [A.constitutive x, B.constitutive x, hmoment]
+  have hvCurvature : A.v.derivative.derivative = B.v.derivative.derivative := by
+    rw [A.kinematics, B.kinematics, hthetaCurvature]
+  have hv : A.v = B.v := polynomial_curvature_end_unique A.v B.v 0 hvCurvature
+    (by rw [A.fixedDisplacement, B.fixedDisplacement])
+    (by rw [A.kinematics, B.kinematics, A.fixedSlope, B.fixedSlope])
+  have htheta : A.theta = B.theta := by rw [← A.kinematics, ← B.kinematics, hv]
+  have hshear : A.shear = B.shear := by rw [← A.momentBalance, ← B.momentBalance, hmoment]
+  exact ⟨hv, htheta, hmoment, hshear⟩
 
 
 end
