@@ -1,0 +1,39 @@
+{
+  "date": "2026-11-04",
+  "baseline": "1a645ec",
+  "scope": "Astro Learn routes, first supports/equilibrium/point-force beam unit, concept records, and separate lesson workspace",
+  "reviewer": "Implementation agent: two self-review stages, not independent peer review",
+  "guidance": "author-style 0.27, language-profile 0.27, code-style 0.2, figure-style 0.6",
+  "sources": [
+    "Maintained course lectures/week-01/lecture.qmd: intended learning outcomes and course roadmap, lines 22–65",
+    "Maintained course lectures/week-02/lecture.qmd: partial/improper constraints, lines 170–202; existing course-alignment-review.json count definitions",
+    "Maintained course lectures/week-04/lecture.qmd: internal actions, cut signs, and section strategy, lines 470–588",
+    "Existing web/course.ts, symbols.ts, engine.ts, math.ts, and proof scope in README.md"
+  ],
+  "meaning_and_evidence_review": {
+    "content": "Read the unit against the course sequence and cut-face conventions. Reaction derivations retain load locations and moment arms. V jumps by minus P and M remains continuous. Maximum M is restricted to a single positive downward point force within the span.",
+    "corrections": [
+      "Kept three parallel roller reactions unstable despite their sufficient count.",
+      "Separated numerical live substitutions from Lean library identities and instance certificates.",
+      "Recorded the three-roller question with its own three-roller model context.",
+      "Used course support and moment helpers in the lesson schematics.",
+      "Moved clipped reaction labels without moving force vectors and separated the two diagrams for compression-side plotting.",
+      "Repaired an escaped LaTeX spacing command and stated that the diagram scales update automatically."
+    ],
+    "boundaries": "No changes to the structural solver, existing proof sources, original lecture/tutorial files, or saved sandbox model. SVG is used for interactive figures to preserve the established browser drawing interface. Ideal trusses and remaining teaching units are explicitly planned."
+  },
+  "voice_and_readability_review": {
+    "references": "Week 4 internal-force explanations and solution strategy; author-supplied prose/symbol pairing in accepted-examples.md",
+    "result": "Reread the short lesson explanations with the displayed equations and revised figure labels. Kept course terminology, concrete operations, variable/unit typography, and expandable derivations. Brief activity prompts retain their instructional purpose without prose padding.",
+    "code": "Reviewed the bounded beam inputs, explicit formulas, solver comparisons, query handoff, record authentication, and print-event suppression. The general workspace keeps its original storage key; lesson examples have a distinct key."
+  },
+  "validation": {
+    "typescript": "Type check passed. 42 Node tests passed, including 36 beam parameter combinations compared with the frame engine, constraint classification, invalid handoff bounds, KaTeX rendering, and unchanged vector origins when reversing the plotting side.",
+    "python": "29 tests completed: 28 passed and one local Lean execution test deliberately skipped. Includes all concept choices, invalid question/choice/unit rejection, authenticated record ownership, and 40 existing mixed-load cross-language cases.",
+    "build": "Astro 7.4.5 build passed at local base / and Pages base /CV2011-Structural-Explorer/. Static artifact checks verified both Learn routes and 30 local links/assets for each base.",
+    "browser": "Inspected desktop 1440x1000 and mobile 390x844. No document overflow or KaTeX errors. Tested support changes, sliders, snapped force dragging, compression-side plotting, independent practice handoff (30 kN at 2 m), exact grading of the 22.5 kN left reaction, concept category in Learning insights, and return to the preserved semi-rigid sandbox.",
+    "records": "Browser submissions used the isolated .data/qa-learn database on port 8766. Print invocation/cancellation added no events: the database retained its two intentional test submissions. The existing pilot was restarted with its original data directory.",
+    "print_limit": "Print CSS and disclosure expansion/restoration implemented. The in-app browser print command required cancellation and did not expose a printable preview to inspection; PDF pagination has not been visually verified.",
+    "security": "No local Lean executable was run. Formal checks remain in the Linux deployment workflow."
+  }
+}

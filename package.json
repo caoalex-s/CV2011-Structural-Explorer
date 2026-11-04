@@ -3,12 +3,20 @@
   "version": "0.2.0",
   "private": true,
   "type": "module",
+  "packageManager": "pnpm@11.25.0",
   "scripts": {
     "build": "node scripts/build.mjs",
     "test": "node --test tests/*.test.mjs",
     "check": "tsc --noEmit"
   },
-  "devDependencies": {"typescript": "5.9.3"},
-  "dependencies": {"katex": "0.19.1"},
-  "engines": {"node": ">=24"}
+  "devDependencies": {
+    "typescript": "5.9.3"
+  },
+  "dependencies": {
+    "astro": "7.4.5",
+    "katex": "0.19.1"
+  },
+  "engines": {
+    "node": ">=24"
+  }
 }

@@ -1,0 +1,38 @@
+[
+  {
+    "id": "concept_parallel_restraints_v1",
+    "title": "Predict before changing the supports",
+    "prompt": "A horizontal beam rests on three vertical rollers. Is it stable in the plane?",
+    "choices": [
+      { "id": "count", "label": "Yes, because there are three reaction components.", "category": "reaction_count_without_geometry" },
+      { "id": "horizontal", "label": "No, because horizontal translation is unrestrained.", "category": "correct_concept" },
+      { "id": "rotation", "label": "No, because every roller permits the whole beam to rotate freely.", "category": "local_rotation_vs_rigid_body_motion" }
+    ],
+    "correct": "horizontal",
+    "explanation": "All three reactions are vertical. They cannot oppose horizontal translation. The reaction count alone therefore does not establish stability."
+  },
+  {
+    "id": "concept_reaction_trend_v1",
+    "title": "Predict before moving the load",
+    "prompt": "For a pin at A and a vertical roller at B, move the downward force towards B without changing its magnitude. What happens to the upward reaction at A?",
+    "choices": [
+      { "id": "increase", "label": "It increases.", "category": "reaction_lever_arm_reversed" },
+      { "id": "decrease", "label": "It decreases.", "category": "correct_concept" },
+      { "id": "equal", "label": "It remains half of the applied force.", "category": "symmetry_assumed_for_asymmetric_loading" }
+    ],
+    "correct": "decrease",
+    "explanation": "Taking moments about B gives A_y L = P(L − a). As a increases, the lever arm L − a decreases. The reaction A_y therefore decreases."
+  },
+  {
+    "id": "concept_point_force_jump_v1",
+    "title": "Check the diagram at the load",
+    "prompt": "At the downward point force P, with no applied couple at that point, which statement is correct?",
+    "choices": [
+      { "id": "moment", "label": "Bending moment jumps, while shear force is continuous.", "category": "point_force_confused_with_couple" },
+      { "id": "both", "label": "Both shear force and bending moment jump.", "category": "moment_continuity_at_point_force" },
+      { "id": "shear", "label": "Shear force jumps by −P, while bending moment is continuous.", "category": "correct_concept" }
+    ],
+    "correct": "shear",
+    "explanation": "The point force changes V from A_y to A_y − P. There is no concentrated couple, and both expressions for M give A_y a at the load. The bending-moment diagram has a corner there."
+  }
+]

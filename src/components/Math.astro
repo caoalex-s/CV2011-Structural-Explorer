@@ -1,0 +1,9 @@
+---
+import katex from 'katex';
+interface Props { tex: string; display?: boolean; }
+const { tex, display = false } = Astro.props;
+// Fail the build on malformed author equations. MathML accompanies the visual
+// rendering for assistive technology; no remote renderer or trusted HTML.
+const rendered = katex.renderToString(tex, { displayMode: display, output: 'htmlAndMathml', throwOnError: true, strict: 'error', trust: false });
+---
+<span class:list={['equation', { display }]} set:html={rendered} />

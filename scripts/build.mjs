@@ -2,6 +2,13 @@
 import { mkdir, readdir, readFile, writeFile, copyFile, cp } from 'node:fs/promises';
 import { stripTypeScriptTypes } from 'node:module';
 import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+
+// Build lessons first, then supply the workspace, fonts, and proof receipts.
+const lessons = spawnSync(process.execPath, ['node_modules/astro/bin/astro.mjs', 'build'], {
+  stdio: 'inherit', env: { ...process.env, ASTRO_TELEMETRY_DISABLED: '1' },
+});
+if (lessons.status !== 0) throw new Error('The lesson build failed.', { cause: lessons.error });
 await mkdir('dist', { recursive: true });
 for (const name of await readdir('web')) {
   if (name.endsWith('.ts')) {
@@ -29,6 +36,7 @@ for (const filename of ['katex.mjs', 'katex.min.css']) {
   await copyFile(`node_modules/katex/dist/${filename}`, `${renderer}/${filename}`);
 }
 await cp('node_modules/katex/dist/fonts', `${renderer}/fonts`, { recursive: true });
+await cp('proofs/StructuralProofs.lean', 'dist/StructuralProofs.lean');
 await copyFile('node_modules/katex/LICENSE', `${renderer}/LICENSE`);
 // Reuse a CI proof receipt locally only while the exact proof source is intact.
 try {
@@ -42,4 +50,5 @@ try {
 } catch {
   // A missing receipt leaves the explicitly pending source status unchanged.
 }
+await import('./check_lessons.mjs');
 console.log('Built static application in dist/');

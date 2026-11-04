@@ -1,0 +1,17 @@
+---
+const base = import.meta.env.BASE_URL;
+---
+<dialog id="settings" aria-labelledby="session-title">
+  <form method="dialog">
+    <h2 id="session-title">Learning record</h2>
+    <p>Submitted answers and solution reveals are saved on this device. Connect the local pilot service to check and collect them under a pseudonymous course ID.</p>
+    <label>Verifier URL<input id="api-url" type="url" placeholder="http://127.0.0.1:8765" /></label>
+    <label>Pseudonymous course ID<input id="course-id" maxlength="40" /></label>
+    <label>Personal access token<input id="access-token" type="password" autocomplete="off" /></label>
+    <label>Instructor token<input id="instructor-token" type="password" autocomplete="off" /></label>
+    <p id="session-status" class="small"></p>
+    <div class="actions"><button value="cancel">Close</button><button id="save-settings" value="save" class="primary">Connect</button></div>
+    <p class="small"><a href={`${base}#insights`}>View or export learning records</a></p>
+  </form>
+</dialog>
+<div id="toast" role="status" aria-live="polite"></div>

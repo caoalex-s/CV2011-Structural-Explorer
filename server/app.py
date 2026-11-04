@@ -18,6 +18,7 @@ from urllib.parse import urlsplit
 
 from server.verifier import VERSION, check, solution
 from server.worked import worked_solution
+from server.concepts import check_concept
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = Path(os.environ.get("EXPLORER_DATA", ROOT / ".data"))
@@ -177,7 +178,7 @@ def make_handler(store, instructor_token, origins, local_demo=None):
                     if payload.get("courseId") != identity:
                         raise ValueError("Course ID does not correspond to the authenticated account.")
                     if payload.get("event") == "submit":
-                        result = check(payload)
+                        result = check_concept(payload) if str(payload.get("step", "")).startswith("concept_") else check(payload)
                     elif payload.get("event") in ("hint", "reveal"):
                         result = {"status": "not_graded", "category": payload["event"], "message": "Learning event recorded.", "verifier": VERSION}
                     else:

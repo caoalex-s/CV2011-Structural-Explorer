@@ -1,0 +1,31 @@
+---
+import LessonLayout from '../../layouts/LessonLayout.astro';
+import { supportShape, forceSymbol, courseColors } from '../../../web/symbols';
+const base = import.meta.env.BASE_URL;
+const topics = [
+  { weeks: 'Weeks 1–2', title: 'Models, supports, and equilibrium', text: 'Idealisation, support restraints, stability, free-body diagrams, and reaction forces.', status: 'First unit available' },
+  { weeks: 'Weeks 3–4', title: 'Planar trusses', text: 'Truss assumptions, stability, zero-force members, method of joints, and method of sections.', status: 'Planned · ideal truss solver required' },
+  { weeks: 'Weeks 4–5', title: 'Beams and internal actions', text: 'Normal force, shear force, bending moment, distributed loads, and applied couples.', status: 'Point-force introduction available' },
+  { weeks: 'Weeks 6–7', title: 'Frames', text: 'Member free bodies, joint equilibrium, internal hinges, and internal-force diagrams.', status: 'Sandbox available · lessons planned' },
+  { weeks: 'Weeks 8–13', title: 'Deflections and energy methods', text: 'Beam and frame displacements, elastic curves, moment-area theorems, virtual work, and truss deflections.', status: 'Beam worked methods available · lessons planned' },
+];
+---
+<LessonLayout title="Learn structural analysis" description="Explore CV2011 concepts through predictions, interactive structures, and concise worked derivations.">
+  <div class="course-home">
+    <section class="course-intro">
+      <p class="eyebrow">Learn structural analysis</p>
+      <h1>See the structure.<br />Follow the reasoning.</h1>
+      <p class="lead">Connect the free-body diagram to the equations. Predict a response, change the structure, and explain what you observe.</p>
+    </section>
+    <a class="featured-unit" href={`${base}learn/beam-basics/`}>
+      <div><span class="eyebrow">Start here · Unit 01</span><h2>A beam, from supports<br />to diagrams</h2><p>Supports → reactions → internal forces</p><span class="text-link">Open the interactive unit <span aria-hidden="true">↗</span></span></div>
+      <svg viewBox="0 0 420 225" aria-hidden="true"><path d="M45 90H375" class="beam-stroke" /><g transform="translate(45 90)" class="support-stroke" set:html={supportShape('pin')} /><g transform="translate(375 90)" class="support-stroke" set:html={supportShape('roller')} /><g set:html={forceSymbol(210, 90, 0, -1, courseColors.force, 'P', 50)} /><path d="M45 150l165 60 165-60Z" class="moment-fill" /><path d="M45 150H375" class="axis-stroke" /><text x="216" y="192" class="svg-variable">M</text></svg>
+    </a>
+    <section class="course-map" aria-labelledby="map-title">
+      <div class="section-heading"><h2 id="map-title">The course at a glance</h2><p>The first unit is ready to explore. The remaining lessons are being developed.</p></div>
+      <ol>{topics.map((topic, index) => <li><span class="topic-number">0{index + 1}</span><div><span class="eyebrow">{topic.weeks}</span><h3>{topic.title}</h3><p>{topic.text}</p><span class="availability">{topic.status}</span></div></li>)}</ol>
+      <p class="source-note">Sequence: CV2011 Week 1 course roadmap. The first unit connects the Weeks 1–2 foundations to the Weeks 4–5 beam topics.</p>
+    </section>
+    <section class="next-actions"><h2>Already working on a structure?</h2><div class="actions"><a class="button" href={`${base}#sandbox`}>Continue in the sandbox</a><a class="text-link" href={`${base}#practice`}>Solve a problem →</a></div></section>
+  </div>
+</LessonLayout>

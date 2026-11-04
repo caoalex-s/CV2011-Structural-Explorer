@@ -1,0 +1,70 @@
+---
+import LessonLayout from '../../layouts/LessonLayout.astro';
+import Math from '../../components/Math.astro';
+import Prediction from '../../components/Prediction.astro';
+import { initialBeam } from '../../../web/lesson-beam';
+import { beamDrawing, reactionEquations, sectionEquations } from '../../../web/lesson-view';
+import { momentSymbol, supportShape, symbolLabel, courseColors } from '../../../web/symbols';
+const base = import.meta.env.BASE_URL;
+const workspace = `${base}?lesson=beam-basics`;
+---
+<LessonLayout title="A beam, from supports to diagrams" description="Predict, explore, and derive support reactions and internal forces for a simply supported beam." activity>
+  <div class="unit-shell">
+    <aside class="unit-nav" aria-label="In this unit">
+      <a class="back-link" href={`${base}learn/`}>← Course map</a>
+      <p class="eyebrow">Unit 01</p>
+      <nav><a href="#supports">01 · Restrain the beam</a><a href="#equilibrium">02 · Find the reactions</a><a href="#sections">03 · Cut and draw</a><a href="#practice">04 · Try it yourself</a></nav>
+      <button class="quiet print-button" id="print-lesson">Print / save PDF</button>
+    </aside>
+    <article class="unit-content">
+      <header class="unit-intro"><p class="eyebrow">Supports · Equilibrium · Beam diagrams</p><h1>A beam, from supports to diagrams</h1><p class="lead">How does a load reach the supports, and what happens inside the beam?</p><p>Start with the restraints. Use equilibrium to obtain the reactions, then cut the beam to expose its internal forces. Each activity connects a physical change to the equation that describes it.</p></header>
+      <noscript><p class="notice">The explanations and default example are available below. Enable JavaScript to change the drawing and check predictions.</p></noscript>
+      <section id="supports" class="lesson-section">
+        <p class="eyebrow">01 · Restrain the beam</p><h2>Which motions do the supports prevent?</h2>
+        <p>A pin support restrains horizontal and vertical translation while permitting rotation. A vertical roller restrains vertical translation and permits horizontal motion. A fixed support also restrains rotation and supplies a reaction moment.</p>
+        <Prediction index={0} />
+        <div class="activity support-activity">
+          <div class="activity-header"><h3>Change the restraints</h3><label>Support arrangement<select id="support-case"><option value="pin-roller">Pin + vertical roller</option><option value="two-rollers">Two vertical rollers</option><option value="three-rollers">Three vertical rollers</option><option value="fixed-roller">Fixed support + roller</option></select></label></div>
+          <div class="drawing-scroll" tabindex="0" aria-label="Support arrangement drawing"><svg id="support-drawing" viewBox="0 0 800 245" role="img" aria-label="Support arrangement" set:html={beamDrawing(initialBeam, 0.5, false, 'pin-roller', false)} /></div>
+          <p id="support-result" class="activity-result" role="status">Stable and statically determinate. The pin and separated roller prevent both translations and rigid-body rotation.</p>
+        </div>
+        <details class="derivation"><summary>Stability before counting</summary><p>For one planar rigid component, equilibrium supplies three equations. A reaction count of three permits a determinate solution only when the restraint directions and locations prevent rigid-body motion. Three parallel reactions leave horizontal motion unrestrained even though their count is sufficient.</p><p>Two vertical rollers provide partial constraints. Three vertical rollers illustrate improper constraints. The fixed support with a roller is stable but statically indeterminate to degree one, and its reactions require compatibility in addition to equilibrium.</p><p class="small">This activity concerns small rigid-body motions of one continuous beam. Buckling and loss of support contact require separate checks.</p></details>
+      </section>
+      <section id="equilibrium" class="lesson-section">
+        <p class="eyebrow">02 · Find the reactions</p><h2>The lever arm determines the share of load</h2>
+        <p>The downward point force <Math tex="P" /> acts at distance <Math tex="a" /> from support A on a span <Math tex="L" />. Assume upward reactions <Math tex="A_y" /> and <Math tex="B_y" />. Global <Math tex="x" /> points rightward, global <Math tex="y" /> points upward, and positive moments act counterclockwise.</p>
+        <Prediction index={1} />
+        <div class="activity beam-activity">
+          <div class="activity-header"><h3>Move the force. Follow the response.</h3><button id="reset-beam" class="quiet">Reset example</button></div>
+          <div class="beam-controls">
+            <label>Force <Math tex="P\;(\mathrm{kN})" /><input id="beam-load" type="range" min="5" max="50" step="5" value="20" /><output for="beam-load" id="load-value">20 kN</output></label>
+            <label>Span <Math tex="L\;(\mathrm{m})" /><input id="beam-span" type="range" min="4" max="12" step="1" value="8" /><output for="beam-span" id="span-value">8 m</output></label>
+            <label>Load position <Math tex="a/L" /><input id="beam-position" type="range" min="0.1" max="0.9" step="0.05" value="0.5" /><output for="beam-position" id="position-value">0.50</output></label>
+          </div>
+          <div class="drawing-scroll" tabindex="0" aria-label="Beam and internal-force diagrams"><svg id="beam-drawing" viewBox="0 0 800 550" role="img" aria-label="Beam, shear-force diagram, and bending-moment diagram" set:html={beamDrawing(initialBeam)} /></div>
+          <p class="small drawing-hint">Swipe the drawing horizontally to see the full span.</p><div class="diagram-options"><span class="small">Drag <Math tex="P" /> or use the sliders. Position snaps to <Math tex="0.05L" />. Diagrams use separate automatic scales.</span><label>Moment plotted on<select id="lesson-moment-side"><option value="tension">Tension side</option><option value="compression">Compression side</option></select></label></div>
+          <div id="reaction-equations" class="equation-panel" set:html={reactionEquations(initialBeam)} />
+        </div>
+        <details class="derivation" data-reveal="reaction_left"><summary>Derive the reactions from equilibrium</summary><p>Replace the supports by their reaction components without changing their points of application. Taking moments about A eliminates both components at A. Vertical equilibrium then determines the remaining vertical reaction:</p><Math display tex={String.raw`\begin{aligned}\sum M_{\mathrm A}=0:&\quad B_yL-Pa=0,\\ \sum F_y=0:&\quad A_y+B_y-P=0,\\ \sum F_x=0:&\quad A_x=0.\end{aligned}`} /><p>Solving gives <Math tex={String.raw`B_y=Pa/L`} /> and <Math tex={String.raw`A_y=P(L-a)/L`} />. Moving the force towards B reduces its moment arm about B and the reaction at A. Equal reactions occur at <Math tex="a=L/2" /> for this loading.</p></details>
+      </section>
+      <section id="sections" class="lesson-section">
+        <p class="eyebrow">03 · Cut and draw</p><h2>Internal forces balance the retained segment</h2>
+        <p>Retain the left portion and expose the right cut face at coordinate <Math tex="x" />. Positive normal force <Math tex="N" /> points rightward, positive shear force <Math tex="V" /> points downward, and positive bending moment <Math tex="M" /> acts counterclockwise on that face. The actions on the opposite cut face reverse.</p>
+        <div class="cut-figure"><svg viewBox="0 0 560 170" role="img" aria-label="Positive actions on the right cut face of a retained left beam segment"><path d="M90 80H380" class="beam-stroke"/><g transform="translate(90 80)" class="support-stroke" set:html={supportShape('pin')} /><path d="M90 150V112m-5 9 5-9 5 9" class="reaction-stroke"/><path d="M380 80H450m-9-5 9 5-9 5M380 80V142m-5-9 5 9 5-9" class="load-stroke"/><g set:html={momentSymbol(380, 80, 1, courseColors.force, '', 30)} /><path d="M380 20V155" class="section-line"/><text x="55" y="140" class="svg-label" set:html={symbolLabel('A_y')} /><text x="460" y="85" class="svg-variable">N</text><text x="392" y="149" class="svg-variable">V</text><text x="415" y="43" class="svg-variable">M</text><text x="150" y="35" class="svg-label" set:html={symbolLabel('Retained left portion, x < a')} /></svg></div>
+        <div class="activity section-activity"><label class="section-control">Section position <Math tex="x/L" /><input id="lesson-section" type="range" min="0.05" max="0.95" step="0.05" value="0.5" /><output for="lesson-section" id="section-value">0.50</output></label><div id="section-equations" class="equation-panel" set:html={sectionEquations(initialBeam, 0.5)} /><p class="small">At the point force, the section readout uses the right-hand value of shear force. The dashed line marks the selected section on both diagrams.</p></div>
+        <Prediction index={2} />
+        <details class="derivation" data-reveal="moment"><summary>Derive the shear-force and bending-moment diagrams</summary><p>A cut before the load contains only the reaction at A. A cut after the load also contains <Math tex="P" /> with moment arm <Math tex="x-a" />. Equilibrium of each retained segment gives:</p><Math display tex={String.raw`N(x)=0,\qquad V(x)=\begin{cases} A_y,&0<x<a,\\ A_y-P,&a<x<L,\end{cases}`} /><Math display tex={String.raw`M(x)=\begin{cases}A_yx,&0\leq x\leq a,\\ A_yx-P(x-a),&a\leq x\leq L.\end{cases}`} /><p>Between the concentrated forces, <Math tex={String.raw`\mathrm dV/\mathrm dx=0`} /> and <Math tex={String.raw`\mathrm dM/\mathrm dx=V`} />. The shear force is constant on each interval, and the bending moment varies linearly. At the point force, <Math tex={String.raw`V(a^+)-V(a^-)=-P`} /> while <Math tex="M" /> remains continuous.</p><p>For <Math tex="P>0" /> and <Math tex="0<a<L" />, the shear force is positive before the load and negative after it. The bending moment therefore reaches its maximum at <Math tex="x=a" />. Substituting into either branch gives <Math tex={String.raw`M_{\max}=Pa(L-a)/L`} />.</p></details>
+        <details class="derivation"><summary>Tension side, compression side, and sign</summary><p>Positive bending moment produces sagging and tension at the bottom of this horizontal beam. The tension-side plot places this diagram below the member, while the compression-side plot places it above. Switching the plotting side preserves the signed bending moment and all reaction values.</p></details>
+      </section>
+      <section id="practice" class="lesson-section">
+        <p class="eyebrow">04 · Try it yourself</p><h2>Use the method without the answers</h2>
+        <p>Keep the pin and roller, then place a <Math tex="30\;\mathrm{kN}" /> downward force at <Math tex="a=2\;\mathrm m" /> on an <Math tex="8\;\mathrm m" /> span. Draw the free body and calculate both reactions before revealing a solution. Determine the shear force and bending moment at <Math tex="x=4\;\mathrm m" /> and locate the maximum bending moment.</p>
+        <div class="actions"><a class="button primary" href={`${workspace}&load=30&span=8&position=0.25#practice`}>Start the practice problem</a><a id="explore-current" class="text-link" href={`${workspace}#sandbox`}>Explore this beam freely →</a></div>
+        <p class="small">Lesson examples use a separate workspace. Your saved sandbox remains available through the Sandbox link.</p>
+        <details class="derivation proof-scope"><summary>Mathematical verification and Lean proofs</summary><p>The generic reaction identities and plotting-side rule have Lean proofs in the shared library. The live lesson substitutes values into the displayed beam formulas. A new slider setting does not generate a Lean certificate in the browser.</p><p id="lesson-proof-status" class="small">Loading the published proof status…</p><p><a href={`${base}StructuralProofs.lean`}>Read the Lean proof source</a> · <a href={`${workspace}#sandbox`}>Open the published example and its worked proof</a></p><p>The worked-solution panel provides symbolic checks and the exact verification scope. The default central-load example has a published instance certificate when the CI check succeeds. Modified examples require the connected verifier for a new certificate, and local Lean execution remains disabled in this pilot.</p></details>
+        <details class="derivation"><summary>Course sources and modelling assumptions</summary><p>This unit follows Week 1 for idealisation and equilibrium, Week 2 for constraints and static determinacy, and Week 4 for beam sections and internal-force signs. The activity uses a straight continuous beam with engaged supports and small displacements. The bending-moment plotting selector provides both diagram sides without changing the signed result.</p><p class="small">After this introduction: distributed loading and applied couples, frame members, elastic curves, moment-area theorems, and virtual work. Ideal truss analysis requires a separate element formulation.</p></details>
+      </section>
+    </article>
+  </div>
+  <script src="../../scripts/beam-lesson.ts"></script>
+</LessonLayout>

@@ -1,0 +1,14 @@
+---
+import questions from '../data/questions.json';
+interface Props { index: number; }
+const question = questions[Astro.props.index];
+---
+<form class="prediction" data-question={question.id}>
+  <p class="eyebrow">{question.title}</p>
+  <fieldset>
+    <legend>{question.prompt}</legend>
+    {question.choices.map(choice => <label><input type="radio" name={question.id} value={choice.id} required /><span>{choice.label}</span></label>)}
+  </fieldset>
+  <button type="submit">Check prediction</button>
+  <p class="feedback" role="status" hidden></p>
+</form>

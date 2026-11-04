@@ -18,12 +18,18 @@ import { renderResponses, sampleSection } from './responses.js';
 import { createWorkspaceControls } from './workspace-controls.js';
 import { createLearningSession } from './learning-session.js';
 import type { Attempt } from './learning-session.js';
+import { lessonContext } from './lesson-beam.js';
 const clone = <T>(value: T): T => structuredClone(value);
 const id = (prefix: string) => `${prefix}${crypto.randomUUID().slice(0, 6)}`;
 renderCourseConventions();
-let model: Model = example();
+const lesson = lessonContext(location.search);
+const modelStorageKey = lesson?.storageKey || 'cv2011-model';
+if (lesson) {
+    $('workspace').insertAdjacentHTML('afterbegin', '<p class="lesson-banner"><a href="learn/beam-basics/">← Back to the beam lesson</a> · Lesson workspace · <a href="./#sandbox">Return to your saved sandbox</a></p>');
+}
+let model: Model = lesson?.model || example();
 try {
-    const saved = localStorage.getItem('cv2011-model');
+    const saved = lesson ? null : localStorage.getItem(modelStorageKey);
     if (saved) {
         const candidate = JSON.parse(saved);
         if (analyse(candidate).status !== 'invalid')
@@ -64,7 +70,7 @@ interface Snap {
 function toast(message: string) { $('toast').textContent = message; $('toast').classList.add('show'); setTimeout(() => $('toast').classList.remove('show'), 4200); }
 function checkpoint(before = model) { history.push(clone(before)); if (history.length > 60)
     history.shift(); future.length = 0; }
-function changed() { assignLoadLabels(model); analysis = analyse(model); localStorage.setItem('cv2011-model', JSON.stringify(model)); render(); }
+function changed() { assignLoadLabels(model); analysis = analyse(model); localStorage.setItem(modelStorageKey, JSON.stringify(model)); render(); }
 function commit(action: () => void) { checkpoint(); action(); solutionRevealed = false; hintUsed = false; practiceResultsVisible = false; changed(); }
 function screen(point: {
     x: number;

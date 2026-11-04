@@ -17,12 +17,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.25.0'
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: npm install --ignore-scripts
-      - run: npm run check
-      - run: npm test
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm run check
+      - run: pnpm test
       - run: python -m pip install -r requirements.txt
       - run: mkdir -p .data && python -m unittest discover -s tests -p 'test_*.py' -v
       - uses: leanprover/lean-action@v1
@@ -52,7 +55,9 @@ jobs:
           python -c "import json; from pathlib import Path; p=Path('web/verification.json'); v=json.loads(p.read_text()); v['lean']='checked'; v['commit']='${{ github.sha }}'; p.write_text(json.dumps(v))"
       - name: Render published symbolic equations
         run: node scripts/check_published_math.mjs
-      - run: npm run build
+      - run: pnpm run build
+        env:
+          EXPLORER_BASE: /CV2011-Structural-Explorer/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

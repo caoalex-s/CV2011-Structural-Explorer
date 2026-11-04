@@ -11,7 +11,7 @@ Use Node.js 24 or later and Python 3.12. KaTeX renders LaTeX equations in the br
 ```powershell
 python -m venv .venv
 .venv/Scripts/python.exe -m pip install -r requirements.txt
-npm install --ignore-scripts
+pnpm install --frozen-lockfile --ignore-scripts
 node scripts/build.mjs
 .venv/Scripts/python.exe -m server.app
 ```
@@ -19,6 +19,35 @@ node scripts/build.mjs
 Open <http://127.0.0.1:8765/>. The local service creates a demonstration account named `DEMO-001` and exposes its credentials only in loopback mode. The database and local credentials are saved in `.data/`, which is excluded from Git and the static build. Keep this directory when restarting the pilot to retain the records.
 
 For a fresh checkout on Windows, `start-local.ps1` starts the configured local pilot in a hidden process and opens no extra console window. Its process ID and logs are written under `.data/`. `stop-local.ps1` stops only that recorded process after checking its command line.
+
+## Learn with an interactive unit
+
+Open `learn/` from the workspace navigation. The first unit connects support
+restraints, equilibrium, and internal-force diagrams for one simply supported
+beam. Students make predictions, vary the load and span, read symbolic formulas
+with numerical substitutions, and open a separate practice problem. The course
+map follows the Week 1 roadmap and marks the remaining teaching units as planned.
+
+Astro builds the static lesson pages. The existing TypeScript workspace and
+solver retain their interfaces. `src/pages/learn/` holds the content, while
+`web/lesson-beam.ts` defines the bounded teaching example. Both interfaces use
+the course SVG symbols and shared typography. Use pnpm 11.25.0 with the committed
+lockfile. A local build uses `/` as its base. GitHub Actions sets
+`EXPLORER_BASE=/CV2011-Structural-Explorer/` for Pages. The combined build creates
+both the lesson routes and workspace in `dist/`.
+
+Only submitted concept choices and solution reveals enter the record. Versioned
+questions in `src/data/questions.json` supply the browser feedback and server
+answer key. The authenticated server overrides client grade claims and records
+the observed choice category. These are course concept checks, not Lean proofs.
+Disconnected submissions remain queued for explicit upload through Learning
+insights. Lesson links use a separate model storage key and preserve the saved
+sandbox. Print view expands the derivations without recording those automatic
+expansions as student reveals.
+
+The lesson links to the existing Lean library and worked example certificates.
+Live slider substitutions do not create new certificates. The course source
+files remain unchanged. Local Lean execution remains disabled by default.
 
 ## Use the drawing workspace
 
