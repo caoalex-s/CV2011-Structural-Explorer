@@ -93,6 +93,7 @@ $('support-case').addEventListener('change', () => {
 
 for (const form of document.querySelectorAll<HTMLFormElement>('[data-question]')) {
     const question = questions.find(item => item.id === form.dataset.question)!;
+    let feedbackSeen = false;
     form.addEventListener('submit', async event => {
         event.preventDefault();
         const answer = String(new FormData(form).get(question.id));
@@ -104,7 +105,8 @@ for (const form of document.querySelectorAll<HTMLFormElement>('[data-question]')
         feedback.hidden = false;
         feedback.textContent = `${answer === question.correct ? 'Correct.' : 'Review the free body.'} ${question.explanation}`;
         try {
-            const attemptContext = context(question.id);
+            const attemptContext = context(question.id, feedbackSeen);
+            feedbackSeen = true;
             if (question.id === 'concept_parallel_restraints_v1')
                 attemptContext.model = lessonBeam(initialBeam, 'three-rollers');
             const attempt = await session.record(attemptContext, 'submit', answer, 'choice');

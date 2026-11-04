@@ -5,8 +5,14 @@ import type { BeamInputs, SupportCase } from './lesson-beam.js';
 import { math } from './math.js';
 
 const number = (value: number) => Number(value.toPrecision(5)).toString();
-const label = (x: number, y: number, text: string, anchor = 'middle') =>
-    `<text x="${x}" y="${y}" text-anchor="${anchor}" class="svg-label">${symbolLabel(text)}</text>`;
+function label(x: number, y: number, text: string, anchor = 'middle'): string {
+    // Here a is the load coordinate. Keep the shared prose-aware formatter from
+    // treating every standalone English article "a" as a mathematical variable.
+    const notation = text.startsWith('a = ')
+        ? `<tspan class="svg-variable">a</tspan>${symbolLabel(text.slice(1))}`
+        : symbolLabel(text);
+    return `<text x="${x}" y="${y}" text-anchor="${anchor}" class="svg-label">${notation}</text>`;
+}
 const support = (x: number, kind: string) =>
     `<g transform="translate(${x} 120)" class="support-stroke">${supportShape(kind)}</g>`;
 
