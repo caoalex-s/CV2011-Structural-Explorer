@@ -14,5 +14,15 @@ export function pointForceWorked(model: Model, section: number) {
     const distance = after ? x - a : 0;
     const theta = thetaLeft + (leftReaction * x ** 2 - P * distance ** 2) / (2 * EI);
     const displacement = thetaLeft * x + (leftReaction * x ** 3 - P * distance ** 3) / (6 * EI);
-    return { ...rule, EI, thetaLeft, theta, displacement };
+    // The displacement stationary point lies on the longer load-to-support
+    // interval. At zero response every point is equivalent.
+    const stationaryX = a >= L / 2
+        ? Math.sqrt(a * (2 * L - a) / 3)
+        : L - Math.sqrt((L - a) * (L + a) / 3);
+    const stationaryDistance = Math.max(0, stationaryX - a);
+    const stationaryDisplacement = thetaLeft * stationaryX +
+        (leftReaction * stationaryX ** 3 - P * stationaryDistance ** 3) / (6 * EI);
+    const thetaRight = thetaLeft + (leftReaction * L ** 2 - P * (L - a) ** 2) / (2 * EI);
+    return { ...rule, EI, thetaLeft, thetaRight, theta, displacement,
+        stationaryX, stationaryDisplacement, maximumSlope: Math.max(Math.abs(thetaLeft), Math.abs(thetaRight)) };
 }

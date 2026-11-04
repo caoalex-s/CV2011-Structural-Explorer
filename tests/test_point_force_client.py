@@ -33,6 +33,11 @@ class PointForceClientTests(unittest.TestCase):
             for key, index, factor in [("shear", 1, 1), ("moment", 2, 1),
                                        ("theta", 3, 1), ("displacement", 4, 1000)]:
                 self.assertAlmostEqual(client[key]*factor, float(Fraction(server["selected"][index]["exact"])), places=8)
+            summaries = {item["field"]: item for item in server["quantities"]["summaries"]}
+            for field, value in [("theta", client["maximumSlope"]*1000),
+                                 ("v", abs(client["stationaryDisplacement"])*1000)]:
+                maximum = next(item for item in summaries[field]["extrema"] if item["kind"] == "absolute")
+                self.assertAlmostEqual(value, maximum["value"], places=6)
 
 
 if __name__ == "__main__":
