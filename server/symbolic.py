@@ -1,7 +1,9 @@
 """Load-labelled beam algebra before numerical substitution.
 
-The drawn ratios x/L and action directions define a family of similar beams.
-Load amplitudes, L, and EI remain symbolic. Exact substitution checks connect
+For general loading, drawn ratios x/L and action directions define a family of
+similar beams. A single vertical point force on endpoint supports additionally
+retains independent load and selected-section coordinates. Load amplitudes,
+L, and EI remain symbolic. Exact substitution checks connect
 every displayed expression to the existing per-instance Lean certificate.
 This module does not claim a universally quantified Lean proof of that family.
 """
@@ -22,8 +24,20 @@ def attach_symbolic_derivation(model, beam, numeric_pieces, section, result):
     )
 
     length, rigidity = sp.symbols("L EI", positive=True)
+    # Only this family has independently variable action and section positions.
+    loads = model.get("loads", [])
+    single_force = (len(loads) == 1 and loads[0]["kind"] == "force"
+                    and rational(loads[0]["fx"]) == 0 and beam.left == 0
+                    and beam.right == beam.length)
+    load_position, cut_position = sp.symbols("a_load x_s", real=True)
+    if single_force:
+        substitutions_extra = {load_position: rational(loads[0]["t"]) * beam.length,
+                               cut_position: section}
+    else:
+        substitutions_extra = {}
     substitutions = {length: beam.length, rigidity: beam.rigidity}
-    display_names = {rigidity: "EI"}
+    substitutions.update(substitutions_extra)
+    display_names = {rigidity: "EI", load_position: r"x_{\loadsymbol{0}{}}", cut_position: r"x_s"}
     parameters = [equation("Beam length", beam.length, "m", "L"),
                   equation("Flexural rigidity", beam.rigidity, "kN m²", "EI")]
     load_parameters = []
@@ -71,7 +85,7 @@ def attach_symbolic_derivation(model, beam, numeric_pieces, section, result):
     forces, couples, distributions = [], [], []
     for index, load in enumerate(model.get("loads", [])):
         load_parameters.append([])
-        start = rational(load["t"])
+        start = load_position / length if single_force else rational(load["t"])
         if load["kind"] == "force":
             fx, fy = rational(load["fx"]), rational(load["fy"])
             if fx != 0 and fy != 0:
@@ -82,7 +96,7 @@ def attach_symbolic_derivation(model, beam, numeric_pieces, section, result):
                 vertical = sp.S.Zero
             else:
                 horizontal = sp.S.Zero
-                vertical = (1 if fy > 0 else -1) * parameter(index, abs(fy), "kN")
+                vertical = -parameter(index, -fy, "kN") if single_force else (1 if fy > 0 else -1) * parameter(index, abs(fy), "kN")
             forces.append((start, horizontal, vertical))
         elif load["kind"] == "moment":
             moment = rational(load["mz"])
@@ -105,7 +119,7 @@ def attach_symbolic_derivation(model, beam, numeric_pieces, section, result):
         if load["kind"] == "distributed":
             coordinates = [(start, rf"x_{{{token},a}}"), (end, rf"x_{{{token},b}}")]
         for fraction, label in coordinates:
-            row = equation("Load coordinate", fraction * beam.length, "m", label)
+            row = equation("Load coordinate", (fraction * beam.length).subs(substitutions), "m", label)
             attach(row, fraction * length)
             parameters.append(row)
 
@@ -126,13 +140,58 @@ def attach_symbolic_derivation(model, beam, numeric_pieces, section, result):
         reaction_horizontal=-horizontal, pin_location=beam.pin_location/beam.length,
         total_vertical=vertical, total_moment=moment,
     )
-    normalized_pieces, _, _, _ = build_polynomials(normalized)
+    if single_force:
+        # Select intervals using current coordinates, but construct their
+        # polynomials with independent a and L. The signed P is downward-positive.
+        q = load_position / length
+        P = -vertical
+        c1 = (-P * (1-q) + P * (1-q)**3) / 6
+        bounds = [(sp.S.Zero, q), (q, sp.S.One)]
+        bounds = [(start, end) for start, end in bounds
+                  if sp.cancel((end-start).subs(substitutions)) > 0]
+        normalized_pieces = []
+        for start, end in bounds:
+            after = bool(sp.cancel((start-q).subs(substitutions)) >= 0)
+            M = P*(1-q)*X - (P*(X-q) if after else 0)
+            V = P*(1-q) - (P if after else 0)
+            theta = P*(1-q)*X**2/2 - (P*(X-q)**2/2 if after else 0) + c1
+            displacement = P*(1-q)*X**3/6 - (P*(X-q)**3/6 if after else 0) + c1*X
+            normalized_pieces.append(dict(start=start, end=end, q=sp.S.Zero, N=sp.S.Zero,
+                                          V=V, M=M, theta=theta, v=displacement))
+
+        def current(expression):
+            return sp.cancel(expression.subs(substitutions))
+
+        def at(pieces, field, position):
+            point = current(position)
+            piece = next((item for item in pieces if current(item["start"]) <= point < current(item["end"])), pieces[-1])
+            return sp.expand(piece[field]).subs(X, position)
+
+        def integrate_pieces(pieces, start, end, weighted=False):
+            direction = 1 if current(end) >= current(start) else -1
+            lower, upper = (start, end) if direction == 1 else (end, start)
+            terms = []
+            for index, piece in enumerate(pieces):
+                lo = lower if current(lower) >= current(piece["start"]) else piece["start"]
+                hi = upper if current(upper) <= current(piece["end"]) else piece["end"]
+                if current(hi) > current(lo):
+                    integrand = piece["M"] * (end-X if weighted else 1)
+                    terms.append((index, lo, hi, direction, sp.integrate(integrand, (X, lo, hi))))
+            return terms
+    else:
+        normalized_pieces, _, _, _ = build_polynomials(normalized)
     require_zero(sp.cancel(normalized.reaction_left + normalized.reaction_right + vertical))
     require_zero(sp.cancel(left*normalized.reaction_left + right*normalized.reaction_right + moment))
-    require_zero(sp.cancel(at(normalized_pieces, "v", left)))
-    require_zero(sp.cancel(at(normalized_pieces, "v", right)))
-    for name, fraction in [("a", left), ("b", right), ("x_s", section/beam.length)]:
-        row = equation("Coordinate", fraction * beam.length, "m", name)
+    for support in (left, right):
+        displacement_at_support = at(normalized_pieces, "v", support)
+        # At an endpoint load one interval has collapsed; its remaining
+        # polynomial satisfies the condition on that endpoint boundary.
+        if single_force and rational(loads[0]["t"]) in (0, 1):
+            displacement_at_support = displacement_at_support.subs(substitutions)
+        require_zero(sp.cancel(displacement_at_support))
+    section_fraction = cut_position / length if single_force else section / beam.length
+    for name, fraction in [("a", left), ("b", right), ("x_s", section_fraction if single_force else section/beam.length)]:
+        row = equation("Coordinate", (fraction * length).subs(substitutions), "m", name)
         attach(row, fraction * length)
         parameters.append(row)
 
@@ -175,7 +234,7 @@ def attach_symbolic_derivation(model, beam, numeric_pieces, section, result):
         for row, field in zip(displayed["displacements"], ["theta", "v"]):
             attach(row, physical[field])
 
-    section_fraction = section / beam.length
+    section_fraction = cut_position / length if single_force else section / beam.length
     def selected(field, location=section_fraction):
         return at(normalized_pieces, field, location) * scales[field]
 
@@ -203,10 +262,18 @@ def attach_symbolic_derivation(model, beam, numeric_pieces, section, result):
         attach(row, expression)
     virtual_index = 0
     for piece in normalized_pieces:
-        breaks = sorted({piece["start"], piece["end"], max(piece["start"], min(section_fraction, piece["end"]))})
+        if single_force:
+            cut = section_fraction
+            if current(cut) < current(piece["start"]): cut = piece["start"]
+            if current(cut) > current(piece["end"]): cut = piece["end"]
+            breaks = sorted({piece["start"], piece["end"], cut}, key=current)
+        else:
+            breaks = sorted({piece["start"], piece["end"], max(piece["start"], min(section_fraction, piece["end"]))})
         for start, end in zip(breaks, breaks[1:]):
+            if single_force and current(start) == current(end):
+                continue
             midpoint = (start+end)/2
-            virtual_moment = sum((fy*(X-location) for location, fy in virtual_actions if location < midpoint), sp.S.Zero)
+            virtual_moment = sum((fy*(X-location) for location, fy in virtual_actions if (current(location) < current(midpoint) if single_force else location < midpoint)), sp.S.Zero)
             value = sp.integrate(sp.expand(virtual_moment*piece["M"]), (X, start, end)) * length**3/rigidity
             row = result["virtual"]["rows"][virtual_index]
             row["intervalLatex"] = f"{latex(start*length)}<x<{latex(end*length)}"
@@ -225,7 +292,10 @@ def attach_symbolic_derivation(model, beam, numeric_pieces, section, result):
     # the current loads only: changing amplitudes may change the governing point.
     from server.quantities import FIELDS
     for point in result["quantities"]["points"]:
-        coordinate = sp.Rational(point["x"]) / beam.length * length
+        numeric_coordinate = sp.Rational(point["x"])
+        coordinate = (load_position if single_force and numeric_coordinate == substitutions[load_position]
+                      else cut_position if single_force and numeric_coordinate == section
+                      else numeric_coordinate / beam.length * length)
         piece = physical_pieces[point["piece"]-1]
         for row, (field, (_, symbol, _, scale, _)) in zip(point["substitutions"], FIELDS.items()):
             side = rf"^{{{point['side']}}}" if point["side"] else ""
@@ -237,7 +307,16 @@ def attach_symbolic_derivation(model, beam, numeric_pieces, section, result):
         for root in summary["roots"]:
             attach(root["equation"], sp.diff(physical_pieces[root["interval"]-1][field], X))
         for extremum in summary["extrema"]:
-            coordinate = sp.Rational(extremum["x"]) / beam.length * length
+            numeric_coordinate = sp.Rational(extremum["x"])
+            coordinate = (load_position if single_force and numeric_coordinate == substitutions[load_position]
+                          else cut_position if single_force and numeric_coordinate == section
+                          else numeric_coordinate / beam.length * length)
+            if single_force and numeric_coordinate not in (sp.S.Zero, beam.length/2, beam.length,
+                                                            substitutions[load_position], section):
+                # The current extremum witness is a comparison coordinate,
+                # not a fixed fraction of every beam in the family.
+                coordinate = sp.Symbol("x_c", real=True)
+                substitutions[coordinate] = numeric_coordinate
             expression = physical_pieces[extremum["piece"]-1][field].subs(X, coordinate) * scale
             side = rf"^{{{extremum['side']}}}" if extremum["side"] else ""
             extremum["substitution"]["labelLatex"] = rf"{symbol}\left({sp.latex(sp.Rational(extremum['x']))}{side}\right)"
@@ -274,9 +353,10 @@ def attach_symbolic_derivation(model, beam, numeric_pieces, section, result):
 
     result["parameters"] = parameters
     result["symbolicScope"] = (
-        "The symbolic formulas retain the labelled load amplitudes, beam length L, and flexural rigidity EI. "
-        "Take L>0 and EI>0. Relative positions x/L follow the drawing. Symbolic displacement and rotation use metres and radians. "
-        "For a single-axis force or couple, its symbol is the magnitude in the drawn direction. "
+        "The symbolic formulas retain the labelled load amplitudes, beam length L, and flexural rigidity EI. " +
+        ("Take L>0 and EI>0. The load coordinate and selected section are independent parameters in the current ordering regime. At an endpoint load, the collapsed-interval formulas apply on that boundary. " if single_force else "Take L>0 and EI>0. Relative positions x/L follow the drawing. ") +
+        "Symbolic displacement and rotation use metres and radians. " +
+        ("The point-force symbol is signed downward-positive. " if single_force else "For a single-axis force or couple, its symbol is the magnitude in the drawn direction. ") +
         "A zero force or couple uses a downward or counterclockwise reference direction, respectively. "
         "An inclined force uses signed rightward/upward components. Distributed intensity is positive downward, "
         "with subscripts a and b denoting its start and end values. "

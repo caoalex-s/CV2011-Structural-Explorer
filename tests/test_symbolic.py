@@ -27,11 +27,52 @@ class SymbolicTests(unittest.TestCase):
         load, length, rigidity = sp.symbols("load0 L EI")
         moment = sp.sympify(result["selected"][2]["symbolicExact"])
         displacement = sp.sympify(result["selected"][4]["symbolicExact"])
-        self.assertEqual(sp.expand(moment-load*length/4), 0)
-        self.assertEqual(sp.expand(displacement+1000*load*length**3/(48*rigidity)), 0)
-        self.assertIn("48", result["selected"][4]["symbolicLatex"])
+        coordinates = {sp.Symbol("a_load"): length/2, sp.Symbol("x_s"): length/2}
+        self.assertEqual(sp.expand(moment.subs(coordinates)-load*length/4), 0)
+        self.assertEqual(sp.expand(displacement.subs(coordinates)+1000*load*length**3/(48*rigidity)), 0)
         self.assertEqual(result["selected"][4]["symbolicUnit"], "m")
         self.assertIn(r"\loadsymbol{0}{}", result["pieces"][0]["forces"][-1]["symbolicLatex"])
+
+    def test_point_force_coordinates_remain_independent_across_regimes(self):
+        model = beam()
+        model["loads"][0]["label"] = "F_A"
+        for location, section, force in [(0.25, 0.6, -30), (0.75, 0.4, -15),
+                                         (0.5, 0.5, 0), (0.25, 0.7, 20),
+                                         (0, 0.5, -20), (1, 1, -20)]:
+            model["loads"][0].update(t=location, fy=force)
+            result = worked_solution({"model": model, "section": section}, verify=False)
+            values = {"L": 8, "EI": 20000, "a_load": 8*sp.Rational(str(location)),
+                      "x_s": 8*sp.Rational(str(section)), "load0": -force}
+            for row in result["selected"]:
+                expression = sp.sympify(row["symbolicExact"])
+                substituted = expression.subs({symbol: values[str(symbol)] for symbol in expression.free_symbols})
+                self.assertEqual(sp.cancel(substituted-sp.sympify(row["exact"])), 0)
+            if 0 < location < 1:
+                self.assertIn("a_load", result["selected"][2]["symbolicExact"])
+                self.assertIn("x_s", result["selected"][2]["symbolicExact"])
+                self.assertIn(r"\loadsymbol{0}{}", result["pieces"][0]["forces"][-1]["symbolicLatex"])
+                self.assertIn("a_load", result["momentArea"][0]["equation"]["symbolicExact"])
+                self.assertIn("x_s", result["virtual"]["result"]["symbolicExact"])
+
+    def test_point_force_formulas_predict_other_coordinates_in_each_regime(self):
+        for first, second in [((0.25, 0.6), (0.35, 0.8)),
+                              ((0.75, 0.4), (0.65, 0.2))]:
+            model = beam()
+            model["loads"][0].update(t=first[0], fy=-12)
+            original = worked_solution({"model": model, "section": first[1]}, verify=False)
+            model["loads"][0].update(t=second[0], fy=-31)
+            model["nodes"][1]["x"] = 12
+            model["members"][0]["EI"] = 30000
+            changed = worked_solution({"model": model, "section": second[1]}, verify=False)
+            values = {"L": 12, "EI": 30000, "a_load": 12*sp.Rational(str(second[0])),
+                      "x_s": 12*sp.Rational(str(second[1])), "load0": 31}
+            pairs = list(zip(original["selected"], changed["selected"]))
+            pairs += [(original["virtual"]["result"], changed["virtual"]["result"])]
+            pairs += [(original["momentArea"][i]["equation"], changed["momentArea"][i]["equation"]) for i in range(4)]
+            for formula, actual in pairs:
+                expression = sp.sympify(formula["symbolicExact"])
+                prediction = expression.subs({symbol: values[str(symbol)] for symbol in expression.free_symbols})
+                self.assertEqual(sp.cancel(prediction-sp.sympify(actual["exact"])), 0)
 
     def test_mixed_load_formulas_predict_a_different_beam_in_the_same_family(self):
         model = beam()
