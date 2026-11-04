@@ -55,7 +55,7 @@ theorem axial_constitutive (u N : Field) (EA x : ℝ)
 theorem shear_balance_superposition (V₁ V₂ w₁ w₂ : Field)
     (h₁ : V₁.derivative = -w₁) (h₂ : V₂.derivative = -w₂) :
     (V₁ + V₂).derivative = -(w₁ + w₂) := by
-  simp [h₁, h₂]
+  simp [h₁, h₂, add_comm]
 
 /-- Polynomial slope and displacement fields represent real derivatives. -/
 theorem displacement_slope (v theta : Field) (h : v.derivative = theta) (x : ℝ) :
@@ -106,15 +106,15 @@ def deflectionAfter (P a L EI : ℝ) : Field :=
 theorem point_before_derivative (P a L EI : ℝ) :
     (deflectionBefore P a L EI).derivative = slopeBefore P a L EI := by
   simp [deflectionBefore, slopeBefore, Polynomial.derivative_mul, Polynomial.derivative_pow, Polynomial.C_eq_natCast]
+  simp only [show C (3 : ℝ) = (3 : Field) from map_natCast (Polynomial.C : ℝ →+* Field) 3]
   ring
-  all_goals first | (left; left; exact map_natCast (Polynomial.C : ℝ →+* Field) 3) | (left; exact map_natCast (Polynomial.C : ℝ →+* Field) 3)
 
 /-- After the point force, the elastic-curve derivative is physical slope. -/
 theorem point_after_derivative (P a L EI : ℝ) :
     (deflectionAfter P a L EI).derivative = slopeAfter P a L EI := by
   simp [deflectionAfter, slopeAfter, point_before_derivative, Polynomial.derivative_mul, Polynomial.derivative_pow, Polynomial.C_eq_natCast]
+  simp only [show C (3 : ℝ) = (3 : Field) from map_natCast (Polynomial.C : ℝ →+* Field) 3]
   ring
-  all_goals first | (left; left; exact map_natCast (Polynomial.C : ℝ →+* Field) 3) | (left; exact map_natCast (Polynomial.C : ℝ →+* Field) 3)
 
 /-- These are derivatives of actual real functions, not formal symbols alone. -/
 theorem point_real_slope_before (P a L EI x : ℝ) :
@@ -250,6 +250,18 @@ theorem point_right_support (P a L EI : ℝ) (hL : L ≠ 0) (hEI : EI ≠ 0) :
   ring
 
 
+/-- For a fixed moment field, the two integration constants in each
+interval are unique if their difference is affine, displacement and slope are
+continuous at the load, and both endpoint displacements are prescribed. -/
+theorem affine_boundary_uniqueness (L a c₀ c₁ d₀ d₁ : ℝ) (hL : L ≠ 0)
+    (hleft : c₀ = 0) (hright : d₀ + d₁*L = 0)
+    (hdisplacement : c₀ + c₁*a = d₀ + d₁*a) (hslope : c₁ = d₁) :
+    c₀ = 0 ∧ c₁ = 0 ∧ d₀ = 0 ∧ d₁ = 0 := by
+  have hd₀ : d₀ = 0 := by nlinarith
+  have hproduct : d₁*L = 0 := by nlinarith
+  have hd₁ : d₁ = 0 := (mul_eq_zero.mp hproduct).resolve_right hL
+  exact ⟨hleft, by linarith, hd₀, hd₁⟩
+
 /-! A cantilever with downward end force P, counterclockwise end couple T,
 and downward intensity w(x) = w₀ + w₁ x. These fields share the same
 real-polynomial calculus as the point-force beam above. -/
@@ -308,6 +320,7 @@ theorem cubic_displacement_derivative (m₀ m₁ m₂ m₃ EI : ℝ) :
     show C (4 : ℝ) = (4 : Field) from map_natCast (Polynomial.C : ℝ →+* Field) 4,
     show C (5 : ℝ) = (5 : Field) from map_natCast (Polynomial.C : ℝ →+* Field) 5]
   ring
+  all_goals simp
 
 theorem cubic_constitutive (m₀ m₁ m₂ m₃ EI x : ℝ) (hEI : EI ≠ 0) :
     EI * (cubicSlope m₀ m₁ m₂ m₃ EI).derivative.eval x = (cubicMoment m₀ m₁ m₂ m₃).eval x := by

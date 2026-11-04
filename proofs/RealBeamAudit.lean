@@ -37,3 +37,4 @@ import RealBeamFields
 #print axioms RealBeamFields.cubic_displacement_derivative
 #print axioms RealBeamFields.cubic_constitutive
 #print axioms RealBeamFields.cantilever_real_slope
+#print axioms RealBeamFields.affine_boundary_uniqueness
