@@ -100,6 +100,11 @@ jobs:
         run: |
           lake env lean FrameEnergyAudit.lean > energy-axioms.log
           python ../scripts/audit_real_axioms.py energy-axioms.log FrameEnergy
+      - name: Audit frame virtual-work theorem axioms
+        working-directory: proofs
+        run: |
+          lake env lean FrameVirtualWorkAudit.lean > virtual-work-axioms.log
+          python ../scripts/audit_real_axioms.py virtual-work-axioms.log FrameVirtualWork
       - name: Check public course examples
         if: ${{ inputs.proof_only != true }}
         run: python -m scripts.check_worked_examples

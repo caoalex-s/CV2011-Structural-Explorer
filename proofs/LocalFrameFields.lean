@@ -152,9 +152,9 @@ theorem stiffness_symmetric (L EA EI : ℝ) (i j : Fin 6) :
     stiffness L EA EI i j = stiffness L EA EI j i := by
   fin_cases i <;> fin_cases j <;> simp [stiffness]
 
+set_option maxHeartbeats 4000000 in
 /-- Recover the endpoint actions from the exact fields and compare them with
 K d − f. This algebraic identity alone is not a virtual-work derivation. -/
-set_option maxHeartbeats 4000000 in
 theorem end_actions_from_fields (d : LocalDofs) (L EA EI p₀ p₁ q₀ q₁ : ℝ)
     (hL : L ≠ 0) (hEA : EA ≠ 0) (hEI : EI ≠ 0) (i : Fin 6) :
     endActions d L EA EI p₀ p₁ q₀ q₁ i =

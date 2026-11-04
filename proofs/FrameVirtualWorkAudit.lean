@@ -1,0 +1,4 @@
+import FrameVirtualWork
+
+#print axioms FrameVirtualWork.load_primitive_derivative
+#print axioms FrameVirtualWork.consistent_load_virtual_work
