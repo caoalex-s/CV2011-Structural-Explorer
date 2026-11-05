@@ -28,3 +28,4 @@ import FrameDeformation
 #print axioms FrameDeformation.basic_stress_selfstress_iff
 #print axioms FrameDeformation.actual_basic_stress_factor
 #print axioms FrameDeformation.equilibrium_has_actual_basic_stress
+#print axioms FrameDeformation.member_elastic_weight_positive_definite

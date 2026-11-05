@@ -131,6 +131,44 @@ theorem member_energy_zero_iff_deformation (d : LocalDofs) (L EA EI : ℝ)
     have hright : relativeRotationRight d L = 0 := by simpa [memberDeformation] using congrFun h 2
     simp [energy, haxial, hleft, hright]
 
+/-- The local constitutive weight on extension and chord-relative rotations. -/
+def memberElasticWeight (L EA EI : ℝ) (deformation : Fin 3 → ℝ) : Fin 3 → ℝ :=
+  ![EA/L*deformation 0,
+    4*EI/L*(deformation 1 + deformation 2/2),
+    4*EI/L*(deformation 2 + deformation 1/2)]
+
+/-- This local elastic weight is positive definite for positive length and
+rigidities; the two rotational coordinates retain their coupling. -/
+theorem member_elastic_weight_positive_definite (L EA EI : ℝ)
+    (hL : 0 < L) (hEA : 0 < EA) (hEI : 0 < EI) (deformation : Fin 3 → ℝ) :
+    0 ≤ (∑ i : Fin 3, memberElasticWeight L EA EI deformation i * deformation i) ∧
+      ((∑ i : Fin 3, memberElasticWeight L EA EI deformation i * deformation i) = 0 ↔ deformation = 0) := by
+  let d : LocalDofs := ![0, 0, deformation 1, deformation 0, 0, deformation 2]
+  have hd : memberDeformation d L = deformation := by
+    funext i
+    fin_cases i <;> simp [memberDeformation, relativeRotationLeft, relativeRotationRight, d]
+  have hs : memberBasicStress d L EA EI = memberElasticWeight L EA EI deformation := by
+    funext i
+    fin_cases i <;> simp [memberBasicStress, memberElasticWeight, relativeRotationLeft, relativeRotationRight, d]
+  have hwork : (∑ i : Fin 3, memberElasticWeight L EA EI deformation i * deformation i) =
+      2 * energy d L EA EI := by
+    rw [← hs, ← hd]
+    exact member_basic_stress_energy d L EA EI (ne_of_gt hL)
+  constructor
+  · rw [hwork]
+    exact mul_nonneg (by norm_num) (energy_nonnegative d L EA EI hL hEA hEI)
+  · rw [hwork]
+    constructor
+    · intro h
+      have he : energy d L EA EI = 0 := by linarith
+      have hz := (member_energy_zero_iff_deformation d L EA EI hL hEA hEI).mp he
+      simpa [hd] using hz
+    · intro h
+      have hz : memberDeformation d L = 0 := by rw [hd, h]
+      have he := (member_energy_zero_iff_deformation d L EA EI hL hEA hEI).mpr hz
+      rw [he]
+      ring
+
 /-- Segment deformation is formed from the actual model-derived B map. -/
 def segmentDeformation (model : Model nodes members cuts segments)
     (q : Coordinate model → ℝ) (segment : Fin segments) : Fin 3 → ℝ :=

@@ -58,6 +58,18 @@ theorem pureSlip_zero_deformation : deformationMap parallelModel pureSlip = 0 :=
   have law01 : endConnection parallelModel (0, true) = rigidConnection := by rfl
   have law10 : endConnection parallelModel (1, false) = freeAxial := by rfl
   have law11 : endConnection parallelModel (1, true) = freeAxial := by rfl
+  have hs10 : hasSlip parallelModel (1, false) 0 := by
+    constructor
+    · exact ⟨1, Or.inl rfl⟩
+    · change EndLaw.released ≠ EndLaw.rigid
+      intro h
+      cases h
+  have hs11 : hasSlip parallelModel (1, true) 0 := by
+    constructor
+    · exact ⟨1, Or.inr rfl⟩
+    · change EndLaw.released ≠ EndLaw.rigid
+      intro h
+      cases h
   funext index
   cases index with
   | inl memberIndex =>
@@ -65,8 +77,8 @@ theorem pureSlip_zero_deformation : deformationMap parallelModel pureSlip = 0 :=
     fin_cases segment <;> fin_cases component <;>
       simp [deformationMap, segmentDeformation, memberDeformation, relativeRotationLeft,
         relativeRotationRight, segmentDofs, segmentMotion, sideMotion, referenceMotion,
-        endMotion, toLocal6, slipValue, hasSlip, directionLaw, endNode, parallelModel,
-        freeAxial, rigidConnection, pureSlip, law00, law01, law10, law11] <;>
+        endMotion, toLocal6, slipValue, endNode, parallelModel,
+        pureSlip, hs10, hs11] <;>
       split_ifs <;> norm_num
   | inr spring =>
     rcases spring with ⟨⟨⟨member, ending⟩, direction⟩, hactive, k, hk⟩
