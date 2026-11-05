@@ -280,6 +280,45 @@ theorem energy_zero_iff_deformation_zero (model : Model nodes members cuts segme
   ⟨energy_zero_implies_deformation_zero model actions supports cutParameter memberLength memberEA memberEI hcontract q,
    deformation_zero_implies_energy_zero model actions supports cutParameter memberLength memberEA memberEI hcontract q⟩
 
+/-- The actual assembled stiffness as a linear map into generalized-force
+functionals, constructed from segment B and spring S coordinate maps. -/
+def stiffnessOperator (model : Model nodes members cuts segments) :
+    (Coordinate model → ℝ) →ₗ[ℝ] Module.Dual ℝ (Coordinate model → ℝ) :=
+  (∑ segment : Fin segments, ∑ i : Fin 6, ∑ j : Fin 6,
+    LocalFrameFields.stiffness (model.segmentLength segment) (model.segmentEA segment)
+      (model.segmentEI segment) i j •
+      (segmentCoordinateLinear model segment j).smulRight (segmentCoordinateLinear model segment i)) +
+  ∑ member : Fin members, ∑ ending : Bool, ∑ direction : Fin 3,
+    let side := (member, ending)
+    let slip := slipLinear model side direction
+    springStiffness (directionLaw (endConnection model side) direction) • slip.smulRight slip
+
+/-- Applying K to a movement and testing against a variation gives the
+previously established assembled stiffness work. -/
+theorem stiffness_operator_apply (model : Model nodes members cuts segments)
+    (q variation : Coordinate model → ℝ) :
+    stiffnessOperator model q variation = stiffnessWork model q variation := by
+  simp [stiffnessOperator, stiffnessWork, internalVirtualWork, segmentCoordinateLinear,
+    segmentDofsLinear, slipLinear, Finset.mul_sum, smul_eq_mul, mul_comm, mul_left_comm, mul_assoc]
+
+/-- Restrict K to the actual support-admissible coordinate subspace. -/
+def admissibleSpace (model : Model nodes members cuts segments)
+    (supports : Fin supportCount → SupportInput members cuts) :=
+  LinearMap.ker (constraintMap model supports)
+
+def restrictedStiffness (model : Model nodes members cuts segments)
+    (supports : Fin supportCount → SupportInput members cuts) :
+    admissibleSpace model supports →ₗ[ℝ] Module.Dual ℝ (admissibleSpace model supports) :=
+  (admissibleSpace model supports).subtype.dualMap.comp
+    ((stiffnessOperator model).comp (admissibleSpace model supports).subtype)
+
+/-- Restricted stiffness work uses the same physical model and support rows. -/
+theorem restricted_stiffness_apply (model : Model nodes members cuts segments)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (q variation : admissibleSpace model supports) :
+    restrictedStiffness model supports q variation = stiffnessWork model q.val variation.val := by
+  exact stiffness_operator_apply model q.val variation.val
+
 /-- The kernel of the actual assembled stiffness work, expressed without
 choosing or inverting a coordinate matrix. -/
 def stiffnessNull (model : Model nodes members cuts segments) (q : Coordinate model → ℝ) : Prop :=
@@ -434,6 +473,55 @@ theorem equilibrium_unique_if_no_mechanism (model : Model nodes members cuts seg
   have henergy : totalEnergy model (q-r) = 0 := by linarith
   have hdeformation := energy_zero_implies_deformation_zero model actions supports cutParameter memberLength memberEA memberEI hcontract (q-r) henergy
   exact sub_eq_zero.mp (hstable (q-r) hzadmissible hdeformation)
+
+/-- A model with no admissible mechanism has an equilibrium for every encoded
+dead load. The proof uses finite-dimensional injectivity and does not infer
+stability from a computed residual or a zero-load solve. -/
+theorem equilibrium_exists_if_no_mechanism (model : Model nodes members cuts segments)
+    (actions : Fin actionCount → PointAction members cuts)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (cutParameter : Fin members → Fin cuts → ℝ)
+    (memberLength memberEA memberEI : Fin members → ℝ)
+    (hcontract : ExactContract model actions supports cutParameter memberLength memberEA memberEI)
+    (hstable : ∀ z, admissible model supports z → deformationMap model z = 0 → z = 0) :
+    ∃ q, equilibrium model actions supports q := by
+  classical
+  letI : Fintype (Coordinate model) := Fintype.ofFinite _
+  let U := admissibleSpace model supports
+  let K := restrictedStiffness model supports
+  let F : Module.Dual ℝ U := U.subtype.dualMap (externalFunctional model actions)
+  have hinjective : Function.Injective K := by
+    apply LinearMap.ker_eq_bot.mp
+    apply le_antisymm
+    · intro z hz
+      have hzK : K z = 0 := LinearMap.mem_ker.mp hz
+      have hwork : stiffnessWork model z.val z.val = 0 := by
+        have h := congrArg (fun f : Module.Dual ℝ U => f z) hzK
+        simpa [K, restricted_stiffness_apply] using h
+      have hsegments := contract_positive_segments model actions supports cutParameter memberLength memberEA memberEI hcontract
+      rw [stiffness_work_energy model z.val hsegments] at hwork
+      have henergy : totalEnergy model z.val = 0 := by linarith
+      have hdeformation := energy_zero_implies_deformation_zero model actions supports
+        cutParameter memberLength memberEA memberEI hcontract z.val henergy
+      have hadmissible : admissible model supports z.val :=
+        (admissible_iff_constraint_kernel model supports z.val).mpr z.property
+      have hzval := hstable z.val hadmissible hdeformation
+      have hz0 : z = 0 := Subtype.ext hzval
+      simpa [hz0]
+    · exact bot_le
+  have hdimension : Module.finrank ℝ U = Module.finrank ℝ (Module.Dual ℝ U) := by simp
+  have hsurjective : Function.Surjective K :=
+    (LinearMap.injective_iff_surjective_of_finrank_eq_finrank hdimension).mp hinjective
+  obtain ⟨solution, hsolution⟩ := hsurjective F
+  refine ⟨solution.val, ?_⟩
+  refine ⟨(admissible_iff_constraint_kernel model supports solution.val).mpr solution.property, ?_⟩
+  intro variation hvariation
+  let v : U := ⟨variation, (admissible_iff_constraint_kernel model supports variation).mp hvariation⟩
+  have hv := congrArg (fun f : Module.Dual ℝ U => f v) hsolution
+  have hwork : stiffnessWork model solution.val variation = externalWork model actions variation := by
+    simpa [K, F, v, restricted_stiffness_apply, external_functional_apply] using hv
+  unfold residualWork
+  exact sub_eq_zero.mpr hwork
 
 /-- A deformation-free admissible motion is a mechanism exactly when nonzero. -/
 def mechanism (model : Model nodes members cuts segments)

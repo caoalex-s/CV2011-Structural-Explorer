@@ -277,8 +277,9 @@ example : ExactContract twoMemberModel sideLoad sideSupport noCuts properties pr
   · intro segment
     fin_cases segment <;> norm_num [twoMemberModel, locationParameter]
   · intro member t ht0 ht1
-    refine ⟨member, ?_⟩
-    fin_cases member <;> norm_num [twoMemberModel, locationParameter] at * <;> linarith
+    refine ⟨member, rfl, ?_, ?_⟩
+    · simpa [twoMemberModel, locationParameter] using ht0
+    · simpa [twoMemberModel, locationParameter] using ht1
   · intro a b hne hmember
     fin_cases a <;> fin_cases b <;> norm_num [twoMemberModel, locationParameter] at *
   · intro member left right hl hr hleft hright hpos
@@ -319,10 +320,13 @@ example : ExactContract twoMemberModel sideLoad sideSupport noCuts properties pr
   · intro segment
     norm_num [twoMemberModel, properties]
   · intro side direction stiffness hactive hlaw
+    have law00 : endConnection twoMemberModel (0, false) = rigidConnection := by rfl
+    have law01 : endConnection twoMemberModel (0, true) = rigidConnection := by rfl
+    have law10 : endConnection twoMemberModel (1, false) = ⟨.spring 2, .released, .spring 3⟩ := by rfl
+    have law11 : endConnection twoMemberModel (1, true) = ⟨.rigid, .rigid, .released⟩ := by rfl
     rcases side with ⟨member, ending⟩
     fin_cases member <;> cases ending <;> fin_cases direction <;>
-      simp [directionLaw, endConnection, referenceMember, incident, endNode, twoMemberModel,
-        rigidConnection] at hlaw
+      simp [directionLaw, law00, law01, law10, law11, rigidConnection] at hlaw
     all_goals subst stiffness <;> norm_num
 """)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

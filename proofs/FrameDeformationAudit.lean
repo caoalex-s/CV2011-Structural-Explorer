@@ -13,3 +13,6 @@ import FrameDeformation
 #print axioms FrameDeformation.residual_difference
 #print axioms FrameDeformation.equilibrium_unique_if_no_mechanism
 #print axioms FrameDeformation.mechanism_generates_second_equilibrium
+#print axioms FrameDeformation.stiffness_operator_apply
+#print axioms FrameDeformation.restricted_stiffness_apply
+#print axioms FrameDeformation.equilibrium_exists_if_no_mechanism
