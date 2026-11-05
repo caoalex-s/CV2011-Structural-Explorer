@@ -95,6 +95,35 @@ example : ¬ sameStructure base base supports supports slots shiftedSlot := by
   rintro ⟨_, _, h⟩
   have v := congrFun h 0
   simp [slots, shiftedSlot] at v
+
+def rotatedSupport : Fin 1 → SupportInput 1 0 := fun _ => ⟨.endSide (0, false), .roller, 1, 0, false, false, false⟩
+example : ¬ sameStructure base base supports rotatedSupport slots slots := by
+  rintro ⟨_, h, _⟩
+  have v := congrArg (fun f : Fin 1 → SupportInput 1 0 => (f 0).cosine) h
+  norm_num [supports, rotatedSupport] at v
+
+def twoMembers : Model 3 2 0 0 where
+  joints := fun _ => ⟨.semiRigid, 2, none⟩
+  member := fun i => if i = 0 then ⟨0, 1, ⟨1, 0⟩, none, none⟩ else ⟨0, 2, ⟨0, 1⟩, none, none⟩
+  segmentMember := Fin.elim0
+  segmentLeft := Fin.elim0
+  segmentRight := Fin.elim0
+  segmentLength := Fin.elim0
+  segmentEA := Fin.elim0
+  segmentEI := Fin.elim0
+  segmentVerticalStart := Fin.elim0
+  segmentVerticalEnd := Fin.elim0
+def changedSpring : Model 3 2 0 0 := { twoMembers with joints := fun _ => ⟨.semiRigid, 3, none⟩ }
+def reorderedMembers : Model 3 2 0 0 := { twoMembers with
+  member := fun i => if i = 0 then ⟨0, 2, ⟨0, 1⟩, none, none⟩ else ⟨0, 1, ⟨1, 0⟩, none, none⟩ }
+example : ¬ sameCore twoMembers changedSpring := by
+  intro h
+  have v := congrArg (fun m : Model 3 2 0 0 => (m.joints 0).rotationStiffness) h
+  norm_num [sameCore, structuralCore, twoMembers, changedSpring] at v
+example : ¬ sameCore twoMembers reorderedMembers := by
+  intro h
+  have v := congrArg (fun m : Model 3 2 0 0 => (m.member 0).endNode) h
+  simp [sameCore, structuralCore, twoMembers, reorderedMembers] at v
 """
         with tempfile.TemporaryDirectory() as folder:
             source = Path(folder) / "ReuseCoreCheck.lean"
@@ -256,24 +285,84 @@ theorem dofs_moment : segmentDofs beam momentMotion 0 = ![0, 0, 0, 0, 1/2, 1] :=
   fin_cases i <;> simp [segmentDofs, segmentMotion, sideMotion, referenceMotion, endMotion,
     toLocal6, slipValue, momentMotion, beam, endNode, h1]
 
-example : LocalFrameFields.endActions (segmentDofs beam axialMotion 0) 1 1 1 0 0 0 0 = ![-1, 0, 0, 1, 0, 0] := by
+theorem axial_actions : LocalFrameFields.endActions (segmentDofs beam axialMotion 0) 1 1 1 0 0 0 0 = ![-1, 0, 0, 1, 0, 0] := by
   rw [dofs_axial]
   funext i
   fin_cases i <;> norm_num [LocalFrameFields.endActions, LocalFrameFields.normal, LocalFrameFields.shear,
     LocalFrameFields.moment, LocalFrameFields.rotation, LocalFrameFields.axialDisplacement,
     LocalFrameFields.transverseDisplacement, LocalFrameFields.coordinate, Polynomial.derivative_mul,
-    Polynomial.derivative_pow] <;> norm_num
-example : LocalFrameFields.endActions (segmentDofs beam momentMotion 0) 1 1 1 0 0 0 0 = ![0, 0, -1, 0, 0, 1] := by
+    Polynomial.derivative_pow] <;> norm_num [Matrix.vecCons, Fin.cases]
+theorem moment_actions : LocalFrameFields.endActions (segmentDofs beam momentMotion 0) 1 1 1 0 0 0 0 = ![0, 0, -1, 0, 0, 1] := by
   rw [dofs_moment]
   funext i
   fin_cases i <;> norm_num [LocalFrameFields.endActions, LocalFrameFields.normal, LocalFrameFields.shear,
     LocalFrameFields.moment, LocalFrameFields.rotation, LocalFrameFields.axialDisplacement,
     LocalFrameFields.transverseDisplacement, LocalFrameFields.coordinate, Polynomial.derivative_mul,
-    Polynomial.derivative_pow] <;> norm_num
+    Polynomial.derivative_pow] <;> norm_num [Matrix.vecCons, Fin.cases]
 example : segmentDofs beam ((2:ℝ) • axialMotion - momentMotion) 0 = ![0, 0, 0, 2, -1/2, -1] := by
   rw [sub_eq_add_neg, ← neg_one_smul ℝ momentMotion, segment_dofs_combination, dofs_axial, dofs_moment]
   funext i
   fin_cases i <;> norm_num
+
+def axialLoad : Fin 1 → PointAction 1 0 := fun _ => ⟨.endSide (0, true), ![1, 0, 0]⟩
+def momentLoad : Fin 1 → PointAction 1 0 := fun _ => ⟨.endSide (0, true), ![0, 0, 1]⟩
+theorem positive : positiveSegments beam := by intro segment; fin_cases segment; norm_num [beam]
+theorem law0 : endConnection beam (0, false) = rigidConnection := by rfl
+theorem law1 : endConnection beam (0, true) = rigidConnection := by rfl
+
+theorem left_axial : sideMotion beam axialMotion (.endSide (0, false)) = 0 := by
+  funext i
+  fin_cases i <;> simp [sideMotion, referenceMotion, endMotion, slipValue, axialMotion, beam, endNode]
+theorem left_moment : sideMotion beam momentMotion (.endSide (0, false)) = 0 := by
+  funext i
+  fin_cases i <;> simp [sideMotion, referenceMotion, endMotion, slipValue, momentMotion, beam, endNode]
+
+theorem admissible_of_left_zero (q : Coordinate beam → ℝ)
+    (h : sideMotion beam q (.endSide (0, false)) = 0) : admissible beam support q := by
+  intro index direction hd
+  fin_cases index
+  simp [support, supportDirections] at hd
+  rcases hd with rfl | rfl | rfl <;> simp [supportRow, FrameTransform.work, support, h]
+
+theorem axial_equilibrium : equilibrium beam axialLoad support axialMotion := by
+  constructor
+  · exact admissible_of_left_zero axialMotion left_axial
+  · intro v hv
+    have hx := hv 0 (![1, 0, 0]) (by simp [support, supportDirections])
+    have hx0 : segmentDofs beam v 0 0 = 0 := by
+      simpa [supportRow, FrameTransform.work, support, segmentDofs, segmentMotion, toLocal6, beam] using hx
+    have hp : pointActionWork beam (axialLoad 0) v = segmentDofs beam v 0 3 := by
+      simp [pointActionWork, FrameTransform.work, axialLoad, segmentDofs, segmentMotion, toLocal6, beam]
+    have ha : recoveredEndActions beam axialMotion 0 = ![-1, 0, 0, 1, 0, 0] := by
+      change LocalFrameFields.endActions (segmentDofs beam axialMotion 0) 1 1 1 0 0 0 0 = _
+      exact axial_actions
+    rw [residual_work_from_end_actions beam axialLoad axialMotion v positive]
+    simp [Fin.sum_univ_succ, ha, hp, springStiffness, directionLaw, law0, law1, rigidConnection, hx0]
+
+theorem moment_equilibrium : equilibrium beam momentLoad support momentMotion := by
+  constructor
+  · exact admissible_of_left_zero momentMotion left_moment
+  · intro v hv
+    have ht := hv 0 (![0, 0, 1]) (by simp [support, supportDirections])
+    have ht0 : segmentDofs beam v 0 2 = 0 := by
+      simpa [supportRow, FrameTransform.work, support, segmentDofs, segmentMotion, toLocal6, beam] using ht
+    have hp : pointActionWork beam (momentLoad 0) v = segmentDofs beam v 0 5 := by
+      simp [pointActionWork, FrameTransform.work, momentLoad, segmentDofs, segmentMotion, toLocal6, beam]
+    have ha : recoveredEndActions beam momentMotion 0 = ![0, 0, -1, 0, 0, 1] := by
+      change LocalFrameFields.endActions (segmentDofs beam momentMotion 0) 1 1 1 0 0 0 0 = _
+      exact moment_actions
+    rw [residual_work_from_end_actions beam momentLoad momentMotion v positive]
+    simp [Fin.sum_univ_succ, ha, hp, springStiffness, directionLaw, law0, law1, rigidConnection, ht0]
+
+def slots : Fin 1 → Location 1 0 := fun _ => .endSide (0, true)
+def forceComponents : Fin 1 → Triple := fun _ => ![1, 0, 0]
+def momentComponents : Fin 1 → Triple := fun _ => ![0, 0, 1]
+example : equilibrium (withLoads beam (fun i => (2:ℝ)*(0 : Fin 1 → ℝ) i+(-1)*(0 : Fin 1 → ℝ) i)
+      (fun i => (2:ℝ)*(0 : Fin 1 → ℝ) i+(-1)*(0 : Fin 1 → ℝ) i))
+    (pointActions slots (fun j i => (2:ℝ)*forceComponents j i+(-1)*momentComponents j i)) support
+      ((2:ℝ) • axialMotion + (-1:ℝ) • momentMotion) := by
+  exact equilibrium_combination beam 2 (-1) 0 0 0 0 slots forceComponents momentComponents support
+    axialMotion momentMotion axial_equilibrium moment_equilibrium
 """
         with tempfile.TemporaryDirectory() as folder:
             source = Path(folder) / "ReuseCantileverCheck.lean"
