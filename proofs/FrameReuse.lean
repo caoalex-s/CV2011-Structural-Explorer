@@ -18,6 +18,13 @@ def structuralCore (model : Model nodes members cuts segments) : Model nodes mem
 def sameCore (first second : Model nodes members cuts segments) : Prop :=
   structuralCore first = structuralCore second
 
+/-- Supports and action slots are part of the reuse boundary. In particular,
+changing a location requires a new partition rather than an amplitude update. -/
+def sameStructure (first second : Model nodes members cuts segments)
+    (supports₁ supports₂ : Fin supportCount → SupportInput members cuts)
+    (locations₁ locations₂ : Fin actionCount → Location members cuts) : Prop :=
+  sameCore first second ∧ supports₁ = supports₂ ∧ locations₁ = locations₂
+
 /-- Replace only the two global-vertical intensity values on each segment. -/
 def withLoads (core : Model nodes members cuts segments)
     (startValue endValue : Fin segments → ℝ) : Model nodes members cuts segments :=
@@ -37,6 +44,32 @@ theorem same_core_with_loads (core : Model nodes members cuts segments)
     (start₁ end₁ start₂ end₂ : Fin segments → ℝ) :
     sameCore (withLoads core start₁ end₁) (withLoads core start₂ end₂) := by
   rfl
+
+/-- Transport coordinates of two independently supplied models whose erased
+structural records are equal. The intermediate maps preserve the subtype IDs. -/
+def sameCoreCoordinateEquiv (first second : Model nodes members cuts segments)
+    (h : sameCore first second) : Coordinate first ≃ Coordinate second := by
+  have coordinateTypes : Coordinate first = Coordinate second := by
+    calc
+      Coordinate first = Coordinate (withLoads (structuralCore first)
+          first.segmentVerticalStart first.segmentVerticalEnd) :=
+        congrArg Coordinate (rebuild_model first).symm
+      _ = Coordinate (withLoads (structuralCore second)
+          first.segmentVerticalStart first.segmentVerticalEnd) := by rw [h]
+      _ = Coordinate (withLoads (structuralCore second)
+          second.segmentVerticalStart second.segmentVerticalEnd) := rfl
+      _ = Coordinate second := congrArg Coordinate (rebuild_model second)
+  exact Equiv.cast coordinateTypes
+
+/-- Coordinate transport induces a linear equivalence of full motion vectors. -/
+def sameCoreMotionEquiv (first second : Model nodes members cuts segments)
+    (h : sameCore first second) : (Coordinate first → ℝ) ≃ₗ[ℝ] (Coordinate second → ℝ) where
+  toFun q := fun i => q ((sameCoreCoordinateEquiv first second h).symm i)
+  invFun q := fun i => q (sameCoreCoordinateEquiv first second h i)
+  left_inv q := by funext i; simp
+  right_inv q := by funext i; simp
+  map_add' q r := by rfl
+  map_smul' a q := by rfl
 
 /-- Both dependent coordinate types have identical active-point and slip
 predicates: intensity amplitudes do not allocate coordinates. -/
@@ -328,17 +361,18 @@ theorem residual_eq_stiffness_minus_load (model : Model nodes members cuts segme
     (hpositive : positiveSegments model) :
     residualFunctional model actions q = stiffnessOperator model q - externalFunctional model actions := by
   ext v
-  rw [residual_functional_apply model actions q v hpositive, stiffness_operator_apply,
-    external_functional_apply]
+  rw [residual_functional_apply model actions q v hpositive]
+  change residualWork model actions q v = stiffnessOperator model q v - externalFunctional model actions v
+  rw [stiffness_operator_apply, external_functional_apply]
   rfl
 
 /-- A combined residual gives the aggregate reaction when it satisfies the
 actual support equations. No individual multiplier is selected here. -/
 theorem combined_aggregate_reaction (model : Model nodes members cuts segments)
     (supports : Fin supportCount → SupportInput members cuts)
-    (λ₁ λ₂ : ConstraintIndex supports → ℝ) (a b : ℝ) :
-    aggregateReaction model supports (a • λ₁ + b • λ₂) =
-      a • aggregateReaction model supports λ₁ + b • aggregateReaction model supports λ₂ := by
+    (coeff₁ coeff₂ : ConstraintIndex supports → ℝ) (a b : ℝ) :
+    aggregateReaction model supports (a • coeff₁ + b • coeff₂) =
+      a • aggregateReaction model supports coeff₁ + b • aggregateReaction model supports coeff₂ := by
   classical
   ext v
   simp [aggregateReaction, multiplierFunctional, LinearMap.dualMap_apply,
