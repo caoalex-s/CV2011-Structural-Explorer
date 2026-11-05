@@ -17,6 +17,7 @@ import { renderInspector } from './inspector.js';
 import { renderResponses, sampleSection } from './responses.js';
 import { createWorkspaceControls } from './workspace-controls.js';
 import { createLearningSession } from './learning-session.js';
+import { createEvidenceEnvelope, EvidenceRequests, parseEvidenceModel } from './model-evidence.js';
 import type { Attempt } from './learning-session.js';
 import { lessonContext } from './lesson-beam.js';
 const clone = <T>(value: T): T => structuredClone(value);
@@ -55,6 +56,13 @@ let drag: {
 } | null = null;
 const history: Model[] = [], future: Model[] = [];
 let currentMember = model.members[0]?.id || '', sectionT = 0.5;
+const evidenceRequests = new EvidenceRequests();
+let evidenceRawSource: string | undefined;
+const evidenceQuery = () => ({ member: currentMember, parameter: sectionT, cutSide: 'unspecified' as const, quantity: 'section-response', units: 'kN, kN m, m, rad', signConvention: 'global y upward; rotation counterclockwise; tension N positive; sagging M positive; dM/dx = V' });
+function updateEvidenceBinding() {
+    try { evidenceRequests.update(model, evidenceQuery()); }
+    catch { evidenceRequests.invalidate(); }
+}
 let solutionStep = 'reaction_left', solutionRevealed = false, hintUsed = false, practiceResultsVisible = false;
 let proofStatus = { lean: 'pending', scope: 'Scaled reaction equilibrium identities and plotting-side inversion.' };
 const svg = $('canvas') as unknown as SVGSVGElement;
@@ -71,7 +79,7 @@ interface Snap {
 function toast(message: string) { $('toast').textContent = message; $('toast').classList.add('show'); setTimeout(() => $('toast').classList.remove('show'), 4200); }
 function checkpoint(before = model) { history.push(clone(before)); if (history.length > 60)
     history.shift(); future.length = 0; }
-function changed() { assignLoadLabels(model); analysis = analyse(model); localStorage.setItem(modelStorageKey, JSON.stringify(model)); render(); }
+function changed() { evidenceRawSource = undefined; assignLoadLabels(model); updateEvidenceBinding(); analysis = analyse(model); localStorage.setItem(modelStorageKey, JSON.stringify(model)); render(); }
 function commit(action: () => void) { checkpoint(); action(); solutionRevealed = false; hintUsed = false; practiceResultsVisible = false; changed(); }
 function screen(point: {
     x: number;
@@ -360,6 +368,7 @@ function sectionSample(): Sample | undefined {
 function render() {
     if (!model.members.some(m => m.id === currentMember))
         currentMember = model.members[0]?.id || '';
+    updateEvidenceBinding();
     renderResponses({ model, analysis, currentMember, sectionT, layer,
         resultsVisible: mode !== 'practice' || practiceResultsVisible });
     controls.setHistory(history.length > 0, future.length > 0);
@@ -592,9 +601,20 @@ document.addEventListener('keydown', event => { if ((event.target as HTMLElement
     $('redo').click();
 } });
 $('load-preset').onclick = () => commit(() => { const preset = $<HTMLSelectElement>('preset').value; model = preset === 'empty' ? { nodes: [], members: [], supports: [], loads: [] } : example(preset); selected = null; start = null; currentMember = model.members[0]?.id || ''; fit(); });
-$<HTMLSelectElement>('section-member').onchange = () => { currentMember = $<HTMLSelectElement>('section-member').value; render(); };
-$<HTMLInputElement>('section-position').oninput = () => { sectionT = Number($<HTMLInputElement>('section-position').value) / 1000; render(); };
+$<HTMLSelectElement>('section-member').onchange = () => { currentMember = $<HTMLSelectElement>('section-member').value; updateEvidenceBinding(); render(); };
+$<HTMLInputElement>('section-position').oninput = () => { sectionT = Number($<HTMLInputElement>('section-position').value) / 1000; updateEvidenceBinding(); render(); };
 $('export-model').onclick = () => download('cv2011-model.json', { version: 2, model });
+$('export-evidence').onclick = async () => {
+    try {
+        updateEvidenceBinding();
+        const token = evidenceRequests.begin();
+        const displayAtStart = JSON.stringify(model.loads.map(load => [load.id, load.label ?? null]));
+        const rawAtStart = evidenceRawSource;
+        const envelope = await createEvidenceEnvelope(model, evidenceQuery(), rawAtStart);
+        if (!evidenceRequests.isCurrent(token) || rawAtStart !== evidenceRawSource || displayAtStart !== JSON.stringify(model.loads.map(load => [load.id, load.label ?? null]))) throw Error('The drawing or query changed; save a fresh snapshot.');
+        download('cv2011-evidence-snapshot.json', envelope);
+    } catch (error) { toast(`Could not save evidence snapshot: ${String(error)}`); }
+};
 $('import-model').onclick = () => $('model-file').click();
 $<HTMLInputElement>('model-file').onchange = async () => { try {
     const file = $<HTMLInputElement>('model-file').files?.[0];
@@ -602,12 +622,17 @@ $<HTMLInputElement>('model-file').onchange = async () => { try {
         return;
     if (file.size > 100000)
         throw Error('Model file is too large.');
-    const parsed = JSON.parse(await file.text()), candidate = parsed.model || parsed;
+    const source = await file.text();
+    const parsed = JSON.parse(source), candidate = parsed.model || parsed;
     if (parsed.version && parsed.version > 2) throw Error('This model uses a newer file format. Update Structural Explorer before opening it.');
     const checked = analyse(candidate);
     if (checked.status === 'invalid')
         throw Error(checked.message);
     commit(() => { model = candidate; selected = null; fit(); });
+    // Keep original text only while its parsed snapshot still matches the drawing.
+    try {
+        if (JSON.stringify(parseEvidenceModel(JSON.parse(source))) === JSON.stringify(parseEvidenceModel(model))) evidenceRawSource = source;
+    } catch { /* The ordinary importer can accept models outside the strict snapshot schema. */ }
 }
 catch (error) {
     toast(`Could not open model: ${String(error)}`);
