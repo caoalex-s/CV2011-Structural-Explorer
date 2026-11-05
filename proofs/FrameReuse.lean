@@ -228,7 +228,7 @@ theorem external_work_combination (core : Model nodes members cuts segments)
     intro j
     exact point_work_combination core a b (locations j) (f₁ j) (f₂ j) q
   simp only [externalWork]
-  simp_rw [hsegment, hpoint, Finset.sum_add_distrib, ← Finset.mul_sum]
+  simp only [hsegment, hpoint, Finset.sum_add_distrib, ← Finset.mul_sum]
   ring
 
 
@@ -263,7 +263,7 @@ theorem equilibrium_combination (core : Model nodes members cuts segments)
     change stiffnessWork core q₁ v - externalWork (withLoads core s₁ e₁) (pointActions locations f₁) v = 0 at hw₁
     change stiffnessWork core q₂ v - externalWork (withLoads core s₂ e₂) (pointActions locations f₂) v = 0 at hw₂
     rw [hk, external_work_combination]
-    linarith
+    linear_combination a * hw₁ + b * hw₂
 
 
 /-- Rotation is the derivative of the jointly linear transverse field. -/
