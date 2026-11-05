@@ -37,6 +37,40 @@ theorem work_invariant (c s : ℝ) (f d : Triple) (h : c^2+s^2 = 1) :
   simp [work, toLocal]
   nlinarith [show (c^2+s^2)*(f 0*d 0+f 1*d 1) = f 0*d 0+f 1*d 1 by rw [h]; ring]
 
+/-- Apply the same orthogonal map to both ends of the six-DOF member. -/
+def toLocal6 (c s : ℝ) (v : LocalDofs) : LocalDofs :=
+  ![c*v 0+s*v 1, -s*v 0+c*v 1, v 2,
+    c*v 3+s*v 4, -s*v 3+c*v 4, v 5]
+
+def toGlobal6 (c s : ℝ) (v : LocalDofs) : LocalDofs :=
+  ![c*v 0-s*v 1, s*v 0+c*v 1, v 2,
+    c*v 3-s*v 4, s*v 3+c*v 4, v 5]
+
+def work6 (a b : LocalDofs) : ℝ := ∑ i : Fin 6, a i*b i
+
+theorem inverse_transform6 (c s : ℝ) (v : LocalDofs) (h : c^2+s^2 = 1) :
+    toGlobal6 c s (toLocal6 c s v) = v := by
+  funext i
+  fin_cases i <;> simp [toGlobal6, toLocal6]
+  all_goals nlinarith [show (c^2+s^2)*v 0 = v 0 by rw [h]; ring,
+    show (c^2+s^2)*v 1 = v 1 by rw [h]; ring,
+    show (c^2+s^2)*v 3 = v 3 by rw [h]; ring,
+    show (c^2+s^2)*v 4 = v 4 by rw [h]; ring]
+
+theorem work_invariant6 (c s : ℝ) (f d : LocalDofs) (h : c^2+s^2 = 1) :
+    work6 (toLocal6 c s f) (toLocal6 c s d) = work6 f d := by
+  simp [work6, toLocal6, Fin.sum_univ_succ]
+  nlinarith [show (c^2+s^2)*(f 0*d 0+f 1*d 1+f 3*d 3+f 4*d 4) =
+      f 0*d 0+f 1*d 1+f 3*d 3+f 4*d 4 by rw [h]; ring]
+
+/-- The transposed map sends member end actions back to global axes and
+preserves their work against the corresponding global displacement. -/
+theorem transpose_work6 (c s : ℝ) (localAction globalDisplacement : LocalDofs) :
+    work6 (toGlobal6 c s localAction) globalDisplacement =
+      work6 localAction (toLocal6 c s globalDisplacement) := by
+  simp [work6, toGlobal6, toLocal6, Fin.sum_univ_succ]
+  ring
+
 /-- End mapping adds local axial/transverse slips to the reference movement. -/
 def endMotion (c s : ℝ) (reference slip : Triple) : Triple :=
   ![reference 0+c*slip 0-s*slip 1,
@@ -79,6 +113,17 @@ theorem free_stationarity (pSide r delta : ℝ)
 /-- Positive spring stiffness gives nonnegative stored energy. -/
 theorem spring_energy_nonnegative (k delta : ℝ) (hk : 0 ≤ k) :
     0 ≤ k*delta^2/2 := by positivity
+
+
+/-- A strictly positive spring stores zero energy only at zero relative slip. -/
+theorem spring_energy_zero_iff (k delta : ℝ) (hk : 0 < k) :
+    k*delta^2/2 = 0 ↔ delta = 0 := by
+  constructor
+  · intro h
+    nlinarith [sq_nonneg delta]
+  · rintro rfl
+    ring
+
 
 end
 end FrameTransform

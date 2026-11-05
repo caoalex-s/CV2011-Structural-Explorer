@@ -166,5 +166,93 @@ theorem end_actions_from_fields (d : LocalDofs) (L EA EI p₀ p₁ q₀ q₁ : �
       Fin.sum_univ_succ] <;> field_simp <;> ring
 
 
+
+/-- Two axial polynomial fields with the same axial load and both prescribed
+end displacements agree, once their second derivatives agree. -/
+theorem axial_prescribed_end_unique (u₁ u₂ : Field) (L : ℝ) (hL : L ≠ 0)
+    (hcurvature : u₁.derivative.derivative = u₂.derivative.derivative)
+    (hleft : u₁.eval 0 = u₂.eval 0) (hright : u₁.eval L = u₂.eval L) : u₁ = u₂ := by
+  exact (piecewise_curvature_uniqueness u₁ u₁ u₂ u₂ 0 L hL hcurvature hcurvature
+    hleft hright rfl rfl).1
+
+/-- A polynomial whose fourth derivative vanishes is at most cubic. -/
+theorem cubic_of_fourth_derivative_zero (p : Field)
+    (h : p.derivative.derivative.derivative.derivative = 0) :
+    ∃ c₀ c₁ c₂ c₃ : ℝ, p = C c₀ + C c₁*X + C c₂*X^2 + C c₃*X^3 := by
+  obtain ⟨a, b, hab⟩ := affine_of_second_derivative_zero p.derivative.derivative h
+  let residual : Field := p - C (a/2)*X^2 - C (b/6)*X^3
+  have hresidual : residual.derivative.derivative = 0 := by
+    simp [residual, Polynomial.derivative_sub, Polynomial.derivative_mul,
+      Polynomial.derivative_pow, Polynomial.C_eq_natCast, hab, map_mul]
+    ring
+  obtain ⟨c₀, c₁, hc⟩ := affine_of_second_derivative_zero residual hresidual
+  refine ⟨c₀, c₁, a/2, b/6, ?_⟩
+  dsimp [residual] at hc
+  linear_combination hc
+
+/-- Clamped polynomial end data and the same fourth derivative determine the
+transverse field. This uses both endpoint translations and rotations. -/
+theorem transverse_prescribed_end_unique (v₁ v₂ : Field) (L : ℝ) (hL : 0 < L)
+    (hload : v₁.derivative.derivative.derivative.derivative =
+             v₂.derivative.derivative.derivative.derivative)
+    (hleft : v₁.eval 0 = v₂.eval 0) (hright : v₁.eval L = v₂.eval L)
+    (hleftSlope : v₁.derivative.eval 0 = v₂.derivative.eval 0)
+    (hrightSlope : v₁.derivative.eval L = v₂.derivative.eval L) : v₁ = v₂ := by
+  have hzero : (v₁-v₂).derivative.derivative.derivative.derivative = 0 := by
+    simp [Polynomial.derivative_sub, hload]
+  obtain ⟨c₀, c₁, c₂, c₃, hc⟩ := cubic_of_fourth_derivative_zero (v₁-v₂) hzero
+  have hc₀ : c₀ = 0 := by
+    have h := congrArg (Polynomial.eval (0 : ℝ)) hc
+    simpa [hleft] using h.symm
+  have hc₁ : c₁ = 0 := by
+    have h := congrArg (fun p : Field => p.derivative.eval 0) hc
+    simp [Polynomial.derivative_sub, Polynomial.derivative_mul,
+      Polynomial.derivative_pow, Polynomial.C_eq_natCast, hleftSlope] at h
+    exact h.symm
+  have hvalue : c₂*L^2 + c₃*L^3 = 0 := by
+    have h := congrArg (Polynomial.eval L) hc
+    simp [hright, hc₀, hc₁] at h
+    linarith
+  have hslope : 2*c₂*L + 3*c₃*L^2 = 0 := by
+    have h := congrArg (fun p : Field => p.derivative.eval L) hc
+    simp [Polynomial.derivative_sub, Polynomial.derivative_mul,
+      Polynomial.derivative_pow, Polynomial.C_eq_natCast, hrightSlope, hc₁] at h
+    linarith
+  have hcube : c₃*L^3 = 0 := by nlinarith [mul_eq_mul_left L hslope]
+  have hc₃ : c₃ = 0 := (mul_eq_zero.mp hcube).resolve_right (pow_ne_zero 3 (ne_of_gt hL))
+  have hsquare : c₂*L^2 = 0 := by simpa [hc₃] using hvalue
+  have hc₂ : c₂ = 0 := (mul_eq_zero.mp hsquare).resolve_right (pow_ne_zero 2 (ne_of_gt hL))
+  have hdiff : v₁-v₂ = 0 := by simpa [hc₀, hc₁, hc₂, hc₃] using hc
+  exact sub_eq_zero.mp hdiff
+
+
+
+/-- With the same affine distributed loads and positive rigidities, prescribed
+end translations and rotations determine the local polynomial fields. -/
+theorem prescribed_fields_unique (u₁ u₂ v₁ v₂ : Field) (L EA EI p₀ p₁ q₀ q₁ : ℝ)
+    (hL : 0 < L) (hEA : 0 < EA) (hEI : 0 < EI)
+    (hu₁ : ∀ x, EA*u₁.derivative.derivative.eval x = -(p₀+(p₁-p₀)*x/L))
+    (hu₂ : ∀ x, EA*u₂.derivative.derivative.eval x = -(p₀+(p₁-p₀)*x/L))
+    (hv₁ : ∀ x, EI*v₁.derivative.derivative.derivative.derivative.eval x = q₀+(q₁-q₀)*x/L)
+    (hv₂ : ∀ x, EI*v₂.derivative.derivative.derivative.derivative.eval x = q₀+(q₁-q₀)*x/L)
+    (huLeft : u₁.eval 0 = u₂.eval 0) (huRight : u₁.eval L = u₂.eval L)
+    (hvLeft : v₁.eval 0 = v₂.eval 0) (hvRight : v₁.eval L = v₂.eval L)
+    (htLeft : v₁.derivative.eval 0 = v₂.derivative.eval 0)
+    (htRight : v₁.derivative.eval L = v₂.derivative.eval L) : u₁ = u₂ ∧ v₁ = v₂ := by
+  have hu : u₁.derivative.derivative = u₂.derivative.derivative := by
+    apply Polynomial.funext
+    intro x
+    apply mul_left_cancel₀ (ne_of_gt hEA)
+    rw [hu₁ x, hu₂ x]
+  have hv : v₁.derivative.derivative.derivative.derivative =
+      v₂.derivative.derivative.derivative.derivative := by
+    apply Polynomial.funext
+    intro x
+    apply mul_left_cancel₀ (ne_of_gt hEI)
+    rw [hv₁ x, hv₂ x]
+  exact ⟨axial_prescribed_end_unique u₁ u₂ L (ne_of_gt hL) hu huLeft huRight,
+    transverse_prescribed_end_unique v₁ v₂ L hL hv hvLeft hvRight htLeft htRight⟩
+
+
 end
 end LocalFrameFields

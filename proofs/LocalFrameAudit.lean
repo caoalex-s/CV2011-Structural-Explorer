@@ -13,3 +13,7 @@ import LocalFrameFields
 #print axioms LocalFrameFields.right_end_action_signs
 #print axioms LocalFrameFields.stiffness_symmetric
 #print axioms LocalFrameFields.end_actions_from_fields
+#print axioms LocalFrameFields.axial_prescribed_end_unique
+#print axioms LocalFrameFields.cubic_of_fourth_derivative_zero
+#print axioms LocalFrameFields.transverse_prescribed_end_unique
+#print axioms LocalFrameFields.prescribed_fields_unique

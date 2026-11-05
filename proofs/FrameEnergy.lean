@@ -84,6 +84,14 @@ theorem energy_zero_rigid (d : LocalDofs) (L EA EI : ℝ)
 
 
 
+/-- The stiffness quadratic form is positive semidefinite. -/
+theorem stiffness_positive_semidefinite (d : LocalDofs) (L EA EI : ℝ)
+    (hL : 0 < L) (hEA : 0 < EA) (hEI : 0 < EI) :
+    0 ≤ ∑ i : Fin 6, ∑ j : Fin 6, d i * stiffness L EA EI i j * d j := by
+  have he := energy_nonnegative d L EA EI hL hEA hEI
+  rw [energy_stiffness_identity d L EA EI (ne_of_gt hL)] at he
+  linarith
+
 /-- The candidate stiffness annihilates each rigid-motion vector. -/
 theorem rigid_stiffness_zero (A B omega L EA EI : ℝ) (hL : L ≠ 0) (i : Fin 6) :
     (∑ j : Fin 6, stiffness L EA EI i j * rigidMotion A B omega L j) = 0 := by
@@ -107,6 +115,53 @@ theorem stiffness_kernel_rigid (d : LocalDofs) (L EA EI : ℝ)
     exact energy_zero_rigid d L EA EI hL hEA hEI henergy
   · rintro ⟨A, B, omega, rfl⟩ i
     exact rigid_stiffness_zero A B omega L EA EI (ne_of_gt hL) i
+
+
+
+/-- Linear map associated with the six-by-six candidate stiffness. -/
+def stiffnessMap (L EA EI : ℝ) : LocalDofs →ₗ[ℝ] LocalDofs :=
+  Matrix.mulVecLin (stiffness L EA EI)
+
+/-- Rigid-motion parameters are a linear coordinate system for the kernel. -/
+def rigidKernelEquiv (L EA EI : ℝ) (hL : 0 < L) (hEA : 0 < EA) (hEI : 0 < EI) :
+    (Fin 3 → ℝ) ≃ₗ[ℝ] LinearMap.ker (stiffnessMap L EA EI) where
+  toFun v := ⟨rigidMotion (v 0) (v 1) (v 2) L, by
+    change stiffnessMap L EA EI (rigidMotion (v 0) (v 1) (v 2) L) = 0
+    funext i
+    simpa [stiffnessMap, Matrix.mulVec, dotProduct] using
+      rigid_stiffness_zero (v 0) (v 1) (v 2) L EA EI (ne_of_gt hL) i⟩
+  invFun v := ![v.val 0, v.val 1, v.val 2]
+  left_inv v := by
+    funext i
+    fin_cases i <;> simp [rigidMotion]
+  right_inv v := by
+    apply Subtype.ext
+    have hkernel : ∀ i : Fin 6, ∑ j : Fin 6, stiffness L EA EI i j * v.val j = 0 := by
+      intro i
+      have h := congrFun v.property i
+      simpa [stiffnessMap, Matrix.mulVec, dotProduct] using h
+    obtain ⟨A, B, omega, h⟩ := (stiffness_kernel_rigid v.val L EA EI hL hEA hEI).mp hkernel
+    rw [h]
+    funext i
+    fin_cases i <;> simp [rigidMotion]
+  map_add' v w := by
+    apply Subtype.ext
+    funext i
+    fin_cases i <;> simp [rigidMotion] <;> ring
+  map_smul' c v := by
+    apply Subtype.ext
+    funext i
+    fin_cases i <;> simp [rigidMotion] <;> ring
+
+/-- Rank-nullity gives rank three for a positive-rigidity local member. -/
+theorem stiffness_rank_three (L EA EI : ℝ) (hL : 0 < L) (hEA : 0 < EA) (hEI : 0 < EI) :
+    Module.finrank ℝ (LinearMap.range (stiffnessMap L EA EI)) = 3 := by
+  have hker : Module.finrank ℝ (LinearMap.ker (stiffnessMap L EA EI)) = 3 := by
+    rw [← (rigidKernelEquiv L EA EI hL hEA hEI).finrank_eq]
+    simp
+  have hrank := LinearMap.finrank_range_add_finrank_ker (stiffnessMap L EA EI)
+  simp [hker] at hrank
+  omega
 
 
 end

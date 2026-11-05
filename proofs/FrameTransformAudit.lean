@@ -7,3 +7,7 @@ import FrameTransform
 #print axioms FrameTransform.spring_stationarity
 #print axioms FrameTransform.free_stationarity
 #print axioms FrameTransform.spring_energy_nonnegative
+#print axioms FrameTransform.inverse_transform6
+#print axioms FrameTransform.work_invariant6
+#print axioms FrameTransform.spring_energy_zero_iff
+#print axioms FrameTransform.transpose_work6

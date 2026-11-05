@@ -6,3 +6,5 @@ import FrameEnergy
 #print axioms FrameEnergy.energy_zero_rigid
 #print axioms FrameEnergy.rigid_stiffness_zero
 #print axioms FrameEnergy.stiffness_kernel_rigid
+#print axioms FrameEnergy.stiffness_rank_three
+#print axioms FrameEnergy.stiffness_positive_semidefinite
