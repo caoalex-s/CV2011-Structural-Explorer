@@ -407,6 +407,66 @@ theorem stiffness_work_nonnegative (model : Model nodes members cuts segments)
   rw [stiffness_work_energy model q hsegments]
   exact mul_nonneg (by norm_num) (total_energy_nonnegative model q hsegments hsprings)
 
+/-- Physical exact-input stiffness is positive semidefinite under the full
+presegmentation, orientation, support and positive-spring contract. -/
+theorem contract_stiffness_nonnegative (model : Model nodes members cuts segments)
+    (actions : Fin actionCount → PointAction members cuts)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (cutParameter : Fin members → Fin cuts → ℝ)
+    (memberLength memberEA memberEI : Fin members → ℝ)
+    (h : ExactContract model actions supports cutParameter memberLength memberEA memberEI)
+    (q : Coordinate model → ℝ) : 0 ≤ stiffnessWork model q q :=
+  stiffness_work_nonnegative model q
+    (contract_positive_segments model actions supports cutParameter memberLength memberEA memberEI h)
+    (contract_nonnegative_springs model actions supports cutParameter memberLength memberEA memberEI h)
+
+/-- Two support multiplier functionals give the same aggregate reaction
+exactly when their difference lies in the kernel of the constraint transpose. -/
+theorem reaction_gauge (model : Model nodes members cuts segments)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (first second : Module.Dual ℝ (ConstraintIndex supports → ℝ)) :
+    (constraintMap model supports).dualMap first = (constraintMap model supports).dualMap second ↔
+      first - second ∈ LinearMap.ker (constraintMap model supports).dualMap := by
+  simp [LinearMap.mem_ker, map_sub, sub_eq_zero]
+
+/-- On a finite row space, a reaction functional has one real coefficient for
+each actual row. Repeated rows may admit more than one coefficient vector. -/
+theorem finite_reaction_coefficients {ι : Type} [Fintype ι] [DecidableEq ι]
+    (reaction : Module.Dual ℝ (ι → ℝ)) :
+    ∃ coefficients : ι → ℝ, ∀ values : ι → ℝ,
+      reaction values = ∑ i : ι, coefficients i * values i := by
+  refine ⟨fun i => reaction (Pi.single i 1), ?_⟩
+  intro values
+  calc
+    reaction values = reaction (∑ i : ι, Pi.single i (values i)) := by
+      rw [Finset.univ_sum_single]
+    _ = ∑ i : ι, reaction (Pi.single i (values i)) := by rw [map_sum]
+    _ = ∑ i : ι, reaction (Pi.single i 1) * values i := by
+      apply Finset.sum_congr rfl
+      intro i _
+      have hsingle : Pi.single i (values i) = values i • Pi.single i (1 : ℝ) := by
+        funext j
+        by_cases h : j = i <;> simp [Pi.single_apply, h]
+      rw [hsingle, map_smul]
+      simp [smul_eq_mul, mul_comm]
+
+/-- Under the complete exact input contract, equilibrium has an aggregate
+support reaction even when constraint rows are dependent. -/
+theorem contract_equilibrium_reaction (model : Model nodes members cuts segments)
+    (actions : Fin actionCount → PointAction members cuts)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (cutParameter : Fin members → Fin cuts → ℝ)
+    (memberLength memberEA memberEI : Fin members → ℝ)
+    (h : ExactContract model actions supports cutParameter memberLength memberEA memberEI)
+    (q : Coordinate model → ℝ) :
+    equilibrium model actions supports q ↔
+      admissible model supports q ∧
+      ∃ reaction : Module.Dual ℝ (ConstraintIndex supports → ℝ),
+        ∀ variation, residualFunctional model actions q variation =
+          reaction (constraintMap model supports variation) :=
+  equilibrium_iff_support_reaction model actions supports q
+    (contract_positive_segments model actions supports cutParameter memberLength memberEA memberEI h)
+
 /-- Each recovered segment has loaded local fields associated with its
 assembled end movements and its exact vertical affine load. -/
 theorem recovered_segment_exists (model : Model nodes members cuts segments)

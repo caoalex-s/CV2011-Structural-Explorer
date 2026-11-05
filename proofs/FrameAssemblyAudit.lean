@@ -14,3 +14,7 @@ import FrameAssembly
 #print axioms FrameAssembly.residual_functional_apply
 #print axioms FrameAssembly.equilibrium_iff_support_reaction
 #print axioms FrameAssembly.stiffness_entry_symmetric
+#print axioms FrameAssembly.contract_stiffness_nonnegative
+#print axioms FrameAssembly.contract_equilibrium_reaction
+#print axioms FrameAssembly.reaction_gauge
+#print axioms FrameAssembly.finite_reaction_coefficients

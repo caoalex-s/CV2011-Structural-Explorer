@@ -230,6 +230,7 @@ example : ExactContract splitModel loads supports cuts lengths rigidity rigidity
     norm_num [splitModel]
   · intro support hkind
     fin_cases support <;> norm_num [supports] at *
+    rcases hkind with hkind | hkind <;> cases hkind
   · intro member
     fin_cases member
     norm_num [lengths, rigidity]
