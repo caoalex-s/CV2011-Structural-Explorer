@@ -26,3 +26,5 @@ import FrameDeformation
 #print axioms FrameDeformation.basic_stress_work_eq_stiffness
 #print axioms FrameDeformation.equilibrium_iff_basic_stress_balance
 #print axioms FrameDeformation.basic_stress_selfstress_iff
+#print axioms FrameDeformation.actual_basic_stress_factor
+#print axioms FrameDeformation.equilibrium_has_actual_basic_stress

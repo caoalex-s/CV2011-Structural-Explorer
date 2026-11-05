@@ -809,6 +809,60 @@ theorem frame_statics_dimension (model : Model nodes members cuts segments)
     Module.finrank ℝ (admissibleSpace model supports) = Module.finrank ℝ (Coordinate model → ℝ) at hconstraints
   omega
 
+/-- The explicit member basic stresses and spring forces factor through the
+actual deformation map. Thus their work is Dᵀσ, not an independently assumed
+global stiffness equation. -/
+theorem actual_basic_stress_factor (model : Model nodes members cuts segments)
+    (actions : Fin actionCount → PointAction members cuts)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (cutParameter : Fin members → Fin cuts → ℝ)
+    (memberLength memberEA memberEI : Fin members → ℝ)
+    (hcontract : ExactContract model actions supports cutParameter memberLength memberEA memberEI)
+    (q : Coordinate model → ℝ) :
+    ∃ stress : Module.Dual ℝ (Sum (Fin segments × Fin 3) (SpringIndex model) → ℝ),
+      ∀ variation, basicStressWork model q variation = stress (deformationMap model variation) := by
+  let D := deformationLinear model
+  let force := stiffnessOperator model q
+  have hsegments := contract_positive_segments model actions supports cutParameter memberLength memberEA memberEI hcontract
+  have hann : force ∈ (LinearMap.ker D).dualAnnihilator := by
+    rw [Submodule.mem_dualAnnihilator]
+    intro variation hvariation
+    have hd : deformationMap model variation = 0 := LinearMap.mem_ker.mp hvariation
+    have hnull := (stiffness_null_iff_deformation_zero model actions supports cutParameter
+      memberLength memberEA memberEI hcontract variation).mpr hd
+    change stiffnessOperator model q variation = 0
+    rw [stiffness_operator_apply, stiffness_work_symmetric]
+    exact hnull q
+  rw [← LinearMap.range_dualMap_eq_dualAnnihilator_ker D] at hann
+  obtain ⟨stress, hstress⟩ := hann
+  refine ⟨stress, ?_⟩
+  intro variation
+  have hv := congrArg (fun f : Module.Dual ℝ (Coordinate model → ℝ) => f variation) hstress
+  change stress (deformationMap model variation) = stiffnessOperator model q variation at hv
+  rw [stiffness_operator_apply, ← basic_stress_work_eq_stiffness model q variation hsegments] at hv
+  exact hv.symm
+
+/-- Actual equilibrium is equivalent to balancing an induced Dᵀσ against the
+encoded load on every admissible movement. -/
+theorem equilibrium_has_actual_basic_stress (model : Model nodes members cuts segments)
+    (actions : Fin actionCount → PointAction members cuts)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (cutParameter : Fin members → Fin cuts → ℝ)
+    (memberLength memberEA memberEI : Fin members → ℝ)
+    (hcontract : ExactContract model actions supports cutParameter memberLength memberEA memberEI)
+    (q : Coordinate model → ℝ) :
+    ∃ stress : Module.Dual ℝ (Sum (Fin segments × Fin 3) (SpringIndex model) → ℝ),
+      (∀ variation, basicStressWork model q variation = stress (deformationMap model variation)) ∧
+      (equilibrium model actions supports q ↔ admissible model supports q ∧
+        ∀ variation, admissible model supports variation →
+          stress (deformationMap model variation) = externalWork model actions variation) := by
+  obtain ⟨stress, hfactor⟩ := actual_basic_stress_factor model actions supports cutParameter
+    memberLength memberEA memberEI hcontract q
+  refine ⟨stress, hfactor, ?_⟩
+  rw [equilibrium_iff_basic_stress_balance model actions supports q
+    (contract_positive_segments model actions supports cutParameter memberLength memberEA memberEI hcontract)]
+  simp only [hfactor]
+
 /-- A deformation-free admissible motion is a mechanism exactly when nonzero. -/
 def mechanism (model : Model nodes members cuts segments)
     (supports : Fin supportCount → SupportInput members cuts) (q : Coordinate model → ℝ) : Prop :=

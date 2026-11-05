@@ -331,20 +331,22 @@ example : ExactContract twoMemberModel sideLoad sideSupport noCuts properties pr
 
 def duplicateSupports : Fin 2 → SupportInput 2 0 := fun _ =>
   ⟨.endSide (1, false), .roller, 1, 0, false, false, false⟩
+def row0 : ConstraintIndex duplicateSupports := ⟨0, ⟨0, by norm_num [duplicateSupports, supportDirections]⟩⟩
+def row1 : ConstraintIndex duplicateSupports := ⟨1, ⟨0, by norm_num [duplicateSupports, supportDirections]⟩⟩
 def reactionFirst : Module.Dual ℝ (ConstraintIndex duplicateSupports → ℝ) :=
-  2 • LinearMap.proj ⟨0, 0⟩ + 3 • LinearMap.proj ⟨1, 0⟩
+  2 • LinearMap.proj row0 + 3 • LinearMap.proj row1
 def reactionSecond : Module.Dual ℝ (ConstraintIndex duplicateSupports → ℝ) :=
-  4 • LinearMap.proj ⟨0, 0⟩ + 1 • LinearMap.proj ⟨1, 0⟩
+  4 • LinearMap.proj row0 + 1 • LinearMap.proj row1
 example : (constraintMap twoMemberModel duplicateSupports).dualMap reactionFirst =
     (constraintMap twoMemberModel duplicateSupports).dualMap reactionSecond := by
   ext variation
-  simp [reactionFirst, reactionSecond, constraintMap, supportRowLinear, duplicateSupports,
+  simp [reactionFirst, reactionSecond, row0, row1, constraintMap, supportRowLinear, duplicateSupports,
     supportDirections, smul_eq_mul]
   ring
 example : reactionFirst - reactionSecond ∈ LinearMap.ker (constraintMap twoMemberModel duplicateSupports).dualMap := by
   apply (reaction_gauge twoMemberModel duplicateSupports reactionFirst reactionSecond).mp
   ext variation
-  simp [reactionFirst, reactionSecond, constraintMap, supportRowLinear, duplicateSupports,
+  simp [reactionFirst, reactionSecond, row0, row1, constraintMap, supportRowLinear, duplicateSupports,
     supportDirections, smul_eq_mul]
   ring
 """)
@@ -371,7 +373,8 @@ example : LocalFrameFields.endActions leftHalf 1 2 1 0 0 0 0 3 +
     LocalFrameFields.endActions rightHalf 1 2 1 0 0 0 0 0 = 0 := by
   rw [LocalFrameFields.end_actions_from_fields leftHalf 1 2 1 0 0 0 0 (by norm_num) (by norm_num) (by norm_num),
     LocalFrameFields.end_actions_from_fields rightHalf 1 2 1 0 0 0 0 (by norm_num) (by norm_num) (by norm_num)]
-  norm_num [leftHalf, rightHalf, LocalFrameFields.stiffness, LocalFrameFields.consistentLoad, Fin.sum_univ_succ]
+  norm_num [leftHalf, rightHalf, LocalFrameFields.stiffness, LocalFrameFields.consistentLoad,
+    Fin.sum_univ_succ, Matrix.vecCons]
 """)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
