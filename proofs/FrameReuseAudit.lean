@@ -25,3 +25,5 @@ import FrameReuse
 #print axioms FrameReuse.moment_recovery_combination
 #print axioms FrameReuse.shear_recovery_combination
 #print axioms FrameReuse.end_actions_combination
+#print axioms FrameReuse.residual_eq_stiffness_minus_load
+#print axioms FrameReuse.combined_aggregate_reaction

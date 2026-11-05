@@ -227,8 +227,17 @@ theorem external_work_combination (core : Model nodes members cuts segments)
         b * pointActionWork core (pointActions locations f₂ j) q := by
     intro j
     exact point_work_combination core a b (locations j) (f₁ j) (f₂ j) q
-  simp only [externalWork]
-  simp only [hsegment, hpoint, Finset.sum_add_distrib, ← Finset.mul_sum]
+  change (∑ segment : Fin segments, ∑ i : Fin 6,
+      segmentLoad (withLoads core (fun j => a*s₁ j+b*s₂ j) (fun j => a*e₁ j+b*e₂ j)) segment i *
+        segmentDofs core q segment i) +
+    (∑ j : Fin actionCount, pointActionWork core (pointActions locations (fun k i => a*f₁ k i+b*f₂ k i) j) q) =
+    a * ((∑ segment : Fin segments, ∑ i : Fin 6,
+      segmentLoad (withLoads core s₁ e₁) segment i * segmentDofs core q segment i) +
+      ∑ j : Fin actionCount, pointActionWork core (pointActions locations f₁ j) q) +
+    b * ((∑ segment : Fin segments, ∑ i : Fin 6,
+      segmentLoad (withLoads core s₂ e₂) segment i * segmentDofs core q segment i) +
+      ∑ j : Fin actionCount, pointActionWork core (pointActions locations f₂ j) q)
+  simp_rw [hsegment, hpoint, Finset.sum_add_distrib, ← Finset.mul_sum]
   ring
 
 
@@ -310,6 +319,30 @@ theorem end_actions_combination (d₁ d₂ : LocalDofs) (a b L EA EI p₀ p₁ r
   fin_cases i <;>
     simp [LocalFrameFields.endActions, normal_recovery_combination, shear_recovery_combination,
       moment_recovery_combination, Polynomial.eval_add, Polynomial.eval_mul] <;> ring
+
+
+/-- On physically valid segments the field-derived residual equals the actual
+assembled Kq−F functional, independently of a multiplier representation. -/
+theorem residual_eq_stiffness_minus_load (model : Model nodes members cuts segments)
+    (actions : Fin actionCount → PointAction members cuts) (q : Coordinate model → ℝ)
+    (hpositive : positiveSegments model) :
+    residualFunctional model actions q = stiffnessOperator model q - externalFunctional model actions := by
+  ext v
+  rw [residual_functional_apply model actions q v hpositive, stiffness_operator_apply,
+    external_functional_apply]
+  rfl
+
+/-- A combined residual gives the aggregate reaction when it satisfies the
+actual support equations. No individual multiplier is selected here. -/
+theorem combined_aggregate_reaction (model : Model nodes members cuts segments)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (λ₁ λ₂ : ConstraintIndex supports → ℝ) (a b : ℝ) :
+    aggregateReaction model supports (a • λ₁ + b • λ₂) =
+      a • aggregateReaction model supports λ₁ + b • aggregateReaction model supports λ₂ := by
+  classical
+  ext v
+  simp [aggregateReaction, multiplierFunctional, LinearMap.dualMap_apply,
+    Finset.sum_add_distrib, Finset.mul_sum, add_mul, mul_add, mul_assoc]
 
 end
 end FrameReuse
