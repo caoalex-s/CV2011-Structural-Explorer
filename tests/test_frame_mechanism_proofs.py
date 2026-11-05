@@ -314,6 +314,7 @@ example : ExactContract fixedModel fixedNoActions fixedSupports fixedNoCuts
 
 theorem fixed_movements_zero (q : Coordinate fixedModel → ℝ)
     (h : admissible fixedModel fixedSupports q) : q = 0 := by
+  classical
   have hleft : sideMotion fixedModel q (.endSide (0, false)) = 0 := by
     funext i
     fin_cases i
@@ -343,12 +344,16 @@ theorem fixed_movements_zero (q : Coordinate fixedModel → ℝ)
   have hrefLeft : referenceMotion fixedModel q (.inl 0) = 0 := by
     have hv := hleft
     change endMotion 1 0 (referenceMotion fixedModel q (.inl 0)) (slipValue fixedModel q (0, false)) = 0 at hv
-    rw [hslipLeft, rigid_end] at hv
+    rw [hslipLeft] at hv
+    change endMotion 1 0 (referenceMotion fixedModel q (.inl 0)) (fun _ => 0) = 0 at hv
+    rw [rigid_end] at hv
     exact hv
   have hrefRight : referenceMotion fixedModel q (.inl 1) = 0 := by
     have hv := hright
     change endMotion 1 0 (referenceMotion fixedModel q (.inl 1)) (slipValue fixedModel q (0, true)) = 0 at hv
-    rw [hslipRight, rigid_end] at hv
+    rw [hslipRight] at hv
+    change endMotion 1 0 (referenceMotion fixedModel q (.inl 1)) (fun _ => 0) = 0 at hv
+    rw [rigid_end] at hv
     exact hv
   funext coordinate
   cases coordinate with
@@ -363,9 +368,13 @@ theorem fixed_movements_zero (q : Coordinate fixedModel → ℝ)
     | inl node =>
       fin_cases node
       · have hx := congrFun hrefLeft direction
-        simpa [referenceMotion, hactive] using hx
+        change (if hp : activePoint fixedModel (.inl 0) then q (.inl (⟨.inl 0, hp⟩, direction)) else 0) = 0 at hx
+        rw [dif_pos hactive] at hx
+        exact hx
       · have hx := congrFun hrefRight direction
-        simpa [referenceMotion, hactive] using hx
+        change (if hp : activePoint fixedModel (.inl 1) then q (.inl (⟨.inl 1, hp⟩, direction)) else 0) = 0 at hx
+        rw [dif_pos hactive] at hx
+        exact hx
 
 example : ∀ q, admissible fixedModel fixedSupports q → deformationMap fixedModel q = 0 → q = 0 := by
   intro q h _
