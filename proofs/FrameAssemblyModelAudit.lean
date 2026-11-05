@@ -1,0 +1,6 @@
+import FrameAssemblyModel
+
+#print axioms FrameAssemblyModel.requested_incident_is_reference
+#print axioms FrameAssemblyModel.reference_end_is_rigid
+#print axioms FrameAssemblyModel.rigid_direction_has_zero_slip
+#print axioms FrameAssemblyModel.distinct_member_cuts

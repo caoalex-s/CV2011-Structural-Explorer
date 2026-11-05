@@ -114,6 +114,11 @@ jobs:
         run: |
           lake env lean FramePotentialAudit.lean > potential-axioms.log
           python ../scripts/audit_real_axioms.py potential-axioms.log FramePotential
+      - name: Audit presegmented assembly model axioms
+        working-directory: proofs
+        run: |
+          lake env lean FrameAssemblyModelAudit.lean > assembly-model-axioms.log
+          python ../scripts/audit_real_axioms.py assembly-model-axioms.log FrameAssemblyModel
       - name: Check public course examples
         if: ${{ inputs.proof_only != true }}
         run: python -m scripts.check_worked_examples
