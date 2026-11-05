@@ -51,7 +51,7 @@ example : (consistentLoad 2 3 (-1) 0 0) 0 = -5/3 := by norm_num [consistentLoad]
 """)
         output = result.stdout + result.stderr
         self.assertNotEqual(result.returncode, 0)
-        self.assertRegex(output, r"unsolved goals|tactic .*failed")
+        self.assertRegex(output, r"unsolved goals|tactic .*failed|linarith failed")
         self.assertNotIn("unknown identifier", output)
 
     def test_incorrect_load_sign_is_rejected(self):
@@ -64,7 +64,7 @@ example : (normal zeroDofs 2 10 3 (-1)).derivative.eval 1 = 1 := by
 """)
         output = result.stdout + result.stderr
         self.assertNotEqual(result.returncode, 0)
-        self.assertRegex(output, r"unsolved goals|tactic .*failed")
+        self.assertRegex(output, r"unsolved goals|tactic .*failed|linarith failed")
         self.assertNotIn("unknown identifier", output)
 
 
