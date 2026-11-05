@@ -104,3 +104,57 @@ example : ¬ sameStructure base base supports supports slots shiftedSlot := by
                 capture_output=True, text=True, timeout=120, check=False,
             )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_actual_signed_load_changes_with_fixed_structure(self):
+        statement = """
+import FrameReuse
+open FrameInterfaces FrameTransform FrameAssemblyModel FrameAssembly FrameReuse
+noncomputable section
+
+def beam : Model 2 1 0 1 where
+  joints := fun _ => ⟨.rigid, 1, none⟩
+  member := fun _ => ⟨0, 1, ⟨1, 0⟩, none, none⟩
+  segmentMember := fun _ => 0
+  segmentLeft := fun _ => .endSide (0, false)
+  segmentRight := fun _ => .endSide (0, true)
+  segmentLength := fun _ => 1
+  segmentEA := fun _ => 1
+  segmentEI := fun _ => 1
+  segmentVerticalStart := fun _ => 0
+  segmentVerticalEnd := fun _ => 0
+
+def slots : Fin 1 → Location 1 0 := fun _ => .endSide (0, true)
+def loadZero : Fin 1 → Triple := fun _ => ![0, 0, 0]
+def loadSigned : Fin 1 → Triple := fun _ => ![0, -2, 3]
+def up : Coordinate beam → ℝ := fun index =>
+  match index with
+  | .inl (_, direction) => if direction = 1 then 1 else 0
+  | .inr _ => 0
+
+theorem node0active : activePoint beam (.inl 0) := ⟨0, Or.inl rfl⟩
+theorem node1active : activePoint beam (.inl 1) := ⟨0, Or.inr rfl⟩
+example : sameCore (withLoads beam 0 0) (withLoads beam (fun _ => 1) (fun _ => 1)) := by
+  exact same_core_with_loads beam 0 0 (fun _ => 1) (fun _ => 1)
+example (q v : Coordinate beam → ℝ) :
+    stiffnessWork (withLoads beam 0 0) q v = stiffnessWork (withLoads beam (fun _ => 1) (fun _ => 1)) q v := by
+  exact stiffness_unchanged beam 0 0 (fun _ => 1) (fun _ => 1) q v
+example : externalWork (withLoads beam 0 0) (pointActions slots loadZero) up = 0 := by
+  simp [externalWork, segmentLoad, withLoads, LocalFrameFields.consistentLoad,
+    pointActions, pointActionWork, loadZero, FrameTransform.work]
+example : externalWork (withLoads beam (fun _ => 1) (fun _ => 1)) (pointActions slots loadSigned) up = -1 := by
+  have h0 := node0active
+  have h1 := node1active
+  dsimp [beam] at h0 h1
+  simp [externalWork, segmentLoad, segmentDofs, segmentMotion, sideMotion, referenceMotion,
+    endMotion, toLocal6, slipValue, withLoads, beam, endNode, pointActions, slots, loadSigned, up,
+    LocalFrameFields.consistentLoad, pointActionWork, FrameTransform.work, h0, h1, Fin.sum_univ_succ]
+  norm_num
+"""
+        with tempfile.TemporaryDirectory() as folder:
+            source = Path(folder) / "ReuseLoadCheck.lean"
+            source.write_text(statement, encoding="utf-8")
+            result = subprocess.run(
+                ["lake", "env", "lean", str(source)], cwd=PROOFS,
+                capture_output=True, text=True, timeout=120, check=False,
+            )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
