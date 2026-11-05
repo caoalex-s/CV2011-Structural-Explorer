@@ -483,7 +483,17 @@ def stableSolutionLinear (core : Model nodes members cuts segments)
         (solutionChoice core locations supports cutsAt length EA EI baseContract baseStable load)
         (solution_choice_equilibrium core locations supports cutsAt length EA EI baseContract baseStable load)
         (solution_choice_equilibrium core locations supports cutsAt length EA EI baseContract baseStable load)
-      simpa [caseModel, caseActions] using h
+      change equilibrium (withLoads core (fun i => a * load.1.1 i) (fun i => a * load.1.2 i))
+        (pointActions locations (fun j i => a * load.2 j i)) supports
+        (a • solutionChoice core locations supports cutsAt length EA EI baseContract baseStable load)
+      have hs : (fun i => a*load.1.1 i+0*load.1.1 i) = (fun i => a*load.1.1 i) := by
+        funext i; ring
+      have he : (fun i => a*load.1.2 i+0*load.1.2 i) = (fun i => a*load.1.2 i) := by
+        funext i; ring
+      have hf : (fun j i => a*load.2 j i+0*load.2 j i) = (fun j i => a*load.2 j i) := by
+        funext j i; ring
+      rw [hs, he, hf] at h
+      simpa only [zero_smul, add_zero] using h
 
 
 /-- Actual residual work combines the same movements and applied loads. -/
@@ -531,7 +541,8 @@ theorem aggregate_reaction_from_residuals (core : Model nodes members cuts segme
     (pointActions locations (fun j i => a*f₁ j i+b*f₂ j i)) (a • q₁ + b • q₂) v hpositive
   have h₁ := residual_functional_apply (withLoads core s₁ e₁) (pointActions locations f₁) q₁ v hpositive
   have h₂ := residual_functional_apply (withLoads core s₂ e₂) (pointActions locations f₂) q₂ v hpositive
-  simpa only [hc, h₁, h₂] using residual_work_combination core a b s₁ e₁ s₂ e₂ locations f₁ f₂ q₁ q₂ v
+  exact hc.trans ((residual_work_combination core a b s₁ e₁ s₂ e₂ locations f₁ f₂ q₁ q₂ v).trans
+    (congrArg₂ (fun x y : ℝ => a*x+b*y) h₁.symm h₂.symm))
 
 /-- The same aggregate identity holds after selecting any global hub component. -/
 theorem grouped_reaction_from_residuals (core : Model nodes members cuts segments)
@@ -555,16 +566,11 @@ def externalLoadLinear (core : Model nodes members cuts segments)
   toFun load := externalFunctional (caseModel core load) (caseActions locations load)
   map_add' load₁ load₂ := by
     ext v
-    simp only [LinearMap.add_apply, external_functional_apply]
+    change externalFunctional (caseModel core (load₁+load₂)) (caseActions locations (load₁+load₂)) v =
+      externalFunctional (caseModel core load₁) (caseActions locations load₁) v +
+        externalFunctional (caseModel core load₂) (caseActions locations load₂) v
     have h := external_work_combination core 1 1 load₁.1.1 load₁.1.2 load₂.1.1 load₂.1.2
       locations load₁.2 load₂.2 v
-    rw [external_functional_apply (caseModel core load₁) (caseActions locations load₁) v,
-      external_functional_apply (caseModel core load₂) (caseActions locations load₂) v]
-    change externalWork (withLoads core (fun i => load₁.1.1 i + load₂.1.1 i)
-      (fun i => load₁.1.2 i + load₂.1.2 i))
-      (pointActions locations (fun j i => load₁.2 j i + load₂.2 j i)) v =
-      externalWork (withLoads core load₁.1.1 load₁.1.2) (pointActions locations load₁.2) v +
-      externalWork (withLoads core load₂.1.1 load₂.1.2) (pointActions locations load₂.2) v
     have hs : (fun i => (1:ℝ)*load₁.1.1 i+1*load₂.1.1 i) = (fun i => load₁.1.1 i+load₂.1.1 i) := by
       funext i; ring
     have he : (fun i => (1:ℝ)*load₁.1.2 i+1*load₂.1.2 i) = (fun i => load₁.1.2 i+load₂.1.2 i) := by
@@ -572,16 +578,18 @@ def externalLoadLinear (core : Model nodes members cuts segments)
     have hf : (fun j i => (1:ℝ)*load₁.2 j i+1*load₂.2 j i) = (fun j i => load₁.2 j i+load₂.2 j i) := by
       funext j i; ring
     rw [hs, he, hf] at h
-    simpa only [one_mul] using h
+    have hh : externalWork (caseModel core (load₁+load₂)) (caseActions locations (load₁+load₂)) v =
+        externalWork (caseModel core load₁) (caseActions locations load₁) v +
+          externalWork (caseModel core load₂) (caseActions locations load₂) v := by
+      simpa only [one_mul] using h
+    exact (external_functional_apply _ _ v).trans (hh.trans
+      (congrArg₂ (· + ·) (external_functional_apply _ _ v).symm (external_functional_apply _ _ v).symm))
   map_smul' a load := by
     ext v
-    simp only [LinearMap.smul_apply, smul_eq_mul, external_functional_apply]
+    change externalFunctional (caseModel core (a • load)) (caseActions locations (a • load)) v =
+      a * externalFunctional (caseModel core load) (caseActions locations load) v
     have h := external_work_combination core a 0 load.1.1 load.1.2 load.1.1 load.1.2
       locations load.2 load.2 v
-    rw [external_functional_apply (caseModel core load) (caseActions locations load) v]
-    change externalWork (withLoads core (fun i => a * load.1.1 i) (fun i => a * load.1.2 i))
-      (pointActions locations (fun j i => a * load.2 j i)) v =
-      a * externalWork (withLoads core load.1.1 load.1.2) (pointActions locations load.2) v
     have hs : (fun i => a*load.1.1 i+0*load.1.1 i) = (fun i => a*load.1.1 i) := by
       funext i; ring
     have he : (fun i => a*load.1.2 i+0*load.1.2 i) = (fun i => a*load.1.2 i) := by
@@ -589,7 +597,11 @@ def externalLoadLinear (core : Model nodes members cuts segments)
     have hf : (fun j i => a*load.2 j i+0*load.2 j i) = (fun j i => a*load.2 j i) := by
       funext j i; ring
     rw [hs, he, hf] at h
-    simpa only [zero_mul, add_zero] using h
+    have hh : externalWork (caseModel core (a • load)) (caseActions locations (a • load)) v =
+        a * externalWork (caseModel core load) (caseActions locations load) v := by
+      simpa only [zero_mul, add_zero] using h
+    exact (external_functional_apply _ _ v).trans (hh.trans
+      (congrArg (fun x : ℝ => a*x) (external_functional_apply _ _ v).symm))
 
 /-- Stable aggregate reaction as K composed with the stable solution map,
 minus the independently derived load map. Individual support shares are not selected. -/
@@ -620,6 +632,47 @@ theorem stable_reaction_is_residual (core : Model nodes members cuts segments)
     cutsAt length EA EI (case_contract core locations supports cutsAt length EA EI baseContract load)
   rw [residual_eq_stiffness_minus_load _ _ _ hpositive]
   rfl
+
+
+/-- The actual B map commutes with movement combinations. -/
+theorem segment_dofs_combination (model : Model nodes members cuts segments)
+    (a b : ℝ) (q₁ q₂ : Coordinate model → ℝ) (segment : Fin segments) :
+    segmentDofs model (a • q₁ + b • q₂) segment =
+      fun i => a * segmentDofs model q₁ segment i + b * segmentDofs model q₂ segment i := by
+  funext i
+  change segmentDofsLinear model segment (a • q₁ + b • q₂) i = _
+  simp [map_add, map_smul, segmentDofsLinear, smul_eq_mul]
+
+/-- Axial recovery through the assembled B map, for fixed segment properties. -/
+theorem segment_axial_combination (model : Model nodes members cuts segments)
+    (a b : ℝ) (q₁ q₂ : Coordinate model → ℝ) (segment : Fin segments) (p₀ p₁ r₀ r₁ : ℝ) :
+    LocalFrameFields.axialDisplacement (segmentDofs model (a • q₁ + b • q₂) segment)
+      (model.segmentLength segment) (model.segmentEA segment) (a*p₀+b*r₀) (a*p₁+b*r₁) =
+    Polynomial.C a * LocalFrameFields.axialDisplacement (segmentDofs model q₁ segment)
+      (model.segmentLength segment) (model.segmentEA segment) p₀ p₁ +
+    Polynomial.C b * LocalFrameFields.axialDisplacement (segmentDofs model q₂ segment)
+      (model.segmentLength segment) (model.segmentEA segment) r₀ r₁ := by
+  rw [segment_dofs_combination]
+  exact axial_recovery_combination _ _ a b _ _ p₀ p₁ r₀ r₁
+
+/-- Transverse recovery through the same assembled B map. -/
+theorem segment_transverse_combination (model : Model nodes members cuts segments)
+    (a b : ℝ) (q₁ q₂ : Coordinate model → ℝ) (segment : Fin segments) (p₀ p₁ r₀ r₁ : ℝ) :
+    LocalFrameFields.transverseDisplacement (segmentDofs model (a • q₁ + b • q₂) segment)
+      (model.segmentLength segment) (model.segmentEI segment) (a*p₀+b*r₀) (a*p₁+b*r₁) =
+    Polynomial.C a * LocalFrameFields.transverseDisplacement (segmentDofs model q₁ segment)
+      (model.segmentLength segment) (model.segmentEI segment) p₀ p₁ +
+    Polynomial.C b * LocalFrameFields.transverseDisplacement (segmentDofs model q₂ segment)
+      (model.segmentLength segment) (model.segmentEI segment) r₀ r₁ := by
+  rw [segment_dofs_combination]
+  exact transverse_recovery_combination _ _ a b _ _ p₀ p₁ r₀ r₁
+
+/-- The orientation map is linear for any fixed direction components. -/
+theorem global_motion_combination (c s a b : ℝ) (v₁ v₂ : Triple) :
+    toGlobal c s (fun i => a*v₁ i+b*v₂ i) =
+      fun i => a*toGlobal c s v₁ i+b*toGlobal c s v₂ i := by
+  funext i
+  fin_cases i <;> simp [toGlobal] <;> ring
 
 end
 end FrameReuse

@@ -34,3 +34,7 @@ import FrameReuse
 #print axioms FrameReuse.aggregate_reaction_from_residuals
 #print axioms FrameReuse.grouped_reaction_from_residuals
 #print axioms FrameReuse.stable_reaction_is_residual
+#print axioms FrameReuse.segment_dofs_combination
+#print axioms FrameReuse.segment_axial_combination
+#print axioms FrameReuse.segment_transverse_combination
+#print axioms FrameReuse.global_motion_combination
