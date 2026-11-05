@@ -118,6 +118,10 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_frame_assembly_model_proofs.py' -v
         env:
           REQUIRE_LEAN: '1'
+      - name: Check exact frame mechanism fixtures
+        run: python -m unittest discover -s tests -p 'test_frame_mechanism_proofs.py' -v
+        env:
+          REQUIRE_LEAN: '1'
       - name: Audit presegmented assembly model axioms
         working-directory: proofs
         run: |
