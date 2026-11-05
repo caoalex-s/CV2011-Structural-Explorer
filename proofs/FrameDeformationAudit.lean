@@ -5,3 +5,8 @@ import FrameDeformation
 #print axioms FrameDeformation.deformation_zero_implies_energy_zero
 #print axioms FrameDeformation.energy_zero_implies_deformation_zero
 #print axioms FrameDeformation.energy_zero_iff_deformation_zero
+#print axioms FrameDeformation.stiffness_null_iff_deformation_zero
+#print axioms FrameDeformation.member_energy_directional_derivative
+#print axioms FrameDeformation.slip_directional_derivative
+#print axioms FrameDeformation.segment_directional_derivative
+#print axioms FrameDeformation.potential_directional_derivative

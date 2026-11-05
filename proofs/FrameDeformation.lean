@@ -29,6 +29,60 @@ def memberDeformationLinear (L : ℝ) : LocalDofs →ₗ[ℝ] (Fin 3 → ℝ) wh
     fin_cases i <;> simp [memberDeformation, relativeRotationLeft, relativeRotationRight,
       Pi.smul_apply, smul_eq_mul] <;> ring
 
+set_option maxHeartbeats 4000000 in
+/-- First variation of one homogeneous member energy along prescribed local
+end movements. The distributed load enters separately through its work. -/
+theorem member_energy_directional_derivative (d e : LocalDofs) (L EA EI : ℝ)
+    (hL : L ≠ 0) :
+    HasDerivAt (fun t : ℝ => energy (fun i => d i + t*e i) L EA EI)
+      (∑ i : Fin 6, e i * (∑ j : Fin 6, LocalFrameFields.stiffness L EA EI i j * d j)) 0 := by
+  let slope := ∑ i : Fin 6, e i * (∑ j : Fin 6, LocalFrameFields.stiffness L EA EI i j * d j)
+  have hpoly (t : ℝ) : energy (fun i => d i + t*e i) L EA EI =
+      energy d L EA EI + t*slope + t^2*energy e L EA EI := by
+    simp [energy, relativeRotationLeft, relativeRotationRight, slope,
+      LocalFrameFields.stiffness, Fin.sum_univ_succ]
+    field_simp
+    ring
+  have h := ((hasDerivAt_const (0 : ℝ) (energy d L EA EI)).add
+    ((hasDerivAt_id (0 : ℝ)).mul_const slope)).add
+      (((hasDerivAt_id (0 : ℝ)).pow 2).mul_const (energy e L EA EI))
+  convert h using 1
+  · funext t
+    exact hpoly t
+  · simp [slope]
+
+/-- A model-derived slip varies linearly along any coordinate direction. -/
+theorem slip_directional_derivative (model : Model nodes members cuts segments)
+    (q variation : Coordinate model → ℝ) (side : MemberEnd members) (direction : Fin 3) :
+    HasDerivAt (fun t : ℝ => slipValue model (q + t • variation) side direction)
+      (slipValue model variation side direction) 0 := by
+  have h := (hasDerivAt_const (0 : ℝ) (slipValue model q side direction)).add
+    ((hasDerivAt_id (0 : ℝ)).mul_const (slipValue model variation side direction))
+  convert h using 1
+  · funext t
+    have heq := (slipLinear model side direction).map_add q (t • variation)
+    have hscale := (slipLinear model side direction).map_smul t variation
+    change slipValue model (q + t • variation) side direction =
+      slipValue model q side direction + slipValue model (t • variation) side direction at heq
+    change slipValue model (t • variation) side direction =
+      t * slipValue model variation side direction at hscale
+    rw [heq, hscale]
+  · simp
+
+/-- The selected segment movement component has the corresponding B-map
+directional derivative. -/
+theorem segment_directional_derivative (model : Model nodes members cuts segments)
+    (q variation : Coordinate model → ℝ) (segment : Fin segments) (i : Fin 6) :
+    HasDerivAt (fun t : ℝ => segmentDofs model (q + t • variation) segment i)
+      (segmentDofs model variation segment i) 0 := by
+  have h := (hasDerivAt_const (0 : ℝ) (segmentDofs model q segment i)).add
+    ((hasDerivAt_id (0 : ℝ)).mul_const (segmentDofs model variation segment i))
+  convert h using 1
+  · funext t
+    rw [segment_dofs_add, segment_dofs_smul]
+    simp [Pi.add_apply, Pi.smul_apply, smul_eq_mul]
+  · simp
+
 /-- The three rigid motions produce no axial extension or chord-relative rotation. -/
 theorem rigid_deformation_zero (A B omega L : ℝ) (hL : L ≠ 0) :
     memberDeformation (rigidMotion A B omega L) L = 0 := by
@@ -224,6 +278,118 @@ theorem energy_zero_iff_deformation_zero (model : Model nodes members cuts segme
     (q : Coordinate model → ℝ) : totalEnergy model q = 0 ↔ deformationMap model q = 0 :=
   ⟨energy_zero_implies_deformation_zero model actions supports cutParameter memberLength memberEA memberEI hcontract q,
    deformation_zero_implies_energy_zero model actions supports cutParameter memberLength memberEA memberEI hcontract q⟩
+
+/-- The kernel of the actual assembled stiffness work, expressed without
+choosing or inverting a coordinate matrix. -/
+def stiffnessNull (model : Model nodes members cuts segments) (q : Coordinate model → ℝ) : Prop :=
+  ∀ variation, stiffnessWork model q variation = 0
+
+/-- The assembled stiffness kernel is exactly the kernel of the actual member
+and spring deformation map, under the complete exact input contract. -/
+theorem stiffness_null_iff_deformation_zero (model : Model nodes members cuts segments)
+    (actions : Fin actionCount → PointAction members cuts)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (cutParameter : Fin members → Fin cuts → ℝ)
+    (memberLength memberEA memberEI : Fin members → ℝ)
+    (hcontract : ExactContract model actions supports cutParameter memberLength memberEA memberEI)
+    (q : Coordinate model → ℝ) : stiffnessNull model q ↔ deformationMap model q = 0 := by
+  have hsegments := contract_positive_segments model actions supports cutParameter memberLength memberEA memberEI hcontract
+  constructor
+  · intro hnull
+    have hwork := hnull q
+    rw [stiffness_work_energy model q hsegments] at hwork
+    have henergy : totalEnergy model q = 0 := by linarith
+    exact energy_zero_implies_deformation_zero model actions supports cutParameter memberLength memberEA memberEI hcontract q henergy
+  · intro hzero variation
+    have hrow (segment : Fin segments) (i : Fin 6) :
+        (∑ j : Fin 6, LocalFrameFields.stiffness (model.segmentLength segment)
+          (model.segmentEA segment) (model.segmentEI segment) i j * segmentDofs model q segment j) = 0 := by
+      obtain ⟨hL, hEA, hEI⟩ := hsegments segment
+      have hdeformation : memberDeformation (segmentDofs model q segment) (model.segmentLength segment) = 0 := by
+        funext component
+        simpa [deformationMap, segmentDeformation] using congrFun hzero (.inl (segment, component))
+      have henergy := (member_energy_zero_iff_deformation _ _ _ _ hL hEA hEI).mpr hdeformation
+      obtain ⟨A, B, omega, hrigid⟩ := energy_zero_rigid _ _ _ _ hL hEA hEI henergy
+      rw [hrigid]
+      exact rigid_stiffness_zero A B omega _ _ _ (ne_of_gt hL) i
+    have hspring (member : Fin members) (ending : Bool) (direction : Fin 3) :
+        springStiffness (directionLaw (endConnection model (member, ending)) direction) *
+          slipValue model q (member, ending) direction * slipValue model variation (member, ending) direction = 0 := by
+      classical
+      by_cases hactive : activeEnd model (member, ending)
+      · cases hlaw : directionLaw (endConnection model (member, ending)) direction with
+        | rigid => simp [springStiffness]
+        | released => simp [springStiffness]
+        | spring k =>
+            have hv := congrFun hzero (.inr ⟨((member, ending), direction), hactive, k, hlaw⟩)
+            have hslip : slipValue model q (member, ending) direction = 0 := by
+              simpa [deformationMap] using hv
+            simp [springStiffness, hslip]
+      · have hslip : slipValue model q (member, ending) direction = 0 := by
+          simp [slipValue, hasSlip, hactive]
+        simp [hslip]
+    unfold stiffnessWork internalVirtualWork
+    simp [hrow, hspring]
+
+/-- First variation of the actual assembled potential, including all finite
+springs and point actions on their selected sides. -/
+theorem potential_directional_derivative (model : Model nodes members cuts segments)
+    (actions : Fin actionCount → PointAction members cuts)
+    (q variation : Coordinate model → ℝ) (hsegments : positiveSegments model) :
+    HasDerivAt (fun t : ℝ => potential model actions (q + t • variation))
+      (residualWork model actions q variation) 0 := by
+  have hmembers : HasDerivAt (fun t : ℝ => ∑ segment : Fin segments,
+      energy (segmentDofs model (q + t • variation) segment) (model.segmentLength segment)
+        (model.segmentEA segment) (model.segmentEI segment))
+      (∑ segment : Fin segments, ∑ i : Fin 6, segmentDofs model variation segment i *
+        (∑ j : Fin 6, LocalFrameFields.stiffness (model.segmentLength segment)
+          (model.segmentEA segment) (model.segmentEI segment) i j * segmentDofs model q segment j)) 0 := by
+    apply HasDerivAt.sum
+    intro segment _
+    have h := member_energy_directional_derivative (segmentDofs model q segment)
+      (segmentDofs model variation segment) (model.segmentLength segment)
+      (model.segmentEA segment) (model.segmentEI segment) (ne_of_gt (hsegments segment).1)
+    convert h using 1
+    funext t
+    congr 1
+    funext i
+    rw [segment_dofs_add, segment_dofs_smul]
+    simp [Pi.add_apply, Pi.smul_apply, smul_eq_mul]
+  have hsprings : HasDerivAt (fun t : ℝ => springEnergy model (q + t • variation))
+      (∑ member : Fin members, ∑ ending : Bool, ∑ direction : Fin 3,
+        let side := (member, ending)
+        let k := springStiffness (directionLaw (endConnection model side) direction)
+        k * slipValue model q side direction * slipValue model variation side direction) 0 := by
+    unfold springEnergy
+    apply HasDerivAt.sum
+    intro member _
+    apply HasDerivAt.sum
+    intro ending _
+    apply HasDerivAt.sum
+    intro direction _
+    let side := (member, ending)
+    let k := springStiffness (directionLaw (endConnection model side) direction)
+    have h := ((slip_directional_derivative model q variation side direction).pow 2).const_mul (k/2)
+    convert h using 1
+    · funext t
+      dsimp [side, k]
+      ring
+    · simp [side, k]
+      ring
+  have hexternal : HasDerivAt (fun t : ℝ => externalWork model actions (q + t • variation))
+      (externalWork model actions variation) 0 := by
+    let F := externalFunctional model actions
+    have h := (hasDerivAt_const (0 : ℝ) (F q)).add
+      ((hasDerivAt_id (0 : ℝ)).mul_const (F variation))
+    convert h using 1
+    · funext t
+      rw [← external_functional_apply model actions]
+      change F (q + t • variation) = F q + t * F variation
+      rw [map_add, map_smul]
+      rfl
+    · simp [F, external_functional_apply]
+  have h := (hmembers.add hsprings).sub hexternal
+  simpa [potential, totalEnergy, residualWork, internalVirtualWork] using h
 
 /-- A deformation-free admissible motion is a mechanism exactly when nonzero. -/
 def mechanism (model : Model nodes members cuts segments)

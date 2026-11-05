@@ -182,6 +182,21 @@ def pointActionLinear (model : Model nodes members cuts segments)
   ∑ i : Fin 3, action.globalAction i •
     ((LinearMap.proj i).comp (sideMotionLinear model action.location))
 
+/-- The complete distributed and point-action work as a linear functional. -/
+def externalFunctional (model : Model nodes members cuts segments)
+    (actions : Fin actionCount → PointAction members cuts) :
+    (Coordinate model → ℝ) →ₗ[ℝ] ℝ :=
+  (∑ segment : Fin segments, ∑ i : Fin 6,
+    segmentLoad model segment i • segmentCoordinateLinear model segment i) +
+  ∑ action : Fin actionCount, pointActionLinear model (actions action)
+
+theorem external_functional_apply (model : Model nodes members cuts segments)
+    (actions : Fin actionCount → PointAction members cuts) (variation : Coordinate model → ℝ) :
+    externalFunctional model actions variation = externalWork model actions variation := by
+  simp [externalFunctional, externalWork, segmentCoordinateLinear, pointActionLinear,
+    pointActionWork, segmentDofsLinear, sideMotionLinear, FrameTransform.work,
+    Fin.sum_univ_succ, smul_eq_mul, add_assoc]
+
 /-- Assemble the loaded field end actions, spring slips and point actions into
 the same residual functional used by constrained virtual work. -/
 def residualFunctional (model : Model nodes members cuts segments)

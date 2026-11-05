@@ -18,3 +18,4 @@ import FrameAssembly
 #print axioms FrameAssembly.contract_equilibrium_reaction
 #print axioms FrameAssembly.reaction_gauge
 #print axioms FrameAssembly.finite_reaction_coefficients
+#print axioms FrameAssembly.external_functional_apply
