@@ -45,6 +45,18 @@ theorem same_core_with_loads (core : Model nodes members cuts segments)
     sameCore (withLoads core start₁ end₁) (withLoads core start₂ end₂) := by
   rfl
 
+/-- Every pair accepted by sameCore can be written using one actual core and
+two sets of amplitudes, so the transport lemmas apply to independently supplied models. -/
+theorem same_core_representation (first second : Model nodes members cuts segments)
+    (h : sameCore first second) :
+    ∃ (core : Model nodes members cuts segments) (start₁ end₁ start₂ end₂ : Fin segments → ℝ),
+      first = withLoads core start₁ end₁ ∧ second = withLoads core start₂ end₂ := by
+  refine ⟨structuralCore first, first.segmentVerticalStart, first.segmentVerticalEnd,
+    second.segmentVerticalStart, second.segmentVerticalEnd, (rebuild_model first).symm, ?_⟩
+  change structuralCore first = structuralCore second at h
+  rw [h]
+  exact (rebuild_model second).symm
+
 /-- Transport coordinates of two independently supplied models whose erased
 structural records are equal. The intermediate maps preserve the subtype IDs. -/
 def sameCoreCoordinateEquiv (first second : Model nodes members cuts segments)

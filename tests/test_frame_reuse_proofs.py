@@ -114,12 +114,17 @@ def twoMembers : Model 3 2 0 0 where
   segmentVerticalStart := Fin.elim0
   segmentVerticalEnd := Fin.elim0
 def changedSpring : Model 3 2 0 0 := { twoMembers with joints := fun _ => ⟨.semiRigid, 3, none⟩ }
+def changedReference : Model 3 2 0 0 := { twoMembers with joints := fun _ => ⟨.semiRigid, 2, some 1⟩ }
 def reorderedMembers : Model 3 2 0 0 := { twoMembers with
   member := fun i => if i = 0 then ⟨0, 2, ⟨0, 1⟩, none, none⟩ else ⟨0, 1, ⟨1, 0⟩, none, none⟩ }
 example : ¬ sameCore twoMembers changedSpring := by
   intro h
   have v := congrArg (fun m : Model 3 2 0 0 => (m.joints 0).rotationStiffness) h
   norm_num [sameCore, structuralCore, twoMembers, changedSpring] at v
+example : ¬ sameCore twoMembers changedReference := by
+  intro h
+  have v := congrArg (fun m : Model 3 2 0 0 => (m.joints 0).requestedReference) h
+  simp [sameCore, structuralCore, twoMembers, changedReference] at v
 example : ¬ sameCore twoMembers reorderedMembers := by
   intro h
   have v := congrArg (fun m : Model 3 2 0 0 => (m.member 0).endNode) h
@@ -296,14 +301,14 @@ theorem axial_actions : LocalFrameFields.endActions (segmentDofs beam axialMotio
   fin_cases i <;> norm_num [LocalFrameFields.endActions, LocalFrameFields.normal, LocalFrameFields.shear,
     LocalFrameFields.moment, LocalFrameFields.rotation, LocalFrameFields.axialDisplacement,
     LocalFrameFields.transverseDisplacement, LocalFrameFields.coordinate, Polynomial.derivative_mul,
-    Polynomial.derivative_pow] <;> norm_num [Matrix.vecCons, Fin.cons, Fin.cases]
+    Polynomial.derivative_pow] <;> simp <;> norm_num
 theorem moment_actions : LocalFrameFields.endActions (segmentDofs beam momentMotion 0) 1 1 1 0 0 0 0 = ![0, 0, -1, 0, 0, 1] := by
   rw [dofs_moment]
   funext i
   fin_cases i <;> norm_num [LocalFrameFields.endActions, LocalFrameFields.normal, LocalFrameFields.shear,
     LocalFrameFields.moment, LocalFrameFields.rotation, LocalFrameFields.axialDisplacement,
     LocalFrameFields.transverseDisplacement, LocalFrameFields.coordinate, Polynomial.derivative_mul,
-    Polynomial.derivative_pow] <;> norm_num [Matrix.vecCons, Fin.cons, Fin.cases]
+    Polynomial.derivative_pow] <;> simp <;> norm_num
 example : segmentDofs beam ((2:ℝ) • axialMotion - momentMotion) 0 = ![0, 0, 0, 2, -1/2, -1] := by
   rw [sub_eq_add_neg, ← neg_one_smul ℝ momentMotion, segment_dofs_combination, dofs_axial, dofs_moment]
   funext i

@@ -2,6 +2,7 @@ import FrameReuse
 
 #print axioms FrameReuse.rebuild_model
 #print axioms FrameReuse.same_core_with_loads
+#print axioms FrameReuse.same_core_representation
 #print axioms FrameReuse.active_points_unchanged
 #print axioms FrameReuse.active_slips_unchanged
 #print axioms FrameReuse.side_motion_unchanged
