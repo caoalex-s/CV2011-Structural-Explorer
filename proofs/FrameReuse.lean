@@ -378,5 +378,209 @@ theorem combined_aggregate_reaction (model : Model nodes members cuts segments)
   simp [aggregateReaction, multiplierFunctional, LinearMap.dualMap_apply,
     Finset.sum_add_distrib, Finset.mul_sum, add_mul, mul_add, mul_assoc]
 
+
+/-- Independent intensity endpoints and fixed-slot point-action components. -/
+abbrev LoadCase (segments actionCount : Nat) :=
+  ((Fin segments → ℝ) × (Fin segments → ℝ)) × (Fin actionCount → Triple)
+
+def caseModel (core : Model nodes members cuts segments) (load : LoadCase segments actionCount) :
+    Model nodes members cuts segments := withLoads core load.1.1 load.1.2
+
+def caseActions (locations : Fin actionCount → Location members cuts) (load : LoadCase segments actionCount) :
+    Fin actionCount → PointAction members cuts := pointActions locations load.2
+
+theorem case_contract (core : Model nodes members cuts segments)
+    (locations : Fin actionCount → Location members cuts)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (cutsAt : Fin members → Fin cuts → ℝ) (length EA EI : Fin members → ℝ)
+    (baseContract : ExactContract (withLoads core 0 0) (pointActions locations 0) supports cutsAt length EA EI)
+    (load : LoadCase segments actionCount) :
+    ExactContract (caseModel core load) (caseActions locations load) supports cutsAt length EA EI := by
+  exact (exact_contract_unchanged core 0 0 load.1.1 load.1.2 locations 0 load.2
+    supports cutsAt length EA EI).mp baseContract
+
+theorem case_stable (core : Model nodes members cuts segments)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (baseStable : ∀ z, admissible (withLoads core 0 0) supports z →
+      deformationMap (withLoads core 0 0) z = 0 → z = 0)
+    (load : LoadCase segments actionCount) :
+    ∀ z, admissible (caseModel core load) supports z → deformationMap (caseModel core load) z = 0 → z = 0 := by
+  exact (no_mechanism_unchanged core 0 0 load.1.1 load.1.2 supports).mp baseStable
+
+/-- Existence follows from the existing restricted-stiffness theorem. Choice is
+only used to name its solution; uniqueness below determines the linear map. -/
+def solutionChoice (core : Model nodes members cuts segments)
+    (locations : Fin actionCount → Location members cuts)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (cutsAt : Fin members → Fin cuts → ℝ) (length EA EI : Fin members → ℝ)
+    (baseContract : ExactContract (withLoads core 0 0) (pointActions locations 0) supports cutsAt length EA EI)
+    (baseStable : ∀ z, admissible (withLoads core 0 0) supports z →
+      deformationMap (withLoads core 0 0) z = 0 → z = 0)
+    (load : LoadCase segments actionCount) : Coordinate core → ℝ :=
+  Classical.choose (equilibrium_exists_if_no_mechanism (caseModel core load) (caseActions locations load)
+    supports cutsAt length EA EI (case_contract core locations supports cutsAt length EA EI baseContract load)
+    (case_stable core supports baseStable load))
+
+theorem solution_choice_equilibrium (core : Model nodes members cuts segments)
+    (locations : Fin actionCount → Location members cuts)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (cutsAt : Fin members → Fin cuts → ℝ) (length EA EI : Fin members → ℝ)
+    (baseContract : ExactContract (withLoads core 0 0) (pointActions locations 0) supports cutsAt length EA EI)
+    (baseStable : ∀ z, admissible (withLoads core 0 0) supports z →
+      deformationMap (withLoads core 0 0) z = 0 → z = 0)
+    (load : LoadCase segments actionCount) :
+    equilibrium (caseModel core load) (caseActions locations load) supports
+      (solutionChoice core locations supports cutsAt length EA EI baseContract baseStable load) :=
+  Classical.choose_spec (equilibrium_exists_if_no_mechanism (caseModel core load) (caseActions locations load)
+    supports cutsAt length EA EI (case_contract core locations supports cutsAt length EA EI baseContract load)
+    (case_stable core supports baseStable load))
+
+
+/-- Unique stable equilibrium varies linearly on the fixed load space. -/
+def stableSolutionLinear (core : Model nodes members cuts segments)
+    (locations : Fin actionCount → Location members cuts)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (cutsAt : Fin members → Fin cuts → ℝ) (length EA EI : Fin members → ℝ)
+    (baseContract : ExactContract (withLoads core 0 0) (pointActions locations 0) supports cutsAt length EA EI)
+    (baseStable : ∀ z, admissible (withLoads core 0 0) supports z →
+      deformationMap (withLoads core 0 0) z = 0 → z = 0) :
+    LoadCase segments actionCount →ₗ[ℝ] (Coordinate core → ℝ) where
+  toFun := solutionChoice core locations supports cutsAt length EA EI baseContract baseStable
+  map_add' load₁ load₂ := by
+    apply equilibrium_unique_if_no_mechanism (caseModel core (load₁+load₂))
+      (caseActions locations (load₁+load₂)) supports cutsAt length EA EI
+      (case_contract core locations supports cutsAt length EA EI baseContract (load₁+load₂))
+      (case_stable core supports baseStable (load₁+load₂))
+    · exact solution_choice_equilibrium core locations supports cutsAt length EA EI baseContract baseStable _
+    · have h := equilibrium_combination core 1 1 load₁.1.1 load₁.1.2 load₂.1.1 load₂.1.2
+        locations load₁.2 load₂.2 supports
+        (solutionChoice core locations supports cutsAt length EA EI baseContract baseStable load₁)
+        (solutionChoice core locations supports cutsAt length EA EI baseContract baseStable load₂)
+        (solution_choice_equilibrium core locations supports cutsAt length EA EI baseContract baseStable load₁)
+        (solution_choice_equilibrium core locations supports cutsAt length EA EI baseContract baseStable load₂)
+      simpa [caseModel, caseActions] using h
+  map_smul' a load := by
+    apply equilibrium_unique_if_no_mechanism (caseModel core (a • load))
+      (caseActions locations (a • load)) supports cutsAt length EA EI
+      (case_contract core locations supports cutsAt length EA EI baseContract (a • load))
+      (case_stable core supports baseStable (a • load))
+    · exact solution_choice_equilibrium core locations supports cutsAt length EA EI baseContract baseStable _
+    · have h := equilibrium_combination core a 0 load.1.1 load.1.2 load.1.1 load.1.2
+        locations load.2 load.2 supports
+        (solutionChoice core locations supports cutsAt length EA EI baseContract baseStable load)
+        (solutionChoice core locations supports cutsAt length EA EI baseContract baseStable load)
+        (solution_choice_equilibrium core locations supports cutsAt length EA EI baseContract baseStable load)
+        (solution_choice_equilibrium core locations supports cutsAt length EA EI baseContract baseStable load)
+      simpa [caseModel, caseActions] using h
+
+
+/-- Actual residual work combines the same movements and applied loads. -/
+theorem residual_work_combination (core : Model nodes members cuts segments)
+    (a b : ℝ) (s₁ e₁ s₂ e₂ : Fin segments → ℝ)
+    (locations : Fin actionCount → Location members cuts) (f₁ f₂ : Fin actionCount → Triple)
+    (q₁ q₂ v : Coordinate core → ℝ) :
+    residualWork (withLoads core (fun i => a*s₁ i+b*s₂ i) (fun i => a*e₁ i+b*e₂ i))
+      (pointActions locations (fun j i => a*f₁ j i+b*f₂ j i)) (a • q₁ + b • q₂) v =
+    a * residualWork (withLoads core s₁ e₁) (pointActions locations f₁) q₁ v +
+      b * residualWork (withLoads core s₂ e₂) (pointActions locations f₂) q₂ v := by
+  have hk : stiffnessWork core (a • q₁ + b • q₂) v =
+      a * stiffnessWork core q₁ v + b * stiffnessWork core q₂ v := by
+    simp only [← stiffness_operator_apply, map_add, map_smul, LinearMap.add_apply,
+      LinearMap.smul_apply, smul_eq_mul]
+  change stiffnessWork core (a • q₁ + b • q₂) v -
+      externalWork (withLoads core (fun i => a*s₁ i+b*s₂ i) (fun i => a*e₁ i+b*e₂ i))
+        (pointActions locations (fun j i => a*f₁ j i+b*f₂ j i)) v =
+    a * (stiffnessWork core q₁ v - externalWork (withLoads core s₁ e₁) (pointActions locations f₁) v) +
+      b * (stiffnessWork core q₂ v - externalWork (withLoads core s₂ e₂) (pointActions locations f₂) v)
+  rw [hk, external_work_combination]
+  ring
+
+/-- Any chosen support representatives for the three equilibria give the
+same aggregate combination, including when duplicate rows admit a gauge. -/
+theorem aggregate_reaction_from_residuals (core : Model nodes members cuts segments)
+    (a b : ℝ) (s₁ e₁ s₂ e₂ : Fin segments → ℝ)
+    (locations : Fin actionCount → Location members cuts) (f₁ f₂ : Fin actionCount → Triple)
+    (supports : Fin supportCount → SupportInput members cuts) (q₁ q₂ : Coordinate core → ℝ)
+    (coeff₁ coeff₂ coeffCombined : ConstraintIndex supports → ℝ) (hpositive : positiveSegments core)
+    (hr₁ : residualFunctional (withLoads core s₁ e₁) (pointActions locations f₁) q₁ =
+      aggregateReaction core supports coeff₁)
+    (hr₂ : residualFunctional (withLoads core s₂ e₂) (pointActions locations f₂) q₂ =
+      aggregateReaction core supports coeff₂)
+    (hrCombined : residualFunctional
+      (withLoads core (fun i => a*s₁ i+b*s₂ i) (fun i => a*e₁ i+b*e₂ i))
+      (pointActions locations (fun j i => a*f₁ j i+b*f₂ j i)) (a • q₁ + b • q₂) =
+        aggregateReaction core supports coeffCombined) :
+    aggregateReaction core supports coeffCombined =
+      a • aggregateReaction core supports coeff₁ + b • aggregateReaction core supports coeff₂ := by
+  rw [← hrCombined, ← hr₁, ← hr₂]
+  ext v
+  simp only [LinearMap.add_apply, LinearMap.smul_apply, smul_eq_mul]
+  rw [residual_functional_apply _ _ _ _ hpositive,
+    residual_functional_apply _ _ _ _ hpositive, residual_functional_apply _ _ _ _ hpositive]
+  exact residual_work_combination core a b s₁ e₁ s₂ e₂ locations f₁ f₂ q₁ q₂ v
+
+/-- The same aggregate identity holds after selecting any global hub component. -/
+theorem grouped_reaction_from_residuals (core : Model nodes members cuts segments)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (coeff₁ coeff₂ coeffCombined : ConstraintIndex supports → ℝ) (a b : ℝ)
+    (h : aggregateReaction core supports coeffCombined =
+      a • aggregateReaction core supports coeff₁ + b • aggregateReaction core supports coeff₂)
+    (point : ActivePoint core) (direction : Fin 3) :
+    groupedGroundAction core supports coeffCombined point direction =
+      a * groupedGroundAction core supports coeff₁ point direction +
+        b * groupedGroundAction core supports coeff₂ point direction := by
+  have hv := congrArg (fun reaction : Module.Dual ℝ (Coordinate core → ℝ) =>
+    reaction (coordinateBasis core (.inl (point, direction)))) h
+  simpa [groupedGroundAction] using hv
+
+
+/-- Actual assembled loads form a linear map from the frozen load slots. -/
+def externalLoadLinear (core : Model nodes members cuts segments)
+    (locations : Fin actionCount → Location members cuts) :
+    LoadCase segments actionCount →ₗ[ℝ] Module.Dual ℝ (Coordinate core → ℝ) where
+  toFun load := externalFunctional (caseModel core load) (caseActions locations load)
+  map_add' load₁ load₂ := by
+    ext v
+    simp only [LinearMap.add_apply, external_functional_apply]
+    have h := external_work_combination core 1 1 load₁.1.1 load₁.1.2 load₂.1.1 load₂.1.2
+      locations load₁.2 load₂.2 v
+    simpa [caseModel, caseActions] using h
+  map_smul' a load := by
+    ext v
+    simp only [LinearMap.smul_apply, smul_eq_mul, external_functional_apply]
+    have h := external_work_combination core a 0 load.1.1 load.1.2 load.1.1 load.1.2
+      locations load.2 load.2 v
+    simpa [caseModel, caseActions] using h
+
+/-- Stable aggregate reaction as K composed with the stable solution map,
+minus the independently derived load map. Individual support shares are not selected. -/
+def stableReactionLinear (core : Model nodes members cuts segments)
+    (locations : Fin actionCount → Location members cuts)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (cutsAt : Fin members → Fin cuts → ℝ) (length EA EI : Fin members → ℝ)
+    (baseContract : ExactContract (withLoads core 0 0) (pointActions locations 0) supports cutsAt length EA EI)
+    (baseStable : ∀ z, admissible (withLoads core 0 0) supports z →
+      deformationMap (withLoads core 0 0) z = 0 → z = 0) :
+    LoadCase segments actionCount →ₗ[ℝ] Module.Dual ℝ (Coordinate core → ℝ) :=
+  (stiffnessOperator core).comp
+    (stableSolutionLinear core locations supports cutsAt length EA EI baseContract baseStable) -
+      externalLoadLinear core locations
+
+theorem stable_reaction_is_residual (core : Model nodes members cuts segments)
+    (locations : Fin actionCount → Location members cuts)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (cutsAt : Fin members → Fin cuts → ℝ) (length EA EI : Fin members → ℝ)
+    (baseContract : ExactContract (withLoads core 0 0) (pointActions locations 0) supports cutsAt length EA EI)
+    (baseStable : ∀ z, admissible (withLoads core 0 0) supports z →
+      deformationMap (withLoads core 0 0) z = 0 → z = 0)
+    (load : LoadCase segments actionCount) :
+    residualFunctional (caseModel core load) (caseActions locations load)
+      (stableSolutionLinear core locations supports cutsAt length EA EI baseContract baseStable load) =
+    stableReactionLinear core locations supports cutsAt length EA EI baseContract baseStable load := by
+  have hpositive := contract_positive_segments (caseModel core load) (caseActions locations load) supports
+    cutsAt length EA EI (case_contract core locations supports cutsAt length EA EI baseContract load)
+  rw [residual_eq_stiffness_minus_load _ _ _ hpositive]
+  rfl
+
 end
 end FrameReuse

@@ -27,3 +27,10 @@ import FrameReuse
 #print axioms FrameReuse.end_actions_combination
 #print axioms FrameReuse.residual_eq_stiffness_minus_load
 #print axioms FrameReuse.combined_aggregate_reaction
+#print axioms FrameReuse.case_contract
+#print axioms FrameReuse.case_stable
+#print axioms FrameReuse.solution_choice_equilibrium
+#print axioms FrameReuse.residual_work_combination
+#print axioms FrameReuse.aggregate_reaction_from_residuals
+#print axioms FrameReuse.grouped_reaction_from_residuals
+#print axioms FrameReuse.stable_reaction_is_residual
