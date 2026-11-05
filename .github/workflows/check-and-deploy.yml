@@ -137,6 +137,11 @@ jobs:
         run: |
           lake env lean FrameDeformationAudit.lean > deformation-axioms.log
           python ../scripts/audit_real_axioms.py deformation-axioms.log FrameDeformation
+      - name: Audit fixed-structure reuse theorem axioms
+        working-directory: proofs
+        run: |
+          lake env lean FrameReuseAudit.lean > reuse-axioms.log
+          python ../scripts/audit_real_axioms.py reuse-axioms.log FrameReuse
       - name: Check public course examples
         if: ${{ inputs.proof_only != true }}
         run: python -m scripts.check_worked_examples
