@@ -334,6 +334,22 @@ theorem fixed_movements_zero (q : Coordinate fixedModel → ℝ)
       simpa [supportRow, FrameTransform.work, fixedSupports] using ht
   have law0 : endConnection fixedModel (0, false) = rigidConnection := by rfl
   have law1 : endConnection fixedModel (0, true) = rigidConnection := by rfl
+  have hslipLeft : slipValue fixedModel q (0, false) = 0 := by
+    funext i
+    fin_cases i <;> simp [slipValue, hasSlip, directionLaw, law0, rigidConnection]
+  have hslipRight : slipValue fixedModel q (0, true) = 0 := by
+    funext i
+    fin_cases i <;> simp [slipValue, hasSlip, directionLaw, law1, rigidConnection]
+  have hrefLeft : referenceMotion fixedModel q (.inl 0) = 0 := by
+    have hv := hleft
+    change endMotion 1 0 (referenceMotion fixedModel q (.inl 0)) (slipValue fixedModel q (0, false)) = 0 at hv
+    rw [hslipLeft, rigid_end] at hv
+    exact hv
+  have hrefRight : referenceMotion fixedModel q (.inl 1) = 0 := by
+    have hv := hright
+    change endMotion 1 0 (referenceMotion fixedModel q (.inl 1)) (slipValue fixedModel q (0, true)) = 0 at hv
+    rw [hslipRight, rigid_end] at hv
+    exact hv
   funext coordinate
   cases coordinate with
   | inr slip =>
@@ -346,12 +362,10 @@ theorem fixed_movements_zero (q : Coordinate fixedModel → ℝ)
     | inr cutPoint => exact Fin.elim0 cutPoint.2
     | inl node =>
       fin_cases node
-      · have hx := congrFun hleft direction
-        simpa [sideMotion, endMotion, referenceMotion, slipValue, hasSlip, directionLaw,
-          fixedModel, endNode, law0, rigidConnection, hactive] using hx
-      · have hx := congrFun hright direction
-        simpa [sideMotion, endMotion, referenceMotion, slipValue, hasSlip, directionLaw,
-          fixedModel, endNode, law1, rigidConnection, hactive] using hx
+      · have hx := congrFun hrefLeft direction
+        simpa [referenceMotion, hactive] using hx
+      · have hx := congrFun hrefRight direction
+        simpa [referenceMotion, hactive] using hx
 
 example : ∀ q, admissible fixedModel fixedSupports q → deformationMap fixedModel q = 0 → q = 0 := by
   intro q h _
@@ -365,9 +379,9 @@ example : ∃ stress : Module.Dual ℝ (Sum (Fin 1 × Fin 3) (SpringIndex fixedM
     ext motion
     have hz := fixed_movements_zero motion.val
       ((admissible_iff_constraint_kernel fixedModel fixedSupports motion.val).mpr motion.property)
-    simp [restrictedDeformation, deformationLinear, deformationMap, segmentDeformation,
-      memberDeformation, segmentDofs, segmentMotion, sideMotion, referenceMotion,
-      slipValue, coordinateBasis, endMotion, toLocal6, hz, stress]
+    have hmotion : motion = 0 := Subtype.ext hz
+    change stress (restrictedDeformation fixedModel fixedSupports motion) = 0
+    rw [hmotion, map_zero, map_zero]
   · intro hzero
     have h := congrArg (fun f : Module.Dual ℝ (Sum (Fin 1 × Fin 3) (SpringIndex fixedModel) → ℝ) => f (fun _ => 1)) hzero
     norm_num [stress] at h
