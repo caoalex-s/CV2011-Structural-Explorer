@@ -751,6 +751,53 @@ def restrictedDeformation (model : Model nodes members cuts segments)
     admissibleSpace model supports →ₗ[ℝ] (Sum (Fin segments × Fin 3) (SpringIndex model) → ℝ) :=
   (deformationLinear model).comp (admissibleSpace model supports).subtype
 
+/-- The exact coordinate and spring index types are finite, including when
+some original points and end directions are not represented. -/
+noncomputable instance activePointFintype (model : Model nodes members cuts segments) : Fintype (ActivePoint model) := by
+  letI : Finite (ActivePoint model) := Finite.of_injective
+    (fun point : ActivePoint model => point.val) Subtype.val_injective
+  exact Fintype.ofFinite _
+
+noncomputable instance slipFintype (model : Model nodes members cuts segments) : Fintype (Slip model) := by
+  letI : Finite (Slip model) := Finite.of_injective
+    (fun slip : Slip model => slip.val) Subtype.val_injective
+  exact Fintype.ofFinite _
+
+noncomputable instance springIndexFintype (model : Model nodes members cuts segments) : Fintype (SpringIndex model) := by
+  letI : Finite (SpringIndex model) := Finite.of_injective
+    (fun spring : SpringIndex model => spring.val) Subtype.val_injective
+  exact Fintype.ofFinite _
+
+/-- In a stable exact model, D restricted to admissible motions controls the
+finite-dimensional motion norm. This is a deformation coercivity bound, not a
+numerical condition-number estimate. -/
+theorem stable_deformation_antilipschitz (model : Model nodes members cuts segments)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (hstable : ∀ z, admissible model supports z → deformationMap model z = 0 → z = 0) :
+    ∃ K > 0, AntilipschitzWith K (restrictedDeformation model supports) := by
+  classical
+  letI : Finite (ActivePoint model) := Finite.of_injective
+    (fun point : ActivePoint model => point.val) Subtype.val_injective
+  letI : Finite (Slip model) := Finite.of_injective
+    (fun slip : Slip model => slip.val) Subtype.val_injective
+  letI : Finite (SpringIndex model) := Finite.of_injective
+    (fun spring : SpringIndex model => spring.val) Subtype.val_injective
+  letI : Fintype (ActivePoint model) := Fintype.ofFinite _
+  letI : Fintype (Slip model) := Fintype.ofFinite _
+  letI : Fintype (SpringIndex model) := Fintype.ofFinite _
+  letI : Fintype (Coordinate model) := inferInstance
+  apply (LinearMap.injective_iff_antilipschitz (restrictedDeformation model supports)).mp
+  apply LinearMap.ker_eq_bot.mp
+  apply le_antisymm
+  · intro z hz
+    have hzdeformation : deformationMap model z.val = 0 := LinearMap.mem_ker.mp hz
+    have hzadmissible := (admissible_iff_constraint_kernel model supports z.val).mpr z.property
+    have hzval := hstable z.val hzadmissible hzdeformation
+    have hz0 : z = 0 := Subtype.ext hzval
+    rw [hz0]
+    exact Submodule.zero_mem _
+  · exact bot_le
+
 /-- The exact mechanism subspace includes all active free-slip coordinates. -/
 def mechanismSpace (model : Model nodes members cuts segments)
     (supports : Fin supportCount → SupportInput members cuts) :=

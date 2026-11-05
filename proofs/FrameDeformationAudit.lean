@@ -29,3 +29,4 @@ import FrameDeformation
 #print axioms FrameDeformation.actual_basic_stress_factor
 #print axioms FrameDeformation.equilibrium_has_actual_basic_stress
 #print axioms FrameDeformation.member_elastic_weight_positive_definite
+#print axioms FrameDeformation.stable_deformation_antilipschitz
