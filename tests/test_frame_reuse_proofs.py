@@ -210,3 +210,72 @@ example (first second : ConstraintIndex duplicateSupports → ℝ) (a b : ℝ) :
                 capture_output=True, text=True, timeout=120, check=False,
             )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_cantilever_signed_displacements_and_fields(self):
+        statement = """
+import FrameReuse
+open FrameInterfaces FrameTransform FrameAssemblyModel FrameAssembly FrameDeformation FrameReuse
+noncomputable section
+
+def beam : Model 2 1 0 1 where
+  joints := fun _ => ⟨.rigid, 1, none⟩
+  member := fun _ => ⟨0, 1, ⟨1, 0⟩, none, none⟩
+  segmentMember := fun _ => 0
+  segmentLeft := fun _ => .endSide (0, false)
+  segmentRight := fun _ => .endSide (0, true)
+  segmentLength := fun _ => 1
+  segmentEA := fun _ => 1
+  segmentEI := fun _ => 1
+  segmentVerticalStart := fun _ => 0
+  segmentVerticalEnd := fun _ => 0
+
+def support : Fin 1 → SupportInput 1 0 := fun _ =>
+  ⟨.endSide (0, false), .fixed, 0, 1, false, false, false⟩
+def axialMotion : Coordinate beam → ℝ := fun index =>
+  match index with
+  | .inl (point, direction) => if point.val = .inl 1 ∧ direction = 0 then 1 else 0
+  | .inr _ => 0
+def momentMotion : Coordinate beam → ℝ := fun index =>
+  match index with
+  | .inl (point, direction) => if point.val = .inl 1 then
+      if direction = 1 then 1/2 else if direction = 2 then 1 else 0 else 0
+  | .inr _ => 0
+
+theorem point0 : activePoint beam (.inl 0) := ⟨0, Or.inl rfl⟩
+theorem point1 : activePoint beam (.inl 1) := ⟨0, Or.inr rfl⟩
+theorem dofs_axial : segmentDofs beam axialMotion 0 = ![0, 0, 0, 1, 0, 0] := by
+  funext i
+  fin_cases i <;> simp [segmentDofs, segmentMotion, sideMotion, referenceMotion, endMotion,
+    toLocal6, slipValue, axialMotion, beam, endNode, point0, point1]
+theorem dofs_moment : segmentDofs beam momentMotion 0 = ![0, 0, 0, 0, 1/2, 1] := by
+  funext i
+  fin_cases i <;> simp [segmentDofs, segmentMotion, sideMotion, referenceMotion, endMotion,
+    toLocal6, slipValue, momentMotion, beam, endNode, point0, point1]
+
+example : LocalFrameFields.endActions (segmentDofs beam axialMotion 0) 1 1 1 0 0 0 0 = ![-1, 0, 0, 1, 0, 0] := by
+  rw [dofs_axial]
+  funext i
+  fin_cases i <;> norm_num [LocalFrameFields.endActions, LocalFrameFields.normal, LocalFrameFields.shear,
+    LocalFrameFields.moment, LocalFrameFields.rotation, LocalFrameFields.axialDisplacement,
+    LocalFrameFields.transverseDisplacement, LocalFrameFields.coordinate, Polynomial.derivative_mul,
+    Polynomial.derivative_pow]
+example : LocalFrameFields.endActions (segmentDofs beam momentMotion 0) 1 1 1 0 0 0 0 = ![0, 0, -1, 0, 0, 1] := by
+  rw [dofs_moment]
+  funext i
+  fin_cases i <;> norm_num [LocalFrameFields.endActions, LocalFrameFields.normal, LocalFrameFields.shear,
+    LocalFrameFields.moment, LocalFrameFields.rotation, LocalFrameFields.axialDisplacement,
+    LocalFrameFields.transverseDisplacement, LocalFrameFields.coordinate, Polynomial.derivative_mul,
+    Polynomial.derivative_pow]
+example : segmentDofs beam (2 • axialMotion - momentMotion) 0 = ![0, 0, 0, 2, -1/2, -1] := by
+  rw [sub_eq_add_neg, ← neg_one_smul ℝ momentMotion, segment_dofs_combination, dofs_axial, dofs_moment]
+  funext i
+  fin_cases i <;> norm_num
+"""
+        with tempfile.TemporaryDirectory() as folder:
+            source = Path(folder) / "ReuseCantileverCheck.lean"
+            source.write_text(statement, encoding="utf-8")
+            result = subprocess.run(
+                ["lake", "env", "lean", str(source)], cwd=PROOFS,
+                capture_output=True, text=True, timeout=120, check=False,
+            )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

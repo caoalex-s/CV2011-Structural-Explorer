@@ -559,8 +559,8 @@ theorem grouped_reaction_from_residuals (core : Model nodes members cuts segment
   simpa [groupedGroundAction] using hv
 
 
-/-- Actual assembled loads form a linear map from the frozen load slots. -/
 set_option maxHeartbeats 1600000 in
+/-- Actual assembled loads form a linear map from the frozen load slots. -/
 def externalLoadLinear (core : Model nodes members cuts segments)
     (locations : Fin actionCount → Location members cuts) :
     LoadCase segments actionCount →ₗ[ℝ] Module.Dual ℝ (Coordinate core → ℝ) where
@@ -583,8 +583,9 @@ def externalLoadLinear (core : Model nodes members cuts segments)
         externalWork (caseModel core load₁) (caseActions locations load₁) v +
           externalWork (caseModel core load₂) (caseActions locations load₂) v := by
       simpa only [one_mul] using h
-    exact (external_functional_apply _ _ v).trans (hh.trans
-      (congrArg₂ (· + ·) (external_functional_apply _ _ v).symm (external_functional_apply _ _ v).symm))
+    exact (external_functional_apply (caseModel core (load₁+load₂)) (caseActions locations (load₁+load₂)) v).trans (hh.trans
+      (congrArg₂ (· + ·) (external_functional_apply (caseModel core load₁) (caseActions locations load₁) v).symm
+        (external_functional_apply (caseModel core load₂) (caseActions locations load₂) v).symm))
   map_smul' a load := by
     ext v
     change externalFunctional (caseModel core (a • load)) (caseActions locations (a • load)) v =
@@ -601,8 +602,8 @@ def externalLoadLinear (core : Model nodes members cuts segments)
     have hh : externalWork (caseModel core (a • load)) (caseActions locations (a • load)) v =
         a * externalWork (caseModel core load) (caseActions locations load) v := by
       simpa only [zero_mul, add_zero] using h
-    exact (external_functional_apply _ _ v).trans (hh.trans
-      (congrArg (fun x : ℝ => a*x) (external_functional_apply _ _ v).symm))
+    exact (external_functional_apply (caseModel core (a • load)) (caseActions locations (a • load)) v).trans (hh.trans
+      (congrArg (fun x : ℝ => a*x) (external_functional_apply (caseModel core load) (caseActions locations load) v).symm))
 
 /-- Stable aggregate reaction as K composed with the stable solution map,
 minus the independently derived load map. Individual support shares are not selected. -/
