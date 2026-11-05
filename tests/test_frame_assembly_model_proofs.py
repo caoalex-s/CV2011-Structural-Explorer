@@ -539,11 +539,11 @@ example : (segmentLoad partialModel 1) 4 = 17/10 := by
 example : pointActionWork partialModel (cutLoad 0) unitUp = -1 := by
   have hc : activePoint partialModel (.inr 0) := hpointCut
   norm_num [pointActionWork, FrameTransform.work, sideMotion, referenceMotion,
-    cutLoad, unitUp, hc]
+    cutLoad, unitUp, hc] <;> norm_num
 example : supportRow partialModel cutSupport (![0, 1, 0]) unitUp = 1 := by
   have hc : activePoint partialModel (.inr 0) := hpointCut
   norm_num [supportRow, FrameTransform.work, sideMotion, referenceMotion,
-    cutSupport, unitUp, hc]
+    cutSupport, unitUp, hc] <;> norm_num
 theorem external_up : externalFunctional partialModel cutLoad unitUp = 2 := by
   rw [external_functional_apply]
   classical
@@ -555,7 +555,7 @@ theorem external_up : externalFunctional partialModel cutLoad unitUp = 2 := by
     endMotion, toLocal6, slipValue, partialModel, endNode, cutLoad, unitUp,
     LocalFrameFields.consistentLoad, pointActionWork, FrameTransform.work,
     hp0, hp1, hpc, Fin.sum_univ_succ]
-  split_ifs <;> norm_num <;> contradiction
+  norm_num
 example : residualWork partialModel cutLoad 0 unitUp = -2 := by
   have hext : externalWork partialModel cutLoad unitUp = 2 := by
     rw [← external_functional_apply]
