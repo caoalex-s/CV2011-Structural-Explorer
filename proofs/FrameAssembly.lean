@@ -187,7 +187,8 @@ theorem residual_functional_apply (model : Model nodes members cuts segments)
     residualFunctional model actions q variation = residualWork model actions q variation := by
   rw [residual_work_from_end_actions model actions q variation hsegments]
   simp [residualFunctional, segmentCoordinateLinear, pointActionLinear, pointActionWork,
-    FrameTransform.work, Fin.sum_univ_succ, smul_eq_mul, mul_comm]
+    segmentDofsLinear, sideMotionLinear, slipLinear, FrameTransform.work, Fin.sum_univ_succ,
+    smul_eq_mul, mul_comm, mul_left_comm, mul_assoc, add_assoc]
 
 /-- A linear residual annihilates the admissible motions exactly when it is
 the pullback of a support-row functional. This allows dependent support rows:
