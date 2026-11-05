@@ -1,0 +1,5 @@
+import FrameAssembly
+
+#print axioms FrameAssembly.spring_energy_nonnegative
+#print axioms FrameAssembly.total_energy_nonnegative
+#print axioms FrameAssembly.recovered_segment_exists

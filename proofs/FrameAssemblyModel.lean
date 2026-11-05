@@ -216,6 +216,16 @@ def segmentLoad (model : Model nodes members cuts segments) (segment : Fin segme
     (orientation.sine*q₀) (orientation.sine*q₁)
     (orientation.cosine*q₀) (orientation.cosine*q₁)
 
+/-- A segment endpoint belongs to the same original member, whether it is
+an original end or an interior cut. This excludes accidental cross-member cuts. -/
+def locationBelongs (member : Fin members) : Location members cuts → Prop
+  | .endSide side => side.1 = member
+  | .interior owner _ => owner = member
+
+def segmentOwnershipValid (model : Model nodes members cuts segments) : Prop :=
+  ∀ segment, locationBelongs (model.segmentMember segment) (model.segmentLeft segment) ∧
+    locationBelongs (model.segmentMember segment) (model.segmentRight segment)
+
 /-- A segment takes both ends from the actual presegmented model. -/
 def segmentDofs (model : Model nodes members cuts segments)
     (q : Coordinate model → ℝ) (segment : Fin segments) : LocalDofs :=

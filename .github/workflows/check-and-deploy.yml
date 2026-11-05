@@ -119,6 +119,11 @@ jobs:
         run: |
           lake env lean FrameAssemblyModelAudit.lean > assembly-model-axioms.log
           python ../scripts/audit_real_axioms.py assembly-model-axioms.log FrameAssemblyModel
+      - name: Audit finite assembly theorem axioms
+        working-directory: proofs
+        run: |
+          lake env lean FrameAssemblyAudit.lean > assembly-axioms.log
+          python ../scripts/audit_real_axioms.py assembly-axioms.log FrameAssembly
       - name: Check public course examples
         if: ${{ inputs.proof_only != true }}
         run: python -m scripts.check_worked_examples
