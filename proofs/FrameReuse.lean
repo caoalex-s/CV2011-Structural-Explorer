@@ -560,6 +560,7 @@ theorem grouped_reaction_from_residuals (core : Model nodes members cuts segment
 
 
 /-- Actual assembled loads form a linear map from the frozen load slots. -/
+set_option maxHeartbeats 1600000 in
 def externalLoadLinear (core : Model nodes members cuts segments)
     (locations : Fin actionCount → Location members cuts) :
     LoadCase segments actionCount →ₗ[ℝ] Module.Dual ℝ (Coordinate core → ℝ) where

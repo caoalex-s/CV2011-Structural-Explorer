@@ -158,3 +158,55 @@ example : externalWork (withLoads beam (fun _ => 1) (fun _ => 1)) (pointActions 
                 capture_output=True, text=True, timeout=120, check=False,
             )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_duplicate_support_reaction_gauge_and_combination(self):
+        statement = """
+import FrameReuse
+open FrameInterfaces FrameTransform FrameAssemblyModel FrameAssembly FrameReuse
+noncomputable section
+
+def beam : Model 2 1 0 1 where
+  joints := fun _ => ⟨.rigid, 1, none⟩
+  member := fun _ => ⟨0, 1, ⟨1, 0⟩, none, none⟩
+  segmentMember := fun _ => 0
+  segmentLeft := fun _ => .endSide (0, false)
+  segmentRight := fun _ => .endSide (0, true)
+  segmentLength := fun _ => 1
+  segmentEA := fun _ => 1
+  segmentEI := fun _ => 1
+  segmentVerticalStart := fun _ => 0
+  segmentVerticalEnd := fun _ => 0
+
+def duplicateSupports : Fin 2 → SupportInput 1 0 := fun _ =>
+  ⟨.endSide (0, false), .roller, 1, 0, false, false, false⟩
+def row0 : ConstraintIndex duplicateSupports := ⟨0, ⟨0, by norm_num [duplicateSupports, supportDirections]⟩⟩
+def row1 : ConstraintIndex duplicateSupports := ⟨1, ⟨0, by norm_num [duplicateSupports, supportDirections]⟩⟩
+def reactionFirst : Module.Dual ℝ (ConstraintIndex duplicateSupports → ℝ) :=
+  2 • LinearMap.proj row0 + 3 • LinearMap.proj row1
+def reactionSecond : Module.Dual ℝ (ConstraintIndex duplicateSupports → ℝ) :=
+  4 • LinearMap.proj row0 + 1 • LinearMap.proj row1
+example : (constraintMap beam duplicateSupports).dualMap reactionFirst =
+    (constraintMap beam duplicateSupports).dualMap reactionSecond := by
+  ext variation
+  simp [reactionFirst, reactionSecond, row0, row1, constraintMap, supportRowLinear, duplicateSupports,
+    supportDirections, smul_eq_mul]
+  ring
+example : reactionFirst - reactionSecond ∈ LinearMap.ker (constraintMap beam duplicateSupports).dualMap := by
+  apply (reaction_gauge beam duplicateSupports reactionFirst reactionSecond).mp
+  ext variation
+  simp [reactionFirst, reactionSecond, row0, row1, constraintMap, supportRowLinear, duplicateSupports,
+    supportDirections, smul_eq_mul]
+  ring
+example (first second : ConstraintIndex duplicateSupports → ℝ) (a b : ℝ) :
+    aggregateReaction beam duplicateSupports (a • first + b • second) =
+      a • aggregateReaction beam duplicateSupports first + b • aggregateReaction beam duplicateSupports second := by
+  exact combined_aggregate_reaction beam duplicateSupports first second a b
+"""
+        with tempfile.TemporaryDirectory() as folder:
+            source = Path(folder) / "ReuseGaugeCheck.lean"
+            source.write_text(statement, encoding="utf-8")
+            result = subprocess.run(
+                ["lake", "env", "lean", str(source)], cwd=PROOFS,
+                capture_output=True, text=True, timeout=120, check=False,
+            )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
