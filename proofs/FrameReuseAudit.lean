@@ -48,3 +48,7 @@ import FrameReuse
 #print axioms FrameReuse.segment_moment_combination
 #print axioms FrameReuse.segment_shear_combination
 #print axioms FrameReuse.segment_end_actions_combination
+#print axioms FrameReuse.same_core_motion_coherent
+#print axioms FrameReuse.same_core_spring_coherent
+#print axioms FrameReuse.same_core_actual_transport
+#print axioms FrameReuse.same_core_deformation_transport

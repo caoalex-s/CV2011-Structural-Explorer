@@ -825,5 +825,77 @@ theorem segment_end_actions_combination (model : Model nodes members cuts segmen
   rw [segment_dofs_combination]
   exact end_actions_combination _ _ a b _ _ _ p₀ p₁ r₀ r₁ t₀ t₁ u₀ u₁
 
+
+/-- Spring indices are transported without changing their member-side IDs. -/
+def sameCoreSpringEquiv (first second : Model nodes members cuts segments)
+    (h : sameCore first second) : SpringIndex first ≃ SpringIndex second := by
+  have springTypes : SpringIndex first = SpringIndex second := by
+    calc
+      SpringIndex first = SpringIndex (withLoads (structuralCore first)
+          first.segmentVerticalStart first.segmentVerticalEnd) :=
+        congrArg SpringIndex (rebuild_model first).symm
+      _ = SpringIndex (withLoads (structuralCore second)
+          first.segmentVerticalStart first.segmentVerticalEnd) := by rw [h]
+      _ = SpringIndex (withLoads (structuralCore second)
+          second.segmentVerticalStart second.segmentVerticalEnd) := rfl
+      _ = SpringIndex second := congrArg SpringIndex (rebuild_model second)
+  exact Equiv.cast springTypes
+
+/-- On a common-core family, the general equivalence is the same movement
+transport used by the model-derived preservation theorems. -/
+theorem same_core_motion_coherent (core : Model nodes members cuts segments)
+    (start₁ end₁ start₂ end₂ : Fin segments → ℝ)
+    (h : sameCore (withLoads core start₁ end₁) (withLoads core start₂ end₂))
+    (q : Coordinate (withLoads core start₁ end₁) → ℝ) :
+    sameCoreMotionEquiv (withLoads core start₁ end₁) (withLoads core start₂ end₂) h q =
+      motionEquiv core start₁ end₁ start₂ end₂ q := by
+  rfl
+
+/-- The general spring-index equivalence is likewise the identity on the
+common family, including the proof-carrying active spring subtype. -/
+theorem same_core_spring_coherent (core : Model nodes members cuts segments)
+    (start₁ end₁ start₂ end₂ : Fin segments → ℝ)
+    (h : sameCore (withLoads core start₁ end₁) (withLoads core start₂ end₂))
+    (index : SpringIndex (withLoads core start₁ end₁)) :
+    sameCoreSpringEquiv (withLoads core start₁ end₁) (withLoads core start₂ end₂) h index = index := by
+  rfl
+
+/-- The general two-model movement equivalence preserves the actual H, B, C,
+K and admissibility maps, not merely the shapes of their coordinate types. -/
+theorem same_core_actual_transport (first second : Model nodes members cuts segments)
+    (h : sameCore first second) (supports : Fin supportCount → SupportInput members cuts)
+    (q v : Coordinate first → ℝ) (location : Location members cuts) (segment : Fin segments) :
+    sideMotion first q location = sideMotion second (sameCoreMotionEquiv first second h q) location ∧
+    segmentDofs first q segment = segmentDofs second (sameCoreMotionEquiv first second h q) segment ∧
+    constraintMap first supports q = constraintMap second supports (sameCoreMotionEquiv first second h q) ∧
+    stiffnessWork first q v = stiffnessWork second (sameCoreMotionEquiv first second h q)
+      (sameCoreMotionEquiv first second h v) ∧
+    (admissible first supports q ↔ admissible second supports (sameCoreMotionEquiv first second h q)) := by
+  obtain ⟨core, start₁, end₁, start₂, end₂, hfirst, hsecond⟩ := same_core_representation first second h
+  subst first
+  subst second
+  rw [same_core_motion_coherent, same_core_motion_coherent]
+  exact ⟨side_motion_unchanged core start₁ end₁ start₂ end₂ q location,
+    segment_dofs_unchanged core start₁ end₁ start₂ end₂ q segment,
+    constraint_map_unchanged core start₁ end₁ start₂ end₂ supports q,
+    stiffness_unchanged core start₁ end₁ start₂ end₂ q v,
+    admissible_unchanged core start₁ end₁ start₂ end₂ supports q⟩
+
+/-- D is transported on member components and on identified spring indices. -/
+theorem same_core_deformation_transport (first second : Model nodes members cuts segments)
+    (h : sameCore first second) (q : Coordinate first → ℝ)
+    (index : Sum (Fin segments × Fin 3) (SpringIndex first)) :
+    deformationMap first q index = deformationMap second (sameCoreMotionEquiv first second h q)
+      (Sum.map id (sameCoreSpringEquiv first second h) index) := by
+  obtain ⟨core, start₁, end₁, start₂, end₂, hfirst, hsecond⟩ := same_core_representation first second h
+  subst first
+  subst second
+  rw [same_core_motion_coherent]
+  cases index with
+  | inl member => rfl
+  | inr spring =>
+    simp only [Sum.map_inr, same_core_spring_coherent]
+    rfl
+
 end
 end FrameReuse
