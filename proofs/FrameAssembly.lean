@@ -77,6 +77,22 @@ def admissible (model : Model nodes members cuts segments)
   ∀ support : Fin supportCount, ∀ direction ∈ supportDirections (supports support),
     supportRow model (supports support) direction q = 0
 
+/-- The support admissibility predicate is precisely the kernel of the
+model-derived constraint map, even when support rows are repeated. -/
+theorem admissible_iff_constraint_kernel (model : Model nodes members cuts segments)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (q : Coordinate model → ℝ) :
+    admissible model supports q ↔ q ∈ LinearMap.ker (constraintMap model supports) := by
+  rw [LinearMap.mem_ker]
+  constructor
+  · intro h
+    funext row
+    exact h row.1 _ (List.get_mem _ _)
+  · intro h support direction hdirection
+    obtain ⟨index, hindex, heq⟩ := List.mem_iff_getElem.mp hdirection
+    have hv := congrFun h ⟨support, ⟨index, hindex⟩⟩
+    simpa [constraintMap, supportRowLinear, heq] using hv
+
 /-- Exact constrained stationarity is a virtual-work statement on all motions
 satisfying the actual support rows. -/
 def equilibrium (model : Model nodes members cuts segments)
@@ -175,6 +191,7 @@ theorem stiffness_work_energy (model : Model nodes members cuts segments)
     ring
   unfold stiffnessWork internalVirtualWork totalEnergy springEnergy
   simp_rw [hsegment]
+  rw [mul_add]
   simp only [Finset.mul_sum]
   congr 1
   apply Finset.sum_congr rfl

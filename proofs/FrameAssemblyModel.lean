@@ -232,5 +232,102 @@ def segmentDofs (model : Model nodes members cuts segments)
   segmentMotion model q (model.segmentMember segment)
     (model.segmentLeft segment) (model.segmentRight segment)
 
+
+/-- End mapping is linear in the complete coordinate vector, including slips. -/
+theorem side_motion_add (model : Model nodes members cuts segments)
+    (q r : Coordinate model → ℝ) (location : Location members cuts) :
+    sideMotion model (q + r) location = sideMotion model q location + sideMotion model r location := by
+  classical
+  cases location with
+  | interior member cut =>
+      funext i
+      rfl
+  | endSide side =>
+      funext i
+      fin_cases i <;>
+        simp [sideMotion, referenceMotion, endMotion, slipValue, Pi.add_apply] <;>
+        split_ifs <;> ring
+
+/-- End mapping preserves scaling of reference movements and member-side slips. -/
+theorem side_motion_smul (model : Model nodes members cuts segments)
+    (a : ℝ) (q : Coordinate model → ℝ) (location : Location members cuts) :
+    sideMotion model (a • q) location = a • sideMotion model q location := by
+  classical
+  cases location with
+  | interior member cut =>
+      funext i
+      rfl
+  | endSide side =>
+      funext i
+      fin_cases i <;>
+        simp [sideMotion, referenceMotion, endMotion, slipValue, Pi.smul_apply, smul_eq_mul] <;>
+        split_ifs <;> ring
+
+/-- The actual end builder as a linear map H. -/
+def sideMotionLinear (model : Model nodes members cuts segments)
+    (location : Location members cuts) : (Coordinate model → ℝ) →ₗ[ℝ] Triple where
+  toFun := fun q => sideMotion model q location
+  map_add' := fun q r => side_motion_add model q r location
+  map_smul' := fun a q => side_motion_smul model a q location
+
+
+/-- The segment transformation B is built from the two actual member-side
+end maps and the segment's local axes. -/
+theorem segment_dofs_add (model : Model nodes members cuts segments)
+    (q r : Coordinate model → ℝ) (segment : Fin segments) :
+    segmentDofs model (q+r) segment = segmentDofs model q segment + segmentDofs model r segment := by
+  funext i
+  fin_cases i <;>
+    simp [segmentDofs, segmentMotion, toLocal6, side_motion_add, Pi.add_apply] <;> ring
+
+theorem segment_dofs_smul (model : Model nodes members cuts segments)
+    (a : ℝ) (q : Coordinate model → ℝ) (segment : Fin segments) :
+    segmentDofs model (a • q) segment = a • segmentDofs model q segment := by
+  funext i
+  fin_cases i <;>
+    simp [segmentDofs, segmentMotion, toLocal6, side_motion_smul, Pi.smul_apply, smul_eq_mul] <;> ring
+
+def segmentDofsLinear (model : Model nodes members cuts segments) (segment : Fin segments) :
+    (Coordinate model → ℝ) →ₗ[ℝ] LocalDofs where
+  toFun := fun q => segmentDofs model q segment
+  map_add' := fun q r => segment_dofs_add model q r segment
+  map_smul' := fun a q => segment_dofs_smul model a q segment
+
+
+/-- A support row is a linear functional of the complete model coordinates. -/
+def supportRowLinear (model : Model nodes members cuts segments)
+    (support : SupportInput members cuts) (direction : Triple) :
+    (Coordinate model → ℝ) →ₗ[ℝ] ℝ where
+  toFun := supportRow model support direction
+  map_add' := by
+    intro q r
+    simp [supportRow, side_motion_add, work, Pi.add_apply]
+    ring
+  map_smul' := by
+    intro a q
+    simp [supportRow, side_motion_smul, work, Pi.smul_apply, smul_eq_mul]
+    ring
+
+/-- Constraint indices retain duplicate rows and their separate ownership. -/
+abbrev ConstraintIndex (supports : Fin supportCount → SupportInput members cuts) :=
+  Σ support : Fin supportCount, Fin (supportDirections (supports support)).length
+
+/-- C maps model coordinates to every actual member-side support row. -/
+def constraintMap (model : Model nodes members cuts segments)
+    (supports : Fin supportCount → SupportInput members cuts) :
+    (Coordinate model → ℝ) →ₗ[ℝ] (ConstraintIndex supports → ℝ) where
+  toFun := fun q row => supportRowLinear model (supports row.1)
+    ((supportDirections (supports row.1)).get row.2) q
+  map_add' := by
+    intro q r
+    funext row
+    exact map_add (supportRowLinear model (supports row.1)
+      ((supportDirections (supports row.1)).get row.2)) q r
+  map_smul' := by
+    intro a q
+    funext row
+    exact map_smul (supportRowLinear model (supports row.1)
+      ((supportDirections (supports row.1)).get row.2)) a q
+
 end
 end FrameAssemblyModel
