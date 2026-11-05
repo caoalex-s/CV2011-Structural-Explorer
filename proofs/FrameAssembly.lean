@@ -444,7 +444,7 @@ theorem finite_reaction_coefficients {ι : Type} [Fintype ι] [DecidableEq ι]
     _ = ∑ i : ι, reaction (Pi.single i 1) * values i := by
       apply Finset.sum_congr rfl
       intro i _
-      have hsingle : Pi.single i (values i) = values i • Pi.single i (1 : ℝ) := by
+      have hsingle : Pi.single i (values i) = values i • (Pi.single i (1 : ℝ) : ι → ℝ) := by
         funext j
         by_cases h : j = i <;> simp [Pi.single_apply, h]
       rw [hsingle, map_smul]

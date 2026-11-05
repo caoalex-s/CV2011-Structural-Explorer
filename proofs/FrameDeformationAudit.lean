@@ -1,0 +1,4 @@
+import FrameDeformation
+
+#print axioms FrameDeformation.rigid_deformation_zero
+#print axioms FrameDeformation.member_energy_zero_iff_deformation

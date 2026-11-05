@@ -128,6 +128,11 @@ jobs:
         run: |
           lake env lean FrameAssemblyAudit.lean > assembly-axioms.log
           python ../scripts/audit_real_axioms.py assembly-axioms.log FrameAssembly
+      - name: Audit frame deformation theorem axioms
+        working-directory: proofs
+        run: |
+          lake env lean FrameDeformationAudit.lean > deformation-axioms.log
+          python ../scripts/audit_real_axioms.py deformation-axioms.log FrameDeformation
       - name: Check public course examples
         if: ${{ inputs.proof_only != true }}
         run: python -m scripts.check_worked_examples
