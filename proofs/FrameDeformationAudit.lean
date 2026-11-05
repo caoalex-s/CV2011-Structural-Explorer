@@ -2,3 +2,6 @@ import FrameDeformation
 
 #print axioms FrameDeformation.rigid_deformation_zero
 #print axioms FrameDeformation.member_energy_zero_iff_deformation
+#print axioms FrameDeformation.deformation_zero_implies_energy_zero
+#print axioms FrameDeformation.energy_zero_implies_deformation_zero
+#print axioms FrameDeformation.energy_zero_iff_deformation_zero
