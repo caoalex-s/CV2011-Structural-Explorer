@@ -44,7 +44,9 @@ theorem load_primitive_derivative (d : LocalDofs) (L p₀ p₁ q₀ q₁ : ℝ) 
   simp only [show C (2 : ℝ) = (2 : Field) from map_natCast (Polynomial.C : ℝ →+* Field) 2,
     show C (3 : ℝ) = (3 : Field) from map_natCast (Polynomial.C : ℝ →+* Field) 3,
     show C (4 : ℝ) = (4 : Field) from map_natCast (Polynomial.C : ℝ →+* Field) 4,
-    show C (5 : ℝ) = (5 : Field) from map_natCast (Polynomial.C : ℝ →+* Field) 5]
+    show C (5 : ℝ) = (5 : Field) from map_natCast (Polynomial.C : ℝ →+* Field) 5,
+    show C (6 : ℝ) = (6 : Field) from map_natCast (Polynomial.C : ℝ →+* Field) 6,
+    show C (12 : ℝ) = (12 : Field) from map_natCast (Polynomial.C : ℝ →+* Field) 12]
   ring
 
 /-- Integrating the load density gives the actual consistent nodal vector. -/
@@ -128,7 +130,9 @@ theorem strain_primitive_derivative (d e : LocalDofs) (L EA EI : ℝ) :
   simp only [show C (2 : ℝ) = (2 : Field) from map_natCast (Polynomial.C : ℝ →+* Field) 2,
     show C (3 : ℝ) = (3 : Field) from map_natCast (Polynomial.C : ℝ →+* Field) 3,
     show C (4 : ℝ) = (4 : Field) from map_natCast (Polynomial.C : ℝ →+* Field) 4,
-    show C (5 : ℝ) = (5 : Field) from map_natCast (Polynomial.C : ℝ →+* Field) 5]
+    show C (5 : ℝ) = (5 : Field) from map_natCast (Polynomial.C : ℝ →+* Field) 5,
+    show C (6 : ℝ) = (6 : Field) from map_natCast (Polynomial.C : ℝ →+* Field) 6,
+    show C (12 : ℝ) = (12 : Field) from map_natCast (Polynomial.C : ℝ →+* Field) 12]
   ring
 
 set_option maxHeartbeats 4000000 in
