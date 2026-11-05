@@ -189,13 +189,13 @@ theorem equilibrium_iff_basic_stress_balance (model : Model nodes members cuts s
     refine ⟨hadmissible, ?_⟩
     intro variation hvariation
     have h := hbalance variation hvariation
-    unfold residualWork at h
+    change stiffnessWork model q variation - externalWork model actions variation = 0 at h
     rw [← basic_stress_work_eq_stiffness model q variation hsegments] at h
     exact sub_eq_zero.mp h
   · rintro ⟨hadmissible, hbalance⟩
     refine ⟨hadmissible, ?_⟩
     intro variation hvariation
-    unfold residualWork
+    change stiffnessWork model q variation - externalWork model actions variation = 0
     rw [← basic_stress_work_eq_stiffness model q variation hsegments]
     exact sub_eq_zero.mpr (hbalance variation hvariation)
 

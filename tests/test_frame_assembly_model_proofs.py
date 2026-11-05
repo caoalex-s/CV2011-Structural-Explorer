@@ -350,6 +350,31 @@ example : reactionFirst - reactionSecond ∈ LinearMap.ker (constraintMap twoMem
 """)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_split_and_unsplit_axial_member(self):
+        result = self.compile_example("""
+def whole : LocalDofs := ![0, 0, 0, 2, 0, 0]
+def leftHalf : LocalDofs := ![0, 0, 0, 1, 0, 0]
+def rightHalf : LocalDofs := ![1, 0, 0, 2, 0, 0]
+example : LocalFrameFields.endActions whole 2 2 1 0 0 0 0 = ![-2, 0, 0, 2, 0, 0] := by
+  funext i
+  rw [LocalFrameFields.end_actions_from_fields whole 2 2 1 0 0 0 0 (by norm_num) (by norm_num) (by norm_num)]
+  fin_cases i <;> norm_num [whole, LocalFrameFields.stiffness, LocalFrameFields.consistentLoad, Fin.sum_univ_succ]
+example : LocalFrameFields.endActions leftHalf 1 2 1 0 0 0 0 = ![-2, 0, 0, 2, 0, 0] := by
+  funext i
+  rw [LocalFrameFields.end_actions_from_fields leftHalf 1 2 1 0 0 0 0 (by norm_num) (by norm_num) (by norm_num)]
+  fin_cases i <;> norm_num [leftHalf, LocalFrameFields.stiffness, LocalFrameFields.consistentLoad, Fin.sum_univ_succ]
+example : LocalFrameFields.endActions rightHalf 1 2 1 0 0 0 0 = ![-2, 0, 0, 2, 0, 0] := by
+  funext i
+  rw [LocalFrameFields.end_actions_from_fields rightHalf 1 2 1 0 0 0 0 (by norm_num) (by norm_num) (by norm_num)]
+  fin_cases i <;> norm_num [rightHalf, LocalFrameFields.stiffness, LocalFrameFields.consistentLoad, Fin.sum_univ_succ]
+example : LocalFrameFields.endActions leftHalf 1 2 1 0 0 0 0 3 +
+    LocalFrameFields.endActions rightHalf 1 2 1 0 0 0 0 0 = 0 := by
+  rw [LocalFrameFields.end_actions_from_fields leftHalf 1 2 1 0 0 0 0 (by norm_num) (by norm_num) (by norm_num),
+    LocalFrameFields.end_actions_from_fields rightHalf 1 2 1 0 0 0 0 (by norm_num) (by norm_num) (by norm_num)]
+  norm_num [leftHalf, rightHalf, LocalFrameFields.stiffness, LocalFrameFields.consistentLoad, Fin.sum_univ_succ]
+""")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_wrong_support_direction_is_rejected(self):
         result = self.compile_example("""
 def guide : SupportInput 2 0 := ⟨.endSide (1, false), .roller, 3/5, 4/5, false, false, false⟩
