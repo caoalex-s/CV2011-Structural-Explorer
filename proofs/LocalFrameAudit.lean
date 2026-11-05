@@ -17,3 +17,5 @@ import LocalFrameFields
 #print axioms LocalFrameFields.cubic_of_fourth_derivative_zero
 #print axioms LocalFrameFields.transverse_prescribed_end_unique
 #print axioms LocalFrameFields.prescribed_fields_unique
+#print axioms LocalFrameFields.segment_solution_exists
+#print axioms LocalFrameFields.segment_solution_unique

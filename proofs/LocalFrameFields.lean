@@ -192,6 +192,7 @@ theorem cubic_of_fourth_derivative_zero (p : Field)
       ring
     simp [residual, Polynomial.derivative_sub, Polynomial.derivative_mul,
       Polynomial.derivative_pow, Polynomial.C_eq_natCast, hab, map_mul]
+    simp only [div_eq_mul_inv, one_mul] at ha hb ⊢
     linear_combination -ha - X*hb
   obtain ⟨c₀, c₁, hc⟩ := affine_of_second_derivative_zero residual hresidual
   refine ⟨c₀, c₁, a/2, b/6, ?_⟩
@@ -261,6 +262,95 @@ theorem prescribed_fields_unique (u₁ u₂ v₁ v₂ : Field) (L EA EI p₀ p�
     rw [hv₁ x, hv₂ x]
   exact ⟨axial_prescribed_end_unique u₁ u₂ L (ne_of_gt hL) hu huLeft huRight,
     transverse_prescribed_end_unique v₁ v₂ L hL hv hvLeft hvRight htLeft htRight⟩
+
+
+
+/-- Mathematical local-segment solution for the prescribed affine loads and
+end movements. This predicate does not certify a particular application model. -/
+structure SegmentSolution (d : LocalDofs) (L EA EI p₀ p₁ q₀ q₁ : ℝ) where
+  u : Field
+  v : Field
+  theta : Field
+  N : Field
+  V : Field
+  M : Field
+  spanPositive : 0 < L
+  axialPositive : 0 < EA
+  flexuralPositive : 0 < EI
+  thetaKinematics : v.derivative = theta
+  axialConstitutive : N = C EA * u.derivative
+  bendingConstitutive : M = C EI * theta.derivative
+  momentBalance : M.derivative = V
+  axialBalance : ∀ x, N.derivative.eval x = -(p₀+(p₁-p₀)*x/L)
+  transverseBalance : ∀ x, V.derivative.eval x = q₀+(q₁-q₀)*x/L
+  uLeft : u.eval 0 = d 0
+  uRight : u.eval L = d 3
+  vLeft : v.eval 0 = d 1
+  vRight : v.eval L = d 4
+  thetaLeft : theta.eval 0 = d 2
+  thetaRight : theta.eval L = d 5
+
+/-- The explicit particular-plus-homogeneous fields solve the local segment. -/
+theorem segment_solution_exists (d : LocalDofs) (L EA EI p₀ p₁ q₀ q₁ : ℝ)
+    (hL : 0 < L) (hEA : 0 < EA) (hEI : 0 < EI) :
+    Nonempty (SegmentSolution d L EA EI p₀ p₁ q₀ q₁) := by
+  refine ⟨{
+    u := axialDisplacement d L EA p₀ p₁
+    v := transverseDisplacement d L EI q₀ q₁
+    theta := rotation d L EI q₀ q₁
+    N := normal d L EA p₀ p₁
+    V := shear d L EI q₀ q₁
+    M := moment d L EI q₀ q₁
+    spanPositive := hL
+    axialPositive := hEA
+    flexuralPositive := hEI
+    thetaKinematics := rfl
+    axialConstitutive := rfl
+    bendingConstitutive := rfl
+    momentBalance := rfl
+    axialBalance := fun x => axial_balance d L EA p₀ p₁ x (ne_of_gt hL) (ne_of_gt hEA)
+    transverseBalance := fun x => transverse_balance d L EI q₀ q₁ x (ne_of_gt hL) (ne_of_gt hEI)
+    uLeft := (axial_end_kinematics d L EA p₀ p₁ (ne_of_gt hL) (ne_of_gt hEA)).1
+    uRight := (axial_end_kinematics d L EA p₀ p₁ (ne_of_gt hL) (ne_of_gt hEA)).2
+    vLeft := (transverse_end_kinematics d L EI q₀ q₁ (ne_of_gt hL) (ne_of_gt hEI)).1
+    vRight := (transverse_end_kinematics d L EI q₀ q₁ (ne_of_gt hL) (ne_of_gt hEI)).2
+    thetaLeft := (rotation_end_kinematics d L EI q₀ q₁ (ne_of_gt hL) (ne_of_gt hEI)).1
+    thetaRight := (rotation_end_kinematics d L EI q₀ q₁ (ne_of_gt hL) (ne_of_gt hEI)).2
+  }⟩
+
+/-- The prescribed affine-load polynomial solution is unique in all six fields. -/
+theorem segment_solution_unique (d : LocalDofs) (L EA EI p₀ p₁ q₀ q₁ : ℝ)
+    (A B : SegmentSolution d L EA EI p₀ p₁ q₀ q₁) :
+    A.u = B.u ∧ A.v = B.v ∧ A.theta = B.theta ∧ A.N = B.N ∧ A.V = B.V ∧ A.M = B.M := by
+  have huA (x : ℝ) : EA*A.u.derivative.derivative.eval x = -(p₀+(p₁-p₀)*x/L) := by
+    have h := A.axialBalance x
+    rw [A.axialConstitutive] at h
+    simpa [Polynomial.derivative_mul] using h
+  have huB (x : ℝ) : EA*B.u.derivative.derivative.eval x = -(p₀+(p₁-p₀)*x/L) := by
+    have h := B.axialBalance x
+    rw [B.axialConstitutive] at h
+    simpa [Polynomial.derivative_mul] using h
+  have hvA (x : ℝ) : EI*A.v.derivative.derivative.derivative.derivative.eval x = q₀+(q₁-q₀)*x/L := by
+    have h := A.transverseBalance x
+    rw [← A.momentBalance, A.bendingConstitutive, ← A.thetaKinematics] at h
+    simpa [Polynomial.derivative_mul] using h
+  have hvB (x : ℝ) : EI*B.v.derivative.derivative.derivative.derivative.eval x = q₀+(q₁-q₀)*x/L := by
+    have h := B.transverseBalance x
+    rw [← B.momentBalance, B.bendingConstitutive, ← B.thetaKinematics] at h
+    simpa [Polynomial.derivative_mul] using h
+  have htLeft : A.v.derivative.eval 0 = B.v.derivative.eval 0 := by
+    rw [A.thetaKinematics, B.thetaKinematics, A.thetaLeft, B.thetaLeft]
+  have htRight : A.v.derivative.eval L = B.v.derivative.eval L := by
+    rw [A.thetaKinematics, B.thetaKinematics, A.thetaRight, B.thetaRight]
+  obtain ⟨hu, hv⟩ := prescribed_fields_unique A.u B.u A.v B.v L EA EI p₀ p₁ q₀ q₁
+    A.spanPositive A.axialPositive A.flexuralPositive huA huB hvA hvB
+    (by rw [A.uLeft, B.uLeft]) (by rw [A.uRight, B.uRight])
+    (by rw [A.vLeft, B.vLeft]) (by rw [A.vRight, B.vRight]) htLeft htRight
+  have ht : A.theta = B.theta := by rw [← A.thetaKinematics, ← B.thetaKinematics, hv]
+  have hn : A.N = B.N := by rw [A.axialConstitutive, B.axialConstitutive, hu]
+  have hm : A.M = B.M := by rw [A.bendingConstitutive, B.bendingConstitutive, ht]
+  have hs : A.V = B.V := by rw [← A.momentBalance, ← B.momentBalance, hm]
+  exact ⟨hu, hv, ht, hn, hs, hm⟩
 
 
 end

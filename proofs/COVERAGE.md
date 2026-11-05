@@ -27,6 +27,14 @@ The real-polynomial derivative and interval-integral lemmas link formal polynomi
 
 CI records a separate real-field status only after the proof build, regression fixtures, and axiom audit succeed. Its SHA-256 digest covers all local Lean sources, the Lean toolchain, the Lake configuration, and the dependency lock that pins Mathlib and its transitive imports. The static build clears a checked status when that bundle changes. The workspace applies the status only to the eligible point-force family and identifies it as a generic derivative and continuity result. It does not reuse a numerical instance certificate.
 
+## Local frame segment in development
+
+The local-element branch defines six end movements in the order (u₁, v₁, θ₁, u₂, v₂, θ₂). Its loaded axial and transverse fields include the particular solutions for affine local intensities. The corresponding end-action order is (Fx₁, Fy₁, C₁, Fx₂, Fy₂, C₂). On the retained left segment, (N, V, M) equals (−Fx₁, Fy₁, −C₁) at the left end and (Fx₂, −Fy₂, C₂) at the right end. These statements are not a certificate for an application model.
+
+The current local proof obligations include endpoint kinematics, real-field balance and constitutive equations, consistent distributed-load and stiffness work integrals, stiffness symmetry and positive semidefiniteness, the rigid-motion kernel and rank, and uniqueness for prescribed end movements. Coordinate lemmas assume c²+s²=1. Spring stationarity includes the action applied directly to the selected member side. The free-direction relation is r=p_side, which does not in general imply r=0.
+
+The numerical model stores distributed intensity in the global vertical direction. Its transformation into local components is qx=sq and qy=cq. A separate distributed global-horizontal intensity is not currently supported. Subdivision, action ownership, reference-member choices, arbitrary geometry, global assembly and restraints, stability, and floating-point execution remain separate proof obligations. No local or global frame verified badge is added by this branch. Linux CI must compile and audit the current sources before any theorem in this section is reported as checked.
+
 ## Later phases
 
 1. Establish generic local six-degree-of-freedom element stiffness and consistent load relations, including axial and bending fields and endpoint force conventions.
