@@ -19,3 +19,5 @@ import FrameDeformation
 #print axioms FrameDeformation.symmetric_range_eq_kernel_annihilator
 #print axioms FrameDeformation.restricted_stiffness_symmetric
 #print axioms FrameDeformation.equilibrium_exists_iff_load_compatible
+#print axioms FrameDeformation.mechanism_selfstress_dimension
+#print axioms FrameDeformation.frame_statics_dimension

@@ -444,6 +444,36 @@ theorem reaction_gauge (model : Model nodes members cuts segments)
       first - second ∈ LinearMap.ker (constraintMap model supports).dualMap := by
   simp [LinearMap.mem_ker, map_sub, sub_eq_zero]
 
+/-- Real coefficients on the actual support rows define a row-space functional. -/
+def multiplierFunctional (supports : Fin supportCount → SupportInput members cuts)
+    (coefficients : ConstraintIndex supports → ℝ) :
+    Module.Dual ℝ (ConstraintIndex supports → ℝ) :=
+  ∑ row : ConstraintIndex supports, coefficients row • LinearMap.proj row
+
+/-- Aggregate generalized ground reaction is Cᵀλ in functional form. -/
+def aggregateReaction (model : Model nodes members cuts segments)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (coefficients : ConstraintIndex supports → ℝ) : Module.Dual ℝ (Coordinate model → ℝ) :=
+  (constraintMap model supports).dualMap (multiplierFunctional supports coefficients)
+
+/-- Projection on an active hub coordinate groups the ground actions at that
+point. It does not assign a unique share to repeated individual restraints. -/
+def groupedGroundAction (model : Model nodes members cuts segments)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (coefficients : ConstraintIndex supports → ℝ) (point : ActivePoint model) (direction : Fin 3) : ℝ :=
+  aggregateReaction model supports coefficients (coordinateBasis model (.inl (point, direction)))
+
+/-- Equal aggregate reactions have equal grouped ground actions, even if the
+individual support coefficients differ by a multiplier gauge. -/
+theorem grouped_ground_action_gauge (model : Model nodes members cuts segments)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (first second : ConstraintIndex supports → ℝ)
+    (h : aggregateReaction model supports first = aggregateReaction model supports second)
+    (point : ActivePoint model) (direction : Fin 3) :
+    groupedGroundAction model supports first point direction = groupedGroundAction model supports second point direction := by
+  exact congrArg (fun reaction : Module.Dual ℝ (Coordinate model → ℝ) =>
+    reaction (coordinateBasis model (.inl (point, direction)))) h
+
 /-- On a finite row space, a reaction functional has one real coefficient for
 each actual row. Repeated rows may admit more than one coefficient vector. -/
 theorem finite_reaction_coefficients {ι : Type} [Fintype ι] [DecidableEq ι]

@@ -631,6 +631,78 @@ theorem equilibrium_exists_iff_load_compatible (model : Model nodes members cuts
     unfold residualWork
     exact sub_eq_zero.mpr hwork
 
+/-- Deformation restricted to the support-admissible subspace. -/
+def restrictedDeformation (model : Model nodes members cuts segments)
+    (supports : Fin supportCount → SupportInput members cuts) :
+    admissibleSpace model supports →ₗ[ℝ] (Sum (Fin segments × Fin 3) (SpringIndex model) → ℝ) :=
+  (deformationLinear model).comp (admissibleSpace model supports).subtype
+
+/-- The exact mechanism subspace includes all active free-slip coordinates. -/
+def mechanismSpace (model : Model nodes members cuts segments)
+    (supports : Fin supportCount → SupportInput members cuts) :=
+  LinearMap.ker (restrictedDeformation model supports)
+
+/-- Generalized self-stress is the kernel of the transpose of D restricted to
+admissible movements. Dependent support multiplier gauges are already removed. -/
+def selfStressSpace (model : Model nodes members cuts segments)
+    (supports : Fin supportCount → SupportInput members cuts) :=
+  LinearMap.ker (restrictedDeformation model supports).dualMap
+
+/-- Exact finite-dimensional mechanism and self-stress dimension relation.
+This uses deformation coordinates, not the application's numerical count. -/
+theorem mechanism_selfstress_dimension (model : Model nodes members cuts segments)
+    (supports : Fin supportCount → SupportInput members cuts) :
+    Module.finrank ℝ (admissibleSpace model supports) +
+      Module.finrank ℝ (selfStressSpace model supports) =
+    Module.finrank ℝ (Sum (Fin segments × Fin 3) (SpringIndex model) → ℝ) +
+      Module.finrank ℝ (mechanismSpace model supports) := by
+  classical
+  letI : Finite (ActivePoint model) := Finite.of_injective
+    (fun point : ActivePoint model => point.val) Subtype.val_injective
+  letI : Finite (Slip model) := Finite.of_injective
+    (fun slip : Slip model => slip.val) Subtype.val_injective
+  letI : Finite (SpringIndex model) := Finite.of_injective
+    (fun spring : SpringIndex model => spring.val) Subtype.val_injective
+  letI : Fintype (ActivePoint model) := Fintype.ofFinite _
+  letI : Fintype (Slip model) := Fintype.ofFinite _
+  letI : Fintype (SpringIndex model) := Fintype.ofFinite _
+  letI : Fintype (Coordinate model) := inferInstance
+  let D := restrictedDeformation model supports
+  have hmovement := LinearMap.finrank_range_add_finrank_ker D
+  have hstatic := LinearMap.finrank_range_add_finrank_ker D.dualMap
+  have hsameRank := LinearMap.finrank_range_dualMap_eq_finrank_range D
+  have hdual := Subspace.dual_finrank_eq (K := ℝ)
+    (V := (Sum (Fin segments × Fin 3) (SpringIndex model) → ℝ))
+  change Module.finrank ℝ (admissibleSpace model supports) + Module.finrank ℝ (LinearMap.ker D.dualMap) =
+    Module.finrank ℝ (Sum (Fin segments × Fin 3) (SpringIndex model) → ℝ) +
+      Module.finrank ℝ (LinearMap.ker D)
+  omega
+
+/-- Including the actual independent constraint rank gives the exact statics
+count. No independence of the original support rows is assumed. -/
+theorem frame_statics_dimension (model : Model nodes members cuts segments)
+    (supports : Fin supportCount → SupportInput members cuts) :
+    Module.finrank ℝ (Coordinate model → ℝ) + Module.finrank ℝ (selfStressSpace model supports) =
+      Module.finrank ℝ (LinearMap.range (constraintMap model supports)) +
+      Module.finrank ℝ (Sum (Fin segments × Fin 3) (SpringIndex model) → ℝ) +
+      Module.finrank ℝ (mechanismSpace model supports) := by
+  classical
+  letI : Finite (ActivePoint model) := Finite.of_injective
+    (fun point : ActivePoint model => point.val) Subtype.val_injective
+  letI : Finite (Slip model) := Finite.of_injective
+    (fun slip : Slip model => slip.val) Subtype.val_injective
+  letI : Finite (SpringIndex model) := Finite.of_injective
+    (fun spring : SpringIndex model => spring.val) Subtype.val_injective
+  letI : Fintype (ActivePoint model) := Fintype.ofFinite _
+  letI : Fintype (Slip model) := Fintype.ofFinite _
+  letI : Fintype (SpringIndex model) := Fintype.ofFinite _
+  letI : Fintype (Coordinate model) := inferInstance
+  have hconstraints := LinearMap.finrank_range_add_finrank_ker (constraintMap model supports)
+  have hstatics := mechanism_selfstress_dimension model supports
+  change Module.finrank ℝ (LinearMap.range (constraintMap model supports)) +
+    Module.finrank ℝ (admissibleSpace model supports) = Module.finrank ℝ (Coordinate model → ℝ) at hconstraints
+  omega
+
 /-- A deformation-free admissible motion is a mechanism exactly when nonzero. -/
 def mechanism (model : Model nodes members cuts segments)
     (supports : Fin supportCount → SupportInput members cuts) (q : Coordinate model → ℝ) : Prop :=
