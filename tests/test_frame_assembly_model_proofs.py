@@ -74,6 +74,8 @@ example : ¬ activePoint sparseModel (.inr (1, 0)) := by
   rintro ⟨i, h⟩
   fin_cases i
   simp [sparseModel, locationPoint, endNode] at h
+  have hm := congrArg Prod.fst h
+  norm_num at hm
 example : ¬ activePoint sparseModel (.inl 2) := by
   rintro ⟨i, h⟩
   fin_cases i
@@ -157,6 +159,90 @@ example {nodes members cuts segments actionCount supportCount : Nat}
   · exact ⟨a, Or.inr rfl⟩
   · exact ⟨b, Or.inl rfl⟩
   · exact samePosition
+""")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_inhabited_two_segment_contract(self):
+        result = self.compile_example("""
+def splitModel : Model 2 1 1 2 where
+  joints := fun _ => ⟨.rigid, 1, none⟩
+  member := fun _ => ⟨0, 1, ⟨1, 0⟩, none, none⟩
+  segmentMember := fun _ => 0
+  segmentLeft := fun i => if i = 0 then .endSide (0, false) else .interior 0 0
+  segmentRight := fun i => if i = 0 then .interior 0 0 else .endSide (0, true)
+  segmentLength := fun _ => 1
+  segmentEA := fun _ => 1
+  segmentEI := fun _ => 1
+  segmentVerticalStart := fun _ => 0
+  segmentVerticalEnd := fun _ => 0
+def cuts : Fin 1 → Fin 1 → ℝ := fun _ _ => 1/2
+def lengths : Fin 1 → ℝ := fun _ => 2
+def rigidity : Fin 1 → ℝ := fun _ => 1
+def loads : Fin 1 → PointAction 1 1 := fun _ => ⟨.interior 0 0, ![0, -1, 0]⟩
+def supports : Fin 3 → SupportInput 1 1 := fun i =>
+  if i = 0 then ⟨.endSide (0, false), .roller, 3/5, 4/5, false, false, false⟩
+  else if i = 1 then ⟨.interior 0 0, .guided, 3/5, 4/5, false, false, false⟩
+  else ⟨.endSide (0, true), .custom, 0, 0, true, false, true⟩
+example : ExactContract splitModel loads supports cuts lengths rigidity rigidity := by
+  constructor
+  · intro segment
+    fin_cases segment <;> simp [segmentOwnershipValid, locationBelongs, splitModel]
+  · intro segment
+    fin_cases segment <;> norm_num [splitModel, locationParameter, cuts]
+  · intro member t ht0 ht1
+    fin_cases member
+    by_cases ht : t ≤ 1/2
+    · refine ⟨0, ?_⟩
+      norm_num [splitModel, locationParameter, cuts]
+      constructor <;> linarith
+    · refine ⟨1, ?_⟩
+      norm_num [splitModel, locationParameter, cuts]
+      constructor <;> linarith
+  · intro a b hne hmember
+    fin_cases a <;> fin_cases b <;> norm_num [splitModel, locationParameter, cuts] at *
+  · intro member left right hl hr hleft hright hpos
+    fin_cases member
+    have leftCases : left = .endSide (0, false) ∨ left = .interior 0 0 ∨ left = .endSide (0, true) := by
+      obtain ⟨i, hi⟩ := hleft
+      fin_cases i <;> simp [splitModel] at hi <;> aesop
+    have rightCases : right = .endSide (0, false) ∨ right = .interior 0 0 ∨ right = .endSide (0, true) := by
+      obtain ⟨i, hi⟩ := hright
+      fin_cases i <;> simp [splitModel] at hi <;> aesop
+    rcases leftCases with rfl | rfl | rfl <;> rcases rightCases with rfl | rfl | rfl <;>
+      norm_num [locationParameter, cuts] at *
+  · intro member
+    fin_cases member
+    exact ⟨⟨0, Or.inl rfl⟩, ⟨1, Or.inr rfl⟩⟩
+  · intro member cut h
+    fin_cases member
+    fin_cases cut
+    norm_num [cuts]
+  · intro action
+    fin_cases action
+    exact ⟨0, Or.inr rfl⟩
+  · intro support
+    fin_cases support
+    · exact ⟨0, Or.inl rfl⟩
+    · exact ⟨0, Or.inr rfl⟩
+    · exact ⟨1, Or.inr rfl⟩
+  · intro member
+    fin_cases member
+    norm_num [splitModel]
+  · intro support hkind
+    fin_cases support <;> norm_num [supports] at *
+  · intro member
+    fin_cases member
+    norm_num [lengths, rigidity]
+  · intro segment
+    fin_cases segment <;> norm_num [splitModel, lengths, cuts, locationParameter]
+  · intro segment
+    fin_cases segment <;> norm_num [splitModel, rigidity]
+  · intro side direction stiffness hactive hlaw
+    rcases side with ⟨member, ending⟩
+    fin_cases member
+    cases ending <;> fin_cases direction <;>
+      simp [directionLaw, endConnection, referenceMember, incident, endNode, splitModel,
+        rigidConnection] at hlaw
 """)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 

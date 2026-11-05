@@ -13,3 +13,4 @@ import FrameAssembly
 #print axioms FrameAssembly.residual_work_from_end_actions
 #print axioms FrameAssembly.residual_functional_apply
 #print axioms FrameAssembly.equilibrium_iff_support_reaction
+#print axioms FrameAssembly.stiffness_entry_symmetric

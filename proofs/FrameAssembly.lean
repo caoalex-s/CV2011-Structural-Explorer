@@ -78,6 +78,21 @@ def admissible (model : Model nodes members cuts segments)
   ∀ support : Fin supportCount, ∀ direction ∈ supportDirections (supports support),
     supportRow model (supports support) direction q = 0
 
+/-- Assemble stiffness by applying the physical bilinear work to coordinate
+basis vectors. These coefficients are derived from the actual B and slip maps. -/
+def coordinateBasis (model : Model nodes members cuts segments) (coordinate : Coordinate model) :
+    Coordinate model → ℝ := by
+  classical
+  exact fun index => if index = coordinate then 1 else 0
+
+def stiffnessEntry (model : Model nodes members cuts segments)
+    (row column : Coordinate model) : ℝ :=
+  stiffnessWork model (coordinateBasis model column) (coordinateBasis model row)
+
+def forceEntry (model : Model nodes members cuts segments)
+    (actions : Fin actionCount → PointAction members cuts) (row : Coordinate model) : ℝ :=
+  externalWork model actions (coordinateBasis model row)
+
 /-- The support admissibility predicate is precisely the kernel of the
 model-derived constraint map, even when support rows are repeated. -/
 theorem admissible_iff_constraint_kernel (model : Model nodes members cuts segments)
@@ -351,6 +366,12 @@ theorem stiffness_work_symmetric (model : Model nodes members cuts segments)
   intro direction _
   dsimp
   ring
+
+/-- The entries of the stiffness matrix built from the model are symmetric. -/
+theorem stiffness_entry_symmetric (model : Model nodes members cuts segments)
+    (row column : Coordinate model) :
+    stiffnessEntry model row column = stiffnessEntry model column row := by
+  exact stiffness_work_symmetric model (coordinateBasis model column) (coordinateBasis model row)
 
 /-- The assembled quadratic stiffness work is twice the model's energy. -/
 theorem stiffness_work_energy (model : Model nodes members cuts segments)
