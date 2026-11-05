@@ -29,7 +29,7 @@ example : work (toLocal 0 (-1) v) (toLocal 0 (-1) v) = work v v :=
   work_invariant 0 (-1) v v (by norm_num)
 example : HasDerivAt (relativePotential 0 7 7) 0 2 := by
   simpa using potential_derivative 0 7 7 2
-example : 7 = 7 := free_stationarity 7 7 2 (by simpa using potential_derivative 0 7 7 2)
+example : (7 : ℝ) = 7 := free_stationarity 7 7 2 (by simpa using potential_derivative 0 7 7 2)
 """)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
