@@ -13,7 +13,7 @@ class LocalFrameFieldChecks(unittest.TestCase):
     def compile_example(self, statement):
         with tempfile.TemporaryDirectory() as folder:
             source = Path(folder) / "LocalFrameCheck.lean"
-            source.write_text("import FrameVirtualWork\nimport FrameTransform\nopen Polynomial MeasureTheory intervalIntegral FrameInterfaces LocalFrameFields FrameEnergy FrameVirtualWork\n" + statement + "\n", encoding="utf-8")
+            source.write_text("import FramePotential\nopen Polynomial MeasureTheory intervalIntegral FrameInterfaces LocalFrameFields FrameEnergy FrameVirtualWork FramePotential\n" + statement + "\n", encoding="utf-8")
             return subprocess.run(["lake", "env", "lean", str(source)], cwd=PROOFS,
                                   capture_output=True, text=True, timeout=120, check=False)
 

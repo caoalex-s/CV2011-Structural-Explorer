@@ -148,11 +148,11 @@ def rigidKernelEquiv (L EA EI : ℝ) (hL : 0 < L) (hEA : 0 < EA) (hEI : 0 < EI) 
   map_add' v w := by
     apply Subtype.ext
     funext i
-    fin_cases i <;> simp [rigidMotion] <;> ring
+    fin_cases i <;> (simp [rigidMotion]; ring)
   map_smul' c v := by
     apply Subtype.ext
     funext i
-    fin_cases i <;> simp [rigidMotion] <;> ring
+    fin_cases i <;> (simp [rigidMotion]; ring)
 
 /-- Rank-nullity gives rank three for a positive-rigidity local member. -/
 theorem stiffness_rank_three (L EA EI : ℝ) (hL : 0 < L) (hEA : 0 < EA) (hEI : 0 < EI) :

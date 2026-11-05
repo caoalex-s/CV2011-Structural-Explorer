@@ -1,0 +1,7 @@
+import FramePotential
+
+#print axioms FramePotential.member_potential_derivative
+#print axioms FramePotential.member_spring_stationarity
+#print axioms FramePotential.member_free_stationarity
+#print axioms FramePotential.physical_work_end_actions
+#print axioms FramePotential.global_stiffness_energy
