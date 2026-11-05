@@ -67,6 +67,7 @@ theorem slip_directional_derivative (model : Model nodes members cuts segments)
     change slipValue model (t • variation) side direction =
       t * slipValue model variation side direction at hscale
     rw [heq, hscale]
+    rfl
   · simp
 
 /-- The selected segment movement component has the corresponding B-map
@@ -391,10 +392,84 @@ theorem potential_directional_derivative (model : Model nodes members cuts segme
   have h := (hmembers.add hsprings).sub hexternal
   simpa [potential, totalEnergy, residualWork, internalVirtualWork] using h
 
+/-- Subtracting two residuals removes the same dead loads and leaves the
+stiffness work of the difference. -/
+theorem residual_difference (model : Model nodes members cuts segments)
+    (actions : Fin actionCount → PointAction members cuts)
+    (q r variation : Coordinate model → ℝ) :
+    residualWork model actions q variation - residualWork model actions r variation =
+      stiffnessWork model (q-r) variation := by
+  have hsegment (segment : Fin segments) :
+      segmentDofs model (q-r) segment = segmentDofs model q segment - segmentDofs model r segment := by
+    exact (segmentDofsLinear model segment).map_sub q r
+  have hslip (member : Fin members) (ending : Bool) (direction : Fin 3) :
+      slipValue model (q-r) (member, ending) direction =
+        slipValue model q (member, ending) direction - slipValue model r (member, ending) direction := by
+    exact (slipLinear model (member, ending) direction).map_sub q r
+  unfold residualWork internalVirtualWork stiffnessWork
+  simp only [hsegment, hslip, Pi.sub_apply, mul_sub, sub_mul, Finset.sum_sub_distrib]
+  ring
+
+/-- Absence of admissible deformation-free motion makes any two equilibria
+identical, independently of whether either equilibrium exists. -/
+theorem equilibrium_unique_if_no_mechanism (model : Model nodes members cuts segments)
+    (actions : Fin actionCount → PointAction members cuts)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (cutParameter : Fin members → Fin cuts → ℝ)
+    (memberLength memberEA memberEI : Fin members → ℝ)
+    (hcontract : ExactContract model actions supports cutParameter memberLength memberEA memberEI)
+    (hstable : ∀ z, admissible model supports z → deformationMap model z = 0 → z = 0)
+    (q r : Coordinate model → ℝ)
+    (hq : equilibrium model actions supports q) (hr : equilibrium model actions supports r) : q = r := by
+  have hqker := (admissible_iff_constraint_kernel model supports q).mp hq.1
+  have hrker := (admissible_iff_constraint_kernel model supports r).mp hr.1
+  have hzker : q-r ∈ LinearMap.ker (constraintMap model supports) := (LinearMap.ker _).sub_mem hqker hrker
+  have hzadmissible := (admissible_iff_constraint_kernel model supports (q-r)).mpr hzker
+  have hwork : stiffnessWork model (q-r) (q-r) = 0 := by
+    rw [← residual_difference model actions q r (q-r), hq.2 (q-r) hzadmissible,
+      hr.2 (q-r) hzadmissible]
+    ring
+  have hsegments := contract_positive_segments model actions supports cutParameter memberLength memberEA memberEI hcontract
+  rw [stiffness_work_energy model (q-r) hsegments] at hwork
+  have henergy : totalEnergy model (q-r) = 0 := by linarith
+  have hdeformation := energy_zero_implies_deformation_zero model actions supports cutParameter memberLength memberEA memberEI hcontract (q-r) henergy
+  exact sub_eq_zero.mp (hstable (q-r) hzadmissible hdeformation)
+
 /-- A deformation-free admissible motion is a mechanism exactly when nonzero. -/
 def mechanism (model : Model nodes members cuts segments)
     (supports : Fin supportCount → SupportInput members cuts) (q : Coordinate model → ℝ) : Prop :=
   q ≠ 0 ∧ admissible model supports q ∧ deformationMap model q = 0
+
+
+/-- A nonzero admissible zero-deformation motion generates a distinct
+solution from any existing equilibrium. -/
+theorem mechanism_generates_second_equilibrium (model : Model nodes members cuts segments)
+    (actions : Fin actionCount → PointAction members cuts)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (cutParameter : Fin members → Fin cuts → ℝ)
+    (memberLength memberEA memberEI : Fin members → ℝ)
+    (hcontract : ExactContract model actions supports cutParameter memberLength memberEA memberEI)
+    (q z : Coordinate model → ℝ) (hq : equilibrium model actions supports q)
+    (hz : mechanism model supports z) :
+    equilibrium model actions supports (q+z) ∧ q+z ≠ q := by
+  have hqker := (admissible_iff_constraint_kernel model supports q).mp hq.1
+  have hzker := (admissible_iff_constraint_kernel model supports z).mp hz.2.1
+  have hplusker : q+z ∈ LinearMap.ker (constraintMap model supports) := (LinearMap.ker _).add_mem hqker hzker
+  have hplus := (admissible_iff_constraint_kernel model supports (q+z)).mpr hplusker
+  have hnull := (stiffness_null_iff_deformation_zero model actions supports cutParameter
+    memberLength memberEA memberEI hcontract z).mpr hz.2.2
+  refine ⟨⟨hplus, ?_⟩, ?_⟩
+  · intro variation hvariation
+    have hdiff := residual_difference model actions (q+z) q variation
+    have hzwork := hnull variation
+    have hqwork := hq.2 variation hvariation
+    simp only [add_sub_cancel_left] at hdiff
+    linarith
+  · intro heq
+    have hz0 : z = 0 := by
+      have h := congrArg (fun x : Coordinate model → ℝ => x-q) heq
+      simpa using h
+    exact hz.1 hz0
 
 end
 end FrameDeformation

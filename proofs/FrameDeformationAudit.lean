@@ -10,3 +10,6 @@ import FrameDeformation
 #print axioms FrameDeformation.slip_directional_derivative
 #print axioms FrameDeformation.segment_directional_derivative
 #print axioms FrameDeformation.potential_directional_derivative
+#print axioms FrameDeformation.residual_difference
+#print axioms FrameDeformation.equilibrium_unique_if_no_mechanism
+#print axioms FrameDeformation.mechanism_generates_second_equilibrium
