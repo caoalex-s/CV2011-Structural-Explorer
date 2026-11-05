@@ -104,6 +104,58 @@ def equilibrium (model : Model nodes members cuts segments)
     ∀ variation, admissible model supports variation → residualWork model actions q variation = 0
 
 
+/-- The encoded segment properties satisfy the hypotheses of the local proof. -/
+def positiveSegments (model : Model nodes members cuts segments) : Prop :=
+  ∀ segment, 0 < model.segmentLength segment ∧
+    0 < model.segmentEA segment ∧ 0 < model.segmentEI segment
+
+/-- End actions recovered from the loaded exact segment fields. -/
+def recoveredEndActions (model : Model nodes members cuts segments)
+    (q : Coordinate model → ℝ) (segment : Fin segments) : LocalActions :=
+  let orientation := (model.member (model.segmentMember segment)).orientation
+  let q₀ := model.segmentVerticalStart segment
+  let q₁ := model.segmentVerticalEnd segment
+  LocalFrameFields.endActions (segmentDofs model q segment)
+    (model.segmentLength segment) (model.segmentEA segment) (model.segmentEI segment)
+    (orientation.sine*q₀) (orientation.sine*q₁)
+    (orientation.cosine*q₀) (orientation.cosine*q₁)
+
+/-- Kd−f in residual work is exactly the end action from the loaded fields,
+with separate spring work and directly applied member-side point actions. -/
+theorem residual_work_from_end_actions (model : Model nodes members cuts segments)
+    (actions : Fin actionCount → PointAction members cuts)
+    (q variation : Coordinate model → ℝ) (hsegments : positiveSegments model) :
+    residualWork model actions q variation =
+      (∑ segment : Fin segments, ∑ i : Fin 6,
+        segmentDofs model variation segment i * recoveredEndActions model q segment i) +
+      (∑ member : Fin members, ∑ endSide : Bool, ∑ direction : Fin 3,
+        let side := (member, endSide)
+        let k := springStiffness (directionLaw (endConnection model side) direction)
+        k * slipValue model q side direction * slipValue model variation side direction) -
+      ∑ action : Fin actionCount, pointActionWork model (actions action) variation := by
+  have hsegment (segment : Fin segments) (i : Fin 6) :
+      recoveredEndActions model q segment i =
+        (∑ j : Fin 6, LocalFrameFields.stiffness (model.segmentLength segment)
+          (model.segmentEA segment) (model.segmentEI segment) i j * segmentDofs model q segment j) -
+        segmentLoad model segment i := by
+    obtain ⟨hL, hEA, hEI⟩ := hsegments segment
+    exact LocalFrameFields.end_actions_from_fields _ _ _ _ _ _ _ _
+      (ne_of_gt hL) (ne_of_gt hEA) (ne_of_gt hEI) i
+  simp_rw [hsegment]
+  unfold residualWork internalVirtualWork externalWork
+  simp only [mul_sub, Finset.sum_sub_distrib]
+  have hloads : (∑ segment : Fin segments, ∑ i : Fin 6,
+      segmentDofs model variation segment i * segmentLoad model segment i) =
+      (∑ segment : Fin segments, ∑ i : Fin 6,
+      segmentLoad model segment i * segmentDofs model variation segment i) := by
+    apply Finset.sum_congr rfl
+    intro segment _
+    apply Finset.sum_congr rfl
+    intro i _
+    ring
+  rw [hloads]
+  ring
+
 /-- A linear residual annihilates the admissible motions exactly when it is
 the pullback of a support-row functional. This allows dependent support rows:
 the row functional need not be unique. -/
@@ -117,23 +169,22 @@ theorem admissible_reaction_dual (model : Model nodes members cuts segments)
   have hann : (∀ variation, admissible model supports variation → residual variation = 0) ↔
       residual ∈ (LinearMap.ker C).dualAnnihilator := by
     rw [Submodule.mem_dualAnnihilator]
-    simp only [← admissible_iff_constraint_kernel model supports]
+    constructor
+    · intro h variation hv
+      exact h variation ((admissible_iff_constraint_kernel model supports variation).mpr hv)
+    · intro h variation hv
+      exact h variation ((admissible_iff_constraint_kernel model supports variation).mp hv)
   rw [hann, ← LinearMap.range_dualMap_eq_dualAnnihilator_ker C, LinearMap.mem_range]
   constructor
   · rintro ⟨reaction, hreaction⟩
     refine ⟨reaction, ?_⟩
     intro variation
-    have h := congrFun hreaction variation
+    have h := congrArg (fun f : Module.Dual ℝ (Coordinate model → ℝ) => f variation) hreaction
     simpa [LinearMap.dualMap_apply] using h.symm
   · rintro ⟨reaction, hreaction⟩
     refine ⟨reaction, ?_⟩
     ext variation
     simpa [LinearMap.dualMap_apply] using (hreaction variation).symm
-
-/-- The encoded segment properties satisfy the hypotheses of the local proof. -/
-def positiveSegments (model : Model nodes members cuts segments) : Prop :=
-  ∀ segment, 0 < model.segmentLength segment ∧
-    0 < model.segmentEA segment ∧ 0 < model.segmentEI segment
 
 /-- Free and rigid directions have zero spring modulus. A finite spring must
 have nonnegative modulus here; physical spring inputs require strict positivity. -/

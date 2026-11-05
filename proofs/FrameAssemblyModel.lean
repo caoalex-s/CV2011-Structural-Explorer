@@ -327,6 +327,10 @@ structure ExactContract (model : Model nodes members cuts segments)
   disjointInteriors : ∀ a b, a ≠ b → model.segmentMember a = model.segmentMember b →
     locationParameter cutParameter (model.segmentRight a) ≤ locationParameter cutParameter (model.segmentLeft b) ∨
     locationParameter cutParameter (model.segmentRight b) ≤ locationParameter cutParameter (model.segmentLeft a)
+  adjacentEndpoints : ∀ a b, model.segmentMember a = model.segmentMember b →
+    locationParameter cutParameter (model.segmentRight a) =
+      locationParameter cutParameter (model.segmentLeft b) →
+    model.segmentRight a = model.segmentLeft b
   memberEnds : ∀ member, representedLocation model (.endSide (member, false)) ∧
     representedLocation model (.endSide (member, true))
   interiorCuts : ∀ member cut, representedLocation model (.interior member cut) →
