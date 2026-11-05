@@ -16,3 +16,5 @@ import FrameDeformation
 #print axioms FrameDeformation.stiffness_operator_apply
 #print axioms FrameDeformation.restricted_stiffness_apply
 #print axioms FrameDeformation.equilibrium_exists_if_no_mechanism
+#print axioms FrameDeformation.symmetric_range_eq_kernel_annihilator
+#print axioms FrameDeformation.restricted_stiffness_symmetric

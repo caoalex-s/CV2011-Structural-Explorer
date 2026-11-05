@@ -319,6 +319,34 @@ theorem restricted_stiffness_apply (model : Model nodes members cuts segments)
     restrictedStiffness model supports q variation = stiffnessWork model q.val variation.val := by
   exact stiffness_operator_apply model q.val variation.val
 
+/-- A symmetric finite-dimensional operator into the dual has range equal
+to the annihilator of its kernel. This is the exact load-compatibility result. -/
+theorem symmetric_range_eq_kernel_annihilator {V : Type} [AddCommGroup V] [Module ℝ V]
+    [FiniteDimensional ℝ V] (K : V →ₗ[ℝ] Module.Dual ℝ V)
+    (hsymmetric : ∀ x y, K x y = K y x) :
+    LinearMap.range K = (LinearMap.ker K).dualAnnihilator := by
+  have hle : LinearMap.range K ≤ (LinearMap.ker K).dualAnnihilator := by
+    intro functional hfunctional
+    obtain ⟨x, rfl⟩ := hfunctional
+    rw [Submodule.mem_dualAnnihilator]
+    intro y hy
+    rw [hsymmetric]
+    have hyzero : K y = 0 := LinearMap.mem_ker.mp hy
+    rw [hyzero]
+    rfl
+  apply Submodule.eq_of_le_of_finrank_eq hle
+  have hrank := LinearMap.finrank_range_add_finrank_ker K
+  have hann := Subspace.finrank_add_finrank_dualAnnihilator_eq (LinearMap.ker K)
+  omega
+
+/-- The restricted stiffness operator is symmetric on admissible motions. -/
+theorem restricted_stiffness_symmetric (model : Model nodes members cuts segments)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (q variation : admissibleSpace model supports) :
+    restrictedStiffness model supports q variation = restrictedStiffness model supports variation q := by
+  rw [restricted_stiffness_apply, restricted_stiffness_apply]
+  exact stiffness_work_symmetric model q.val variation.val
+
 /-- The kernel of the actual assembled stiffness work, expressed without
 choosing or inverting a coordinate matrix. -/
 def stiffnessNull (model : Model nodes members cuts segments) (q : Coordinate model → ℝ) : Prop :=
@@ -486,7 +514,13 @@ theorem equilibrium_exists_if_no_mechanism (model : Model nodes members cuts seg
     (hstable : ∀ z, admissible model supports z → deformationMap model z = 0 → z = 0) :
     ∃ q, equilibrium model actions supports q := by
   classical
-  letI : Fintype (Coordinate model) := Fintype.ofFinite _
+  letI : Finite (ActivePoint model) := Finite.of_injective
+    (fun point : ActivePoint model => point.val) Subtype.val_injective
+  letI : Finite (Slip model) := Finite.of_injective
+    (fun slip : Slip model => slip.val) Subtype.val_injective
+  letI : Fintype (ActivePoint model) := Fintype.ofFinite _
+  letI : Fintype (Slip model) := Fintype.ofFinite _
+  letI : Fintype (Coordinate model) := inferInstance
   let U := admissibleSpace model supports
   let K := restrictedStiffness model supports
   let F : Module.Dual ℝ U := U.subtype.dualMap (externalFunctional model actions)
@@ -497,7 +531,9 @@ theorem equilibrium_exists_if_no_mechanism (model : Model nodes members cuts seg
       have hzK : K z = 0 := LinearMap.mem_ker.mp hz
       have hwork : stiffnessWork model z.val z.val = 0 := by
         have h := congrArg (fun f : Module.Dual ℝ U => f z) hzK
-        simpa [K, restricted_stiffness_apply] using h
+        change restrictedStiffness model supports z z = 0 at h
+        rw [restricted_stiffness_apply] at h
+        exact h
       have hsegments := contract_positive_segments model actions supports cutParameter memberLength memberEA memberEI hcontract
       rw [stiffness_work_energy model z.val hsegments] at hwork
       have henergy : totalEnergy model z.val = 0 := by linarith
@@ -507,7 +543,8 @@ theorem equilibrium_exists_if_no_mechanism (model : Model nodes members cuts seg
         (admissible_iff_constraint_kernel model supports z.val).mpr z.property
       have hzval := hstable z.val hadmissible hdeformation
       have hz0 : z = 0 := Subtype.ext hzval
-      simpa [hz0]
+      rw [hz0]
+      exact Submodule.zero_mem _
     · exact bot_le
   have hdimension : Module.finrank ℝ U = Module.finrank ℝ (Module.Dual ℝ U) := by simp
   have hsurjective : Function.Surjective K :=
@@ -519,7 +556,9 @@ theorem equilibrium_exists_if_no_mechanism (model : Model nodes members cuts seg
   let v : U := ⟨variation, (admissible_iff_constraint_kernel model supports variation).mp hvariation⟩
   have hv := congrArg (fun f : Module.Dual ℝ U => f v) hsolution
   have hwork : stiffnessWork model solution.val variation = externalWork model actions variation := by
-    simpa [K, F, v, restricted_stiffness_apply, external_functional_apply] using hv
+    change restrictedStiffness model supports solution v = externalFunctional model actions v.val at hv
+    rw [restricted_stiffness_apply, external_functional_apply] at hv
+    exact hv
   unfold residualWork
   exact sub_eq_zero.mpr hwork
 
