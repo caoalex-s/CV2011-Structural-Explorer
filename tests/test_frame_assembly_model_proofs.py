@@ -540,10 +540,16 @@ example : pointActionWork partialModel (cutLoad 0) unitUp = -1 := by
   have hc : activePoint partialModel (.inr 0) := hpointCut
   norm_num [pointActionWork, FrameTransform.work, sideMotion, referenceMotion,
     cutLoad, unitUp, hc] <;> norm_num
+  intro h
+  have hne : (2 : Fin 3) ≠ 1 := by decide
+  exact (hne h).elim
 example : supportRow partialModel cutSupport (![0, 1, 0]) unitUp = 1 := by
   have hc : activePoint partialModel (.inr 0) := hpointCut
   norm_num [supportRow, FrameTransform.work, sideMotion, referenceMotion,
     cutSupport, unitUp, hc] <;> norm_num
+  intro h
+  have hne : (2 : Fin 3) ≠ 1 := by decide
+  exact (hne h).elim
 theorem external_up : externalFunctional partialModel cutLoad unitUp = 2 := by
   rw [external_functional_apply]
   classical
