@@ -6,7 +6,7 @@ Assembly from the exact presegmented input. The local terms use the previously
 proved element energy, consistent loads and end actions. The definitions keep
 all member-side slips, including free directions, in the displacement space.
 -/
-open FrameInterfaces FrameEnergy FrameVirtualWork FrameAssemblyModel
+open FrameInterfaces FrameEnergy FrameVirtualWork FrameAssemblyModel FrameTransform
 
 namespace FrameAssembly
 noncomputable section
@@ -474,20 +474,24 @@ theorem side_motion_hub_basis (model : Model nodes members cuts segments)
   · have hactive : activePoint model (locationPoint model location) := by rw [hmatch]; exact point.property
     cases location with
     | interior member cut =>
+      simp only [locationPoint] at hmatch hactive
       funext i
       simp [sideMotion, referenceMotion, coordinateBasis, locationPoint, hmatch, hactive,
         Subtype.ext_iff, Prod.ext_iff]
     | endSide side =>
+      simp only [locationPoint] at hmatch hactive
       funext i
       fin_cases i <;> fin_cases direction <;>
         simp [sideMotion, referenceMotion, coordinateBasis, locationPoint, endMotion,
           slipValue, hmatch, hactive, Subtype.ext_iff, Prod.ext_iff]
   · cases location with
     | interior member cut =>
+      simp only [locationPoint] at hmatch
       funext i
       simp [sideMotion, referenceMotion, coordinateBasis, locationPoint, hmatch,
         Subtype.ext_iff, Prod.ext_iff]
     | endSide side =>
+      simp only [locationPoint] at hmatch
       funext i
       fin_cases i <;> fin_cases direction <;>
         simp [sideMotion, referenceMotion, coordinateBasis, locationPoint, endMotion,
