@@ -247,6 +247,86 @@ example : ExactContract splitModel loads supports cuts lengths rigidity rigidity
 """)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_inhabited_released_spring_side_contract(self):
+        result = self.compile_example("""
+def twoMemberModel : Model 2 2 0 2 where
+  joints := fun _ => ⟨.pinned, 3, none⟩
+  member := fun i => if i = 0 then ⟨0, 1, ⟨1, 0⟩, none, none⟩
+    else ⟨1, 0, ⟨-1, 0⟩, some ⟨.spring 2, .released, .spring 3⟩, none⟩
+  segmentMember := fun i => i
+  segmentLeft := fun i => .endSide (i, false)
+  segmentRight := fun i => .endSide (i, true)
+  segmentLength := fun _ => 1
+  segmentEA := fun _ => 1
+  segmentEI := fun _ => 1
+  segmentVerticalStart := fun _ => 0
+  segmentVerticalEnd := fun _ => 0
+def noCuts : Fin 2 → Fin 0 → ℝ := fun _ => Fin.elim0
+def properties : Fin 2 → ℝ := fun _ => 1
+def sideLoad : Fin 1 → PointAction 2 0 := fun _ => ⟨.endSide (1, false), ![0, 0, 4]⟩
+def sideSupport : Fin 2 → SupportInput 2 0 := fun i =>
+  if i = 0 then ⟨.endSide (1, false), .guided, 3/5, 4/5, false, false, false⟩
+  else ⟨.endSide (0, false), .custom, 0, 0, true, true, true⟩
+example : directionLaw (endConnection twoMemberModel (1, false)) 0 = .spring 2 := by rfl
+example : directionLaw (endConnection twoMemberModel (1, false)) 1 = .released := by rfl
+example : directionLaw (endConnection twoMemberModel (1, false)) 2 = .spring 3 := by rfl
+example : ExactContract twoMemberModel sideLoad sideSupport noCuts properties properties properties := by
+  constructor
+  · intro segment
+    fin_cases segment <;> simp [segmentOwnershipValid, locationBelongs, twoMemberModel]
+  · intro segment
+    fin_cases segment <;> norm_num [twoMemberModel, locationParameter]
+  · intro member t ht0 ht1
+    refine ⟨member, ?_⟩
+    fin_cases member <;> norm_num [twoMemberModel, locationParameter] at * <;> linarith
+  · intro a b hne hmember
+    fin_cases a <;> fin_cases b <;> norm_num [twoMemberModel, locationParameter] at *
+  · intro member left right hl hr hleft hright hpos
+    cases left with
+    | interior m cut => exact Fin.elim0 cut
+    | endSide leftSide =>
+      cases right with
+      | interior m cut => exact Fin.elim0 cut
+      | endSide rightSide =>
+        rcases leftSide with ⟨lm, lb⟩
+        rcases rightSide with ⟨rm, rb⟩
+        simp only [locationBelongs] at hl hr
+        subst lm
+        subst rm
+        cases lb <;> cases rb <;> norm_num [locationParameter] at *
+  · intro member
+    constructor
+    · exact ⟨member, Or.inl rfl⟩
+    · exact ⟨member, Or.inr rfl⟩
+  · intro member cut
+    exact Fin.elim0 cut
+  · intro action
+    fin_cases action
+    exact ⟨1, Or.inl rfl⟩
+  · intro support
+    fin_cases support
+    · exact ⟨1, Or.inl rfl⟩
+    · exact ⟨0, Or.inl rfl⟩
+  · intro member
+    fin_cases member <;> norm_num [twoMemberModel]
+  · intro support hkind
+    fin_cases support <;> norm_num [sideSupport] at *
+    rcases hkind with hkind | hkind <;> cases hkind
+  · intro member
+    norm_num [properties]
+  · intro segment
+    fin_cases segment <;> norm_num [twoMemberModel, properties, locationParameter]
+  · intro segment
+    norm_num [twoMemberModel, properties]
+  · intro side direction stiffness hactive hlaw
+    rcases side with ⟨member, ending⟩
+    fin_cases member <;> cases ending <;> fin_cases direction <;>
+      simp [directionLaw, endConnection, referenceMember, incident, endNode, twoMemberModel,
+        rigidConnection] at hlaw
+    all_goals subst stiffness <;> norm_num
+""")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_wrong_support_direction_is_rejected(self):
         result = self.compile_example("""
 def guide : SupportInput 2 0 := ⟨.endSide (1, false), .roller, 3/5, 4/5, false, false, false⟩

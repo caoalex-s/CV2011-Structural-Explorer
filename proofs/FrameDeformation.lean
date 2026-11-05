@@ -406,7 +406,7 @@ theorem residual_difference (model : Model nodes members cuts segments)
       slipValue model (q-r) (member, ending) direction =
         slipValue model q (member, ending) direction - slipValue model r (member, ending) direction := by
     exact (slipLinear model (member, ending) direction).map_sub q r
-  unfold residualWork internalVirtualWork stiffnessWork
+  unfold residualWork stiffnessWork internalVirtualWork
   simp only [hsegment, hslip, Pi.sub_apply, mul_sub, sub_mul, Finset.sum_sub_distrib]
   ring
 
