@@ -346,7 +346,7 @@ def springMode : Coordinate twoMemberModel → ℝ := fun coordinate =>
   | .inl _ => 0
   | .inr slip => if slip.val.1 = (1, false) ∧ slip.val.2 = 0 then 1 else 0
 
-example : 0 < springEnergy twoMemberModel springMode := by
+theorem springMode_positive : 0 < springEnergy twoMemberModel springMode := by
   classical
   have hactive : hasSlip twoMemberModel (1, false) 0 := by
     constructor
@@ -376,6 +376,12 @@ example : 0 < springEnergy twoMemberModel springMode := by
     rw [hslip]
     norm_num [springStiffness]
   change 0 < ∑ m : Fin 2, ∑ e : Bool, ∑ i : Fin 3, term m e i
+  linarith
+
+/-- Omitting this positive spring term changes the actual total energy. -/
+example : totalEnergy twoMemberModel springMode ≠
+    totalEnergy twoMemberModel springMode - springEnergy twoMemberModel springMode := by
+  have h := springMode_positive
   linarith
 
 def duplicateSupports : Fin 2 → SupportInput 2 0 := fun _ =>
@@ -423,6 +429,126 @@ example : LocalFrameFields.endActions leftHalf 1 2 1 0 0 0 0 3 +
   rw [leftHalf_actions, rightHalf_actions]
   change (2 : ℝ) + (-2) = 0
   norm_num
+""")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_partial_affine_load_with_cut_action_and_support(self):
+        result = self.compile_example("""
+def partialModel : Model 2 1 1 2 where
+  joints := fun _ => ⟨.rigid, 1, none⟩
+  member := fun _ => ⟨0, 1, ⟨1, 0⟩, none, none⟩
+  segmentMember := fun _ => 0
+  segmentLeft := fun i => if i = 0 then .endSide (0, false) else .interior 0 0
+  segmentRight := fun i => if i = 0 then .interior 0 0 else .endSide (0, true)
+  segmentLength := fun _ => 1
+  segmentEA := fun _ => 1
+  segmentEI := fun _ => 1
+  segmentVerticalStart := fun i => if i = 0 then 0 else 2
+  segmentVerticalEnd := fun i => if i = 0 then 0 else 4
+
+def unitUp : Coordinate partialModel → ℝ := fun coordinate =>
+  match coordinate with
+  | .inl (_, direction) => if direction = 1 then 1 else 0
+  | .inr _ => 0
+
+def cutLoad : Fin 1 → PointAction 1 1 := fun _ => ⟨.interior 0 0, ![0, -1, 0]⟩
+def cutSupport : SupportInput 1 1 := ⟨.interior 0 0, .roller, 0, 1, false, false, false⟩
+
+theorem hpoint0 : activePoint partialModel (.inl 0) := ⟨0, Or.inl rfl⟩
+theorem hpoint1 : activePoint partialModel (.inl 1) := ⟨1, Or.inr rfl⟩
+theorem hpointCut : activePoint partialModel (.inr (0, 0)) := ⟨0, Or.inr rfl⟩
+
+example : segmentLoad partialModel 0 = 0 := by
+  funext i
+  fin_cases i <;> norm_num [segmentLoad, partialModel, LocalFrameFields.consistentLoad]
+example : (segmentLoad partialModel 1) 1 = 13/10 := by
+  norm_num [segmentLoad, partialModel, LocalFrameFields.consistentLoad]
+example : (segmentLoad partialModel 1) 4 = 17/10 := by
+  norm_num [segmentLoad, partialModel, LocalFrameFields.consistentLoad]
+example : pointActionWork partialModel (cutLoad 0) unitUp = -1 := by
+  norm_num [pointActionWork, FrameTransform.work, sideMotion, referenceMotion,
+    cutLoad, unitUp, hpointCut]
+example : supportRow partialModel cutSupport (![0, 1, 0]) unitUp = 1 := by
+  norm_num [supportRow, FrameTransform.work, sideMotion, referenceMotion,
+    cutSupport, unitUp, hpointCut]
+theorem external_up : externalFunctional partialModel cutLoad unitUp = 2 := by
+  rw [external_functional_apply]
+  classical
+  simp [externalWork, segmentLoad, segmentDofs, segmentMotion, sideMotion, referenceMotion,
+    endMotion, toLocal6, slipValue, partialModel, cutLoad, unitUp,
+    LocalFrameFields.consistentLoad, pointActionWork, FrameTransform.work,
+    hpoint0, hpoint1, hpointCut, Fin.sum_univ_succ]
+  split_ifs <;> norm_num
+example : residualWork partialModel cutLoad 0 unitUp = -2 := by
+  have hext : externalWork partialModel cutLoad unitUp = 2 := by
+    rw [← external_functional_apply]
+    exact external_up
+  have hzero (segment : Fin 2) : segmentDofs partialModel 0 segment = 0 :=
+    (segmentDofsLinear partialModel segment).map_zero
+  have hslip (member : Fin 1) (ending : Bool) (direction : Fin 3) :
+      slipValue partialModel 0 (member, ending) direction = 0 :=
+    (slipLinear partialModel (member, ending) direction).map_zero
+  simp [residualWork, internalVirtualWork, hzero, hslip, hext]
+""")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_released_rotation_side_action_and_support_ownership(self):
+        result = self.compile_example("""
+def hingeModel : Model 2 2 0 2 where
+  joints := fun _ => ⟨.pinned, 1, none⟩
+  member := fun i => if i = 0 then ⟨0, 1, ⟨1, 0⟩, none, none⟩
+    else ⟨1, 0, ⟨-1, 0⟩, none, none⟩
+  segmentMember := fun i => i
+  segmentLeft := fun i => .endSide (i, false)
+  segmentRight := fun i => .endSide (i, true)
+  segmentLength := fun _ => 1
+  segmentEA := fun _ => 1
+  segmentEI := fun _ => 1
+  segmentVerticalStart := fun _ => 0
+  segmentVerticalEnd := fun _ => 0
+
+def sideRotation : Coordinate hingeModel → ℝ := fun coordinate =>
+  match coordinate with
+  | .inl _ => 0
+  | .inr slip => if slip.val.1 = (1, false) ∧ slip.val.2 = 2 then 1 else 0
+
+def releasedCouple : PointAction 2 0 := ⟨.endSide (1, false), ![0, 0, 5]⟩
+def hubCouple : PointAction 2 0 := ⟨.endSide (0, true), ![0, 0, 5]⟩
+def releasedSupport : SupportInput 2 0 := ⟨.endSide (1, false), .fixed, 0, 0, false, false, false⟩
+def hubSupport : SupportInput 2 0 := ⟨.endSide (0, true), .fixed, 0, 0, false, false, false⟩
+
+theorem rotationReleased : directionLaw (endConnection hingeModel (1, false)) 2 = .released := by rfl
+theorem rotationSlip : hasSlip hingeModel (1, false) 2 := by
+  constructor
+  · exact ⟨1, Or.inl rfl⟩
+  · rw [rotationReleased]
+    intro h
+    cases h
+
+theorem releasedSideMotion : sideMotion hingeModel sideRotation (.endSide (1, false)) = ![0, 0, 1] := by
+  classical
+  funext i
+  fin_cases i <;> simp [sideMotion, referenceMotion, endMotion, slipValue, sideRotation,
+    hingeModel, endNode, rotationSlip] <;> split_ifs <;> norm_num <;> contradiction
+
+theorem hubSideMotion : sideMotion hingeModel sideRotation (.endSide (0, true)) = 0 := by
+  classical
+  funext i
+  fin_cases i <;> simp [sideMotion, referenceMotion, endMotion, slipValue, sideRotation,
+    hingeModel, endNode] <;> split_ifs <;> norm_num
+
+example : pointActionWork hingeModel releasedCouple sideRotation = 5 := by
+  simp [pointActionWork, releasedCouple, FrameTransform.work, releasedSideMotion]
+example : pointActionWork hingeModel hubCouple sideRotation = 0 := by
+  simp [pointActionWork, hubCouple, FrameTransform.work, hubSideMotion]
+example : supportRow hingeModel releasedSupport (![0, 0, 1]) sideRotation = 1 := by
+  simp [supportRow, releasedSupport, FrameTransform.work, releasedSideMotion]
+example : supportRow hingeModel hubSupport (![0, 0, 1]) sideRotation = 0 := by
+  simp [supportRow, hubSupport, FrameTransform.work, hubSideMotion]
+example : pointActionWork hingeModel releasedCouple sideRotation ≠
+    pointActionWork hingeModel hubCouple sideRotation := by
+  simp [pointActionWork, releasedCouple, hubCouple, FrameTransform.work,
+    releasedSideMotion, hubSideMotion]
 """)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
