@@ -54,6 +54,10 @@ theorem pureSlip_admissible : admissible parallelModel noSupports pureSlip := by
   exact Fin.elim0 support
 theorem pureSlip_zero_deformation : deformationMap parallelModel pureSlip = 0 := by
   classical
+  have law00 : endConnection parallelModel (0, false) = rigidConnection := by rfl
+  have law01 : endConnection parallelModel (0, true) = rigidConnection := by rfl
+  have law10 : endConnection parallelModel (1, false) = freeAxial := by rfl
+  have law11 : endConnection parallelModel (1, true) = freeAxial := by rfl
   funext index
   cases index with
   | inl memberIndex =>
@@ -61,15 +65,13 @@ theorem pureSlip_zero_deformation : deformationMap parallelModel pureSlip = 0 :=
     fin_cases segment <;> fin_cases component <;>
       simp [deformationMap, segmentDeformation, memberDeformation, relativeRotationLeft,
         relativeRotationRight, segmentDofs, segmentMotion, sideMotion, referenceMotion,
-        endMotion, toLocal6, slipValue, hasSlip, activeEnd, endConnection, directionLaw,
-        referenceMember, incident, endNode, parallelModel, freeAxial, pureSlip] <;>
+        endMotion, toLocal6, slipValue, hasSlip, directionLaw, endNode, parallelModel,
+        freeAxial, rigidConnection, pureSlip, law00, law01, law10, law11] <;>
       split_ifs <;> norm_num
   | inr spring =>
-    obtain ⟨k, hk⟩ := spring.property.2
-    rcases spring.val with ⟨⟨member, ending⟩, direction⟩
+    rcases spring with ⟨⟨⟨member, ending⟩, direction⟩, hactive, k, hk⟩
     fin_cases member <;> cases ending <;> fin_cases direction <;>
-      simp [directionLaw, endConnection, referenceMember, incident, endNode,
-        parallelModel, freeAxial, rigidConnection] at hk
+      simp [directionLaw, freeAxial, rigidConnection, law00, law01, law10, law11] at hk
 example : mechanism parallelModel noSupports pureSlip :=
   ⟨pureSlip_nonzero, pureSlip_admissible, pureSlip_zero_deformation⟩
 """

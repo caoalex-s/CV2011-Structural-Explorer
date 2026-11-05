@@ -20,3 +20,9 @@ import FrameAssembly
 #print axioms FrameAssembly.finite_reaction_coefficients
 #print axioms FrameAssembly.external_functional_apply
 #print axioms FrameAssembly.grouped_ground_action_gauge
+#print axioms FrameAssembly.grouped_ground_action_sum
+#print axioms FrameAssembly.multiplier_functional_apply
+#print axioms FrameAssembly.equilibrium_iff_reaction_coefficients
+#print axioms FrameAssembly.side_motion_hub_basis
+#print axioms FrameAssembly.support_row_hub_basis
+#print axioms FrameAssembly.grouped_ground_action_global

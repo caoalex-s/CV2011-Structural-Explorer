@@ -21,3 +21,7 @@ import FrameDeformation
 #print axioms FrameDeformation.equilibrium_exists_iff_load_compatible
 #print axioms FrameDeformation.mechanism_selfstress_dimension
 #print axioms FrameDeformation.frame_statics_dimension
+#print axioms FrameDeformation.member_basic_stress_work
+#print axioms FrameDeformation.member_basic_stress_energy
+#print axioms FrameDeformation.basic_stress_work_eq_stiffness
+#print axioms FrameDeformation.equilibrium_iff_basic_stress_balance

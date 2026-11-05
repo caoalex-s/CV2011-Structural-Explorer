@@ -84,6 +84,32 @@ theorem segment_directional_derivative (model : Model nodes members cuts segment
     simp [Pi.add_apply, Pi.smul_apply, smul_eq_mul]
   · simp
 
+/-- Axial force and the two end-rotation generalized stresses conjugate to
+the extension and chord-relative rotations. -/
+def memberBasicStress (d : LocalDofs) (L EA EI : ℝ) : Fin 3 → ℝ :=
+  ![EA/L*(d 3-d 0),
+    4*EI/L*(relativeRotationLeft d L + relativeRotationRight d L/2),
+    4*EI/L*(relativeRotationRight d L + relativeRotationLeft d L/2)]
+
+/-- The positive local elastic weighting maps deformations to the actual
+stiffness virtual work, including the coupling of the two end rotations. -/
+theorem member_basic_stress_work (d variation : LocalDofs) (L EA EI : ℝ) (hL : L ≠ 0) :
+    (∑ i : Fin 3, memberBasicStress d L EA EI i * memberDeformation variation L i) =
+      ∑ i : Fin 6, variation i *
+        (∑ j : Fin 6, LocalFrameFields.stiffness L EA EI i j * d j) := by
+  simp [memberBasicStress, memberDeformation, relativeRotationLeft, relativeRotationRight,
+    LocalFrameFields.stiffness, Fin.sum_univ_succ]
+  field_simp
+  ring
+
+/-- Half the generalized stress-deformation work is the local strain energy. -/
+theorem member_basic_stress_energy (d : LocalDofs) (L EA EI : ℝ) (hL : L ≠ 0) :
+    (∑ i : Fin 3, memberBasicStress d L EA EI i * memberDeformation d L i) =
+      2 * energy d L EA EI := by
+  rw [member_basic_stress_work d d L EA EI hL, energy_stiffness_identity d L EA EI hL]
+  simp [Fin.sum_univ_succ]
+  ring
+
 /-- The three rigid motions produce no axial extension or chord-relative rotation. -/
 theorem rigid_deformation_zero (A B omega L : ℝ) (hL : L ≠ 0) :
     memberDeformation (rigidMotion A B omega L) L = 0 := by
@@ -122,6 +148,56 @@ def deformationMap (model : Model nodes members cuts segments)
     (q : Coordinate model → ℝ) : Sum (Fin segments × Fin 3) (SpringIndex model) → ℝ
   | .inl (segment, component) => segmentDeformation model q segment component
   | .inr spring => slipValue model q spring.val.1 spring.val.2
+
+/-- Actual member basic stresses and spring forces tested against an encoded
+movement. Free and rigid directions have zero spring modulus. -/
+def basicStressWork (model : Model nodes members cuts segments)
+    (q variation : Coordinate model → ℝ) : ℝ :=
+  (∑ segment : Fin segments, ∑ i : Fin 3,
+    memberBasicStress (segmentDofs model q segment) (model.segmentLength segment)
+      (model.segmentEA segment) (model.segmentEI segment) i * segmentDeformation model variation segment i) +
+  ∑ member : Fin members, ∑ ending : Bool, ∑ direction : Fin 3,
+    let side := (member, ending)
+    springStiffness (directionLaw (endConnection model side) direction) *
+      slipValue model q side direction * slipValue model variation side direction
+
+/-- Assembled stiffness work is the work of physical basic stresses and
+spring forces against the actual member and connection deformations. -/
+theorem basic_stress_work_eq_stiffness (model : Model nodes members cuts segments)
+    (q variation : Coordinate model → ℝ) (hsegments : positiveSegments model) :
+    basicStressWork model q variation = stiffnessWork model q variation := by
+  unfold basicStressWork stiffnessWork internalVirtualWork
+  congr 1
+  apply Finset.sum_congr rfl
+  intro segment _
+  exact member_basic_stress_work (segmentDofs model q segment) (segmentDofs model variation segment)
+    (model.segmentLength segment) (model.segmentEA segment) (model.segmentEI segment)
+    (ne_of_gt (hsegments segment).1)
+
+/-- The exact equilibrium equations are the balance of assembled member basic
+stresses and spring forces against the encoded external virtual work. -/
+theorem equilibrium_iff_basic_stress_balance (model : Model nodes members cuts segments)
+    (actions : Fin actionCount → PointAction members cuts)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (q : Coordinate model → ℝ) (hsegments : positiveSegments model) :
+    equilibrium model actions supports q ↔ admissible model supports q ∧
+      ∀ variation, admissible model supports variation →
+        basicStressWork model q variation = externalWork model actions variation := by
+  unfold equilibrium
+  constructor
+  · rintro ⟨hadmissible, hbalance⟩
+    refine ⟨hadmissible, ?_⟩
+    intro variation hvariation
+    have h := hbalance variation hvariation
+    unfold residualWork at h
+    rw [← basic_stress_work_eq_stiffness model q variation hsegments] at h
+    exact sub_eq_zero.mp h
+  · rintro ⟨hadmissible, hbalance⟩
+    refine ⟨hadmissible, ?_⟩
+    intro variation hvariation
+    unfold residualWork
+    rw [← basic_stress_work_eq_stiffness model q variation hsegments]
+    exact sub_eq_zero.mpr (hbalance variation hvariation)
 
 /-- D is a linear map built from actual segment B maps and spring slip maps. -/
 def deformationLinear (model : Model nodes members cuts segments) :

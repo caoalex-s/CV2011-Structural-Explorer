@@ -463,6 +463,70 @@ def groupedGroundAction (model : Model nodes members cuts segments)
     (coefficients : ConstraintIndex supports → ℝ) (point : ActivePoint model) (direction : Fin 3) : ℝ :=
   aggregateReaction model supports coefficients (coordinateBasis model (.inl (point, direction)))
 
+/-- A unit active-hub coordinate moves every member side attached to that
+same physical reference point, without introducing a member-side slip. -/
+theorem side_motion_hub_basis (model : Model nodes members cuts segments)
+    (point : ActivePoint model) (direction : Fin 3) (location : Location members cuts) :
+    sideMotion model (coordinateBasis model (.inl (point, direction))) location =
+      if locationPoint model location = point.val then (fun i => if i = direction then 1 else 0) else 0 := by
+  classical
+  by_cases hmatch : locationPoint model location = point.val
+  · have hactive : activePoint model (locationPoint model location) := by rw [hmatch]; exact point.property
+    cases location with
+    | interior member cut =>
+      funext i
+      simp [sideMotion, referenceMotion, coordinateBasis, locationPoint, hmatch, hactive,
+        Subtype.ext_iff, Prod.ext_iff]
+    | endSide side =>
+      funext i
+      fin_cases i <;> fin_cases direction <;>
+        simp [sideMotion, referenceMotion, coordinateBasis, locationPoint, endMotion,
+          slipValue, hmatch, hactive, Subtype.ext_iff, Prod.ext_iff]
+  · cases location with
+    | interior member cut =>
+      funext i
+      simp [sideMotion, referenceMotion, coordinateBasis, locationPoint, hmatch,
+        Subtype.ext_iff, Prod.ext_iff]
+    | endSide side =>
+      funext i
+      fin_cases i <;> fin_cases direction <;>
+        simp [sideMotion, referenceMotion, coordinateBasis, locationPoint, endMotion,
+          slipValue, hmatch, Subtype.ext_iff, Prod.ext_iff]
+
+/-- A support row acting on a unit hub movement returns its blocked global
+direction component at that point, and zero at every other active hub. -/
+theorem support_row_hub_basis (model : Model nodes members cuts segments)
+    (support : SupportInput members cuts) (blocked : Triple)
+    (point : ActivePoint model) (direction : Fin 3) :
+    supportRow model support blocked (coordinateBasis model (.inl (point, direction))) =
+      if locationPoint model support.location = point.val then blocked direction else 0 := by
+  rw [supportRow, side_motion_hub_basis]
+  split_ifs <;> fin_cases direction <;> simp [FrameTransform.work]
+
+/-- The grouped component is the sum of the actual member-side support-row
+contributions projected onto the chosen active hub coordinate. -/
+theorem grouped_ground_action_sum (model : Model nodes members cuts segments)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (coefficients : ConstraintIndex supports → ℝ) (point : ActivePoint model) (direction : Fin 3) :
+    groupedGroundAction model supports coefficients point direction =
+      ∑ row : ConstraintIndex supports, coefficients row *
+        supportRow model (supports row.1) ((supportDirections (supports row.1)).get row.2)
+          (coordinateBasis model (.inl (point, direction))) := by
+  simp [groupedGroundAction, aggregateReaction, multiplierFunctional, constraintMap,
+    supportRowLinear, LinearMap.dualMap_apply, smul_eq_mul]
+
+/-- Ground actions are grouped by actual shared hub and resolved in global
+coordinates. Member-side slip components are not mistaken for hub reactions. -/
+theorem grouped_ground_action_global (model : Model nodes members cuts segments)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (coefficients : ConstraintIndex supports → ℝ) (point : ActivePoint model) (direction : Fin 3) :
+    groupedGroundAction model supports coefficients point direction =
+      ∑ row : ConstraintIndex supports, coefficients row *
+        (if locationPoint model (supports row.1).location = point.val then
+          ((supportDirections (supports row.1)).get row.2) direction else 0) := by
+  rw [grouped_ground_action_sum]
+  simp_rw [support_row_hub_basis]
+
 /-- Equal aggregate reactions have equal grouped ground actions, even if the
 individual support coefficients differ by a multiplier gauge. -/
 theorem grouped_ground_action_gauge (model : Model nodes members cuts segments)
@@ -494,6 +558,36 @@ theorem finite_reaction_coefficients {ι : Type} [Fintype ι] [DecidableEq ι]
         by_cases h : j = i <;> simp [Pi.single_apply, h]
       rw [hsingle, map_smul]
       simp [smul_eq_mul, mul_comm]
+
+/-- The selected row coefficients act on the actual constraint values. -/
+theorem multiplier_functional_apply (supports : Fin supportCount → SupportInput members cuts)
+    (coefficients : ConstraintIndex supports → ℝ) (values : ConstraintIndex supports → ℝ) :
+    multiplierFunctional supports coefficients values = ∑ row, coefficients row * values row := by
+  simp [multiplierFunctional, smul_eq_mul]
+
+/-- Equilibrium selects support coefficients whose aggregate Cᵀλ is exactly
+the field-derived residual. Coefficients can differ by the multiplier gauge. -/
+theorem equilibrium_iff_reaction_coefficients (model : Model nodes members cuts segments)
+    (actions : Fin actionCount → PointAction members cuts)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (q : Coordinate model → ℝ) (hsegments : positiveSegments model) :
+    equilibrium model actions supports q ↔ admissible model supports q ∧
+      ∃ coefficients : ConstraintIndex supports → ℝ,
+        residualFunctional model actions q = aggregateReaction model supports coefficients := by
+  classical
+  rw [equilibrium_iff_support_reaction model actions supports q hsegments]
+  constructor
+  · rintro ⟨hadmissible, reaction, hreaction⟩
+    obtain ⟨coefficients, hcoefficients⟩ := finite_reaction_coefficients reaction
+    refine ⟨hadmissible, coefficients, ?_⟩
+    ext variation
+    rw [hreaction variation, hcoefficients]
+    simp [aggregateReaction, LinearMap.dualMap_apply, multiplier_functional_apply]
+  · rintro ⟨hadmissible, coefficients, hreaction⟩
+    refine ⟨hadmissible, multiplierFunctional supports coefficients, ?_⟩
+    intro variation
+    have h := congrArg (fun f : Module.Dual ℝ (Coordinate model → ℝ) => f variation) hreaction
+    simpa [aggregateReaction, LinearMap.dualMap_apply] using h
 
 /-- Under the complete exact input contract, equilibrium has an aggregate
 support reaction even when constraint rows are dependent. -/

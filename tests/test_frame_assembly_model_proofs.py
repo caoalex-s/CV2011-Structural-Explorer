@@ -328,6 +328,25 @@ example : ExactContract twoMemberModel sideLoad sideSupport noCuts properties pr
     fin_cases member <;> cases ending <;> fin_cases direction <;>
       simp [directionLaw, law00, law01, law10, law11, rigidConnection] at hlaw
     all_goals subst stiffness <;> norm_num
+
+def duplicateSupports : Fin 2 → SupportInput 2 0 := fun _ =>
+  ⟨.endSide (1, false), .roller, 1, 0, false, false, false⟩
+def reactionFirst : Module.Dual ℝ (ConstraintIndex duplicateSupports → ℝ) :=
+  2 • LinearMap.proj ⟨0, 0⟩ + 3 • LinearMap.proj ⟨1, 0⟩
+def reactionSecond : Module.Dual ℝ (ConstraintIndex duplicateSupports → ℝ) :=
+  4 • LinearMap.proj ⟨0, 0⟩ + 1 • LinearMap.proj ⟨1, 0⟩
+example : (constraintMap twoMemberModel duplicateSupports).dualMap reactionFirst =
+    (constraintMap twoMemberModel duplicateSupports).dualMap reactionSecond := by
+  ext variation
+  simp [reactionFirst, reactionSecond, constraintMap, supportRowLinear, duplicateSupports,
+    supportDirections, smul_eq_mul]
+  ring
+example : reactionFirst - reactionSecond ∈ LinearMap.ker (constraintMap twoMemberModel duplicateSupports).dualMap := by
+  apply (reaction_gauge twoMemberModel duplicateSupports reactionFirst reactionSecond).mp
+  ext variation
+  simp [reactionFirst, reactionSecond, constraintMap, supportRowLinear, duplicateSupports,
+    supportDirections, smul_eq_mul]
+  ring
 """)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
