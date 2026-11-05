@@ -145,7 +145,9 @@ theorem spring_energy_zero_iff (k delta : ℝ) (hk : 0 < k) :
     k*delta^2/2 = 0 ↔ delta = 0 := by
   constructor
   · intro h
-    nlinarith [sq_nonneg delta]
+    have hp : k * delta ^ 2 = 0 := by linarith
+    have hd : delta ^ 2 = 0 := (mul_eq_zero.mp hp).resolve_left (ne_of_gt hk)
+    nlinarith [hd]
   · rintro rfl
     ring
 

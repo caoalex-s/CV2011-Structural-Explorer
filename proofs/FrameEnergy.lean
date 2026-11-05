@@ -138,12 +138,13 @@ def rigidKernelEquiv (L EA EI : ℝ) (hL : 0 < L) (hEA : 0 < EA) (hEI : 0 < EI) 
     apply Subtype.ext
     have hkernel : ∀ i : Fin 6, ∑ j : Fin 6, stiffness L EA EI i j * v.val j = 0 := by
       intro i
-      have h := congrFun v.property i
-      simpa [stiffnessMap, Matrix.mulVec, dotProduct] using h
+      have hv : stiffnessMap L EA EI v.val = 0 := LinearMap.mem_ker.mp v.property
+      have h := congrFun hv i
+      change (∑ j : Fin 6, stiffness L EA EI i j * v.val j) = 0 at h
+      exact h
     obtain ⟨A, B, omega, h⟩ := (stiffness_kernel_rigid v.val L EA EI hL hEA hEI).mp hkernel
-    rw [h]
     funext i
-    fin_cases i <;> simp [rigidMotion]
+    fin_cases i <;> simp [rigidMotion, h]
   map_add' v w := by
     apply Subtype.ext
     funext i
