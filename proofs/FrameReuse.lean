@@ -200,5 +200,116 @@ theorem point_work_combination (core : Model nodes members cuts segments)
   simp [pointActionWork, FrameTransform.work]
   ring
 
+
+/-- Actual external work is linear in distributed amplitudes and fixed-slot
+point-action components, including both member-side ownership and orientation. -/
+theorem external_work_combination (core : Model nodes members cuts segments)
+    (a b : ℝ) (s₁ e₁ s₂ e₂ : Fin segments → ℝ)
+    (locations : Fin actionCount → Location members cuts)
+    (f₁ f₂ : Fin actionCount → Triple) (q : Coordinate core → ℝ) :
+    externalWork (withLoads core (fun i => a*s₁ i+b*s₂ i) (fun i => a*e₁ i+b*e₂ i))
+      (pointActions locations (fun j i => a*f₁ j i+b*f₂ j i)) q =
+    a * externalWork (withLoads core s₁ e₁) (pointActions locations f₁) q +
+      b * externalWork (withLoads core s₂ e₂) (pointActions locations f₂) q := by
+  have hsegment : ∀ segment i,
+      segmentLoad (withLoads core (fun j => a*s₁ j+b*s₂ j) (fun j => a*e₁ j+b*e₂ j)) segment i *
+          segmentDofs core q segment i =
+      a * (segmentLoad (withLoads core s₁ e₁) segment i * segmentDofs core q segment i) +
+        b * (segmentLoad (withLoads core s₂ e₂) segment i * segmentDofs core q segment i) := by
+    intro segment i
+    have h := congrFun (segment_load_combination core a b s₁ e₁ s₂ e₂ segment) i
+    simp only [Pi.add_apply, Pi.smul_apply, smul_eq_mul] at h
+    rw [h]
+    ring
+  have hpoint : ∀ j,
+      pointActionWork core (pointActions locations (fun k i => a*f₁ k i+b*f₂ k i) j) q =
+      a * pointActionWork core (pointActions locations f₁ j) q +
+        b * pointActionWork core (pointActions locations f₂ j) q := by
+    intro j
+    exact point_work_combination core a b (locations j) (f₁ j) (f₂ j) q
+  simp only [externalWork]
+  simp_rw [hsegment, hpoint, Finset.sum_add_distrib, ← Finset.mul_sum]
+  ring
+
+
+/-- Constrained equilibria superpose for fixed structure and homogeneous
+support rows, whether or not the system has a mechanism. -/
+theorem equilibrium_combination (core : Model nodes members cuts segments)
+    (a b : ℝ) (s₁ e₁ s₂ e₂ : Fin segments → ℝ)
+    (locations : Fin actionCount → Location members cuts) (f₁ f₂ : Fin actionCount → Triple)
+    (supports : Fin supportCount → SupportInput members cuts) (q₁ q₂ : Coordinate core → ℝ)
+    (h₁ : equilibrium (withLoads core s₁ e₁) (pointActions locations f₁) supports q₁)
+    (h₂ : equilibrium (withLoads core s₂ e₂) (pointActions locations f₂) supports q₂) :
+    equilibrium (withLoads core (fun i => a*s₁ i+b*s₂ i) (fun i => a*e₁ i+b*e₂ i))
+      (pointActions locations (fun j i => a*f₁ j i+b*f₂ j i)) supports (a • q₁ + b • q₂) := by
+  have hq₁ : q₁ ∈ LinearMap.ker (constraintMap core supports) :=
+    (admissible_iff_constraint_kernel core supports q₁).mp h₁.1
+  have hq₂ : q₂ ∈ LinearMap.ker (constraintMap core supports) :=
+    (admissible_iff_constraint_kernel core supports q₂).mp h₂.1
+  have hq : a • q₁ + b • q₂ ∈ LinearMap.ker (constraintMap core supports) :=
+    (LinearMap.ker _).add_mem ((LinearMap.ker _).smul_mem a hq₁) ((LinearMap.ker _).smul_mem b hq₂)
+  constructor
+  · exact (admissible_iff_constraint_kernel core supports (a • q₁ + b • q₂)).mpr hq
+  · intro v hv
+    have hw₁ := h₁.2 v hv
+    have hw₂ := h₂.2 v hv
+    have hk : stiffnessWork core (a • q₁ + b • q₂) v =
+        a * stiffnessWork core q₁ v + b * stiffnessWork core q₂ v := by
+      simp only [← stiffness_operator_apply, map_add, map_smul, LinearMap.add_apply,
+        LinearMap.smul_apply, smul_eq_mul]
+    change stiffnessWork core (a • q₁ + b • q₂) v -
+      externalWork (withLoads core (fun i => a*s₁ i+b*s₂ i) (fun i => a*e₁ i+b*e₂ i))
+        (pointActions locations (fun j i => a*f₁ j i+b*f₂ j i)) v = 0
+    change stiffnessWork core q₁ v - externalWork (withLoads core s₁ e₁) (pointActions locations f₁) v = 0 at hw₁
+    change stiffnessWork core q₂ v - externalWork (withLoads core s₂ e₂) (pointActions locations f₂) v = 0 at hw₂
+    rw [hk, external_work_combination]
+    linarith
+
+
+/-- Rotation is the derivative of the jointly linear transverse field. -/
+theorem rotation_recovery_combination (d₁ d₂ : LocalDofs) (a b L EI q₀ q₁ r₀ r₁ : ℝ) :
+    LocalFrameFields.rotation (fun i => a*d₁ i+b*d₂ i) L EI (a*q₀+b*r₀) (a*q₁+b*r₁) =
+      Polynomial.C a * LocalFrameFields.rotation d₁ L EI q₀ q₁ +
+        Polynomial.C b * LocalFrameFields.rotation d₂ L EI r₀ r₁ := by
+  simp [LocalFrameFields.rotation, transverse_recovery_combination, Polynomial.derivative_add,
+    Polynomial.derivative_mul]
+
+/-- Normal force keeps the distributed axial-load contribution. -/
+theorem normal_recovery_combination (d₁ d₂ : LocalDofs) (a b L EA p₀ p₁ r₀ r₁ : ℝ) :
+    LocalFrameFields.normal (fun i => a*d₁ i+b*d₂ i) L EA (a*p₀+b*r₀) (a*p₁+b*r₁) =
+      Polynomial.C a * LocalFrameFields.normal d₁ L EA p₀ p₁ +
+        Polynomial.C b * LocalFrameFields.normal d₂ L EA r₀ r₁ := by
+  simp [LocalFrameFields.normal, axial_recovery_combination, Polynomial.derivative_add,
+    Polynomial.derivative_mul]
+  ring
+
+/-- Bending moment and shear follow by differentiation of the same field. -/
+theorem moment_recovery_combination (d₁ d₂ : LocalDofs) (a b L EI q₀ q₁ r₀ r₁ : ℝ) :
+    LocalFrameFields.moment (fun i => a*d₁ i+b*d₂ i) L EI (a*q₀+b*r₀) (a*q₁+b*r₁) =
+      Polynomial.C a * LocalFrameFields.moment d₁ L EI q₀ q₁ +
+        Polynomial.C b * LocalFrameFields.moment d₂ L EI r₀ r₁ := by
+  simp [LocalFrameFields.moment, rotation_recovery_combination, Polynomial.derivative_add,
+    Polynomial.derivative_mul]
+  ring
+
+theorem shear_recovery_combination (d₁ d₂ : LocalDofs) (a b L EI q₀ q₁ r₀ r₁ : ℝ) :
+    LocalFrameFields.shear (fun i => a*d₁ i+b*d₂ i) L EI (a*q₀+b*r₀) (a*q₁+b*r₁) =
+      Polynomial.C a * LocalFrameFields.shear d₁ L EI q₀ q₁ +
+        Polynomial.C b * LocalFrameFields.shear d₂ L EI r₀ r₁ := by
+  simp [LocalFrameFields.shear, moment_recovery_combination, Polynomial.derivative_add,
+    Polynomial.derivative_mul]
+
+
+/-- End actions use the established force and moment fields at both ends. -/
+theorem end_actions_combination (d₁ d₂ : LocalDofs) (a b L EA EI p₀ p₁ r₀ r₁ q₀ q₁ t₀ t₁ : ℝ) :
+    LocalFrameFields.endActions (fun i => a*d₁ i+b*d₂ i) L EA EI
+      (a*p₀+b*r₀) (a*p₁+b*r₁) (a*q₀+b*t₀) (a*q₁+b*t₁) =
+      a • LocalFrameFields.endActions d₁ L EA EI p₀ p₁ q₀ q₁ +
+        b • LocalFrameFields.endActions d₂ L EA EI r₀ r₁ t₀ t₁ := by
+  funext i
+  fin_cases i <;>
+    simp [LocalFrameFields.endActions, normal_recovery_combination, shear_recovery_combination,
+      moment_recovery_combination, Polynomial.eval_add, Polynomial.eval_mul] <;> ring
+
 end
 end FrameReuse

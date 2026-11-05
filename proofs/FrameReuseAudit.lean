@@ -18,3 +18,10 @@ import FrameReuse
 #print axioms FrameReuse.transverse_recovery_movement_affine
 #print axioms FrameReuse.segment_load_combination
 #print axioms FrameReuse.point_work_combination
+#print axioms FrameReuse.external_work_combination
+#print axioms FrameReuse.equilibrium_combination
+#print axioms FrameReuse.rotation_recovery_combination
+#print axioms FrameReuse.normal_recovery_combination
+#print axioms FrameReuse.moment_recovery_combination
+#print axioms FrameReuse.shear_recovery_combination
+#print axioms FrameReuse.end_actions_combination
