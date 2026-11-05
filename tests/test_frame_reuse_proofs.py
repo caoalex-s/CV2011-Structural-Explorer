@@ -129,6 +129,26 @@ example : ¬ sameCore twoMembers reorderedMembers := by
   intro h
   have v := congrArg (fun m : Model 3 2 0 0 => (m.member 0).endNode) h
   simp [sameCore, structuralCore, twoMembers, reorderedMembers] at v
+
+def splitModel : Model 2 1 1 2 where
+  joints := fun _ => ⟨.rigid, 1, none⟩
+  member := fun _ => ⟨0, 1, ⟨1, 0⟩, none, none⟩
+  segmentMember := fun _ => 0
+  segmentLeft := fun i => if i = 0 then .endSide (0, false) else .interior 0 0
+  segmentRight := fun i => if i = 0 then .interior 0 0 else .endSide (0, true)
+  segmentLength := fun _ => 1
+  segmentEA := fun _ => 1
+  segmentEI := fun _ => 1
+  segmentVerticalStart := fun _ => 0
+  segmentVerticalEnd := fun _ => 0
+def noSupports : Fin 0 → SupportInput 1 1 := Fin.elim0
+def noSlots : Fin 0 → Location 1 1 := Fin.elim0
+def cutHalf : Fin 1 → Fin 1 → ℝ := fun _ _ => 1/2
+def cutThird : Fin 1 → Fin 1 → ℝ := fun _ _ => 1/3
+example : ¬ sameReuseBoundary splitModel splitModel noSupports noSupports noSlots noSlots cutHalf cutThird := by
+  rintro ⟨_, h⟩
+  have v := congrFun (congrFun h 0) 0
+  norm_num [cutHalf, cutThird] at v
 """
         with tempfile.TemporaryDirectory() as folder:
             source = Path(folder) / "ReuseCoreCheck.lean"
@@ -160,6 +180,11 @@ def beam : Model 2 1 0 1 where
 def slots : Fin 1 → Location 1 0 := fun _ => .endSide (0, true)
 def loadZero : Fin 1 → Triple := fun _ => ![0, 0, 0]
 def loadSigned : Fin 1 → Triple := fun _ => ![0, -2, 3]
+def support : Fin 1 → SupportInput 1 0 := fun _ => ⟨.endSide (0, false), .fixed, 0, 1, false, false, false⟩
+def rotation : Coordinate beam → ℝ := fun index =>
+  match index with
+  | .inl (_, direction) => if direction = 2 then 1 else 0
+  | .inr _ => 0
 def up : Coordinate beam → ℝ := fun index =>
   match index with
   | .inl (_, direction) => if direction = 1 then 1 else 0
@@ -172,6 +197,9 @@ example : sameCore (withLoads beam 0 0) (withLoads beam (fun _ => 1) (fun _ => 1
 example (q v : Coordinate beam → ℝ) :
     stiffnessWork (withLoads beam 0 0) q v = stiffnessWork (withLoads beam (fun _ => 1) (fun _ => 1)) q v := by
   exact stiffness_unchanged beam 0 0 (fun _ => 1) (fun _ => 1) q v
+example (q : Coordinate beam → ℝ) :
+    constraintMap (withLoads beam 0 0) support q = constraintMap (withLoads beam (fun _ => 1) (fun _ => 1)) support q := by
+  exact constraint_map_unchanged beam 0 0 (fun _ => 1) (fun _ => 1) support q
 example : externalWork (withLoads beam 0 0) (pointActions slots loadZero) up = 0 := by
   simp [externalWork, segmentLoad, withLoads, LocalFrameFields.consistentLoad,
     pointActions, pointActionWork, loadZero, FrameTransform.work, Fin.sum_univ_succ]
@@ -181,6 +209,14 @@ example : externalWork (withLoads beam (fun _ => 1) (fun _ => 1)) (pointActions 
   dsimp [withLoads, beam] at h0 h1
   simp [externalWork, segmentLoad, segmentDofs, segmentMotion, sideMotion, referenceMotion,
     endMotion, toLocal6, slipValue, withLoads, beam, endNode, pointActions, slots, loadSigned, up,
+    LocalFrameFields.consistentLoad, pointActionWork, FrameTransform.work, h0, h1, Fin.sum_univ_succ]
+  norm_num
+example : externalWork (withLoads beam (fun _ => 1) (fun _ => 1)) (pointActions slots loadSigned) rotation = 3 := by
+  have h0 : activePoint (withLoads beam (fun _ => 1) (fun _ => 1)) (.inl 0) := node0active
+  have h1 : activePoint (withLoads beam (fun _ => 1) (fun _ => 1)) (.inl 1) := node1active
+  dsimp [withLoads, beam] at h0 h1
+  simp [externalWork, segmentLoad, segmentDofs, segmentMotion, sideMotion, referenceMotion,
+    endMotion, toLocal6, slipValue, withLoads, beam, endNode, pointActions, slots, loadSigned, rotation,
     LocalFrameFields.consistentLoad, pointActionWork, FrameTransform.work, h0, h1, Fin.sum_univ_succ]
   norm_num
 """

@@ -40,3 +40,5 @@ import FrameReuse
 #print axioms FrameReuse.segment_transverse_combination
 #print axioms FrameReuse.global_motion_combination
 #print axioms FrameReuse.stable_grouped_reaction_agrees
+#print axioms FrameReuse.slip_combination
+#print axioms FrameReuse.spring_action_combination

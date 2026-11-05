@@ -25,6 +25,14 @@ def sameStructure (first second : Model nodes members cuts segments)
     (locations₁ locations₂ : Fin actionCount → Location members cuts) : Prop :=
   sameCore first second ∧ supports₁ = supports₂ ∧ locations₁ = locations₂
 
+/-- The complete reuse boundary also freezes the original-member cut parameters,
+including distributed-load boundaries represented by those cuts. -/
+def sameReuseBoundary (first second : Model nodes members cuts segments)
+    (supports₁ supports₂ : Fin supportCount → SupportInput members cuts)
+    (locations₁ locations₂ : Fin actionCount → Location members cuts)
+    (cuts₁ cuts₂ : Fin members → Fin cuts → ℝ) : Prop :=
+  sameStructure first second supports₁ supports₂ locations₁ locations₂ ∧ cuts₁ = cuts₂
+
 /-- Replace only the two global-vertical intensity values on each segment. -/
 def withLoads (core : Model nodes members cuts segments)
     (startValue endValue : Fin segments → ℝ) : Model nodes members cuts segments :=
@@ -724,6 +732,25 @@ theorem stable_grouped_reaction_agrees (core : Model nodes members cuts segments
   have hvalue := congrArg (fun reaction : Module.Dual ℝ (Coordinate core → ℝ) =>
     reaction (coordinateBasis core (.inl (point, direction)))) (hres.symm.trans h)
   exact hvalue
+
+
+/-- Relative spring or release motion is obtained from the actual slip map. -/
+theorem slip_combination (model : Model nodes members cuts segments)
+    (a b : ℝ) (q₁ q₂ : Coordinate model → ℝ) (side : MemberEnd members) (direction : Fin 3) :
+    slipValue model (a • q₁ + b • q₂) side direction =
+      a * slipValue model q₁ side direction + b * slipValue model q₂ side direction := by
+  change slipLinear model side direction (a • q₁ + b • q₂) = _
+  simp [map_add, map_smul, slipLinear, smul_eq_mul]
+
+/-- Spring action follows the same fixed end law and relative motion. -/
+theorem spring_action_combination (model : Model nodes members cuts segments)
+    (a b : ℝ) (q₁ q₂ : Coordinate model → ℝ) (side : MemberEnd members) (direction : Fin 3) :
+    springStiffness (directionLaw (endConnection model side) direction) *
+      slipValue model (a • q₁ + b • q₂) side direction =
+    a * (springStiffness (directionLaw (endConnection model side) direction) * slipValue model q₁ side direction) +
+    b * (springStiffness (directionLaw (endConnection model side) direction) * slipValue model q₂ side direction) := by
+  rw [slip_combination]
+  ring
 
 end
 end FrameReuse
