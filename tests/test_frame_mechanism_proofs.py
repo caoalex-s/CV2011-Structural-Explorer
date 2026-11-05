@@ -79,7 +79,7 @@ theorem pureSlip_zero_deformation : deformationMap parallelModel pureSlip = 0 :=
         relativeRotationRight, segmentDofs, segmentMotion, sideMotion, referenceMotion,
         endMotion, toLocal6, slipValue, endNode, parallelModel,
         pureSlip, hs10, hs11] <;>
-      split_ifs <;> norm_num
+      split_ifs <;> norm_num <;> contradiction
   | inr spring =>
     rcases spring with ⟨⟨⟨member, ending⟩, direction⟩, hactive, k, hk⟩
     fin_cases member <;> cases ending <;> fin_cases direction <;>
