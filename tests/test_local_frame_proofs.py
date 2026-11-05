@@ -35,15 +35,24 @@ example : (shear zeroDofs 2 10 0 0).derivative.eval 1 = 0 := by
 
     def test_virtual_work_and_rank_for_signed_affine_load(self):
         result = self.compile_example("""
-def tipAxial : LocalDofs := ![1, 0, 0, 0, 0, 0]
+def leftAxial : LocalDofs := ![1, 0, 0, 0, 0, 0]
 example : (consistentLoad 2 3 (-1) 0 0) 0 = 5/3 := by norm_num [consistentLoad]
-example : (∫ x in (0 : ℝ)..2, physicalLoadDensity tipAxial 2 10 10 3 (-1) 0 0 x) =
-    ∑ i : Fin 6, consistentLoad 2 3 (-1) 0 0 i * tipAxial i :=
-  physical_consistent_load_work tipAxial 2 10 10 3 (-1) 0 0 (by norm_num)
+example : (∫ x in (0 : ℝ)..2, physicalLoadDensity leftAxial 2 10 10 3 (-1) 0 0 x) =
+    ∑ i : Fin 6, consistentLoad 2 3 (-1) 0 0 i * leftAxial i :=
+  physical_consistent_load_work leftAxial 2 10 10 3 (-1) 0 0 (by norm_num)
 example : Module.finrank ℝ (LinearMap.range (stiffnessMap 2 10 10)) = 3 :=
   stiffness_rank_three 2 10 10 (by norm_num) (by norm_num) (by norm_num)
 """)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_wrong_consistent_load_sign_is_rejected(self):
+        result = self.compile_example("""
+example : (consistentLoad 2 3 (-1) 0 0) 0 = -5/3 := by norm_num [consistentLoad]
+""")
+        output = result.stdout + result.stderr
+        self.assertNotEqual(result.returncode, 0)
+        self.assertRegex(output, r"unsolved goals|tactic .*failed")
+        self.assertNotIn("unknown identifier", output)
 
     def test_incorrect_load_sign_is_rejected(self):
         result = self.compile_example("""

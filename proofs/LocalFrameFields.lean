@@ -182,9 +182,17 @@ theorem cubic_of_fourth_derivative_zero (p : Field)
   obtain ⟨a, b, hab⟩ := affine_of_second_derivative_zero p.derivative.derivative h
   let residual : Field := p - C (a/2)*X^2 - C (b/6)*X^3
   have hresidual : residual.derivative.derivative = 0 := by
+    have ha : C (a*(1/2)) * C (2 : ℝ) = C a := by
+      rw [← map_mul]
+      congr 1
+      ring
+    have hb : C (2 : ℝ) * C (b*(1/6)) * C (3 : ℝ) = C b := by
+      rw [← map_mul, ← map_mul]
+      congr 1
+      ring
     simp [residual, Polynomial.derivative_sub, Polynomial.derivative_mul,
       Polynomial.derivative_pow, Polynomial.C_eq_natCast, hab, map_mul]
-    ring
+    linear_combination -ha - X*hb
   obtain ⟨c₀, c₁, hc⟩ := affine_of_second_derivative_zero residual hresidual
   refine ⟨c₀, c₁, a/2, b/6, ?_⟩
   dsimp [residual] at hc
@@ -218,7 +226,8 @@ theorem transverse_prescribed_end_unique (v₁ v₂ : Field) (L : ℝ) (hL : 0 <
     simp [Polynomial.derivative_sub, Polynomial.derivative_mul,
       Polynomial.derivative_pow, Polynomial.C_eq_natCast, hrightSlope, hc₁] at h
     linarith
-  have hcube : c₃*L^3 = 0 := by nlinarith [mul_eq_mul_left L hslope]
+  have hslopeL := congrArg (fun value : ℝ => L*value) hslope
+  have hcube : c₃*L^3 = 0 := by nlinarith
   have hc₃ : c₃ = 0 := (mul_eq_zero.mp hcube).resolve_right (pow_ne_zero 3 (ne_of_gt hL))
   have hsquare : c₂*L^2 = 0 := by simpa [hc₃] using hvalue
   have hc₂ : c₂ = 0 := (mul_eq_zero.mp hsquare).resolve_right (pow_ne_zero 2 (ne_of_gt hL))

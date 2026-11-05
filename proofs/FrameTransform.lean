@@ -17,6 +17,13 @@ abbrev Triple := Fin 3 → ℝ
 def toLocal (c s : ℝ) (v : Triple) : Triple :=
   ![c*v 0+s*v 1, -s*v 0+c*v 1, v 2]
 
+/-- A stored global-vertical intensity has these local components. The
+current application does not use a separate distributed global-x intensity. -/
+theorem global_vertical_components (c s q : ℝ) :
+    toLocal c s (![0, q, 0] : Triple) = ![s*q, c*q, 0] := by
+  funext i
+  fin_cases i <;> simp [toLocal]
+
 /-- Apply the transposed rotation to a local translation or action. -/
 def toGlobal (c s : ℝ) (v : Triple) : Triple :=
   ![c*v 0-s*v 1, s*v 0+c*v 1, v 2]
@@ -63,6 +70,14 @@ theorem work_invariant6 (c s : ℝ) (f d : LocalDofs) (h : c^2+s^2 = 1) :
   nlinarith [show (c^2+s^2)*(f 0*d 0+f 1*d 1+f 3*d 3+f 4*d 4) =
       f 0*d 0+f 1*d 1+f 3*d 3+f 4*d 4 by rw [h]; ring]
 
+/-- The inverse also holds when a local vector is mapped to global and back. -/
+theorem inverse_transform_reverse (c s : ℝ) (v : Triple) (h : c^2+s^2 = 1) :
+    toLocal c s (toGlobal c s v) = v := by
+  funext i
+  fin_cases i <;> simp [toGlobal, toLocal]
+  all_goals nlinarith [show (c^2+s^2)*v 0 = v 0 by rw [h]; ring,
+    show (c^2+s^2)*v 1 = v 1 by rw [h]; ring]
+
 /-- The transposed map sends member end actions back to global axes and
 preserves their work against the corresponding global displacement. -/
 theorem transpose_work6 (c s : ℝ) (localAction globalDisplacement : LocalDofs) :
@@ -81,6 +96,16 @@ theorem rigid_end (c s : ℝ) (reference : Triple) :
     endMotion c s reference (fun _ => 0) = reference := by
   funext i
   fin_cases i <;> simp [endMotion]
+
+/-- Local projections recover the member-side relative slips when the
+reference movement is subtracted. -/
+theorem end_motion_slips (c s : ℝ) (reference slip : Triple) (h : c^2+s^2 = 1) :
+    toLocal c s (fun i => endMotion c s reference slip i - reference i) = slip := by
+  have hrelative : (fun i => endMotion c s reference slip i - reference i) = toGlobal c s slip := by
+    funext i
+    fin_cases i <;> simp [endMotion, toGlobal] <;> ring
+  rw [hrelative]
+  exact inverse_transform_reverse c s slip h
 
 /-- Potential for one relative direction. pSide includes all actions applied
 directly to this member side, including loads and support actions. -/

@@ -11,3 +11,6 @@ import FrameTransform
 #print axioms FrameTransform.work_invariant6
 #print axioms FrameTransform.spring_energy_zero_iff
 #print axioms FrameTransform.transpose_work6
+#print axioms FrameTransform.inverse_transform_reverse
+#print axioms FrameTransform.end_motion_slips
+#print axioms FrameTransform.global_vertical_components
