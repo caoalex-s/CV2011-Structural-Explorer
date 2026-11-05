@@ -454,6 +454,72 @@ def unitUp : Coordinate partialModel → ℝ := fun coordinate =>
 def cutLoad : Fin 1 → PointAction 1 1 := fun _ => ⟨.interior 0 0, ![0, -1, 0]⟩
 def cutSupport : SupportInput 1 1 := ⟨.interior 0 0, .roller, 0, 1, false, false, false⟩
 
+def partialSupports : Fin 1 → SupportInput 1 1 := fun _ => cutSupport
+def partialCuts : Fin 1 → Fin 1 → ℝ := fun _ _ => 1/2
+def partialLengths : Fin 1 → ℝ := fun _ => 2
+def partialRigidities : Fin 1 → ℝ := fun _ => 1
+
+example : ExactContract partialModel cutLoad partialSupports partialCuts partialLengths
+    partialRigidities partialRigidities := by
+  constructor
+  · intro segment
+    fin_cases segment <;> simp [segmentOwnershipValid, locationBelongs, partialModel]
+  · intro segment
+    fin_cases segment <;> norm_num [partialModel, locationParameter, partialCuts]
+  · intro member t ht0 ht1
+    fin_cases member
+    by_cases ht : t ≤ 1/2
+    · refine ⟨0, ?_⟩
+      norm_num [partialModel, locationParameter, partialCuts]
+      constructor <;> linarith
+    · refine ⟨1, ?_⟩
+      norm_num [partialModel, locationParameter, partialCuts]
+      constructor <;> linarith
+  · intro a b hne hmember
+    fin_cases a <;> fin_cases b <;> norm_num [partialModel, locationParameter, partialCuts] at *
+  · intro member left right hl hr hleft hright hpos
+    fin_cases member
+    have leftCases : left = .endSide (0, false) ∨ left = .interior 0 0 ∨ left = .endSide (0, true) := by
+      obtain ⟨i, hi⟩ := hleft
+      fin_cases i <;> simp [partialModel] at hi <;> aesop
+    have rightCases : right = .endSide (0, false) ∨ right = .interior 0 0 ∨ right = .endSide (0, true) := by
+      obtain ⟨i, hi⟩ := hright
+      fin_cases i <;> simp [partialModel] at hi <;> aesop
+    rcases leftCases with rfl | rfl | rfl <;> rcases rightCases with rfl | rfl | rfl <;>
+      norm_num [locationParameter, partialCuts] at *
+  · intro member
+    fin_cases member
+    exact ⟨⟨0, Or.inl rfl⟩, ⟨1, Or.inr rfl⟩⟩
+  · intro member cut h
+    fin_cases member
+    fin_cases cut
+    norm_num [partialCuts]
+  · intro action
+    fin_cases action
+    exact ⟨0, Or.inr rfl⟩
+  · intro support
+    fin_cases support
+    exact ⟨0, Or.inr rfl⟩
+  · intro member
+    fin_cases member
+    norm_num [partialModel]
+  · intro support hkind
+    fin_cases support
+    norm_num [partialSupports, cutSupport]
+  · intro member
+    fin_cases member
+    norm_num [partialLengths, partialRigidities]
+  · intro segment
+    fin_cases segment <;> norm_num [partialModel, partialLengths, partialCuts, locationParameter]
+  · intro segment
+    fin_cases segment <;> norm_num [partialModel, partialRigidities]
+  · intro side direction stiffness hactive hlaw
+    rcases side with ⟨member, ending⟩
+    fin_cases member
+    cases ending <;> fin_cases direction <;>
+      simp [directionLaw, endConnection, referenceMember, incident, endNode, partialModel,
+        rigidConnection] at hlaw
+
 theorem hpoint0 : activePoint partialModel (.inl 0) := ⟨0, Or.inl rfl⟩
 theorem hpoint1 : activePoint partialModel (.inl 1) := ⟨1, Or.inr rfl⟩
 theorem hpointCut : activePoint partialModel (.inr (0, 0)) := ⟨0, Or.inr rfl⟩
@@ -464,21 +530,32 @@ example : segmentLoad partialModel 0 = 0 := by
 example : (segmentLoad partialModel 1) 1 = 13/10 := by
   norm_num [segmentLoad, partialModel, LocalFrameFields.consistentLoad]
 example : (segmentLoad partialModel 1) 4 = 17/10 := by
-  norm_num [segmentLoad, partialModel, LocalFrameFields.consistentLoad]
+  have h : segmentLoad partialModel 1 = ![0, 13/10, 7/30, 0, 17/10, -(4/15)] := by
+    funext i
+    fin_cases i <;> norm_num [segmentLoad, partialModel, LocalFrameFields.consistentLoad]
+  rw [h]
+  change (17/10 : ℝ) = 17/10
+  rfl
 example : pointActionWork partialModel (cutLoad 0) unitUp = -1 := by
+  have hc : activePoint partialModel (.inr 0) := hpointCut
   norm_num [pointActionWork, FrameTransform.work, sideMotion, referenceMotion,
-    cutLoad, unitUp, hpointCut]
+    cutLoad, unitUp, hc]
 example : supportRow partialModel cutSupport (![0, 1, 0]) unitUp = 1 := by
+  have hc : activePoint partialModel (.inr 0) := hpointCut
   norm_num [supportRow, FrameTransform.work, sideMotion, referenceMotion,
-    cutSupport, unitUp, hpointCut]
+    cutSupport, unitUp, hc]
 theorem external_up : externalFunctional partialModel cutLoad unitUp = 2 := by
   rw [external_functional_apply]
   classical
+  have hp0 := hpoint0
+  have hp1 := hpoint1
+  have hpc := hpointCut
+  dsimp [partialModel] at hp0 hp1 hpc
   simp [externalWork, segmentLoad, segmentDofs, segmentMotion, sideMotion, referenceMotion,
-    endMotion, toLocal6, slipValue, partialModel, cutLoad, unitUp,
+    endMotion, toLocal6, slipValue, partialModel, endNode, cutLoad, unitUp,
     LocalFrameFields.consistentLoad, pointActionWork, FrameTransform.work,
-    hpoint0, hpoint1, hpointCut, Fin.sum_univ_succ]
-  split_ifs <;> norm_num
+    hp0, hp1, hpc, Fin.sum_univ_succ]
+  split_ifs <;> norm_num <;> contradiction
 example : residualWork partialModel cutLoad 0 unitUp = -2 := by
   have hext : externalWork partialModel cutLoad unitUp = 2 := by
     rw [← external_functional_apply]
@@ -529,7 +606,8 @@ theorem releasedSideMotion : sideMotion hingeModel sideRotation (.endSide (1, fa
   classical
   funext i
   fin_cases i <;> simp [sideMotion, referenceMotion, endMotion, slipValue, sideRotation,
-    hingeModel, endNode, rotationSlip] <;> split_ifs <;> norm_num <;> contradiction
+    hingeModel, endNode, rotationSlip] <;> try split_ifs <;> try norm_num <;> try contradiction
+  all_goals exact rotationSlip
 
 theorem hubSideMotion : sideMotion hingeModel sideRotation (.endSide (0, true)) = 0 := by
   classical
@@ -549,6 +627,40 @@ example : pointActionWork hingeModel releasedCouple sideRotation ≠
     pointActionWork hingeModel hubCouple sideRotation := by
   simp [pointActionWork, releasedCouple, hubCouple, FrameTransform.work,
     releasedSideMotion, hubSideMotion]
+""")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_rigid_joint_with_reversed_member(self):
+        result = self.compile_example("""
+def rigidJoined : Model 2 2 0 2 where
+  joints := fun _ => ⟨.rigid, 1, none⟩
+  member := fun i => if i = 0 then ⟨0, 1, ⟨1, 0⟩, none, none⟩
+    else ⟨1, 0, ⟨-1, 0⟩, none, none⟩
+  segmentMember := fun i => i
+  segmentLeft := fun i => .endSide (i, false)
+  segmentRight := fun i => .endSide (i, true)
+  segmentLength := fun _ => 1
+  segmentEA := fun _ => 1
+  segmentEI := fun _ => 1
+  segmentVerticalStart := fun _ => 0
+  segmentVerticalEnd := fun _ => 0
+
+example (q : Coordinate rigidJoined → ℝ) :
+    sideMotion rigidJoined q (.endSide (0, true)) = sideMotion rigidJoined q (.endSide (1, false)) := by
+  have law0 : endConnection rigidJoined (0, true) = rigidConnection := by rfl
+  have law1 : endConnection rigidJoined (1, false) = rigidConnection := by rfl
+  have h0 : slipValue rigidJoined q (0, true) = 0 := by
+    funext i
+    fin_cases i <;> simp [slipValue, hasSlip, directionLaw, law0, rigidConnection]
+  have h1 : slipValue rigidJoined q (1, false) = 0 := by
+    funext i
+    fin_cases i <;> simp [slipValue, hasSlip, directionLaw, law1, rigidConnection]
+  change endMotion 1 0 (referenceMotion rigidJoined q (.inl 1)) (slipValue rigidJoined q (0, true)) =
+    endMotion (-1) 0 (referenceMotion rigidJoined q (.inl 1)) (slipValue rigidJoined q (1, false))
+  rw [h0, h1]
+  change endMotion 1 0 (referenceMotion rigidJoined q (.inl 1)) (fun _ => 0) =
+    endMotion (-1) 0 (referenceMotion rigidJoined q (.inl 1)) (fun _ => 0)
+  rw [rigid_end, rigid_end]
 """)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
