@@ -106,6 +106,18 @@ example {nodes members cuts segments actionCount supportCount : Nat}
     (cutParameter : Fin members → Fin cuts → ℝ)
     (length EA EI : Fin members → ℝ)
     (h : ExactContract model actions supports cutParameter length EA EI)
+    (member : Fin members) (zeroC : (model.member member).orientation.cosine = 0)
+    (zeroS : (model.member member).orientation.sine = 0) : False := by
+  have normalized := h.orientationNormalized member
+  rw [zeroC, zeroS] at normalized
+  norm_num at normalized
+example {nodes members cuts segments actionCount supportCount : Nat}
+    (model : Model nodes members cuts segments)
+    (actions : Fin actionCount → PointAction members cuts)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (cutParameter : Fin members → Fin cuts → ℝ)
+    (length EA EI : Fin members → ℝ)
+    (h : ExactContract model actions supports cutParameter length EA EI)
     (side : MemberEnd members) (direction : Fin 3)
     (active : activeEnd model side)
     (zeroSpring : directionLaw (endConnection model side) direction = .spring 0) : False := by

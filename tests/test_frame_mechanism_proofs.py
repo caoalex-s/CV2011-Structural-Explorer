@@ -148,6 +148,13 @@ example : totalEnergy parallelModel pureSlip = 0 :=
   deformation_zero_implies_energy_zero parallelModel noActions noSupports noCuts
     unitProperties unitProperties unitProperties pureSlip_contract pureSlip pureSlip_zero_deformation
 
+example (q : Coordinate parallelModel → ℝ) (hq : equilibrium parallelModel noActions noSupports q) :
+    ∃ r, equilibrium parallelModel noActions noSupports r ∧ r ≠ q := by
+  refine ⟨q + pureSlip, ?_⟩
+  exact mechanism_generates_second_equilibrium parallelModel noActions noSupports noCuts
+    unitProperties unitProperties unitProperties pureSlip_contract q pureSlip hq
+      ⟨pureSlip_nonzero, pureSlip_admissible, pureSlip_zero_deformation⟩
+
 example : ∃ q, equilibrium parallelModel noActions noSupports q := by
   apply (equilibrium_exists_iff_load_compatible parallelModel noActions noSupports noCuts
     unitProperties unitProperties unitProperties pureSlip_contract).mpr
@@ -369,12 +376,14 @@ theorem fixed_movements_zero (q : Coordinate fixedModel → ℝ)
       fin_cases node
       · have hx := congrFun hrefLeft direction
         change (if hp : activePoint fixedModel (.inl 0) then q (.inl (⟨.inl 0, hp⟩, direction)) else 0) = 0 at hx
-        rw [dif_pos hactive] at hx
-        exact hx
+        have ha : activePoint fixedModel (.inl 0) := ⟨0, Or.inl rfl⟩
+        rw [dif_pos ha] at hx
+        simpa using hx
       · have hx := congrFun hrefRight direction
         change (if hp : activePoint fixedModel (.inl 1) then q (.inl (⟨.inl 1, hp⟩, direction)) else 0) = 0 at hx
-        rw [dif_pos hactive] at hx
-        exact hx
+        have ha : activePoint fixedModel (.inl 1) := ⟨0, Or.inr rfl⟩
+        rw [dif_pos ha] at hx
+        simpa using hx
 
 example : ∀ q, admissible fixedModel fixedSupports q → deformationMap fixedModel q = 0 → q = 0 := by
   intro q h _
