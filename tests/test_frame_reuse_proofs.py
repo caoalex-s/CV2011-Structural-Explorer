@@ -140,11 +140,11 @@ example (q v : Coordinate beam → ℝ) :
   exact stiffness_unchanged beam 0 0 (fun _ => 1) (fun _ => 1) q v
 example : externalWork (withLoads beam 0 0) (pointActions slots loadZero) up = 0 := by
   simp [externalWork, segmentLoad, withLoads, LocalFrameFields.consistentLoad,
-    pointActions, pointActionWork, loadZero, FrameTransform.work]
+    pointActions, pointActionWork, loadZero, FrameTransform.work, Fin.sum_univ_succ]
 example : externalWork (withLoads beam (fun _ => 1) (fun _ => 1)) (pointActions slots loadSigned) up = -1 := by
-  have h0 := node0active
-  have h1 := node1active
-  dsimp [beam] at h0 h1
+  have h0 : activePoint (withLoads beam (fun _ => 1) (fun _ => 1)) (.inl 0) := node0active
+  have h1 : activePoint (withLoads beam (fun _ => 1) (fun _ => 1)) (.inl 1) := node1active
+  dsimp [withLoads, beam] at h0 h1
   simp [externalWork, segmentLoad, segmentDofs, segmentMotion, sideMotion, referenceMotion,
     endMotion, toLocal6, slipValue, withLoads, beam, endNode, pointActions, slots, loadSigned, up,
     LocalFrameFields.consistentLoad, pointActionWork, FrameTransform.work, h0, h1, Fin.sum_univ_succ]
@@ -244,13 +244,17 @@ def momentMotion : Coordinate beam → ℝ := fun index =>
 theorem point0 : activePoint beam (.inl 0) := ⟨0, Or.inl rfl⟩
 theorem point1 : activePoint beam (.inl 1) := ⟨0, Or.inr rfl⟩
 theorem dofs_axial : segmentDofs beam axialMotion 0 = ![0, 0, 0, 1, 0, 0] := by
+  have h1 := point1
+  dsimp [beam] at h1
   funext i
   fin_cases i <;> simp [segmentDofs, segmentMotion, sideMotion, referenceMotion, endMotion,
-    toLocal6, slipValue, axialMotion, beam, endNode, point0, point1]
+    toLocal6, slipValue, axialMotion, beam, endNode, h1]
 theorem dofs_moment : segmentDofs beam momentMotion 0 = ![0, 0, 0, 0, 1/2, 1] := by
+  have h1 := point1
+  dsimp [beam] at h1
   funext i
   fin_cases i <;> simp [segmentDofs, segmentMotion, sideMotion, referenceMotion, endMotion,
-    toLocal6, slipValue, momentMotion, beam, endNode, point0, point1]
+    toLocal6, slipValue, momentMotion, beam, endNode, h1]
 
 example : LocalFrameFields.endActions (segmentDofs beam axialMotion 0) 1 1 1 0 0 0 0 = ![-1, 0, 0, 1, 0, 0] := by
   rw [dofs_axial]
@@ -258,15 +262,15 @@ example : LocalFrameFields.endActions (segmentDofs beam axialMotion 0) 1 1 1 0 0
   fin_cases i <;> norm_num [LocalFrameFields.endActions, LocalFrameFields.normal, LocalFrameFields.shear,
     LocalFrameFields.moment, LocalFrameFields.rotation, LocalFrameFields.axialDisplacement,
     LocalFrameFields.transverseDisplacement, LocalFrameFields.coordinate, Polynomial.derivative_mul,
-    Polynomial.derivative_pow]
+    Polynomial.derivative_pow] <;> norm_num
 example : LocalFrameFields.endActions (segmentDofs beam momentMotion 0) 1 1 1 0 0 0 0 = ![0, 0, -1, 0, 0, 1] := by
   rw [dofs_moment]
   funext i
   fin_cases i <;> norm_num [LocalFrameFields.endActions, LocalFrameFields.normal, LocalFrameFields.shear,
     LocalFrameFields.moment, LocalFrameFields.rotation, LocalFrameFields.axialDisplacement,
     LocalFrameFields.transverseDisplacement, LocalFrameFields.coordinate, Polynomial.derivative_mul,
-    Polynomial.derivative_pow]
-example : segmentDofs beam (2 • axialMotion - momentMotion) 0 = ![0, 0, 0, 2, -1/2, -1] := by
+    Polynomial.derivative_pow] <;> norm_num
+example : segmentDofs beam ((2:ℝ) • axialMotion - momentMotion) 0 = ![0, 0, 0, 2, -1/2, -1] := by
   rw [sub_eq_add_neg, ← neg_one_smul ℝ momentMotion, segment_dofs_combination, dofs_axial, dofs_moment]
   funext i
   fin_cases i <;> norm_num

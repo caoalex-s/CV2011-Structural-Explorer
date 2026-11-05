@@ -676,5 +676,42 @@ theorem global_motion_combination (c s a b : ℝ) (v₁ v₂ : Triple) :
   funext i
   fin_cases i <;> simp [toGlobal] <;> ring
 
+
+/-- A fixed hub component of the stable aggregate reaction is a linear
+functional of the same load case. -/
+def stableGroupedReactionLinear (core : Model nodes members cuts segments)
+    (locations : Fin actionCount → Location members cuts)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (cutsAt : Fin members → Fin cuts → ℝ) (length EA EI : Fin members → ℝ)
+    (baseContract : ExactContract (withLoads core 0 0) (pointActions locations 0) supports cutsAt length EA EI)
+    (baseStable : ∀ z, admissible (withLoads core 0 0) supports z →
+      deformationMap (withLoads core 0 0) z = 0 → z = 0)
+    (point : ActivePoint core) (direction : Fin 3) : LoadCase segments actionCount →ₗ[ℝ] ℝ where
+  toFun load := stableReactionLinear core locations supports cutsAt length EA EI baseContract baseStable load
+    (coordinateBasis core (.inl (point, direction)))
+  map_add' first second := by simp
+  map_smul' a load := by simp
+
+/-- A support-row representative projects to the same stable hub result.
+The statement intentionally does not choose one representative of its gauge. -/
+theorem stable_grouped_reaction_agrees (core : Model nodes members cuts segments)
+    (locations : Fin actionCount → Location members cuts)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (cutsAt : Fin members → Fin cuts → ℝ) (length EA EI : Fin members → ℝ)
+    (baseContract : ExactContract (withLoads core 0 0) (pointActions locations 0) supports cutsAt length EA EI)
+    (baseStable : ∀ z, admissible (withLoads core 0 0) supports z →
+      deformationMap (withLoads core 0 0) z = 0 → z = 0)
+    (load : LoadCase segments actionCount) (coefficients : ConstraintIndex supports → ℝ)
+    (h : residualFunctional (caseModel core load) (caseActions locations load)
+      (stableSolutionLinear core locations supports cutsAt length EA EI baseContract baseStable load) =
+        aggregateReaction core supports coefficients)
+    (point : ActivePoint core) (direction : Fin 3) :
+    stableGroupedReactionLinear core locations supports cutsAt length EA EI baseContract baseStable point direction load =
+      groupedGroundAction core supports coefficients point direction := by
+  have hres := stable_reaction_is_residual core locations supports cutsAt length EA EI baseContract baseStable load
+  have hvalue := congrArg (fun reaction : Module.Dual ℝ (Coordinate core → ℝ) =>
+    reaction (coordinateBasis core (.inl (point, direction)))) (hres.symm.trans h)
+  exact hvalue
+
 end
 end FrameReuse

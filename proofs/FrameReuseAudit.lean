@@ -38,3 +38,4 @@ import FrameReuse
 #print axioms FrameReuse.segment_axial_combination
 #print axioms FrameReuse.segment_transverse_combination
 #print axioms FrameReuse.global_motion_combination
+#print axioms FrameReuse.stable_grouped_reaction_agrees
