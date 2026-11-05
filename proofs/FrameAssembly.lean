@@ -122,8 +122,79 @@ theorem total_energy_nonnegative (model : Model nodes members cuts segments)
     exact energy_nonnegative (segmentDofs model q segment) _ _ _ hL hEA hEI
   · exact spring_energy_nonnegative model q hsprings
 
-/-- Each recovered segment has the unique loaded local fields associated with
-its assembled end movements and its exact vertical affine load. -/
+/-- Actual assembled stiffness work is symmetric because each local element
+stiffness is symmetric and each spring contribution is a scalar product. -/
+theorem stiffness_work_symmetric (model : Model nodes members cuts segments)
+    (q variation : Coordinate model → ℝ) :
+    stiffnessWork model q variation = stiffnessWork model variation q := by
+  have hsegment (segment : Fin segments) :
+      (∑ i : Fin 6, segmentDofs model variation segment i *
+        (∑ j : Fin 6, LocalFrameFields.stiffness (model.segmentLength segment)
+          (model.segmentEA segment) (model.segmentEI segment) i j * segmentDofs model q segment j)) =
+      (∑ i : Fin 6, segmentDofs model q segment i *
+        (∑ j : Fin 6, LocalFrameFields.stiffness (model.segmentLength segment)
+          (model.segmentEA segment) (model.segmentEI segment) i j * segmentDofs model variation segment j)) := by
+    simp only [Finset.mul_sum]
+    rw [Finset.sum_comm]
+    apply Finset.sum_congr rfl
+    intro i _
+    apply Finset.sum_congr rfl
+    intro j _
+    rw [LocalFrameFields.stiffness_symmetric _ _ _ j i]
+    ring
+  unfold stiffnessWork internalVirtualWork
+  rw [show (∑ segment : Fin segments, ∑ i : Fin 6, segmentDofs model variation segment i *
+      (∑ j : Fin 6, LocalFrameFields.stiffness (model.segmentLength segment)
+        (model.segmentEA segment) (model.segmentEI segment) i j * segmentDofs model q segment j)) =
+      (∑ segment : Fin segments, ∑ i : Fin 6, segmentDofs model q segment i *
+      (∑ j : Fin 6, LocalFrameFields.stiffness (model.segmentLength segment)
+        (model.segmentEA segment) (model.segmentEI segment) i j * segmentDofs model variation segment j)) by
+    exact Finset.sum_congr rfl (fun segment _ => hsegment segment)]
+  congr 1
+  apply Finset.sum_congr rfl
+  intro member _
+  apply Finset.sum_congr rfl
+  intro endSide _
+  apply Finset.sum_congr rfl
+  intro direction _
+  dsimp
+  ring
+
+/-- The assembled quadratic stiffness work is twice the model's energy. -/
+theorem stiffness_work_energy (model : Model nodes members cuts segments)
+    (q : Coordinate model → ℝ) (hsegments : positiveSegments model) :
+    stiffnessWork model q q = 2 * totalEnergy model q := by
+  have hsegment (segment : Fin segments) :
+      (∑ i : Fin 6, segmentDofs model q segment i *
+        (∑ j : Fin 6, LocalFrameFields.stiffness (model.segmentLength segment)
+          (model.segmentEA segment) (model.segmentEI segment) i j * segmentDofs model q segment j)) =
+      2 * energy (segmentDofs model q segment) (model.segmentLength segment)
+        (model.segmentEA segment) (model.segmentEI segment) := by
+    rw [energy_stiffness_identity _ _ _ _ (ne_of_gt (hsegments segment).1)]
+    simp [Fin.sum_univ_succ]
+    ring
+  unfold stiffnessWork internalVirtualWork totalEnergy springEnergy
+  simp_rw [hsegment]
+  simp only [Finset.mul_sum]
+  congr 1
+  apply Finset.sum_congr rfl
+  intro member _
+  apply Finset.sum_congr rfl
+  intro endSide _
+  apply Finset.sum_congr rfl
+  intro direction _
+  dsimp
+  ring
+
+/-- Positive member and spring data give positive semidefinite global stiffness. -/
+theorem stiffness_work_nonnegative (model : Model nodes members cuts segments)
+    (q : Coordinate model → ℝ) (hsegments : positiveSegments model)
+    (hsprings : nonnegativeSprings model) : 0 ≤ stiffnessWork model q q := by
+  rw [stiffness_work_energy model q hsegments]
+  exact mul_nonneg (by norm_num) (total_energy_nonnegative model q hsegments hsprings)
+
+/-- Each recovered segment has loaded local fields associated with its
+assembled end movements and its exact vertical affine load. -/
 theorem recovered_segment_exists (model : Model nodes members cuts segments)
     (q : Coordinate model → ℝ) (segment : Fin segments) (h : positiveSegments model) :
     Nonempty (LocalFrameFields.SegmentSolution (segmentDofs model q segment)

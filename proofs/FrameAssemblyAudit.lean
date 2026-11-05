@@ -3,3 +3,6 @@ import FrameAssembly
 #print axioms FrameAssembly.spring_energy_nonnegative
 #print axioms FrameAssembly.total_energy_nonnegative
 #print axioms FrameAssembly.recovered_segment_exists
+#print axioms FrameAssembly.stiffness_work_symmetric
+#print axioms FrameAssembly.stiffness_work_energy
+#print axioms FrameAssembly.stiffness_work_nonnegative
