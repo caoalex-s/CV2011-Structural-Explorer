@@ -226,6 +226,11 @@ example : reactionFirst - reactionSecond ∈ LinearMap.ker (constraintMap beam d
   simp [reactionFirst, reactionSecond, row0, row1, constraintMap, supportRowLinear, duplicateSupports,
     supportDirections, smul_eq_mul]
   ring
+example : reactionFirst ≠ reactionSecond := by
+  intro h
+  let probe : ConstraintIndex duplicateSupports → ℝ := fun row => if row.1 = 0 then 1 else 0
+  have hvalue := congrArg (fun reaction : Module.Dual ℝ (ConstraintIndex duplicateSupports → ℝ) => reaction probe) h
+  norm_num [reactionFirst, reactionSecond, row0, row1, probe] at hvalue
 example (first second : ConstraintIndex duplicateSupports → ℝ) (a b : ℝ) :
     aggregateReaction beam duplicateSupports (a • first + b • second) =
       a • aggregateReaction beam duplicateSupports first + b • aggregateReaction beam duplicateSupports second := by
@@ -291,14 +296,14 @@ theorem axial_actions : LocalFrameFields.endActions (segmentDofs beam axialMotio
   fin_cases i <;> norm_num [LocalFrameFields.endActions, LocalFrameFields.normal, LocalFrameFields.shear,
     LocalFrameFields.moment, LocalFrameFields.rotation, LocalFrameFields.axialDisplacement,
     LocalFrameFields.transverseDisplacement, LocalFrameFields.coordinate, Polynomial.derivative_mul,
-    Polynomial.derivative_pow] <;> norm_num [Matrix.vecCons, Fin.cases]
+    Polynomial.derivative_pow] <;> norm_num [Matrix.vecCons, Fin.cons, Fin.cases]
 theorem moment_actions : LocalFrameFields.endActions (segmentDofs beam momentMotion 0) 1 1 1 0 0 0 0 = ![0, 0, -1, 0, 0, 1] := by
   rw [dofs_moment]
   funext i
   fin_cases i <;> norm_num [LocalFrameFields.endActions, LocalFrameFields.normal, LocalFrameFields.shear,
     LocalFrameFields.moment, LocalFrameFields.rotation, LocalFrameFields.axialDisplacement,
     LocalFrameFields.transverseDisplacement, LocalFrameFields.coordinate, Polynomial.derivative_mul,
-    Polynomial.derivative_pow] <;> norm_num [Matrix.vecCons, Fin.cases]
+    Polynomial.derivative_pow] <;> norm_num [Matrix.vecCons, Fin.cons, Fin.cases]
 example : segmentDofs beam ((2:ℝ) • axialMotion - momentMotion) 0 = ![0, 0, 0, 2, -1/2, -1] := by
   rw [sub_eq_add_neg, ← neg_one_smul ℝ momentMotion, segment_dofs_combination, dofs_axial, dofs_moment]
   funext i
@@ -334,8 +339,7 @@ theorem axial_equilibrium : equilibrium beam axialLoad support axialMotion := by
     have hp : pointActionWork beam (axialLoad 0) v = segmentDofs beam v 0 3 := by
       simp [pointActionWork, FrameTransform.work, axialLoad, segmentDofs, segmentMotion, toLocal6, beam]
     have ha : recoveredEndActions beam axialMotion 0 = ![-1, 0, 0, 1, 0, 0] := by
-      change LocalFrameFields.endActions (segmentDofs beam axialMotion 0) 1 1 1 0 0 0 0 = _
-      exact axial_actions
+      simpa [recoveredEndActions, beam] using axial_actions
     rw [residual_work_from_end_actions beam axialLoad axialMotion v positive]
     simp [Fin.sum_univ_succ, ha, hp, springStiffness, directionLaw, law0, law1, rigidConnection, hx0]
 
@@ -349,8 +353,7 @@ theorem moment_equilibrium : equilibrium beam momentLoad support momentMotion :=
     have hp : pointActionWork beam (momentLoad 0) v = segmentDofs beam v 0 5 := by
       simp [pointActionWork, FrameTransform.work, momentLoad, segmentDofs, segmentMotion, toLocal6, beam]
     have ha : recoveredEndActions beam momentMotion 0 = ![0, 0, -1, 0, 0, 1] := by
-      change LocalFrameFields.endActions (segmentDofs beam momentMotion 0) 1 1 1 0 0 0 0 = _
-      exact moment_actions
+      simpa [recoveredEndActions, beam] using moment_actions
     rw [residual_work_from_end_actions beam momentLoad momentMotion v positive]
     simp [Fin.sum_univ_succ, ha, hp, springStiffness, directionLaw, law0, law1, rigidConnection, ht0]
 
