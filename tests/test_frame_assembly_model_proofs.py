@@ -282,7 +282,7 @@ def sideSupport : Fin 2 → SupportInput 2 0 := fun i =>
 example : directionLaw (endConnection twoMemberModel (1, false)) 0 = .spring 2 := by rfl
 example : directionLaw (endConnection twoMemberModel (1, false)) 1 = .released := by rfl
 example : directionLaw (endConnection twoMemberModel (1, false)) 2 = .spring 3 := by rfl
-example : ExactContract twoMemberModel sideLoad sideSupport noCuts properties properties properties := by
+theorem twoMember_contract : ExactContract twoMemberModel sideLoad sideSupport noCuts properties properties properties := by
   constructor
   · intro segment
     fin_cases segment <;> simp [segmentOwnershipValid, locationBelongs, twoMemberModel]
@@ -340,6 +340,43 @@ example : ExactContract twoMemberModel sideLoad sideSupport noCuts properties pr
     fin_cases member <;> cases ending <;> fin_cases direction <;>
       simp [directionLaw, law00, law01, law10, law11, rigidConnection] at hlaw
     all_goals subst stiffness <;> norm_num
+
+def springMode : Coordinate twoMemberModel → ℝ := fun coordinate =>
+  match coordinate with
+  | .inl _ => 0
+  | .inr slip => if slip.val.1 = (1, false) ∧ slip.val.2 = 0 then 1 else 0
+
+example : 0 < springEnergy twoMemberModel springMode := by
+  classical
+  have hactive : hasSlip twoMemberModel (1, false) 0 := by
+    constructor
+    · exact ⟨1, Or.inl rfl⟩
+    · change EndLaw.spring 2 ≠ EndLaw.rigid
+      intro h
+      cases h
+  have hslip : slipValue twoMemberModel springMode (1, false) 0 = 1 := by
+    simp [slipValue, hactive, springMode]
+  have hnonnegative := contract_nonnegative_springs twoMemberModel sideLoad sideSupport noCuts
+    properties properties properties twoMember_contract
+  let term := fun (m : Fin 2) (e : Bool) (i : Fin 3) =>
+    springStiffness (directionLaw (endConnection twoMemberModel (m, e)) i) *
+      (slipValue twoMemberModel springMode (m, e) i)^2 / 2
+  have hterm (m : Fin 2) (e : Bool) (i : Fin 3) : 0 ≤ term m e i := by
+    exact div_nonneg (mul_nonneg (hnonnegative m e i) (sq_nonneg _)) (by norm_num)
+  have hi : term 1 false 0 ≤ ∑ i : Fin 3, term 1 false i :=
+    Finset.single_le_sum (fun i _ => hterm 1 false i) (Finset.mem_univ 0)
+  have he : (∑ i : Fin 3, term 1 false i) ≤ ∑ e : Bool, ∑ i : Fin 3, term 1 e i :=
+    Finset.single_le_sum (fun e _ => Finset.sum_nonneg (fun i _ => hterm 1 e i)) (Finset.mem_univ false)
+  have hm : (∑ e : Bool, ∑ i : Fin 3, term 1 e i) ≤
+      ∑ m : Fin 2, ∑ e : Bool, ∑ i : Fin 3, term m e i :=
+    Finset.single_le_sum (fun m _ => Finset.sum_nonneg
+      (fun e _ => Finset.sum_nonneg (fun i _ => hterm m e i))) (Finset.mem_univ 1)
+  have hpositive : 0 < term 1 false 0 := by
+    change 0 < springStiffness (EndLaw.spring 2) * (slipValue twoMemberModel springMode (1, false) 0)^2 / 2
+    rw [hslip]
+    norm_num [springStiffness]
+  change 0 < ∑ m : Fin 2, ∑ e : Bool, ∑ i : Fin 3, term m e i
+  linarith
 
 def duplicateSupports : Fin 2 → SupportInput 2 0 := fun _ =>
   ⟨.endSide (1, false), .roller, 1, 0, false, false, false⟩
