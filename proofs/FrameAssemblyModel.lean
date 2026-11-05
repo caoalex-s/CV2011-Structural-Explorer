@@ -279,6 +279,22 @@ theorem side_motion_smul (model : Model nodes members cuts segments)
         simp [sideMotion, referenceMotion, endMotion, slipValue, Pi.smul_apply, smul_eq_mul] <;>
         split_ifs <;> ring
 
+/-- Relative movement in one member-end direction is a linear functional. -/
+def slipLinear (model : Model nodes members cuts segments)
+    (side : MemberEnd members) (direction : Fin 3) :
+    (Coordinate model → ℝ) →ₗ[ℝ] ℝ where
+  toFun := fun q => slipValue model q side direction
+  map_add' := by
+    intro q r
+    classical
+    unfold slipValue
+    split_ifs <;> simp [Pi.add_apply]
+  map_smul' := by
+    intro a q
+    classical
+    unfold slipValue
+    split_ifs <;> simp [Pi.smul_apply, smul_eq_mul]
+
 /-- The actual end builder as a linear map H. -/
 def sideMotionLinear (model : Model nodes members cuts segments)
     (location : Location members cuts) : (Coordinate model → ℝ) →ₗ[ℝ] Triple where
@@ -327,10 +343,10 @@ structure ExactContract (model : Model nodes members cuts segments)
   disjointInteriors : ∀ a b, a ≠ b → model.segmentMember a = model.segmentMember b →
     locationParameter cutParameter (model.segmentRight a) ≤ locationParameter cutParameter (model.segmentLeft b) ∨
     locationParameter cutParameter (model.segmentRight b) ≤ locationParameter cutParameter (model.segmentLeft a)
-  adjacentEndpoints : ∀ a b, model.segmentMember a = model.segmentMember b →
-    locationParameter cutParameter (model.segmentRight a) =
-      locationParameter cutParameter (model.segmentLeft b) →
-    model.segmentRight a = model.segmentLeft b
+  canonicalLocations : ∀ member left right,
+    locationBelongs member left → locationBelongs member right →
+    representedLocation model left → representedLocation model right →
+    locationParameter cutParameter left = locationParameter cutParameter right → left = right
   memberEnds : ∀ member, representedLocation model (.endSide (member, false)) ∧
     representedLocation model (.endSide (member, true))
   interiorCuts : ∀ member cut, representedLocation model (.interior member cut) →
@@ -339,6 +355,9 @@ structure ExactContract (model : Model nodes members cuts segments)
   supportLocations : ∀ support, representedLocation model (supports support).location
   orientationNormalized : ∀ member,
     (model.member member).orientation.cosine^2 + (model.member member).orientation.sine^2 = 1
+  supportNormalized : ∀ support,
+    (supports support).kind = .roller ∨ (supports support).kind = .guided →
+    (supports support).cosine^2 + (supports support).sine^2 = 1
   positiveMember : ∀ member, 0 < memberLength member ∧ 0 < memberEA member ∧ 0 < memberEI member
   segmentLengthMatches : ∀ segment,
     model.segmentLength segment = memberLength (model.segmentMember segment) *
@@ -349,6 +368,27 @@ structure ExactContract (model : Model nodes members cuts segments)
     model.segmentEI segment = memberEI (model.segmentMember segment)
   positiveSpring : ∀ side direction stiffness, activeEnd model side →
     directionLaw (endConnection model side) direction = .spring stiffness → 0 < stiffness
+
+/-- Adjacent segments at the same member parameter share the same actual
+location and therefore the same reference movement. -/
+theorem contract_shared_join (model : Model nodes members cuts segments)
+    (actions : Fin actionCount → PointAction members cuts)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (cutParameter : Fin members → Fin cuts → ℝ)
+    (memberLength memberEA memberEI : Fin members → ℝ)
+    (h : ExactContract model actions supports cutParameter memberLength memberEA memberEI)
+    (q : Coordinate model → ℝ) (a b : Fin segments)
+    (sameMember : model.segmentMember a = model.segmentMember b)
+    (samePosition : locationParameter cutParameter (model.segmentRight a) =
+      locationParameter cutParameter (model.segmentLeft b)) :
+    sideMotion model q (model.segmentRight a) = sideMotion model q (model.segmentLeft b) := by
+  apply congrArg (sideMotion model q)
+  apply h.canonicalLocations (model.segmentMember a)
+  · exact (h.ownership a).2
+  · rw [sameMember]; exact (h.ownership b).1
+  · exact ⟨a, Or.inr rfl⟩
+  · exact ⟨b, Or.inl rfl⟩
+  · exact samePosition
 
 /-- The segment transformation B is built from the two actual member-side
 end maps and the segment's local axes. -/

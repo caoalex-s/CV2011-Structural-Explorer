@@ -156,6 +156,39 @@ theorem residual_work_from_end_actions (model : Model nodes members cuts segment
   rw [hloads]
   ring
 
+/-- A selected segment movement component, built from B. -/
+def segmentCoordinateLinear (model : Model nodes members cuts segments)
+    (segment : Fin segments) (i : Fin 6) : (Coordinate model → ℝ) →ₗ[ℝ] ℝ :=
+  (LinearMap.proj i).comp (segmentDofsLinear model segment)
+
+/-- Point-action work as a linear functional on its actual member side. -/
+def pointActionLinear (model : Model nodes members cuts segments)
+    (action : PointAction members cuts) : (Coordinate model → ℝ) →ₗ[ℝ] ℝ :=
+  ∑ i : Fin 3, action.globalAction i •
+    ((LinearMap.proj i).comp (sideMotionLinear model action.location))
+
+/-- Assemble the loaded field end actions, spring slips and point actions into
+the same residual functional used by constrained virtual work. -/
+def residualFunctional (model : Model nodes members cuts segments)
+    (actions : Fin actionCount → PointAction members cuts) (q : Coordinate model → ℝ) :
+    (Coordinate model → ℝ) →ₗ[ℝ] ℝ :=
+  (∑ segment : Fin segments, ∑ i : Fin 6,
+    recoveredEndActions model q segment i • segmentCoordinateLinear model segment i) +
+  (∑ member : Fin members, ∑ endSide : Bool, ∑ direction : Fin 3,
+    let side := (member, endSide)
+    let k := springStiffness (directionLaw (endConnection model side) direction)
+    (k * slipValue model q side direction) • slipLinear model side direction) -
+  ∑ action : Fin actionCount, pointActionLinear model (actions action)
+
+/-- Its value is the model-derived residual virtual work. -/
+theorem residual_functional_apply (model : Model nodes members cuts segments)
+    (actions : Fin actionCount → PointAction members cuts)
+    (q variation : Coordinate model → ℝ) (hsegments : positiveSegments model) :
+    residualFunctional model actions q variation = residualWork model actions q variation := by
+  rw [residual_work_from_end_actions model actions q variation hsegments]
+  simp [residualFunctional, segmentCoordinateLinear, pointActionLinear, pointActionWork,
+    FrameTransform.work, Fin.sum_univ_succ, smul_eq_mul, mul_comm]
+
 /-- A linear residual annihilates the admissible motions exactly when it is
 the pullback of a support-row functional. This allows dependent support rows:
 the row functional need not be unique. -/
@@ -185,6 +218,31 @@ theorem admissible_reaction_dual (model : Model nodes members cuts segments)
     refine ⟨reaction, ?_⟩
     ext variation
     simpa [LinearMap.dualMap_apply] using (hreaction variation).symm
+
+/-- Constrained equilibrium is equivalent to an aggregate support reaction
+functional, with no independence assumption on the support rows. -/
+theorem equilibrium_iff_support_reaction (model : Model nodes members cuts segments)
+    (actions : Fin actionCount → PointAction members cuts)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (q : Coordinate model → ℝ) (hsegments : positiveSegments model) :
+    equilibrium model actions supports q ↔
+      admissible model supports q ∧
+      ∃ reaction : Module.Dual ℝ (ConstraintIndex supports → ℝ),
+        ∀ variation, residualFunctional model actions q variation =
+          reaction (constraintMap model supports variation) := by
+  unfold equilibrium
+  constructor
+  · rintro ⟨hadmissible, hstationary⟩
+    refine ⟨hadmissible, (admissible_reaction_dual model supports _).mp ?_⟩
+    intro variation hvariation
+    rw [residual_functional_apply model actions q variation hsegments]
+    exact hstationary variation hvariation
+  · rintro ⟨hadmissible, reaction, hreaction⟩
+    refine ⟨hadmissible, ?_⟩
+    have hstationary := (admissible_reaction_dual model supports _).mpr ⟨reaction, hreaction⟩
+    intro variation hvariation
+    rw [← residual_functional_apply model actions q variation hsegments]
+    exact hstationary variation hvariation
 
 /-- Free and rigid directions have zero spring modulus. A finite spring must
 have nonnegative modulus here; physical spring inputs require strict positivity. -/

@@ -69,10 +69,94 @@ def sparseModel : Model 3 2 1 1 where
   segmentEI := fun _ => 1
   segmentVerticalStart := fun _ => 0
   segmentVerticalEnd := fun _ => 0
-example : activePoint sparseModel (.inr (0, 0)) := by decide
-example : ¬ activePoint sparseModel (.inr (1, 0)) := by decide
-example : ¬ activePoint sparseModel (.inl 2) := by decide
-example : ¬ activeEnd sparseModel (1, false) := by decide
+example : activePoint sparseModel (.inr (0, 0)) := ⟨0, Or.inr rfl⟩
+example : ¬ activePoint sparseModel (.inr (1, 0)) := by
+  rintro ⟨i, h⟩
+  fin_cases i
+  simp [sparseModel, locationPoint, endNode] at h
+example : ¬ activePoint sparseModel (.inl 2) := by
+  rintro ⟨i, h⟩
+  fin_cases i
+  simp [sparseModel, locationPoint, endNode] at h
+example : ¬ activeEnd sparseModel (1, false) := by
+  rintro ⟨i, h⟩
+  fin_cases i
+  simp [sparseModel] at h
+""")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_contract_rejects_unrepresented_support_and_zero_spring(self):
+        result = self.compile_example("""
+example {nodes members cuts segments actionCount supportCount : Nat}
+    (model : Model nodes members cuts segments)
+    (actions : Fin actionCount → PointAction members cuts)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (cutParameter : Fin members → Fin cuts → ℝ)
+    (length EA EI : Fin members → ℝ)
+    (h : ExactContract model actions supports cutParameter length EA EI)
+    (support : Fin supportCount)
+    (unrepresented : ¬ representedLocation model (supports support).location) : False :=
+  unrepresented (h.supportLocations support)
+example {nodes members cuts segments actionCount supportCount : Nat}
+    (model : Model nodes members cuts segments)
+    (actions : Fin actionCount → PointAction members cuts)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (cutParameter : Fin members → Fin cuts → ℝ)
+    (length EA EI : Fin members → ℝ)
+    (h : ExactContract model actions supports cutParameter length EA EI)
+    (side : MemberEnd members) (direction : Fin 3)
+    (active : activeEnd model side)
+    (zeroSpring : directionLaw (endConnection model side) direction = .spring 0) : False := by
+  have positive := h.positiveSpring side direction 0 active zeroSpring
+  norm_num at positive
+""")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_contract_rejects_disconnected_join_and_zero_support_axis(self):
+        result = self.compile_example("""
+example {nodes members cuts segments actionCount supportCount : Nat}
+    (model : Model nodes members cuts segments)
+    (actions : Fin actionCount → PointAction members cuts)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (cutParameter : Fin members → Fin cuts → ℝ) (length EA EI : Fin members → ℝ)
+    (h : ExactContract model actions supports cutParameter length EA EI)
+    (member : Fin members) (a b : Fin cuts) (different : a ≠ b)
+    (ha : representedLocation model (.interior member a))
+    (hb : representedLocation model (.interior member b))
+    (samePosition : cutParameter member a = cutParameter member b) : False := by
+  have sameLocation := h.canonicalLocations member (.interior member a) (.interior member b)
+    rfl rfl ha hb samePosition
+  cases sameLocation
+  exact different rfl
+example {nodes members cuts segments actionCount supportCount : Nat}
+    (model : Model nodes members cuts segments)
+    (actions : Fin actionCount → PointAction members cuts)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (cutParameter : Fin members → Fin cuts → ℝ) (length EA EI : Fin members → ℝ)
+    (h : ExactContract model actions supports cutParameter length EA EI)
+    (support : Fin supportCount) (roller : (supports support).kind = .roller)
+    (zeroX : (supports support).cosine = 0) (zeroY : (supports support).sine = 0) : False := by
+  have unit := h.supportNormalized support (Or.inl roller)
+  rw [zeroX, zeroY] at unit
+  norm_num at unit
+example {nodes members cuts segments actionCount supportCount : Nat}
+    (model : Model nodes members cuts segments)
+    (actions : Fin actionCount → PointAction members cuts)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (cutParameter : Fin members → Fin cuts → ℝ) (length EA EI : Fin members → ℝ)
+    (h : ExactContract model actions supports cutParameter length EA EI)
+    (q : Coordinate model → ℝ) (a b : Fin segments)
+    (sameMember : model.segmentMember a = model.segmentMember b)
+    (samePosition : locationParameter cutParameter (model.segmentRight a) =
+      locationParameter cutParameter (model.segmentLeft b)) :
+    sideMotion model q (model.segmentRight a) = sideMotion model q (model.segmentLeft b) := by
+  apply congrArg (sideMotion model q)
+  apply h.canonicalLocations (model.segmentMember a)
+  · exact (h.ownership a).2
+  · rw [sameMember]; exact (h.ownership b).1
+  · exact ⟨a, Or.inr rfl⟩
+  · exact ⟨b, Or.inl rfl⟩
+  · exact samePosition
 """)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 

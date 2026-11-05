@@ -11,3 +11,5 @@ import FrameAssembly
 #print axioms FrameAssembly.contract_positive_segments
 #print axioms FrameAssembly.contract_nonnegative_springs
 #print axioms FrameAssembly.residual_work_from_end_actions
+#print axioms FrameAssembly.residual_functional_apply
+#print axioms FrameAssembly.equilibrium_iff_support_reaction

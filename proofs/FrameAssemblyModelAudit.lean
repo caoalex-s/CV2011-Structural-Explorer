@@ -10,3 +10,4 @@ import FrameAssemblyModel
 #print axioms FrameAssemblyModel.segment_dofs_smul
 #print axioms FrameAssemblyModel.segment_left_point_active
 #print axioms FrameAssemblyModel.segment_right_point_active
+#print axioms FrameAssemblyModel.contract_shared_join
