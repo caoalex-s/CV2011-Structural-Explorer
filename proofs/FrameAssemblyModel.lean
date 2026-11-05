@@ -273,7 +273,6 @@ theorem side_motion_smul (model : Model nodes members cuts segments)
   | interior member cut =>
       funext i
       simp [sideMotion, referenceMotion, Pi.add_apply, Pi.smul_apply, smul_eq_mul]
-      split_ifs <;> simp
   | endSide side =>
       funext i
       fin_cases i <;>
