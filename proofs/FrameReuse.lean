@@ -897,5 +897,74 @@ theorem same_core_deformation_transport (first second : Model nodes members cuts
     simp only [Sum.map_inr, same_core_spring_coherent]
     rfl
 
+
+/-- A fixed reuse boundary transfers the physical contract while allowing the
+actual point-action components and segment intensities to differ. -/
+theorem same_boundary_contract_transport (first second : Model nodes members cuts segments)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (locations : Fin actionCount → Location members cuts)
+    (cutsAt : Fin members → Fin cuts → ℝ) (length EA EI : Fin members → ℝ)
+    (f₁ f₂ : Fin actionCount → Triple)
+    (h : sameReuseBoundary first second supports supports locations locations cutsAt cutsAt) :
+    ExactContract first (pointActions locations f₁) supports cutsAt length EA EI ↔
+      ExactContract second (pointActions locations f₂) supports cutsAt length EA EI := by
+  obtain ⟨core, start₁, end₁, start₂, end₂, hfirst, hsecond⟩ := same_core_representation first second h.1.1
+  subst first
+  subst second
+  exact exact_contract_unchanged core start₁ end₁ start₂ end₂ locations f₁ f₂ supports cutsAt length EA EI
+
+/-- Stability is a structural hypothesis, transferred across the same boundary;
+no inference is made from solvability of a particular load case. -/
+theorem same_boundary_no_mechanism_transport (first second : Model nodes members cuts segments)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (locations : Fin actionCount → Location members cuts)
+    (cutsAt : Fin members → Fin cuts → ℝ)
+    (h : sameReuseBoundary first second supports supports locations locations cutsAt cutsAt) :
+    (∀ q, admissible first supports q → deformationMap first q = 0 → q = 0) ↔
+    (∀ q, admissible second supports q → deformationMap second q = 0 → q = 0) := by
+  obtain ⟨core, start₁, end₁, start₂, end₂, hfirst, hsecond⟩ := same_core_representation first second h.1.1
+  subst first
+  subst second
+  exact no_mechanism_unchanged core start₁ end₁ start₂ end₂ supports
+
+/-- Rebuild the two supplied models with one core and solve their own actual
+loads. Each result passes through the general two-model movement equivalence;
+the two results are not asserted to be equal when their loads differ. -/
+theorem same_boundary_stable_solutions (first second : Model nodes members cuts segments)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (locations : Fin actionCount → Location members cuts)
+    (cutsAt : Fin members → Fin cuts → ℝ) (length EA EI : Fin members → ℝ)
+    (f₁ f₂ : Fin actionCount → Triple)
+    (h : sameReuseBoundary first second supports supports locations locations cutsAt cutsAt)
+    (hcontract : ExactContract first (pointActions locations f₁) supports cutsAt length EA EI)
+    (hstable : ∀ q, admissible first supports q → deformationMap first q = 0 → q = 0) :
+    ∃ (core : Model nodes members cuts segments) (start₁ end₁ start₂ end₂ : Fin segments → ℝ)
+      (baseContract : ExactContract (withLoads core 0 0) (pointActions locations 0) supports cutsAt length EA EI)
+      (baseStable : ∀ q, admissible (withLoads core 0 0) supports q →
+        deformationMap (withLoads core 0 0) q = 0 → q = 0),
+      first = withLoads core start₁ end₁ ∧ second = withLoads core start₂ end₂ ∧
+      ∃ (hfirst : sameCore (withLoads core 0 0) (withLoads core start₁ end₁))
+        (hsecond : sameCore (withLoads core 0 0) (withLoads core start₂ end₂)),
+        equilibrium (withLoads core start₁ end₁) (pointActions locations f₁) supports
+          (sameCoreMotionEquiv (withLoads core 0 0) (withLoads core start₁ end₁) hfirst
+            (stableSolutionLinear core locations supports cutsAt length EA EI baseContract baseStable ⟨⟨start₁, end₁⟩, f₁⟩)) ∧
+        equilibrium (withLoads core start₂ end₂) (pointActions locations f₂) supports
+          (sameCoreMotionEquiv (withLoads core 0 0) (withLoads core start₂ end₂) hsecond
+            (stableSolutionLinear core locations supports cutsAt length EA EI baseContract baseStable ⟨⟨start₂, end₂⟩, f₂⟩)) := by
+  obtain ⟨core, start₁, end₁, start₂, end₂, hfirst, hsecond⟩ := same_core_representation first second h.1.1
+  subst first
+  subst second
+  have baseContract : ExactContract (withLoads core 0 0) (pointActions locations 0) supports cutsAt length EA EI :=
+    (exact_contract_unchanged core start₁ end₁ 0 0 locations f₁ 0 supports cutsAt length EA EI).mp hcontract
+  have baseStable : ∀ q, admissible (withLoads core 0 0) supports q →
+      deformationMap (withLoads core 0 0) q = 0 → q = 0 :=
+    (no_mechanism_unchanged core start₁ end₁ 0 0 supports).mp hstable
+  refine ⟨core, start₁, end₁, start₂, end₂, baseContract, baseStable, rfl, rfl,
+    same_core_with_loads core 0 0 start₁ end₁, same_core_with_loads core 0 0 start₂ end₂, ?_, ?_⟩
+  · rw [same_core_motion_coherent]
+    exact stable_solution_equilibrium core locations supports cutsAt length EA EI baseContract baseStable _
+  · rw [same_core_motion_coherent]
+    exact stable_solution_equilibrium core locations supports cutsAt length EA EI baseContract baseStable _
+
 end
 end FrameReuse

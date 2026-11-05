@@ -52,3 +52,6 @@ import FrameReuse
 #print axioms FrameReuse.same_core_spring_coherent
 #print axioms FrameReuse.same_core_actual_transport
 #print axioms FrameReuse.same_core_deformation_transport
+#print axioms FrameReuse.same_boundary_contract_transport
+#print axioms FrameReuse.same_boundary_no_mechanism_transport
+#print axioms FrameReuse.same_boundary_stable_solutions

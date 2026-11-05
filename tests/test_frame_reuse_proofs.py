@@ -400,6 +400,193 @@ theorem moment_equilibrium : equilibrium beam momentLoad support momentMotion :=
 def slots : Fin 1 → Location 1 0 := fun _ => .endSide (0, true)
 def forceComponents : Fin 1 → Triple := fun _ => ![1, 0, 0]
 def momentComponents : Fin 1 → Triple := fun _ => ![0, 0, 1]
+
+/-- A separately written record has the same core but a different actual load. -/
+def loadedBeam : Model 2 1 0 1 where
+  joints := fun _ => ⟨.rigid, 1, none⟩
+  member := fun _ => ⟨0, 1, ⟨1, 0⟩, none, none⟩
+  segmentMember := fun _ => 0
+  segmentLeft := fun _ => .endSide (0, false)
+  segmentRight := fun _ => .endSide (0, true)
+  segmentLength := fun _ => 1
+  segmentEA := fun _ => 1
+  segmentEI := fun _ => 1
+  segmentVerticalStart := fun _ => 2
+  segmentVerticalEnd := fun _ => -3
+
+theorem coresMatch : sameCore beam loadedBeam := by rfl
+example (q v : Coordinate beam → ℝ) :
+    sideMotion beam q (.endSide (0, true)) = sideMotion loadedBeam (sameCoreMotionEquiv beam loadedBeam coresMatch q) (.endSide (0, true)) ∧
+    segmentDofs beam q 0 = segmentDofs loadedBeam (sameCoreMotionEquiv beam loadedBeam coresMatch q) 0 ∧
+    constraintMap beam support q = constraintMap loadedBeam support (sameCoreMotionEquiv beam loadedBeam coresMatch q) ∧
+    stiffnessWork beam q v = stiffnessWork loadedBeam (sameCoreMotionEquiv beam loadedBeam coresMatch q) (sameCoreMotionEquiv beam loadedBeam coresMatch v) ∧
+    (admissible beam support q ↔ admissible loadedBeam support (sameCoreMotionEquiv beam loadedBeam coresMatch q)) := by
+  exact same_core_actual_transport beam loadedBeam coresMatch support q v (.endSide (0, true)) 0
+example (q : Coordinate beam → ℝ) (index : Sum (Fin 1 × Fin 3) (SpringIndex beam)) :
+    deformationMap beam q index = deformationMap loadedBeam (sameCoreMotionEquiv beam loadedBeam coresMatch q)
+      (Sum.map id (sameCoreSpringEquiv beam loadedBeam coresMatch) index) := by
+  exact same_core_deformation_transport beam loadedBeam coresMatch q index
+
+def noCuts : Fin 1 → Fin 0 → ℝ := fun _ => Fin.elim0
+def properties : Fin 1 → ℝ := fun _ => 1
+
+theorem cantileverContract : ExactContract (withLoads beam 0 0) (pointActions slots 0) support noCuts
+    properties properties properties := by
+  constructor
+  · intro segment
+    fin_cases segment <;> simp [segmentOwnershipValid, locationBelongs, withLoads, beam]
+  · intro segment
+    fin_cases segment <;> norm_num [withLoads, beam, locationParameter]
+  · intro member t ht0 ht1
+    fin_cases member
+    exact ⟨0, rfl, by simpa [withLoads, beam, locationParameter] using ht0,
+      by simpa [withLoads, beam, locationParameter] using ht1⟩
+  · intro a b hne hmember
+    fin_cases a <;> fin_cases b <;> contradiction
+  · intro member left right hl hr hleft hright hpos
+    cases left with
+    | interior m cut => exact Fin.elim0 cut
+    | endSide leftSide =>
+      cases right with
+      | interior m cut => exact Fin.elim0 cut
+      | endSide rightSide =>
+        rcases leftSide with ⟨lm, lb⟩
+        rcases rightSide with ⟨rm, rb⟩
+        simp only [locationBelongs] at hl hr
+        subst lm
+        subst rm
+        cases lb <;> cases rb <;> norm_num [locationParameter] at *
+  · intro member
+    fin_cases member
+    exact ⟨⟨0, Or.inl rfl⟩, ⟨0, Or.inr rfl⟩⟩
+  · intro member cut
+    exact Fin.elim0 cut
+  · intro action
+    fin_cases action
+    exact ⟨0, Or.inr rfl⟩
+  · intro index
+    fin_cases index
+    exact ⟨0, Or.inl rfl⟩
+  · intro member
+    fin_cases member
+    norm_num [withLoads, beam]
+  · intro index hkind
+    fin_cases index
+    simp [support] at hkind
+  · intro member
+    norm_num [properties]
+  · intro segment
+    fin_cases segment
+    norm_num [withLoads, beam, properties, locationParameter]
+  · intro segment
+    norm_num [withLoads, beam, properties]
+  · intro side direction stiffness hactive hlaw
+    rcases side with ⟨member, ending⟩
+    fin_cases member <;> cases ending <;> fin_cases direction <;>
+      simp [directionLaw, law0, law1, rigidConnection] at hlaw
+/-- The fixed left end removes all three rigid-body motions of this member. -/
+theorem cantileverStable : ∀ q, admissible (withLoads beam 0 0) support q →
+    deformationMap (withLoads beam 0 0) q = 0 → q = 0 := by
+  intro q h hD
+  have hleft : sideMotion beam q (.endSide (0, false)) = 0 := by
+    funext i
+    fin_cases i
+    · have hx := h 0 (![1, 0, 0]) (by simp [support, supportDirections])
+      simpa [supportRow, FrameTransform.work, support] using hx
+    · have hy := h 0 (![0, 1, 0]) (by simp [support, supportDirections])
+      simpa [supportRow, FrameTransform.work, support] using hy
+    · have ht := h 0 (![0, 0, 1]) (by simp [support, supportDirections])
+      simpa [supportRow, FrameTransform.work, support] using ht
+  have left0 : segmentDofs beam q 0 0 = 0 := by
+    simpa [segmentDofs, segmentMotion, toLocal6, beam] using congrFun hleft 0
+  have left1 : segmentDofs beam q 0 1 = 0 := by
+    simpa [segmentDofs, segmentMotion, toLocal6, beam] using congrFun hleft 1
+  have left2 : segmentDofs beam q 0 2 = 0 := by
+    simpa [segmentDofs, segmentMotion, toLocal6, beam] using congrFun hleft 2
+  have right0 : segmentDofs beam q 0 3 = 0 := by
+    have hd := congrFun hD (.inl (0, 0))
+    change memberDeformation (segmentDofs beam q 0) 1 0 = 0 at hd
+    simpa [memberDeformation, left0] using hd
+  have right1 : segmentDofs beam q 0 4 = 0 := by
+    have hd := congrFun hD (.inl (0, 1))
+    change memberDeformation (segmentDofs beam q 0) 1 1 = 0 at hd
+    simp [memberDeformation, FrameEnergy.relativeRotationLeft, left1, left2] at hd
+    linarith
+  have right2 : segmentDofs beam q 0 5 = 0 := by
+    have hd := congrFun hD (.inl (0, 2))
+    change memberDeformation (segmentDofs beam q 0) 1 2 = 0 at hd
+    simpa [memberDeformation, FrameEnergy.relativeRotationRight, left1, right1] using hd
+  have hright : sideMotion beam q (.endSide (0, true)) = 0 := by
+    funext i
+    fin_cases i
+    · simpa [segmentDofs, segmentMotion, toLocal6, beam] using right0
+    · simpa [segmentDofs, segmentMotion, toLocal6, beam] using right1
+    · simpa [segmentDofs, segmentMotion, toLocal6, beam] using right2
+  have law0 : endConnection beam (0, false) = rigidConnection := by rfl
+  have law1 : endConnection beam (0, true) = rigidConnection := by rfl
+  have hslipLeft : slipValue beam q (0, false) = 0 := by
+    funext i
+    fin_cases i <;> simp [slipValue, hasSlip, directionLaw, law0, rigidConnection]
+  have hslipRight : slipValue beam q (0, true) = 0 := by
+    funext i
+    fin_cases i <;> simp [slipValue, hasSlip, directionLaw, law1, rigidConnection]
+  have hrefLeft : referenceMotion beam q (.inl 0) = 0 := by
+    have hv := hleft
+    change endMotion 1 0 (referenceMotion beam q (.inl 0)) (slipValue beam q (0, false)) = 0 at hv
+    rw [hslipLeft] at hv
+    change endMotion 1 0 (referenceMotion beam q (.inl 0)) (fun _ => 0) = 0 at hv
+    rw [rigid_end] at hv
+    exact hv
+  have hrefRight : referenceMotion beam q (.inl 1) = 0 := by
+    have hv := hright
+    change endMotion 1 0 (referenceMotion beam q (.inl 1)) (slipValue beam q (0, true)) = 0 at hv
+    rw [hslipRight] at hv
+    change endMotion 1 0 (referenceMotion beam q (.inl 1)) (fun _ => 0) = 0 at hv
+    rw [rigid_end] at hv
+    exact hv
+  funext coordinate
+  cases coordinate with
+  | inr slip =>
+    rcases slip with ⟨⟨⟨member, ending⟩, direction⟩, hactive, hslip⟩
+    fin_cases member <;> cases ending <;> fin_cases direction <;>
+      simp [directionLaw, law0, law1, rigidConnection] at hslip
+  | inl pointDirection =>
+    rcases pointDirection with ⟨⟨point, hactive⟩, direction⟩
+    cases point with
+    | inr cutPoint => exact Fin.elim0 cutPoint.2
+    | inl node =>
+      fin_cases node
+      · have hx := congrFun hrefLeft direction
+        change (if hp : activePoint beam (.inl 0) then q (.inl (⟨.inl 0, hp⟩, direction)) else 0) = 0 at hx
+        have ha : activePoint beam (.inl 0) := ⟨0, Or.inl rfl⟩
+        rw [dif_pos ha] at hx
+        simpa using hx
+      · have hx := congrFun hrefRight direction
+        change (if hp : activePoint beam (.inl 1) then q (.inl (⟨.inl 1, hp⟩, direction)) else 0) = 0 at hx
+        have ha : activePoint beam (.inl 1) := ⟨0, Or.inr rfl⟩
+        rw [dif_pos ha] at hx
+        simpa using hx
+
+
+theorem boundaryMatches : sameReuseBoundary beam loadedBeam support support slots slots noCuts noCuts :=
+  ⟨⟨coresMatch, rfl, rfl⟩, rfl⟩
+example : ExactContract loadedBeam (pointActions slots forceComponents) support noCuts properties properties properties := by
+  exact (same_boundary_contract_transport beam loadedBeam support slots noCuts properties properties properties
+    0 forceComponents boundaryMatches).mp cantileverContract
+example : ∀ q, admissible loadedBeam support q → deformationMap loadedBeam q = 0 → q = 0 := by
+  exact (same_boundary_no_mechanism_transport beam loadedBeam support slots noCuts boundaryMatches).mp cantileverStable
+
+def axialCase : LoadCase 1 1 := ⟨⟨0, 0⟩, forceComponents⟩
+example : stableSolutionLinear beam slots support noCuts properties properties properties
+    cantileverContract cantileverStable axialCase = axialMotion := by
+  apply equilibrium_unique_if_no_mechanism (caseModel beam axialCase) (caseActions slots axialCase)
+    support noCuts properties properties properties
+    (case_contract beam slots support noCuts properties properties properties cantileverContract axialCase)
+    (case_stable beam support cantileverStable axialCase)
+  · exact stable_solution_equilibrium beam slots support noCuts properties properties properties
+      cantileverContract cantileverStable axialCase
+  · exact axial_equilibrium
+
 theorem combined_equilibrium : equilibrium (withLoads beam (fun i => (2:ℝ)*(0 : Fin 1 → ℝ) i+(-1)*(0 : Fin 1 → ℝ) i)
       (fun i => (2:ℝ)*(0 : Fin 1 → ℝ) i+(-1)*(0 : Fin 1 → ℝ) i))
     (pointActions slots (fun j i => (2:ℝ)*forceComponents j i+(-1)*momentComponents j i)) support
