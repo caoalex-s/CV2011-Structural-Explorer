@@ -181,7 +181,7 @@ def slots : Fin 1 → Location 1 0 := fun _ => .endSide (0, true)
 def loadZero : Fin 1 → Triple := fun _ => ![0, 0, 0]
 def loadSigned : Fin 1 → Triple := fun _ => ![0, -2, 3]
 def support : Fin 1 → SupportInput 1 0 := fun _ => ⟨.endSide (0, false), .fixed, 0, 1, false, false, false⟩
-def rotation : Coordinate beam → ℝ := fun index =>
+def rotationMode : Coordinate beam → ℝ := fun index =>
   match index with
   | .inl (_, direction) => if direction = 2 then 1 else 0
   | .inr _ => 0
@@ -211,14 +211,13 @@ example : externalWork (withLoads beam (fun _ => 1) (fun _ => 1)) (pointActions 
     endMotion, toLocal6, slipValue, withLoads, beam, endNode, pointActions, slots, loadSigned, up,
     LocalFrameFields.consistentLoad, pointActionWork, FrameTransform.work, h0, h1, Fin.sum_univ_succ]
   norm_num
-example : externalWork (withLoads beam (fun _ => 1) (fun _ => 1)) (pointActions slots loadSigned) rotation = 3 := by
+example : externalWork (withLoads beam (fun _ => 1) (fun _ => 1)) (pointActions slots loadSigned) rotationMode = 3 := by
   have h0 : activePoint (withLoads beam (fun _ => 1) (fun _ => 1)) (.inl 0) := node0active
   have h1 : activePoint (withLoads beam (fun _ => 1) (fun _ => 1)) (.inl 1) := node1active
   dsimp [withLoads, beam] at h0 h1
   simp [externalWork, segmentLoad, segmentDofs, segmentMotion, sideMotion, referenceMotion,
-    endMotion, toLocal6, slipValue, withLoads, beam, endNode, pointActions, slots, loadSigned, rotation,
-    LocalFrameFields.consistentLoad, pointActionWork, FrameTransform.work, h0, h1, Fin.sum_univ_succ]
-  norm_num
+    endMotion, toLocal6, slipValue, withLoads, beam, endNode, pointActions, slots, loadSigned, rotationMode,
+    LocalFrameFields.consistentLoad, pointActionWork, FrameTransform.work, h0, h1, Fin.sum_univ_succ] <;> norm_num
 """
         with tempfile.TemporaryDirectory() as folder:
             source = Path(folder) / "ReuseLoadCheck.lean"

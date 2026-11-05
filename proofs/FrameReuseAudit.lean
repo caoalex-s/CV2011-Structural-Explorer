@@ -31,6 +31,7 @@ import FrameReuse
 #print axioms FrameReuse.case_contract
 #print axioms FrameReuse.case_stable
 #print axioms FrameReuse.solution_choice_equilibrium
+#print axioms FrameReuse.stable_solution_equilibrium
 #print axioms FrameReuse.residual_work_combination
 #print axioms FrameReuse.aggregate_reaction_from_residuals
 #print axioms FrameReuse.grouped_reaction_from_residuals
@@ -42,3 +43,8 @@ import FrameReuse
 #print axioms FrameReuse.stable_grouped_reaction_agrees
 #print axioms FrameReuse.slip_combination
 #print axioms FrameReuse.spring_action_combination
+#print axioms FrameReuse.segment_rotation_combination
+#print axioms FrameReuse.segment_normal_combination
+#print axioms FrameReuse.segment_moment_combination
+#print axioms FrameReuse.segment_shear_combination
+#print axioms FrameReuse.segment_end_actions_combination

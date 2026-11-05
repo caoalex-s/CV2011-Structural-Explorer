@@ -516,6 +516,19 @@ def stableSolutionLinear (core : Model nodes members cuts segments)
       simpa only [zero_smul, add_zero] using h
 
 
+/-- The linear stable-solution map returns the actual constrained equilibrium. -/
+theorem stable_solution_equilibrium (core : Model nodes members cuts segments)
+    (locations : Fin actionCount → Location members cuts)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (cutsAt : Fin members → Fin cuts → ℝ) (length EA EI : Fin members → ℝ)
+    (baseContract : ExactContract (withLoads core 0 0) (pointActions locations 0) supports cutsAt length EA EI)
+    (baseStable : ∀ z, admissible (withLoads core 0 0) supports z →
+      deformationMap (withLoads core 0 0) z = 0 → z = 0)
+    (load : LoadCase segments actionCount) :
+    equilibrium (caseModel core load) (caseActions locations load) supports
+      (stableSolutionLinear core locations supports cutsAt length EA EI baseContract baseStable load) := by
+  exact solution_choice_equilibrium core locations supports cutsAt length EA EI baseContract baseStable load
+
 /-- Actual residual work combines the same movements and applied loads. -/
 theorem residual_work_combination (core : Model nodes members cuts segments)
     (a b : ℝ) (s₁ e₁ s₂ e₂ : Fin segments → ℝ)
@@ -751,6 +764,66 @@ theorem spring_action_combination (model : Model nodes members cuts segments)
     b * (springStiffness (directionLaw (endConnection model side) direction) * slipValue model q₂ side direction) := by
   rw [slip_combination]
   ring
+
+
+/-- Local rotation, force and moment readouts use the same actual B map. -/
+theorem segment_rotation_combination (model : Model nodes members cuts segments)
+    (a b : ℝ) (q₁ q₂ : Coordinate model → ℝ) (segment : Fin segments) (p₀ p₁ r₀ r₁ : ℝ) :
+    LocalFrameFields.rotation (segmentDofs model (a • q₁ + b • q₂) segment)
+      (model.segmentLength segment) (model.segmentEI segment) (a*p₀+b*r₀) (a*p₁+b*r₁) =
+    Polynomial.C a * LocalFrameFields.rotation (segmentDofs model q₁ segment)
+      (model.segmentLength segment) (model.segmentEI segment) p₀ p₁ +
+    Polynomial.C b * LocalFrameFields.rotation (segmentDofs model q₂ segment)
+      (model.segmentLength segment) (model.segmentEI segment) r₀ r₁ := by
+  rw [segment_dofs_combination]
+  exact rotation_recovery_combination _ _ a b _ _ p₀ p₁ r₀ r₁
+
+theorem segment_normal_combination (model : Model nodes members cuts segments)
+    (a b : ℝ) (q₁ q₂ : Coordinate model → ℝ) (segment : Fin segments) (p₀ p₁ r₀ r₁ : ℝ) :
+    LocalFrameFields.normal (segmentDofs model (a • q₁ + b • q₂) segment)
+      (model.segmentLength segment) (model.segmentEA segment) (a*p₀+b*r₀) (a*p₁+b*r₁) =
+    Polynomial.C a * LocalFrameFields.normal (segmentDofs model q₁ segment)
+      (model.segmentLength segment) (model.segmentEA segment) p₀ p₁ +
+    Polynomial.C b * LocalFrameFields.normal (segmentDofs model q₂ segment)
+      (model.segmentLength segment) (model.segmentEA segment) r₀ r₁ := by
+  rw [segment_dofs_combination]
+  exact normal_recovery_combination _ _ a b _ _ p₀ p₁ r₀ r₁
+
+theorem segment_moment_combination (model : Model nodes members cuts segments)
+    (a b : ℝ) (q₁ q₂ : Coordinate model → ℝ) (segment : Fin segments) (p₀ p₁ r₀ r₁ : ℝ) :
+    LocalFrameFields.moment (segmentDofs model (a • q₁ + b • q₂) segment)
+      (model.segmentLength segment) (model.segmentEI segment) (a*p₀+b*r₀) (a*p₁+b*r₁) =
+    Polynomial.C a * LocalFrameFields.moment (segmentDofs model q₁ segment)
+      (model.segmentLength segment) (model.segmentEI segment) p₀ p₁ +
+    Polynomial.C b * LocalFrameFields.moment (segmentDofs model q₂ segment)
+      (model.segmentLength segment) (model.segmentEI segment) r₀ r₁ := by
+  rw [segment_dofs_combination]
+  exact moment_recovery_combination _ _ a b _ _ p₀ p₁ r₀ r₁
+
+theorem segment_shear_combination (model : Model nodes members cuts segments)
+    (a b : ℝ) (q₁ q₂ : Coordinate model → ℝ) (segment : Fin segments) (p₀ p₁ r₀ r₁ : ℝ) :
+    LocalFrameFields.shear (segmentDofs model (a • q₁ + b • q₂) segment)
+      (model.segmentLength segment) (model.segmentEI segment) (a*p₀+b*r₀) (a*p₁+b*r₁) =
+    Polynomial.C a * LocalFrameFields.shear (segmentDofs model q₁ segment)
+      (model.segmentLength segment) (model.segmentEI segment) p₀ p₁ +
+    Polynomial.C b * LocalFrameFields.shear (segmentDofs model q₂ segment)
+      (model.segmentLength segment) (model.segmentEI segment) r₀ r₁ := by
+  rw [segment_dofs_combination]
+  exact shear_recovery_combination _ _ a b _ _ p₀ p₁ r₀ r₁
+
+/-- End-action recovery preserves the combined end motions and both local loads. -/
+theorem segment_end_actions_combination (model : Model nodes members cuts segments)
+    (a b : ℝ) (q₁ q₂ : Coordinate model → ℝ) (segment : Fin segments)
+    (p₀ p₁ r₀ r₁ t₀ t₁ u₀ u₁ : ℝ) :
+    LocalFrameFields.endActions (segmentDofs model (a • q₁ + b • q₂) segment)
+      (model.segmentLength segment) (model.segmentEA segment) (model.segmentEI segment)
+      (a*p₀+b*r₀) (a*p₁+b*r₁) (a*t₀+b*u₀) (a*t₁+b*u₁) =
+    a • LocalFrameFields.endActions (segmentDofs model q₁ segment)
+      (model.segmentLength segment) (model.segmentEA segment) (model.segmentEI segment) p₀ p₁ t₀ t₁ +
+    b • LocalFrameFields.endActions (segmentDofs model q₂ segment)
+      (model.segmentLength segment) (model.segmentEA segment) (model.segmentEI segment) r₀ r₁ u₀ u₁ := by
+  rw [segment_dofs_combination]
+  exact end_actions_combination _ _ a b _ _ _ p₀ p₁ r₀ r₁ t₀ t₁ u₀ u₁
 
 end
 end FrameReuse
