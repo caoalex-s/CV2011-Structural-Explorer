@@ -361,20 +361,19 @@ example : LocalFrameFields.endActions whole 2 2 1 0 0 0 0 = ![-2, 0, 0, 2, 0, 0]
   funext i
   rw [LocalFrameFields.end_actions_from_fields whole 2 2 1 0 0 0 0 (by norm_num) (by norm_num) (by norm_num)]
   fin_cases i <;> norm_num [whole, LocalFrameFields.stiffness, LocalFrameFields.consistentLoad, Fin.sum_univ_succ]
-example : LocalFrameFields.endActions leftHalf 1 2 1 0 0 0 0 = ![-2, 0, 0, 2, 0, 0] := by
+theorem leftHalf_actions : LocalFrameFields.endActions leftHalf 1 2 1 0 0 0 0 = ![-2, 0, 0, 2, 0, 0] := by
   funext i
   rw [LocalFrameFields.end_actions_from_fields leftHalf 1 2 1 0 0 0 0 (by norm_num) (by norm_num) (by norm_num)]
   fin_cases i <;> norm_num [leftHalf, LocalFrameFields.stiffness, LocalFrameFields.consistentLoad, Fin.sum_univ_succ]
-example : LocalFrameFields.endActions rightHalf 1 2 1 0 0 0 0 = ![-2, 0, 0, 2, 0, 0] := by
+theorem rightHalf_actions : LocalFrameFields.endActions rightHalf 1 2 1 0 0 0 0 = ![-2, 0, 0, 2, 0, 0] := by
   funext i
   rw [LocalFrameFields.end_actions_from_fields rightHalf 1 2 1 0 0 0 0 (by norm_num) (by norm_num) (by norm_num)]
   fin_cases i <;> norm_num [rightHalf, LocalFrameFields.stiffness, LocalFrameFields.consistentLoad, Fin.sum_univ_succ]
 example : LocalFrameFields.endActions leftHalf 1 2 1 0 0 0 0 3 +
     LocalFrameFields.endActions rightHalf 1 2 1 0 0 0 0 0 = 0 := by
-  rw [LocalFrameFields.end_actions_from_fields leftHalf 1 2 1 0 0 0 0 (by norm_num) (by norm_num) (by norm_num),
-    LocalFrameFields.end_actions_from_fields rightHalf 1 2 1 0 0 0 0 (by norm_num) (by norm_num) (by norm_num)]
-  norm_num [leftHalf, rightHalf, LocalFrameFields.stiffness, LocalFrameFields.consistentLoad,
-    Fin.sum_univ_succ, Matrix.vecCons]
+  rw [leftHalf_actions, rightHalf_actions]
+  change (2 : ℝ) + (-2) = 0
+  norm_num
 """)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
