@@ -1,4 +1,5 @@
 import FrameAssemblyModel
+import Mathlib.LinearAlgebra.Dual.Lemmas
 
 /-!
 Assembly from the exact presegmented input. The local terms use the previously
@@ -103,6 +104,32 @@ def equilibrium (model : Model nodes members cuts segments)
     ∀ variation, admissible model supports variation → residualWork model actions q variation = 0
 
 
+/-- A linear residual annihilates the admissible motions exactly when it is
+the pullback of a support-row functional. This allows dependent support rows:
+the row functional need not be unique. -/
+theorem admissible_reaction_dual (model : Model nodes members cuts segments)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (residual : Module.Dual ℝ (Coordinate model → ℝ)) :
+    (∀ variation, admissible model supports variation → residual variation = 0) ↔
+    ∃ reaction : Module.Dual ℝ (ConstraintIndex supports → ℝ),
+      ∀ variation, residual variation = reaction (constraintMap model supports variation) := by
+  let C := constraintMap model supports
+  have hann : (∀ variation, admissible model supports variation → residual variation = 0) ↔
+      residual ∈ (LinearMap.ker C).dualAnnihilator := by
+    rw [Submodule.mem_dualAnnihilator]
+    simp only [← admissible_iff_constraint_kernel model supports]
+  rw [hann, ← LinearMap.range_dualMap_eq_dualAnnihilator_ker C, LinearMap.mem_range]
+  constructor
+  · rintro ⟨reaction, hreaction⟩
+    refine ⟨reaction, ?_⟩
+    intro variation
+    have h := congrFun hreaction variation
+    simpa [LinearMap.dualMap_apply] using h.symm
+  · rintro ⟨reaction, hreaction⟩
+    refine ⟨reaction, ?_⟩
+    ext variation
+    simpa [LinearMap.dualMap_apply] using (hreaction variation).symm
+
 /-- The encoded segment properties satisfy the hypotheses of the local proof. -/
 def positiveSegments (model : Model nodes members cuts segments) : Prop :=
   ∀ segment, 0 < model.segmentLength segment ∧
@@ -137,6 +164,45 @@ theorem total_energy_nonnegative (model : Model nodes members cuts segments)
     obtain ⟨hL, hEA, hEI⟩ := hsegments segment
     exact energy_nonnegative (segmentDofs model q segment) _ _ _ hL hEA hEI
   · exact spring_energy_nonnegative model q hsprings
+
+/-- The exact model contract supplies positive segment properties. -/
+theorem contract_positive_segments (model : Model nodes members cuts segments)
+    (actions : Fin actionCount → PointAction members cuts)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (cutParameter : Fin members → Fin cuts → ℝ)
+    (memberLength memberEA memberEI : Fin members → ℝ)
+    (h : ExactContract model actions supports cutParameter memberLength memberEA memberEI) :
+    positiveSegments model := by
+  intro segment
+  obtain ⟨hLength, hEA, hEI⟩ := h.positiveMember (model.segmentMember segment)
+  obtain ⟨_, hOrder, _⟩ := h.ordered segment
+  obtain ⟨hSegEA, hSegEI⟩ := h.segmentPropertiesMatch segment
+  refine ⟨?_, ?_, ?_⟩
+  · rw [h.segmentLengthMatches segment]
+    exact mul_pos hLength (sub_pos.mpr hOrder)
+  · rw [hSegEA]; exact hEA
+  · rw [hSegEI]; exact hEI
+
+/-- Physical spring inputs are strictly positive; rigid and released directions
+contribute zero spring modulus. -/
+theorem contract_nonnegative_springs (model : Model nodes members cuts segments)
+    (actions : Fin actionCount → PointAction members cuts)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (cutParameter : Fin members → Fin cuts → ℝ)
+    (memberLength memberEA memberEI : Fin members → ℝ)
+    (h : ExactContract model actions supports cutParameter memberLength memberEA memberEI) :
+    nonnegativeSprings model := by
+  intro member endSide direction
+  have hactive : activeEnd model (member, endSide) := by
+    cases endSide with
+    | false => exact (h.memberEnds member).1
+    | true => exact (h.memberEnds member).2
+  cases hlaw : directionLaw (endConnection model (member, endSide)) direction with
+  | rigid => simp [springStiffness]
+  | released => simp [springStiffness]
+  | spring stiffness =>
+      simp only [springStiffness]
+      exact (h.positiveSpring (member, endSide) direction stiffness hactive hlaw).le
 
 /-- Actual assembled stiffness work is symmetric because each local element
 stiffness is symmetric and each spring contribution is a scalar product. -/

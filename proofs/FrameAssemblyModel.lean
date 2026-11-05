@@ -34,6 +34,7 @@ structure MemberInput (nodes : Nat) where
 inductive Location (members cuts : Nat) where
   | endSide (side : MemberEnd members)
   | interior (member : Fin members) (cut : Fin cuts)
+  deriving DecidableEq
 
 structure Model (nodes members cuts segments : Nat) where
   joints : Fin nodes → JointInput members
@@ -82,28 +83,42 @@ def endConnection (model : Model nodes members cuts segments) (side : MemberEnd 
 def directionLaw (connection : EndConnection) (direction : Fin 3) : EndLaw :=
   if direction = 0 then connection.axial else if direction = 1 then connection.transverse else connection.rotation
 
-def hasSlip (model : Model nodes members cuts segments) (side : MemberEnd members) (direction : Fin 3) : Prop :=
-  directionLaw (endConnection model side) direction ≠ .rigid
-
-/-- A slip coordinate exists exactly when the end law is free or spring. -/
-def Slip (model : Model nodes members cuts segments) :=
-  { pair : MemberEnd members × Fin 3 // hasSlip model pair.1 pair.2 }
-
 /-- Interior points carry member ownership, so crossing members stay distinct. -/
 abbrev Point (nodes members cuts : Nat) := Sum (Fin nodes) (Fin members × Fin cuts)
-
-abbrev Coordinate (model : Model nodes members cuts segments) :=
-  Sum (Point nodes members cuts × Fin 3) (Slip model)
 
 /-- The physical reference point selected by an end or member-owned cut. -/
 def locationPoint (model : Model nodes members cuts segments) : Location members cuts → Point nodes members cuts
   | .endSide side => .inl (endNode model side)
   | .interior member cut => .inr (member, cut)
 
-/-- Reference global movement at any exact point, before member-end slip. -/
+/-- Actual nodeIndex allocation occurs only at an endpoint of a segment. -/
+def activePoint (model : Model nodes members cuts segments) (point : Point nodes members cuts) : Prop :=
+  ∃ segment, locationPoint model (model.segmentLeft segment) = point ∨
+    locationPoint model (model.segmentRight segment) = point
+
+/-- End slips are allocated only for member ends represented by a segment. -/
+def activeEnd (model : Model nodes members cuts segments) (side : MemberEnd members) : Prop :=
+  ∃ segment, model.segmentLeft segment = .endSide side ∨ model.segmentRight segment = .endSide side
+
+def hasSlip (model : Model nodes members cuts segments) (side : MemberEnd members) (direction : Fin 3) : Prop :=
+  activeEnd model side ∧ directionLaw (endConnection model side) direction ≠ .rigid
+
+/-- A slip coordinate exists only for an active free or spring end direction. -/
+def Slip (model : Model nodes members cuts segments) :=
+  { pair : MemberEnd members × Fin 3 // hasSlip model pair.1 pair.2 }
+
+def ActivePoint (model : Model nodes members cuts segments) :=
+  { point : Point nodes members cuts // activePoint model point }
+
+abbrev Coordinate (model : Model nodes members cuts segments) :=
+  Sum (ActivePoint model × Fin 3) (Slip model)
+
+/-- On an unrepresented location this total helper returns zero. Physical
+loads and supports must satisfy the represented-location input contract. -/
 def referenceMotion (model : Model nodes members cuts segments)
-    (q : Coordinate model → ℝ) (point : Point nodes members cuts) : Triple :=
-  fun direction => q (.inl (point, direction))
+    (q : Coordinate model → ℝ) (point : Point nodes members cuts) : Triple := by
+  classical
+  exact fun direction => if h : activePoint model point then q (.inl (⟨point, h⟩, direction)) else 0
 
 /-- Slip is zero for rigid directions, which have no associated coordinate. -/
 def slipValue (model : Model nodes members cuts segments)
@@ -241,7 +256,8 @@ theorem side_motion_add (model : Model nodes members cuts segments)
   cases location with
   | interior member cut =>
       funext i
-      rfl
+      simp [sideMotion, referenceMotion, Pi.add_apply, Pi.smul_apply, smul_eq_mul]
+      split_ifs <;> simp
   | endSide side =>
       funext i
       fin_cases i <;>
@@ -256,7 +272,8 @@ theorem side_motion_smul (model : Model nodes members cuts segments)
   cases location with
   | interior member cut =>
       funext i
-      rfl
+      simp [sideMotion, referenceMotion, Pi.add_apply, Pi.smul_apply, smul_eq_mul]
+      split_ifs <;> simp
   | endSide side =>
       funext i
       fin_cases i <;>
@@ -270,6 +287,65 @@ def sideMotionLinear (model : Model nodes members cuts segments)
   map_add' := fun q r => side_motion_add model q r location
   map_smul' := fun a q => side_motion_smul model a q location
 
+
+/-- Both endpoints of an encoded segment necessarily allocate a reference point. -/
+theorem segment_left_point_active (model : Model nodes members cuts segments) (segment : Fin segments) :
+    activePoint model (locationPoint model (model.segmentLeft segment)) :=
+  ⟨segment, Or.inl rfl⟩
+
+theorem segment_right_point_active (model : Model nodes members cuts segments) (segment : Fin segments) :
+    activePoint model (locationPoint model (model.segmentRight segment)) :=
+  ⟨segment, Or.inr rfl⟩
+
+/-- An action or support must be attached to an actual presegmented location. -/
+def representedLocation (model : Model nodes members cuts segments) (location : Location members cuts) : Prop :=
+  ∃ segment, model.segmentLeft segment = location ∨ model.segmentRight segment = location
+
+/-- Position along an original member, before any floating-point snapping. -/
+def locationParameter (cutParameter : Fin members → Fin cuts → ℝ) : Location members cuts → ℝ
+  | .endSide (_, false) => 0
+  | .endSide (_, true) => 1
+  | .interior member cut => cutParameter member cut
+
+/-- Exact presegmentation assumptions, separate from drawing and numerical
+refinement. Segment interiors partition each member; their end locations also
+cover all selected point actions and support rows. -/
+structure ExactContract (model : Model nodes members cuts segments)
+    (actions : Fin actionCount → PointAction members cuts)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (cutParameter : Fin members → Fin cuts → ℝ)
+    (memberLength memberEA memberEI : Fin members → ℝ) : Prop where
+  ownership : segmentOwnershipValid model
+  ordered : ∀ segment,
+    0 ≤ locationParameter cutParameter (model.segmentLeft segment) ∧
+    locationParameter cutParameter (model.segmentLeft segment) <
+      locationParameter cutParameter (model.segmentRight segment) ∧
+    locationParameter cutParameter (model.segmentRight segment) ≤ 1
+  coverage : ∀ member t, 0 ≤ t → t ≤ 1 → ∃ segment,
+    model.segmentMember segment = member ∧
+    locationParameter cutParameter (model.segmentLeft segment) ≤ t ∧
+    t ≤ locationParameter cutParameter (model.segmentRight segment)
+  disjointInteriors : ∀ a b, a ≠ b → model.segmentMember a = model.segmentMember b →
+    locationParameter cutParameter (model.segmentRight a) ≤ locationParameter cutParameter (model.segmentLeft b) ∨
+    locationParameter cutParameter (model.segmentRight b) ≤ locationParameter cutParameter (model.segmentLeft a)
+  memberEnds : ∀ member, representedLocation model (.endSide (member, false)) ∧
+    representedLocation model (.endSide (member, true))
+  interiorCuts : ∀ member cut, representedLocation model (.interior member cut) →
+    0 < cutParameter member cut ∧ cutParameter member cut < 1
+  actionLocations : ∀ action, representedLocation model (actions action).location
+  supportLocations : ∀ support, representedLocation model (supports support).location
+  orientationNormalized : ∀ member,
+    (model.member member).orientation.cosine^2 + (model.member member).orientation.sine^2 = 1
+  positiveMember : ∀ member, 0 < memberLength member ∧ 0 < memberEA member ∧ 0 < memberEI member
+  segmentLengthMatches : ∀ segment,
+    model.segmentLength segment = memberLength (model.segmentMember segment) *
+      (locationParameter cutParameter (model.segmentRight segment) -
+       locationParameter cutParameter (model.segmentLeft segment))
+  segmentPropertiesMatch : ∀ segment,
+    model.segmentEA segment = memberEA (model.segmentMember segment) ∧
+    model.segmentEI segment = memberEI (model.segmentMember segment)
+  positiveSpring : ∀ side direction stiffness, activeEnd model side →
+    directionLaw (endConnection model side) direction = .spring stiffness → 0 < stiffness
 
 /-- The segment transformation B is built from the two actual member-side
 end maps and the segment's local axes. -/

@@ -7,3 +7,6 @@ import FrameAssembly
 #print axioms FrameAssembly.stiffness_work_energy
 #print axioms FrameAssembly.stiffness_work_nonnegative
 #print axioms FrameAssembly.admissible_iff_constraint_kernel
+#print axioms FrameAssembly.admissible_reaction_dual
+#print axioms FrameAssembly.contract_positive_segments
+#print axioms FrameAssembly.contract_nonnegative_springs

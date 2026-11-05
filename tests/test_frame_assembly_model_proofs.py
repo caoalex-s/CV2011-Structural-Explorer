@@ -14,7 +14,7 @@ class FrameAssemblyModelChecks(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             source = Path(folder) / "AssemblyModelCheck.lean"
             source.write_text(
-                "import FrameAssembly\nopen FrameInterfaces FrameTransform FrameAssemblyModel FrameAssembly\n"
+                "import FrameAssembly\nopen FrameInterfaces FrameTransform FrameAssemblyModel FrameAssembly\nnoncomputable section\n"
                 + statement + "\n", encoding="utf-8"
             )
             return subprocess.run(
@@ -52,6 +52,27 @@ example : supportDirections custom = [![1, 0, 0], ![0, 0, 1]] := by rfl
         result = self.compile_example("""
 example : (Sum.inr (0, 0) : Point 1 2 1) ≠ Sum.inr (1, 0) := by
   exact distinct_member_cuts 0 1 0 0 (by decide)
+""")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_unused_cut_and_node_have_no_coordinates(self):
+        result = self.compile_example("""
+def sparseModel : Model 3 2 1 1 where
+  joints := fun _ => ⟨.pinned, 5, none⟩
+  member := fun i => if i = 0 then ⟨0, 1, ⟨1, 0⟩, none, none⟩
+    else ⟨1, 0, ⟨-1, 0⟩, none, none⟩
+  segmentMember := fun _ => 0
+  segmentLeft := fun _ => .endSide (0, false)
+  segmentRight := fun _ => .interior 0 0
+  segmentLength := fun _ => 1
+  segmentEA := fun _ => 1
+  segmentEI := fun _ => 1
+  segmentVerticalStart := fun _ => 0
+  segmentVerticalEnd := fun _ => 0
+example : activePoint sparseModel (.inr (0, 0)) := by decide
+example : ¬ activePoint sparseModel (.inr (1, 0)) := by decide
+example : ¬ activePoint sparseModel (.inl 2) := by decide
+example : ¬ activeEnd sparseModel (1, false) := by decide
 """)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 

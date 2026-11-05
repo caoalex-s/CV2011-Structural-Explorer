@@ -8,3 +8,5 @@ import FrameAssemblyModel
 #print axioms FrameAssemblyModel.side_motion_smul
 #print axioms FrameAssemblyModel.segment_dofs_add
 #print axioms FrameAssemblyModel.segment_dofs_smul
+#print axioms FrameAssemblyModel.segment_left_point_active
+#print axioms FrameAssemblyModel.segment_right_point_active
