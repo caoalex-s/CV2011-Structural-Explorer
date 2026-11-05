@@ -107,7 +107,8 @@ theorem deformation_unchanged (core : Model nodes members cuts segments)
     (q : Coordinate (withLoads core start₁ end₁) → ℝ) :
     deformationMap (withLoads core start₁ end₁) q =
       deformationMap (withLoads core start₂ end₂) (motionEquiv core start₁ end₁ start₂ end₂ q) := by
-  rfl
+  funext index
+  cases index <;> rfl
 
 /-- The input contract concerns locations and properties, not load amplitudes. -/
 theorem exact_contract_unchanged (core : Model nodes members cuts segments)
@@ -132,7 +133,15 @@ theorem no_mechanism_unchanged (core : Model nodes members cuts segments)
       deformationMap (withLoads core start₁ end₁) z = 0 → z = 0) ↔
     (∀ z, admissible (withLoads core start₂ end₂) supports z →
       deformationMap (withLoads core start₂ end₂) z = 0 → z = 0) := by
-  rfl
+  constructor
+  · intro h z hz hd
+    apply h z hz
+    rw [deformation_unchanged core start₁ end₁ start₂ end₂ z]
+    exact hd
+  · intro h z hz hd
+    apply h z hz
+    rw [deformation_unchanged core start₂ end₂ start₁ end₁ z]
+    exact hd
 
 
 /-- Axial recovery is linear jointly in end movements and affine-load values. -/
@@ -171,6 +180,24 @@ theorem transverse_recovery_movement_affine (d₁ d₂ : LocalDofs) (L EI q₀ q
       LocalFrameFields.transverseDisplacement d₂ L EI q₀ q₁ -
       LocalFrameFields.transverseDisplacement (fun _ => 0) L EI q₀ q₁ := by
   simp only [LocalFrameFields.transverseDisplacement, map_add, map_mul, map_zero, mul_zero]
+  ring
+
+
+/-- Consistent segment loads vary linearly with both endpoint intensities. -/
+theorem segment_load_combination (core : Model nodes members cuts segments)
+    (a b : ℝ) (s₁ e₁ s₂ e₂ : Fin segments → ℝ) (segment : Fin segments) :
+    segmentLoad (withLoads core (fun i => a*s₁ i+b*s₂ i) (fun i => a*e₁ i+b*e₂ i)) segment =
+      a • segmentLoad (withLoads core s₁ e₁) segment + b • segmentLoad (withLoads core s₂ e₂) segment := by
+  funext i
+  fin_cases i <;> simp [segmentLoad, withLoads, LocalFrameFields.consistentLoad] <;> ring
+
+/-- Point actions retain their fixed member-side location while components vary. -/
+theorem point_work_combination (core : Model nodes members cuts segments)
+    (a b : ℝ) (location : Location members cuts) (f₁ f₂ : Triple)
+    (q : Coordinate core → ℝ) :
+    pointActionWork core ⟨location, fun i => a*f₁ i+b*f₂ i⟩ q =
+      a * pointActionWork core ⟨location, f₁⟩ q + b * pointActionWork core ⟨location, f₂⟩ q := by
+  simp [pointActionWork, FrameTransform.work]
   ring
 
 end

@@ -16,3 +16,5 @@ import FrameReuse
 #print axioms FrameReuse.transverse_recovery_combination
 #print axioms FrameReuse.axial_recovery_movement_affine
 #print axioms FrameReuse.transverse_recovery_movement_affine
+#print axioms FrameReuse.segment_load_combination
+#print axioms FrameReuse.point_work_combination
