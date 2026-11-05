@@ -458,7 +458,12 @@ def stableSolutionLinear (core : Model nodes members cuts segments)
         (solutionChoice core locations supports cutsAt length EA EI baseContract baseStable load₂)
         (solution_choice_equilibrium core locations supports cutsAt length EA EI baseContract baseStable load₁)
         (solution_choice_equilibrium core locations supports cutsAt length EA EI baseContract baseStable load₂)
-      simpa [caseModel, caseActions] using h
+      change equilibrium (withLoads core (fun i => load₁.1.1 i + load₂.1.1 i)
+        (fun i => load₁.1.2 i + load₂.1.2 i))
+        (pointActions locations (fun j i => load₁.2 j i + load₂.2 j i)) supports
+        (solutionChoice core locations supports cutsAt length EA EI baseContract baseStable load₁ +
+          solutionChoice core locations supports cutsAt length EA EI baseContract baseStable load₂)
+      simpa only [one_mul, one_smul] using h
   map_smul' a load := by
     apply equilibrium_unique_if_no_mechanism (caseModel core (a • load))
       (caseActions locations (a • load)) supports cutsAt length EA EI
@@ -515,8 +520,10 @@ theorem aggregate_reaction_from_residuals (core : Model nodes members cuts segme
   rw [← hrCombined, ← hr₁, ← hr₂]
   ext v
   simp only [LinearMap.add_apply, LinearMap.smul_apply, smul_eq_mul]
-  rw [residual_functional_apply _ _ _ _ hpositive,
-    residual_functional_apply _ _ _ _ hpositive, residual_functional_apply _ _ _ _ hpositive]
+  rw [residual_functional_apply (withLoads core (fun i => a*s₁ i+b*s₂ i) (fun i => a*e₁ i+b*e₂ i))
+      (pointActions locations (fun j i => a*f₁ j i+b*f₂ j i)) (a • q₁ + b • q₂) v hpositive,
+    residual_functional_apply (withLoads core s₁ e₁) (pointActions locations f₁) q₁ v hpositive,
+    residual_functional_apply (withLoads core s₂ e₂) (pointActions locations f₂) q₂ v hpositive]
   exact residual_work_combination core a b s₁ e₁ s₂ e₂ locations f₁ f₂ q₁ q₂ v
 
 /-- The same aggregate identity holds after selecting any global hub component. -/
@@ -544,13 +551,21 @@ def externalLoadLinear (core : Model nodes members cuts segments)
     simp only [LinearMap.add_apply, external_functional_apply]
     have h := external_work_combination core 1 1 load₁.1.1 load₁.1.2 load₂.1.1 load₂.1.2
       locations load₁.2 load₂.2 v
-    simpa [caseModel, caseActions] using h
+    change externalWork (withLoads core (fun i => load₁.1.1 i + load₂.1.1 i)
+      (fun i => load₁.1.2 i + load₂.1.2 i))
+      (pointActions locations (fun j i => load₁.2 j i + load₂.2 j i)) v =
+      externalWork (withLoads core load₁.1.1 load₁.1.2) (pointActions locations load₁.2) v +
+      externalWork (withLoads core load₂.1.1 load₂.1.2) (pointActions locations load₂.2) v
+    simpa only [one_mul] using h
   map_smul' a load := by
     ext v
     simp only [LinearMap.smul_apply, smul_eq_mul, external_functional_apply]
     have h := external_work_combination core a 0 load.1.1 load.1.2 load.1.1 load.1.2
       locations load.2 load.2 v
-    simpa [caseModel, caseActions] using h
+    change externalWork (withLoads core (fun i => a * load.1.1 i) (fun i => a * load.1.2 i))
+      (pointActions locations (fun j i => a * load.2 j i)) v =
+      a * externalWork (withLoads core load.1.1 load.1.2) (pointActions locations load.2) v
+    simpa only [zero_mul, add_zero] using h
 
 /-- Stable aggregate reaction as K composed with the stable solution map,
 minus the independently derived load map. Individual support shares are not selected. -/
