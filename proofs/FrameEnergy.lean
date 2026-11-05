@@ -46,7 +46,6 @@ theorem rigid_energy_zero (A B omega L EA EI : ℝ) (hL : L ≠ 0) :
     energy (rigidMotion A B omega L) L EA EI = 0 := by
   simp [energy, relativeRotationLeft, relativeRotationRight, rigidMotion]
   field_simp
-  ring
 
 
 /-- The candidate energy vanishes only for the three rigid motions. -/
@@ -99,7 +98,12 @@ theorem stiffness_kernel_rigid (d : LocalDofs) (L EA EI : ℝ)
   · intro hkernel
     have henergy : energy d L EA EI = 0 := by
       rw [energy_stiffness_identity d L EA EI (ne_of_gt hL)]
-      simp [← Finset.mul_sum, hkernel]
+      have hinner (i : Fin 6) : (∑ j : Fin 6, d i * stiffness L EA EI i j * d j) = 0 := by
+        calc
+          (∑ j : Fin 6, d i * stiffness L EA EI i j * d j) =
+              d i * (∑ j : Fin 6, stiffness L EA EI i j * d j) := by simp [Finset.mul_sum, mul_assoc]
+          _ = 0 := by rw [hkernel i]; ring
+      simp [hinner]
     exact energy_zero_rigid d L EA EI hL hEA hEI henergy
   · rintro ⟨A, B, omega, rfl⟩ i
     exact rigid_stiffness_zero A B omega L EA EI (ne_of_gt hL) i

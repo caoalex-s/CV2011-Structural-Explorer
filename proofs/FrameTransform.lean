@@ -56,7 +56,12 @@ theorem potential_derivative (k pSide r delta : ℝ) :
     HasDerivAt (relativePotential k pSide r) (k*delta-pSide+r) delta := by
   have h := (((hasDerivAt_id delta).pow 2).const_mul (k/2)).sub
     ((hasDerivAt_id delta).const_mul pSide) |>.add ((hasDerivAt_id delta).const_mul r)
-  convert h using 1 <;> simp [relativePotential] <;> ring
+  convert h using 1
+  · funext x
+    dsimp [relativePotential]
+    ring
+  · simp
+    ring
 
 /-- Stationarity includes side loads; it does not identify −r with kδ alone. -/
 theorem spring_stationarity (k pSide r delta : ℝ)

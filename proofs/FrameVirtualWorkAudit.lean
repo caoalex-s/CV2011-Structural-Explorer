@@ -2,3 +2,9 @@ import FrameVirtualWork
 
 #print axioms FrameVirtualWork.load_primitive_derivative
 #print axioms FrameVirtualWork.consistent_load_virtual_work
+#print axioms FrameVirtualWork.strain_primitive_derivative
+#print axioms FrameVirtualWork.stiffness_virtual_work
+#print axioms FrameVirtualWork.normalized_load_density
+#print axioms FrameVirtualWork.physical_consistent_load_work
+#print axioms FrameVirtualWork.normalized_strain_density
+#print axioms FrameVirtualWork.physical_stiffness_work
