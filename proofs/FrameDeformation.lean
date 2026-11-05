@@ -724,6 +724,36 @@ def selfStressSpace (model : Model nodes members cuts segments)
     (supports : Fin supportCount → SupportInput members cuts) :=
   LinearMap.ker (restrictedDeformation model supports).dualMap
 
+/-- A vector of member basic stresses and finite-spring forces defines its
+work functional on the same D coordinates used in the statics map. -/
+def basicStressFunctional (model : Model nodes members cuts segments)
+    (stress : Sum (Fin segments × Fin 3) (SpringIndex model) → ℝ) :
+    Module.Dual ℝ (Sum (Fin segments × Fin 3) (SpringIndex model) → ℝ) := by
+  classical
+  letI : Finite (SpringIndex model) := Finite.of_injective
+    (fun spring : SpringIndex model => spring.val) Subtype.val_injective
+  letI : Fintype (SpringIndex model) := Fintype.ofFinite _
+  exact ∑ index, stress index • LinearMap.proj index
+
+/-- A physical generalized stress is self-equilibrated precisely when its
+virtual work vanishes for every actual support-admissible movement. -/
+theorem basic_stress_selfstress_iff (model : Model nodes members cuts segments)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (stress : Sum (Fin segments × Fin 3) (SpringIndex model) → ℝ) :
+    basicStressFunctional model stress ∈ selfStressSpace model supports ↔
+      ∀ variation, admissible model supports variation →
+        basicStressFunctional model stress (deformationMap model variation) = 0 := by
+  change (restrictedDeformation model supports).dualMap (basicStressFunctional model stress) = 0 ↔ _
+  constructor
+  · intro h variation hvariation
+    let v : admissibleSpace model supports :=
+      ⟨variation, (admissible_iff_constraint_kernel model supports variation).mp hvariation⟩
+    have hv := congrArg (fun f : Module.Dual ℝ (admissibleSpace model supports) => f v) h
+    exact hv
+  · intro h
+    ext v
+    exact h v.val ((admissible_iff_constraint_kernel model supports v.val).mpr v.property)
+
 /-- Exact finite-dimensional mechanism and self-stress dimension relation.
 This uses deformation coordinates, not the application's numerical count. -/
 theorem mechanism_selfstress_dimension (model : Model nodes members cuts segments)

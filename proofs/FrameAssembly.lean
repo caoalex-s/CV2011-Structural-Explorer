@@ -477,25 +477,33 @@ theorem side_motion_hub_basis (model : Model nodes members cuts segments)
       simp only [locationPoint] at hmatch hactive
       funext i
       simp [sideMotion, referenceMotion, coordinateBasis, locationPoint, hmatch, hactive,
-        Subtype.ext_iff, Prod.ext_iff]
+        Subtype.ext_iff, Prod.ext_iff, point.property]
     | endSide side =>
       simp only [locationPoint] at hmatch hactive
       funext i
       fin_cases i <;> fin_cases direction <;>
         simp [sideMotion, referenceMotion, coordinateBasis, locationPoint, endMotion,
-          slipValue, hmatch, hactive, Subtype.ext_iff, Prod.ext_iff]
+          slipValue, hmatch, hactive, Subtype.ext_iff, Prod.ext_iff, point.property]
   · cases location with
     | interior member cut =>
       simp only [locationPoint] at hmatch
+      have hne (ha : activePoint model (.inr (member, cut))) :
+          (⟨.inr (member, cut), ha⟩ : ActivePoint model) ≠ point := by
+        intro heq
+        exact hmatch (congrArg Subtype.val heq)
       funext i
-      simp [sideMotion, referenceMotion, coordinateBasis, locationPoint, hmatch,
-        Subtype.ext_iff, Prod.ext_iff]
+      simp [sideMotion, referenceMotion, coordinateBasis, locationPoint, hmatch, hne,
+        Subtype.ext_iff, Prod.ext_iff, point.property]
     | endSide side =>
       simp only [locationPoint] at hmatch
+      have hne (ha : activePoint model (.inl (endNode model side))) :
+          (⟨.inl (endNode model side), ha⟩ : ActivePoint model) ≠ point := by
+        intro heq
+        exact hmatch (congrArg Subtype.val heq)
       funext i
       fin_cases i <;> fin_cases direction <;>
         simp [sideMotion, referenceMotion, coordinateBasis, locationPoint, endMotion,
-          slipValue, hmatch, Subtype.ext_iff, Prod.ext_iff]
+          slipValue, hmatch, hne, Subtype.ext_iff, Prod.ext_iff, point.property]
 
 /-- A support row acting on a unit hub movement returns its blocked global
 direction component at that point, and zero at every other active hub. -/
