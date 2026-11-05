@@ -365,12 +365,33 @@ theorem moment_equilibrium : equilibrium beam momentLoad support momentMotion :=
 def slots : Fin 1 → Location 1 0 := fun _ => .endSide (0, true)
 def forceComponents : Fin 1 → Triple := fun _ => ![1, 0, 0]
 def momentComponents : Fin 1 → Triple := fun _ => ![0, 0, 1]
-example : equilibrium (withLoads beam (fun i => (2:ℝ)*(0 : Fin 1 → ℝ) i+(-1)*(0 : Fin 1 → ℝ) i)
+theorem combined_equilibrium : equilibrium (withLoads beam (fun i => (2:ℝ)*(0 : Fin 1 → ℝ) i+(-1)*(0 : Fin 1 → ℝ) i)
       (fun i => (2:ℝ)*(0 : Fin 1 → ℝ) i+(-1)*(0 : Fin 1 → ℝ) i))
     (pointActions slots (fun j i => (2:ℝ)*forceComponents j i+(-1)*momentComponents j i)) support
       ((2:ℝ) • axialMotion + (-1:ℝ) • momentMotion) := by
   exact equilibrium_combination beam 2 (-1) 0 0 0 0 slots forceComponents momentComponents support
     axialMotion momentMotion axial_equilibrium moment_equilibrium
+
+example : ∃ first second combined : ConstraintIndex support → ℝ,
+    groupedGroundAction beam support combined ⟨.inl 0, point0⟩ 0 =
+      2 * groupedGroundAction beam support first ⟨.inl 0, point0⟩ 0 -
+        groupedGroundAction beam support second ⟨.inl 0, point0⟩ 0 := by
+  obtain ⟨_, first, hfirst⟩ := (equilibrium_iff_reaction_coefficients beam axialLoad support axialMotion positive).mp axial_equilibrium
+  obtain ⟨_, second, hsecond⟩ := (equilibrium_iff_reaction_coefficients beam momentLoad support momentMotion positive).mp moment_equilibrium
+  let combinedModel := withLoads beam (fun i => (2:ℝ)*(0 : Fin 1 → ℝ) i+(-1)*(0 : Fin 1 → ℝ) i)
+    (fun i => (2:ℝ)*(0 : Fin 1 → ℝ) i+(-1)*(0 : Fin 1 → ℝ) i)
+  let combinedLoad := pointActions slots (fun j i => (2:ℝ)*forceComponents j i+(-1)*momentComponents j i)
+  have hpositive : positiveSegments combinedModel := positive
+  obtain ⟨_, combined, hcombined⟩ :=
+    (equilibrium_iff_reaction_coefficients combinedModel combinedLoad support
+      ((2:ℝ) • axialMotion + (-1:ℝ) • momentMotion) hpositive).mp combined_equilibrium
+  refine ⟨first, second, combined, ?_⟩
+  have haggregate := aggregate_reaction_from_residuals beam 2 (-1) 0 0 0 0 slots
+    forceComponents momentComponents support axialMotion momentMotion first second combined positive
+    hfirst hsecond hcombined
+  have hgroup := grouped_reaction_from_residuals beam support first second combined 2 (-1)
+    haggregate ⟨.inl 0, point0⟩ 0
+  linarith
 """
         with tempfile.TemporaryDirectory() as folder:
             source = Path(folder) / "ReuseCantileverCheck.lean"
