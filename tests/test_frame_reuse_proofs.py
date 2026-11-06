@@ -579,6 +579,18 @@ example : ExactContract loadedBeam (pointActions slots forceComponents) support 
 example : ∀ q, admissible loadedBeam support q → deformationMap loadedBeam q = 0 → q = 0 := by
   exact (same_boundary_no_mechanism_transport beam loadedBeam support slots noCuts boundaryMatches).mp cantileverStable
 
+example (q : Coordinate beam → ℝ) :
+    recoveredFields (withLoads beam loadedBeam.segmentVerticalStart loadedBeam.segmentVerticalEnd) q 0 =
+      recoveredFields loadedBeam (sameCoreMotionEquiv beam loadedBeam coresMatch q) 0 := by
+  exact (same_core_loaded_recovery_transport beam loadedBeam coresMatch q 0).1
+
+example : (∃ q : Coordinate beam → ℝ, equilibrium beam (pointActions slots forceComponents) support q) ∧
+    (∃ q : Coordinate loadedBeam → ℝ, equilibrium loadedBeam (pointActions slots momentComponents) support q) := by
+  obtain ⟨baseContract, baseStable, hfirst, hsecond⟩ :=
+    same_boundary_original_stable_solutions beam loadedBeam support slots noCuts properties properties properties
+      forceComponents momentComponents boundaryMatches cantileverContract cantileverStable
+  exact ⟨⟨_, hfirst⟩, ⟨_, hsecond⟩⟩
+
 def axialCase : LoadCase 1 1 := ⟨⟨0, 0⟩, forceComponents⟩
 example : stableSolutionLinear beam slots support noCuts properties properties properties
     cantileverContract cantileverStable axialCase = axialMotion := by

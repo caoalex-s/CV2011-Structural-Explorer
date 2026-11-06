@@ -1003,5 +1003,64 @@ theorem same_core_loaded_recovery_transport (first second : Model nodes members 
   rw [same_core_motion_coherent]
   constructor <;> rfl
 
+
+/-- Transport an equilibrium solved on the first core with the second model's
+actual segment loads. Point actions are supplied separately at their fixed slots. -/
+theorem same_core_equilibrium_transport (first second : Model nodes members cuts segments)
+    (h : sameCore first second) (actions : Fin actionCount → PointAction members cuts)
+    (supports : Fin supportCount → SupportInput members cuts) (q : Coordinate first → ℝ)
+    (hq : equilibrium (withLoads first second.segmentVerticalStart second.segmentVerticalEnd) actions supports q) :
+    equilibrium second actions supports (sameCoreMotionEquiv first second h q) := by
+  obtain ⟨core, start₁, end₁, start₂, end₂, hfirst, hsecond⟩ := same_core_representation first second h
+  subst first
+  subst second
+  rw [same_core_motion_coherent]
+  exact hq
+
+/-- The two actual supplied models receive separately solved load cases. The
+second solution is computed using the second amplitudes before it is transported;
+no unchanged-solution claim is made for a changed right-hand side. -/
+theorem same_boundary_original_stable_solutions (first second : Model nodes members cuts segments)
+    (supports : Fin supportCount → SupportInput members cuts)
+    (locations : Fin actionCount → Location members cuts)
+    (cutsAt : Fin members → Fin cuts → ℝ) (length EA EI : Fin members → ℝ)
+    (f₁ f₂ : Fin actionCount → Triple)
+    (h : sameReuseBoundary first second supports supports locations locations cutsAt cutsAt)
+    (hcontract : ExactContract first (pointActions locations f₁) supports cutsAt length EA EI)
+    (hstable : ∀ q, admissible first supports q → deformationMap first q = 0 → q = 0) :
+    ∃ (baseContract : ExactContract (withLoads first 0 0) (pointActions locations 0) supports cutsAt length EA EI)
+      (baseStable : ∀ q, admissible (withLoads first 0 0) supports q →
+        deformationMap (withLoads first 0 0) q = 0 → q = 0),
+    equilibrium first (pointActions locations f₁) supports
+      (sameCoreMotionEquiv first first (show sameCore first first from rfl)
+        (stableSolutionLinear first locations supports cutsAt length EA EI baseContract baseStable
+          ⟨⟨first.segmentVerticalStart, first.segmentVerticalEnd⟩, f₁⟩)) ∧
+    equilibrium second (pointActions locations f₂) supports
+      (sameCoreMotionEquiv first second h.1.1
+        (stableSolutionLinear first locations supports cutsAt length EA EI baseContract baseStable
+          ⟨⟨second.segmentVerticalStart, second.segmentVerticalEnd⟩, f₂⟩)) := by
+  have hself : withLoads first first.segmentVerticalStart first.segmentVerticalEnd = first := by
+    cases first
+    rfl
+  have contractAtFirst : ExactContract (withLoads first first.segmentVerticalStart first.segmentVerticalEnd)
+      (pointActions locations f₁) supports cutsAt length EA EI := by
+    rw [hself]
+    exact hcontract
+  have stableAtFirst : ∀ q, admissible (withLoads first first.segmentVerticalStart first.segmentVerticalEnd) supports q →
+      deformationMap (withLoads first first.segmentVerticalStart first.segmentVerticalEnd) q = 0 → q = 0 := by
+    rw [hself]
+    exact hstable
+  have baseContract : ExactContract (withLoads first 0 0) (pointActions locations 0) supports cutsAt length EA EI :=
+    (exact_contract_unchanged first first.segmentVerticalStart first.segmentVerticalEnd 0 0
+      locations f₁ 0 supports cutsAt length EA EI).mp contractAtFirst
+  have baseStable : ∀ q, admissible (withLoads first 0 0) supports q →
+      deformationMap (withLoads first 0 0) q = 0 → q = 0 :=
+    (no_mechanism_unchanged first first.segmentVerticalStart first.segmentVerticalEnd 0 0 supports).mp stableAtFirst
+  refine ⟨baseContract, baseStable, ?_, ?_⟩
+  · apply same_core_equilibrium_transport first first (show sameCore first first from rfl)
+    exact stable_solution_equilibrium first locations supports cutsAt length EA EI baseContract baseStable _
+  · apply same_core_equilibrium_transport first second h.1.1
+    exact stable_solution_equilibrium first locations supports cutsAt length EA EI baseContract baseStable _
+
 end
 end FrameReuse
