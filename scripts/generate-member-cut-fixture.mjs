@@ -150,15 +150,15 @@ example : resultant 1 0 (1/2) ${leftStart} ${leftEnd} + resultant 1 (1/2) 1 ${ri
 
 -- Equal resultant and first moment do not determine work against t^3.
 example : (∫ t in (0:ℝ)..1, t^3) = 1/4 := by
-  norm_num [intervalIntegral.integral_pow]
+  norm_num [integral_pow]
 example : (∫ t in (0:ℝ)..(1/2), 4*t^4) + (∫ t in (1/2:ℝ)..1, (4*t^3-4*t^4)) = 3/16 := by
   have hleft : (∫ t in (0:ℝ)..(1/2), 4*t^4) = 1/40 := by
     rw [intervalIntegral.integral_const_mul]
-    norm_num [intervalIntegral.integral_pow]
+    norm_num [integral_pow]
   have hright : (∫ t in (1/2:ℝ)..1, (4*t^3-4*t^4)) = 13/80 := by
     rw [intervalIntegral.integral_sub]
     · rw [intervalIntegral.integral_const_mul, intervalIntegral.integral_const_mul]
-      norm_num [intervalIntegral.integral_pow]
+      norm_num [integral_pow]
     · exact (continuous_const.mul (continuous_id.pow 3)).intervalIntegrable _ _
     · exact (continuous_const.mul (continuous_id.pow 4)).intervalIntegrable _ _
   linarith
@@ -166,3 +166,4 @@ example : (∫ t in (0:ℝ)..(1/2), 4*t^4) + (∫ t in (1/2:ℝ)..1, (4*t^3-4*t^
 `;
 await writeFile(target, source, 'utf8');
 console.log(`Generated synthetic adapter fixture from artifact ${artifact.artifactDigest}`);
+
