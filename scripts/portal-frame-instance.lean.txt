@@ -186,6 +186,7 @@ theorem portalConditionalReaction (q : Coordinate model → ℝ) :
 
 -- Kernel-checked rejection: a normalized axis is still wrong for downward CD.
 theorem rejectUpwardCD : (model.member 2).orientation.sine ≠ 1 := by
-  norm_num [model, sine]
+  change sine (⟨2, by decide⟩ : Fin 3) ≠ 1
+  norm_num [sine]
 
 end PortalFramePilot

@@ -31,7 +31,7 @@ const realVector = values => vector(values.map(emitExactExpression));
 /** Emit only bounded indices. No source ID or arbitrary text enters Lean. */
 function finiteIndex(index, count) {
     assert.ok(Number.isSafeInteger(index) && index >= 0 && index < count);
-    return String(index);
+    return `⟨${index}, by decide⟩`;
 }
 
 function endLocation(location) {
