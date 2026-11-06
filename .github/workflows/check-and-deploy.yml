@@ -154,6 +154,10 @@ jobs:
         run: |
           lake env lean MemberCutAdapterAudit.lean > member-cut-axioms.log
           python ../scripts/audit_real_axioms.py member-cut-axioms.log MemberCutAdapter
+      - name: Check synthetic exact geometry expressions
+        run: python -m unittest discover -s tests -p 'test_exact_geometry_proofs.py' -v
+        env:
+          REQUIRE_LEAN: '1'
       - name: Audit exact geometry theorem axioms
         working-directory: proofs
         run: |

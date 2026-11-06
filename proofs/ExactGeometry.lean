@@ -46,7 +46,7 @@ theorem direction_components (a b : Point) (h : a ≠ b) :
     distance a b * (direction a b).cosine = dx a b ∧
     distance a b * (direction a b).sine = dy a b := by
   have hl := ne_of_gt (distance_positive a b h)
-  simp [direction, hl]
+  constructor <;> dsimp [direction] <;> field_simp
 
 theorem position_ends (a b : Point) : position a b 0 = a ∧ position a b 1 = b := by
   constructor <;> apply Prod.ext <;> simp [position, dx, dy]
@@ -64,8 +64,10 @@ theorem position_injective (a b : Point) (h : a ≠ b) : Function.Injective (pos
   have hy := congrArg Prod.snd huv
   simp only [position, Prod.fst, Prod.snd] at hx hy
   by_contra hn
-  have hdx : dx a b = 0 := by nlinarith [hx]
-  have hdy : dy a b = 0 := by nlinarith [hy]
+  have hxzero : (u-v)*dx a b = 0 := by nlinarith [hx]
+  have hyzero : (u-v)*dy a b = 0 := by nlinarith [hy]
+  have hdx : dx a b = 0 := (mul_eq_zero.mp hxzero).resolve_left (sub_ne_zero.mpr hn)
+  have hdy : dy a b = 0 := (mul_eq_zero.mp hyzero).resolve_left (sub_ne_zero.mpr hn)
   rw [hdx, hdy] at hp
   norm_num at hp
 
@@ -101,11 +103,13 @@ theorem segment_positive (a b : Point) (h : a ≠ b) (u v : ℝ) (huv : u < v) :
   rw [segment_distance a b u v huv]
   exact mul_pos (sub_pos.mpr huv) (distance_positive a b h)
 
-theorem segment_direction (a b : Point) (h : a ≠ b) (u v : ℝ) (huv : u < v) :
+theorem segment_direction (a b : Point) (_h : a ≠ b) (u v : ℝ) (huv : u < v) :
     direction (position a b u) (position a b v) = direction a b := by
   have hd := position_difference a b u v
   have hw : v-u ≠ 0 := ne_of_gt (sub_pos.mpr huv)
-  apply Orientation.ext <;> simp [direction, hd.1, hd.2, segment_distance a b u v huv, hw]
+  unfold direction
+  rw [hd.1, hd.2, segment_distance a b u v huv]
+  congr 1 <;> field_simp
 
 theorem position_reverse (a b : Point) (t : ℝ) : position b a (1-t) = position a b t := by
   apply Prod.ext <;> simp [position, dx, dy] <;> ring
