@@ -150,14 +150,19 @@ example : resultant 1 0 (1/2) ${leftStart} ${leftEnd} + resultant 1 (1/2) 1 ${ri
 
 -- Equal resultant and first moment do not determine work against t^3.
 example : (∫ t in (0:ℝ)..1, t^3) = 1/4 := by
-  have h := RealBeamFields.real_integral (Polynomial.C (1/4 : ℝ) * X^4) 0 1
-  norm_num [Polynomial.derivative_mul, Polynomial.derivative_pow] at h
-  exact h
+  norm_num [intervalIntegral.integral_pow]
 example : (∫ t in (0:ℝ)..(1/2), 4*t^4) + (∫ t in (1/2:ℝ)..1, (4*t^3-4*t^4)) = 3/16 := by
-  have hl := RealBeamFields.real_integral (Polynomial.C (4/5 : ℝ) * X^5) 0 (1/2)
-  have hr := RealBeamFields.real_integral (X^4 - Polynomial.C (4/5 : ℝ) * X^5) (1/2) 1
-  norm_num [Polynomial.derivative_mul, Polynomial.derivative_pow, Polynomial.derivative_sub] at hl hr
+  have hleft : (∫ t in (0:ℝ)..(1/2), 4*t^4) = 1/40 := by
+    rw [intervalIntegral.integral_const_mul]
+    norm_num [intervalIntegral.integral_pow]
+  have hright : (∫ t in (1/2:ℝ)..1, (4*t^3-4*t^4)) = 13/80 := by
+    rw [intervalIntegral.integral_sub]
+    · rw [intervalIntegral.integral_const_mul, intervalIntegral.integral_const_mul]
+      norm_num [intervalIntegral.integral_pow]
+    · exact (continuous_const.mul (continuous_id.pow 3)).intervalIntegrable _ _
+    · exact (continuous_const.mul (continuous_id.pow 4)).intervalIntegrable _ _
   linarith
+
 `;
 await writeFile(target, source, 'utf8');
 console.log(`Generated synthetic adapter fixture from artifact ${artifact.artifactDigest}`);
