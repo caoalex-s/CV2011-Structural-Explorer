@@ -75,6 +75,27 @@ const oq10 = real(src1.sourceEndpoints[0]), oq11 = real(src1.sourceEndpoints[1])
 const ou = real(overlap.from), ov = real(overlap.to);
 const oq0 = real(overlap.verticalEndpoints[0]), oq1 = real(overlap.verticalEndpoints[1]);
 const sideMoment = real(detailedAction.components.mz), sideSpring = real(law.transverse.stiffness);
+const loadedSpans = detailedMember.intervals.filter(interval => interval.contributions.length > 0);
+if (loadedSpans.length !== 3) throw Error('Expected three loaded elementary intervals');
+// A missing source is padded with an identically zero affine source on the
+// target interval, keeping containment true without inventing load work.
+const padded = loadedSpans.map(interval => [0, 1].map(index => {
+    const contribution = interval.contributions.find(item => item.sourceIndex === index);
+    return contribution ?? { sourceInterval: [interval.from, interval.to], sourceEndpoints: [
+        { numerator: '0', denominator: '1' }, { numerator: '0', denominator: '1' }] };
+}));
+const selectSpan = values => `fun k => if k = 0 then ${values[0]} else if k = 1 then ${values[1]} else ${values[2]}`;
+const selectSources = values => `fun k i => if i = 0 then (${selectSpan(values.map(pair => pair[0]))}) k else (${selectSpan(values.map(pair => pair[1]))}) k`;
+const familyA = selectSources(padded.map(pair => pair.map(item => real(item.sourceInterval[0]))));
+const familyB = selectSources(padded.map(pair => pair.map(item => real(item.sourceInterval[1]))));
+const familyQ0 = selectSources(padded.map(pair => pair.map(item => real(item.sourceEndpoints[0]))));
+const familyQ1 = selectSources(padded.map(pair => pair.map(item => real(item.sourceEndpoints[1]))));
+const familyU = selectSpan(loadedSpans.map(interval => real(interval.from)));
+const familyV = selectSpan(loadedSpans.map(interval => real(interval.to)));
+const familyStart = selectSpan(loadedSpans.map(interval => real(interval.verticalEndpoints[0])));
+const familyEnd = selectSpan(loadedSpans.map(interval => real(interval.verticalEndpoints[1])));
+const restricted00 = real(src0.restrictedEndpoints[0]), restricted01 = real(src0.restrictedEndpoints[1]);
+const restricted10 = real(src1.restrictedEndpoints[0]), restricted11 = real(src1.restrictedEndpoints[1]);
 if (!/^[a-f0-9]{64}$/.test(detailed.artifactDigest)) throw Error('Invalid detailed artifact digest');
 const source = `-- Synthetic adapter artifact SHA-256: ${artifact.artifactDigest}
 import MemberCutAdapter
@@ -206,8 +227,65 @@ example : (∫ t in ${ou}..${ov}, overlapDensity.eval t) =
   rw [overlapEndpoints.1, overlapEndpoints.2] at h
   simpa using h
 
-example : (${ov}-${ou}) ≠ 1 := by norm_num
-example : ${oq0} ≠ ${oq1} := by norm_num
+def familyA : Fin 3 → Fin 2 → ℝ := ${familyA}
+def familyB : Fin 3 → Fin 2 → ℝ := ${familyB}
+def familyQ0 : Fin 3 → Fin 2 → ℝ := ${familyQ0}
+def familyQ1 : Fin 3 → Fin 2 → ℝ := ${familyQ1}
+def familyU : Fin 3 → ℝ := ${familyU}
+def familyV : Fin 3 → ℝ := ${familyV}
+def familyStart : Fin 3 → ℝ := ${familyStart}
+def familyEnd : Fin 3 → ℝ := ${familyEnd}
+def familyDensity : Fin 3 → Polynomial ℝ := fun k =>
+  if k = 0 then 8*X^4-4*X^3 else if k = 1 then 4*X^4-X^3 else 3*X^3-4*X^4
+
+theorem familyEndpoints (k : Fin 3) :
+    (∑ i : Fin 2, affine (familyA k i) (familyB k i) (familyQ0 k i) (familyQ1 k i) (familyU k)) = familyStart k ∧
+    (∑ i : Fin 2, affine (familyA k i) (familyB k i) (familyQ0 k i) (familyQ1 k i) (familyV k)) = familyEnd k := by
+  fin_cases k <;> norm_num [Fin.sum_univ_succ, familyA, familyB, familyQ0, familyQ1,
+    familyU, familyV, familyStart, familyEnd, affine]
+
+example : (∑ k : Fin 3, (∫ t in familyU k..familyV k, (familyDensity k).eval t)) =
+    ∑ k : Fin 3, (familyV k-familyU k) * (∫ z in (0:ℝ)..1,
+      intervalAffine (familyStart k) (familyEnd k) z * (X^3 : Polynomial ℝ).eval (pullback (familyU k) (familyV k) z)) := by
+  have h := overlap_finite_interval_work (Fin 3) (Fin 2) familyA familyB familyQ0 familyQ1 familyU familyV 1
+    familyDensity (X^3)
+    (by intro k; fin_cases k <;> norm_num [familyU, familyV])
+    (by intro k i; fin_cases k <;> fin_cases i <;> norm_num [familyA, familyB])
+    (by intro k i; fin_cases k <;> fin_cases i <;> norm_num [familyA, familyB, familyU, familyV])
+    (by intro k t; fin_cases k <;> simp [Fin.sum_univ_succ, familyA, familyB, familyQ0, familyQ1,
+      familyDensity, affine] <;> ring)
+  simp only [one_mul] at h
+  convert h using 1
+  apply Finset.sum_congr rfl
+  intro k hk
+  rw [(familyEndpoints k).1, (familyEndpoints k).2]
+
+def overlapLocalDofs : FrameInterfaces.LocalDofs := ![0, 1/8, 3/4, 0, 27/64, 27/16]
+def overlapVirtual : Polynomial ℝ := (C ${ou} + C (${ov}-${ou}) * X)^3
+def localSourceQ0 : Fin 2 → ℝ := fun i => if i = 0 then ${restricted00} else ${restricted10}
+def localSourceQ1 : Fin 2 → ℝ := fun i => if i = 0 then ${restricted01} else ${restricted11}
+def localA : Fin 2 → ℝ := fun _ => 0
+def localB : Fin 2 → ℝ := fun _ => 1
+
+example : (∑ i : Fin 6, LocalFrameFields.consistentLoad (${ov}-${ou}) 0 0 ${oq0} ${oq1} i * overlapLocalDofs i) =
+    (${ov}-${ou}) * (∫ z in (0:ℝ)..1, intervalAffine ${oq0} ${oq1} z * overlapVirtual.eval z) := by
+  have h := overlap_rotated_consistent_work (Fin 2) localA localB localSourceQ0 localSourceQ1
+    overlapLocalDofs (${ov}-${ou}) 1 0 ${oq0} ${oq1} overlapVirtual
+    (by intro i; norm_num [localA, localB]) (by intro i; norm_num [localA, localB]) (by
+      intro t
+      simp [FrameVirtualWork.loadDensity, FrameVirtualWork.axialShape, FrameVirtualWork.transverseShape,
+        overlapLocalDofs, overlapVirtual, localA, localB, localSourceQ0, localSourceQ1,
+        Fin.sum_univ_succ, affine]
+      ring)
+  norm_num [localA, localB, localSourceQ0, localSourceQ1, Fin.sum_univ_succ, affine, pullback] at h ⊢
+  exact h
+
+-- For this nonzero work, omitting the Jacobian changes the value fourfold.
+example : (∫ t in ${ou}..${ov}, overlapDensity.eval t) ≠
+    (∫ z in (0:ℝ)..1, intervalAffine ${oq0} ${oq1} z * (X^3 : Polynomial ℝ).eval (pullback ${ou} ${ov} z)) := by
+  norm_num [overlapDensity, intervalAffine, pullback, Polynomial.eval_sub, Polynomial.eval_mul,
+    intervalIntegral.integral_sub, intervalIntegral.integral_add, intervalIntegral.integral_const_mul, integral_pow]
+
 
 def releasedModel : Model 3 2 0 2 where
   joints := fun _ => ⟨.rigid, 1, none⟩

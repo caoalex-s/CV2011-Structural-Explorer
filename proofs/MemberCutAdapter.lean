@@ -151,6 +151,7 @@ theorem overlap_interval_work (ι : Type) [Fintype ι] (a b qa qb : ι → ℝ)
   congr 1
   rw [← overlap_restriction ι a b qa qb u v z (fun i => ne_of_lt (hsource i))]
   simp [intervalAffine, Finset.sum_add_distrib, Finset.sum_sub_distrib, Finset.sum_mul]
+  rw [← Finset.sum_mul, Finset.sum_sub_distrib]
 
 /-- The statement applies simultaneously to any finite family of elementary
 intervals, with each interval carrying its own active source parameters. -/
