@@ -133,6 +133,16 @@ example : distance a b * (1:ℝ) ≠ dx a b := by
   norm_num [a, b, dx, dy] at hs ⊢
   nlinarith
 
+example (q : Coordinate syntheticModel → ℝ) :
+    supportRow syntheticModel (syntheticSupports 0) ![0, 0, 1] q =
+      sideMotion syntheticModel q (.interior 0 0) 2 := by
+  simp [supportRow, syntheticSupports, FrameTransform.work]
+example (q : Coordinate syntheticModel → ℝ) :
+    supportRow syntheticModel (syntheticSupports 0) ![emittedAxisCos, emittedAxisSin, 0] q =
+      emittedAxisCos * sideMotion syntheticModel q (.interior 0 0) 0 +
+        emittedAxisSin * sideMotion syntheticModel q (.interior 0 0) 1 := by
+  simp [supportRow, syntheticSupports, FrameTransform.work]
+
 theorem syntheticStructure : StructuralPremises syntheticModel syntheticActions syntheticSupports cutParam := by
   constructor
   · intro segment
@@ -205,6 +215,16 @@ example : ¬ GeometryCorrespondence badPropertyModel nodePos cutParam memberEA m
   have h := (geometry.properties 0).1
   norm_num [badPropertyModel, memberEA] at h
 
+def badLengthModel : Model 2 2 1 3 := { syntheticModel with segmentLength := fun _ => emittedLength }
+example : ¬ GeometryCorrespondence badLengthModel nodePos cutParam memberEA memberEI segmentStart segmentEnd := by
+  intro geometry
+  have h := geometry.length 0
+  norm_num [badLengthModel, segmentStart, segmentEnd, emittedLength, emittedPoint1, distance, dx, dy, a, b] at h
+  have hs := Real.sq_sqrt (show (0:ℝ) ≤ 2 by norm_num)
+  have hp := Real.sqrt_pos.2 (show (0:ℝ) < 2 by norm_num)
+  field_simp at h
+  nlinarith
+
 def badSpringModel : Model 2 2 1 3 := { syntheticModel with member := fun m => if m.val = 0 then
   ⟨0, 1, ⟨emittedCos, emittedSin⟩, none, none⟩
   else ⟨1, 0, ⟨reversedCos, reversedSin⟩, some ⟨.released, .spring (-7), .released⟩, none⟩ }
@@ -219,11 +239,15 @@ theorem syntheticSupportAxes : SupportAxisCorrespondence syntheticSupports suppo
   · norm_num [syntheticSupports, supportAngles, emittedAngle, emittedAxisCos, emittedAxisSin, degreeCos, degreeSin]
   · simp [syntheticSupports] at hs
 
-theorem syntheticSprings : EffectiveSpringPositive syntheticModel := by
-  intro side direction stiffness active law
-  rcases side with ⟨member, ending⟩
-  fin_cases member <;> cases ending <;> fin_cases direction <;>
-    norm_num [directionLaw, endConnection, referenceMember, incident, endNode, syntheticModel, rigidConnection] at *
+theorem syntheticSprings : SpringInputPositive syntheticModel := by
+  constructor
+  · intro side connection direction stiffness choice law
+    rcases side with ⟨member, ending⟩
+    fin_cases member <;> cases ending <;> simp [syntheticModel] at choice
+    all_goals cases choice
+    all_goals fin_cases direction <;> norm_num [directionLaw] at law ⊢
+  · intro node h
+    fin_cases node <;> simp [syntheticModel] at h
 
 example : ExactContract syntheticModel syntheticActions syntheticSupports cutParam
     (memberDistance syntheticModel nodePos) memberEA memberEI := by

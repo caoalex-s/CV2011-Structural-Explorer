@@ -180,6 +180,31 @@ def EffectiveSpringPositive (model : Model nodes members cuts segments) : Prop :
   ∀ side direction stiffness, activeEnd model side →
     directionLaw (endConnection model side) direction = .spring stiffness → 0 < stiffness
 
+/-- Positivity of explicit spring inputs and semi-rigid default stiffnesses.
+Reference ends and all default/explicit choices are resolved by endConnection. -/
+def SpringInputPositive (model : Model nodes members cuts segments) : Prop :=
+  (∀ side connection direction stiffness,
+    (if side.2 then (model.member side.1).explicitEnd else (model.member side.1).explicitStart) = some connection →
+    directionLaw connection direction = .spring stiffness → 0 < stiffness) ∧
+  (∀ node, (model.joints node).kind = .semiRigid → 0 < (model.joints node).rotationStiffness)
+
+theorem effective_springs_from_inputs (model : Model nodes members cuts segments)
+    (inputs : SpringInputPositive model) : EffectiveSpringPositive model := by
+  intro side direction stiffness _active law
+  by_cases reference : referenceMember model (endNode model side) = some side.1
+  · fin_cases direction <;> simp [endConnection, reference, directionLaw, rigidConnection] at law
+  · simp only [endConnection, reference, if_false] at law
+    cases choice : (if side.2 then (model.member side.1).explicitEnd else (model.member side.1).explicitStart) with
+    | some connection =>
+      rw [choice] at law
+      exact inputs.1 side connection direction stiffness choice law
+    | none =>
+      rw [choice] at law
+      cases joint : (model.joints (endNode model side)).kind <;>
+        fin_cases direction <;> simp [joint, directionLaw] at law
+      subst stiffness
+      exact inputs.2 (endNode model side) joint
+
 def memberDistance (model : Model nodes members cuts segments) (nodePosition : Fin nodes → Point) (m : Fin members) : ℝ :=
   distance (nodePosition (model.member m).startNode) (nodePosition (model.member m).endNode)
 
@@ -196,7 +221,7 @@ theorem compose_exact_contract (model : Model nodes members cuts segments)
     (noncoincident : ∀ m, nodePosition (model.member m).startNode ≠ nodePosition (model.member m).endNode)
     (positiveEA : ∀ m, 0 < memberEA m) (positiveEI : ∀ m, 0 < memberEI m)
     (supportAxes : SupportAxisCorrespondence supports angles)
-    (springs : EffectiveSpringPositive model) :
+    (springInputs : SpringInputPositive model) :
     ExactContract model actions supports cutParameter (memberDistance model nodePosition) memberEA memberEI ∧
       GeometryCorrespondence model nodePosition cutParameter memberEA memberEI segmentStart segmentEnd := by
   constructor
@@ -224,7 +249,7 @@ theorem compose_exact_contract (model : Model nodes members cuts segments)
         segment_distance _ _ _ _ (structureValid.ordered s).2.1]
       simp [memberDistance, mul_comm]
     · exact geometry.properties
-    · exact springs
+    · exact effective_springs_from_inputs model springInputs
   · exact geometry
 
 end
