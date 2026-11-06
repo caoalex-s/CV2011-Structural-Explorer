@@ -183,10 +183,10 @@ def EffectiveSpringPositive (model : Model nodes members cuts segments) : Prop :
 /-- Positivity of explicit spring inputs and semi-rigid default stiffnesses.
 Reference ends and all default/explicit choices are resolved by endConnection. -/
 def SpringInputPositive (model : Model nodes members cuts segments) : Prop :=
-  (∀ side connection direction stiffness,
+  (∀ (side : MemberEnd members) (connection : EndConnection) (direction : Fin 3) (stiffness : ℝ),
     (if side.2 then (model.member side.1).explicitEnd else (model.member side.1).explicitStart) = some connection →
     directionLaw connection direction = .spring stiffness → 0 < stiffness) ∧
-  (∀ node, (model.joints node).kind = .semiRigid → 0 < (model.joints node).rotationStiffness)
+  (∀ (node : Fin nodes), (model.joints node).kind = .semiRigid → 0 < (model.joints node).rotationStiffness)
 
 theorem effective_springs_from_inputs (model : Model nodes members cuts segments)
     (inputs : SpringInputPositive model) : EffectiveSpringPositive model := by
