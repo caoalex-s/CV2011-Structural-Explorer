@@ -117,18 +117,19 @@ theorem position_reverse (a b : Point) (t : ℝ) : position b a (1-t) = position
 /-- The drawing coordinates are external to Model. This relation anchors the
 stored orientation, segment endpoints, length and inherited properties. -/
 structure GeometryCorrespondence (model : Model nodes members cuts segments)
-    (nodePosition : Fin nodes → Point) (cutParameter : Fin members → Fin cuts → ℝ)
-    (memberEA memberEI : Fin members → ℝ)
+    (nodePosition : Fin nodes → Point) (drawingStart drawingEnd : Fin members → Fin nodes)
+    (cutParameter : Fin members → Fin cuts → ℝ) (memberEA memberEI : Fin members → ℝ)
     (segmentStart segmentEnd : Fin segments → Point) : Prop where
+  incidence : ∀ m, (model.member m).startNode = drawingStart m ∧ (model.member m).endNode = drawingEnd m
   orientation : ∀ m, (model.member m).orientation =
-    direction (nodePosition (model.member m).startNode) (nodePosition (model.member m).endNode)
+    direction (nodePosition (drawingStart m)) (nodePosition (drawingEnd m))
   startPosition : ∀ s, segmentStart s = position
-    (nodePosition (model.member (model.segmentMember s)).startNode)
-    (nodePosition (model.member (model.segmentMember s)).endNode)
+    (nodePosition (drawingStart (model.segmentMember s)))
+    (nodePosition (drawingEnd (model.segmentMember s)))
     (locationParameter cutParameter (model.segmentLeft s))
   endPosition : ∀ s, segmentEnd s = position
-    (nodePosition (model.member (model.segmentMember s)).startNode)
-    (nodePosition (model.member (model.segmentMember s)).endNode)
+    (nodePosition (drawingStart (model.segmentMember s)))
+    (nodePosition (drawingEnd (model.segmentMember s)))
     (locationParameter cutParameter (model.segmentRight s))
   length : ∀ s, model.segmentLength s = distance (segmentStart s) (segmentEnd s)
   properties : ∀ s, model.segmentEA s = memberEA (model.segmentMember s) ∧
@@ -137,9 +138,10 @@ structure GeometryCorrespondence (model : Model nodes members cuts segments)
 /-- Equal adjacent parameters on the same original member give the same
 external physical endpoint; this does not weld different member owners. -/
 theorem correspondence_shared_join (model : Model nodes members cuts segments)
-    (nodePosition : Fin nodes → Point) (cutParameter : Fin members → Fin cuts → ℝ)
-    (memberEA memberEI : Fin members → ℝ) (segmentStart segmentEnd : Fin segments → Point)
-    (geometry : GeometryCorrespondence model nodePosition cutParameter memberEA memberEI segmentStart segmentEnd)
+    (nodePosition : Fin nodes → Point) (drawingStart drawingEnd : Fin members → Fin nodes)
+    (cutParameter : Fin members → Fin cuts → ℝ) (memberEA memberEI : Fin members → ℝ)
+    (segmentStart segmentEnd : Fin segments → Point)
+    (geometry : GeometryCorrespondence model nodePosition drawingStart drawingEnd cutParameter memberEA memberEI segmentStart segmentEnd)
     (left right : Fin segments) (sameMember : model.segmentMember left = model.segmentMember right)
     (sameParameter : locationParameter cutParameter (model.segmentRight left) =
       locationParameter cutParameter (model.segmentLeft right)) : segmentEnd left = segmentStart right := by
@@ -205,8 +207,8 @@ theorem effective_springs_from_inputs (model : Model nodes members cuts segments
       subst stiffness
       exact inputs.2 (endNode model side) joint
 
-def memberDistance (model : Model nodes members cuts segments) (nodePosition : Fin nodes → Point) (m : Fin members) : ℝ :=
-  distance (nodePosition (model.member m).startNode) (nodePosition (model.member m).endNode)
+def memberDistance (nodePosition : Fin nodes → Point) (drawingStart drawingEnd : Fin members → Fin nodes) (m : Fin members) : ℝ :=
+  distance (nodePosition (drawingStart m)) (nodePosition (drawingEnd m))
 
 /-- Geometry and properties are derived, while the finite-builder premises and
 actual spring-law positivity remain explicit. -/
@@ -214,16 +216,16 @@ theorem compose_exact_contract (model : Model nodes members cuts segments)
     (actions : Fin actionCount → PointAction members cuts)
     (supports : Fin supportCount → SupportInput members cuts)
     (cutParameter : Fin members → Fin cuts → ℝ)
-    (nodePosition : Fin nodes → Point) (memberEA memberEI : Fin members → ℝ)
-    (segmentStart segmentEnd : Fin segments → Point) (angles : Fin supportCount → ℝ)
+    (nodePosition : Fin nodes → Point) (drawingStart drawingEnd : Fin members → Fin nodes)
+    (memberEA memberEI : Fin members → ℝ) (segmentStart segmentEnd : Fin segments → Point) (angles : Fin supportCount → ℝ)
     (structureValid : StructuralPremises model actions supports cutParameter)
-    (geometry : GeometryCorrespondence model nodePosition cutParameter memberEA memberEI segmentStart segmentEnd)
-    (noncoincident : ∀ m, nodePosition (model.member m).startNode ≠ nodePosition (model.member m).endNode)
+    (geometry : GeometryCorrespondence model nodePosition drawingStart drawingEnd cutParameter memberEA memberEI segmentStart segmentEnd)
+    (noncoincident : ∀ m, nodePosition (drawingStart m) ≠ nodePosition (drawingEnd m))
     (positiveEA : ∀ m, 0 < memberEA m) (positiveEI : ∀ m, 0 < memberEI m)
     (supportAxes : SupportAxisCorrespondence supports angles)
     (springInputs : SpringInputPositive model) :
-    ExactContract model actions supports cutParameter (memberDistance model nodePosition) memberEA memberEI ∧
-      GeometryCorrespondence model nodePosition cutParameter memberEA memberEI segmentStart segmentEnd := by
+    ExactContract model actions supports cutParameter (memberDistance nodePosition drawingStart drawingEnd) memberEA memberEI ∧
+      GeometryCorrespondence model nodePosition drawingStart drawingEnd cutParameter memberEA memberEI segmentStart segmentEnd := by
   constructor
   · constructor
     · exact structureValid.ownership

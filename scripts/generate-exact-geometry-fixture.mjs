@@ -115,6 +115,8 @@ def syntheticSupports : Fin 2 → SupportInput 2 1 := fun s => if s.val = 0 then
   ⟨.interior 0 0, .guided, emittedAxisCos, emittedAxisSin, false, false, false⟩
   else ⟨.endSide (1, false), .custom, 0, 0, true, false, false⟩
 def nodePos : Fin 2 → Point := fun n => if n.val = 0 then a else b
+def drawingStart : Fin 2 → Fin 2 := fun m => if m.val = 0 then 0 else 1
+def drawingEnd : Fin 2 → Fin 2 := fun m => if m.val = 0 then 1 else 0
 def memberEA : Fin 2 → ℝ := fun _ => ${emit(first.intervals[0].EA)}
 def memberEI : Fin 2 → ℝ := fun _ => ${emit(first.intervals[0].EI)}
 def segmentStart : Fin 3 → Point := fun s => if s.val = 0 then a else if s.val = 1 then emittedPoint1 else b
@@ -198,16 +200,18 @@ theorem syntheticStructure : StructuralPremises syntheticModel syntheticActions 
     · exact ⟨0, Or.inr rfl⟩
     · exact ⟨2, Or.inl rfl⟩
 
-theorem syntheticGeometry : GeometryCorrespondence syntheticModel nodePos cutParam memberEA memberEI segmentStart segmentEnd := by
+theorem syntheticGeometry : GeometryCorrespondence syntheticModel nodePos drawingStart drawingEnd cutParam memberEA memberEI segmentStart segmentEnd := by
   constructor
   · intro m
-    fin_cases m <;> norm_num [syntheticModel, nodePos, direction, distance, dx, dy, a, b,
+    fin_cases m <;> norm_num [syntheticModel, drawingStart, drawingEnd]
+  · intro m
+    fin_cases m <;> norm_num [syntheticModel, nodePos, drawingStart, drawingEnd, direction, distance, dx, dy, a, b,
       emittedCos, emittedSin, reversedCos, reversedSin, emittedLength] <;> ring
   · intro s
-    fin_cases s <;> norm_num [syntheticModel, segmentStart, nodePos, position, locationParameter,
+    fin_cases s <;> norm_num [syntheticModel, segmentStart, nodePos, drawingStart, drawingEnd, position, locationParameter,
       cutParam, emittedCut1, emittedPoint1, a, b, dx, dy]
   · intro s
-    fin_cases s <;> norm_num [syntheticModel, segmentEnd, nodePos, position, locationParameter,
+    fin_cases s <;> norm_num [syntheticModel, segmentEnd, nodePos, drawingStart, drawingEnd, position, locationParameter,
       cutParam, emittedCut1, emittedPoint1, a, b, dx, dy]
   · intro s
     fin_cases s <;> simp [syntheticModel, segmentStart, segmentEnd]
@@ -215,18 +219,18 @@ theorem syntheticGeometry : GeometryCorrespondence syntheticModel nodePos cutPar
     fin_cases s <;> norm_num [syntheticModel, memberEA, memberEI]
 
 example : segmentEnd 0 = segmentStart 1 := by
-  apply correspondence_shared_join syntheticModel nodePos cutParam memberEA memberEI segmentStart segmentEnd syntheticGeometry 0 1
+  apply correspondence_shared_join syntheticModel nodePos drawingStart drawingEnd cutParam memberEA memberEI segmentStart segmentEnd syntheticGeometry 0 1
   · rfl
   · rfl
 
 def badPropertyModel : Model 2 2 1 3 := { syntheticModel with segmentEA := fun _ => -2 }
-example : ¬ GeometryCorrespondence badPropertyModel nodePos cutParam memberEA memberEI segmentStart segmentEnd := by
+example : ¬ GeometryCorrespondence badPropertyModel nodePos drawingStart drawingEnd cutParam memberEA memberEI segmentStart segmentEnd := by
   intro geometry
   have h := (geometry.properties 0).1
   norm_num [badPropertyModel, memberEA] at h
 
 def badLengthModel : Model 2 2 1 3 := { syntheticModel with segmentLength := fun _ => emittedLength }
-example : ¬ GeometryCorrespondence badLengthModel nodePos cutParam memberEA memberEI segmentStart segmentEnd := by
+example : ¬ GeometryCorrespondence badLengthModel nodePos drawingStart drawingEnd cutParam memberEA memberEI segmentStart segmentEnd := by
   intro geometry
   have h := geometry.length 0
   norm_num [badLengthModel, segmentStart, segmentEnd, emittedLength, emittedPoint1, distance, dx, dy, a, b] at h
@@ -257,10 +261,10 @@ theorem syntheticSprings : SpringInputPositive syntheticModel := by
     fin_cases node <;> simp [syntheticModel] at h
 
 example : ExactContract syntheticModel syntheticActions syntheticSupports cutParam
-    (memberDistance syntheticModel nodePos) memberEA memberEI := by
+    (memberDistance nodePos drawingStart drawingEnd) memberEA memberEI := by
   have h := compose_exact_contract syntheticModel syntheticActions syntheticSupports cutParam
-    nodePos memberEA memberEI segmentStart segmentEnd supportAngles syntheticStructure syntheticGeometry
-    (by intro m; fin_cases m <;> norm_num [syntheticModel, nodePos, a, b])
+    nodePos drawingStart drawingEnd memberEA memberEI segmentStart segmentEnd supportAngles syntheticStructure syntheticGeometry
+    (by intro m; fin_cases m <;> norm_num [drawingStart, drawingEnd, nodePos, a, b])
     (by intro m; norm_num [memberEA]) (by intro m; norm_num [memberEI]) syntheticSupportAxes syntheticSprings
   exact h.1
 
