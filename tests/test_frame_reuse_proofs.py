@@ -481,12 +481,14 @@ theorem cantileverContract : ExactContract (withLoads beam 0 0) (pointActions sl
   · intro segment
     norm_num [withLoads, beam, properties]
   · intro side direction stiffness hactive hlaw
+    change directionLaw (endConnection beam side) direction = .spring stiffness at hlaw
     rcases side with ⟨member, ending⟩
     fin_cases member <;> cases ending <;> fin_cases direction <;>
       simp [directionLaw, law0, law1, rigidConnection] at hlaw
 /-- The fixed left end removes all three rigid-body motions of this member. -/
 theorem cantileverStable : ∀ q, admissible (withLoads beam 0 0) support q →
     deformationMap (withLoads beam 0 0) q = 0 → q = 0 := by
+  classical
   intro q h hD
   have hleft : sideMotion beam q (.endSide (0, false)) = 0 := by
     funext i
@@ -548,6 +550,7 @@ theorem cantileverStable : ∀ q, admissible (withLoads beam 0 0) support q →
   cases coordinate with
   | inr slip =>
     rcases slip with ⟨⟨⟨member, ending⟩, direction⟩, hactive, hslip⟩
+    change directionLaw (endConnection beam (member, ending)) direction ≠ .rigid at hslip
     fin_cases member <;> cases ending <;> fin_cases direction <;>
       simp [directionLaw, law0, law1, rigidConnection] at hslip
   | inl pointDirection =>

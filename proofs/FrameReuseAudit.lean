@@ -55,3 +55,4 @@ import FrameReuse
 #print axioms FrameReuse.same_boundary_contract_transport
 #print axioms FrameReuse.same_boundary_no_mechanism_transport
 #print axioms FrameReuse.same_boundary_stable_solutions
+#print axioms FrameReuse.same_core_loaded_recovery_transport

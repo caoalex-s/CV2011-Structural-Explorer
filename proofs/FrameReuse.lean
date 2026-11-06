@@ -943,13 +943,13 @@ theorem same_boundary_stable_solutions (first second : Model nodes members cuts 
       (baseStable : ∀ q, admissible (withLoads core 0 0) supports q →
         deformationMap (withLoads core 0 0) q = 0 → q = 0),
       first = withLoads core start₁ end₁ ∧ second = withLoads core start₂ end₂ ∧
-      ∃ (hfirst : sameCore (withLoads core 0 0) (withLoads core start₁ end₁))
-        (hsecond : sameCore (withLoads core 0 0) (withLoads core start₂ end₂)),
+      ∃ (hfirst : sameCore (withLoads core start₁ end₁) (withLoads core start₁ end₁))
+        (hsecond : sameCore (withLoads core start₁ end₁) (withLoads core start₂ end₂)),
         equilibrium (withLoads core start₁ end₁) (pointActions locations f₁) supports
-          (sameCoreMotionEquiv (withLoads core 0 0) (withLoads core start₁ end₁) hfirst
+          (sameCoreMotionEquiv (withLoads core start₁ end₁) (withLoads core start₁ end₁) hfirst
             (stableSolutionLinear core locations supports cutsAt length EA EI baseContract baseStable ⟨⟨start₁, end₁⟩, f₁⟩)) ∧
         equilibrium (withLoads core start₂ end₂) (pointActions locations f₂) supports
-          (sameCoreMotionEquiv (withLoads core 0 0) (withLoads core start₂ end₂) hsecond
+          (sameCoreMotionEquiv (withLoads core start₁ end₁) (withLoads core start₂ end₂) hsecond
             (stableSolutionLinear core locations supports cutsAt length EA EI baseContract baseStable ⟨⟨start₂, end₂⟩, f₂⟩)) := by
   obtain ⟨core, start₁, end₁, start₂, end₂, hfirst, hsecond⟩ := same_core_representation first second h.1.1
   subst first
@@ -960,11 +960,48 @@ theorem same_boundary_stable_solutions (first second : Model nodes members cuts 
       deformationMap (withLoads core 0 0) q = 0 → q = 0 :=
     (no_mechanism_unchanged core start₁ end₁ 0 0 supports).mp hstable
   refine ⟨core, start₁, end₁, start₂, end₂, baseContract, baseStable, rfl, rfl,
-    same_core_with_loads core 0 0 start₁ end₁, same_core_with_loads core 0 0 start₂ end₂, ?_, ?_⟩
+    same_core_with_loads core start₁ end₁ start₁ end₁,
+    same_core_with_loads core start₁ end₁ start₂ end₂, ?_, ?_⟩
   · rw [same_core_motion_coherent]
     exact stable_solution_equilibrium core locations supports cutsAt length EA EI baseContract baseStable _
   · rw [same_core_motion_coherent]
     exact stable_solution_equilibrium core locations supports cutsAt length EA EI baseContract baseStable _
+
+
+/-- The six local polynomial fields use the actual segment B map, orientation
+and stored global-vertical endpoint intensities. -/
+def recoveredFields (model : Model nodes members cuts segments)
+    (q : Coordinate model → ℝ) (segment : Fin segments) :=
+  let d := segmentDofs model q segment
+  let L := model.segmentLength segment
+  let EA := model.segmentEA segment
+  let EI := model.segmentEI segment
+  let orientation := (model.member (model.segmentMember segment)).orientation
+  let p₀ := orientation.sine * model.segmentVerticalStart segment
+  let p₁ := orientation.sine * model.segmentVerticalEnd segment
+  let q₀ := orientation.cosine * model.segmentVerticalStart segment
+  let q₁ := orientation.cosine * model.segmentVerticalEnd segment
+  (LocalFrameFields.axialDisplacement d L EA p₀ p₁,
+    LocalFrameFields.transverseDisplacement d L EI q₀ q₁,
+    LocalFrameFields.rotation d L EI q₀ q₁,
+    LocalFrameFields.normal d L EA p₀ p₁,
+    LocalFrameFields.shear d L EI q₀ q₁,
+    LocalFrameFields.moment d L EI q₀ q₁)
+
+/-- Recover the second model's actual loading after transporting movements.
+The first core is deliberately supplied with the second amplitudes: the
+particular field is not asserted equal under a change of loading. -/
+theorem same_core_loaded_recovery_transport (first second : Model nodes members cuts segments)
+    (h : sameCore first second) (q : Coordinate first → ℝ) (segment : Fin segments) :
+    recoveredFields (withLoads first second.segmentVerticalStart second.segmentVerticalEnd) q segment =
+      recoveredFields second (sameCoreMotionEquiv first second h q) segment ∧
+    recoveredEndActions (withLoads first second.segmentVerticalStart second.segmentVerticalEnd) q segment =
+      recoveredEndActions second (sameCoreMotionEquiv first second h q) segment := by
+  obtain ⟨core, start₁, end₁, start₂, end₂, hfirst, hsecond⟩ := same_core_representation first second h
+  subst first
+  subst second
+  rw [same_core_motion_coherent]
+  constructor <;> rfl
 
 end
 end FrameReuse
