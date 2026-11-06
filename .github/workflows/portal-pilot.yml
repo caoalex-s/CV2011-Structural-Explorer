@@ -1,0 +1,39 @@
+name: Check shipped portal pilot
+on:
+  push:
+    branches: [codex/portal-frame-pipeline-pilot]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  portal:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check unchanged source, bindings and numerical observations
+        run: node --test tests/portal-frame-pilot.test.mjs
+      - uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: proofs
+          build: 'true'
+          build-args: '--wfail'
+          test: 'false'
+          use-mathlib-cache: 'true'
+      - name: Confirm pinned dependency lock is unchanged
+        run: git diff --exit-code -- proofs/lake-manifest.json
+      - name: Check actual portal instance and audit its axioms
+        run: python -m unittest discover -s tests -p 'test_portal_frame_pilot.py' -v
+        env:
+          REQUIRE_LEAN: '1'
+          PORTAL_PILOT_OUTPUT: .data/portal-frame-pilot
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: public-portal-frame-pilot
+          path: .data/portal-frame-pilot
