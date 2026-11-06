@@ -215,7 +215,7 @@ theorem overlapEndpoints :
     (∑ i : Fin 2, affine (sourceA i) (sourceB i) (sourceQ0 i) (sourceQ1 i) ${ov}) = ${oq1} := by
   norm_num [Fin.sum_univ_succ, sourceA, sourceB, sourceQ0, sourceQ1, affine]
 
-example : (∫ t in ${ou}..${ov}, overlapDensity.eval t) =
+theorem overlapWork : (∫ t in ${ou}..${ov}, overlapDensity.eval t) =
     (${ov}-${ou}) * (∫ z in (0:ℝ)..1, intervalAffine ${oq0} ${oq1} z *
       (X^3 : Polynomial ℝ).eval (pullback ${ou} ${ov} z)) := by
   have h := overlap_interval_work (Fin 2) sourceA sourceB sourceQ0 sourceQ1 ${ou} ${ov} 1
@@ -283,8 +283,15 @@ example : (∑ i : Fin 6, LocalFrameFields.consistentLoad (${ov}-${ou}) 0 0 ${oq
 -- For this nonzero work, omitting the Jacobian changes the value fourfold.
 example : (∫ t in ${ou}..${ov}, overlapDensity.eval t) ≠
     (∫ z in (0:ℝ)..1, intervalAffine ${oq0} ${oq1} z * (X^3 : Polynomial ℝ).eval (pullback ${ou} ${ov} z)) := by
-  norm_num [overlapDensity, intervalAffine, pullback, Polynomial.eval_sub, Polynomial.eval_mul,
-    intervalIntegral.integral_sub, intervalIntegral.integral_add, intervalIntegral.integral_const_mul, integral_pow]
+  have hleft : (∫ t in ${ou}..${ov}, overlapDensity.eval t) = (519/5120 : ℝ) := by
+    norm_num [overlapDensity, Polynomial.eval_sub, Polynomial.eval_mul,
+      intervalIntegral.integral_sub, intervalIntegral.integral_const_mul, integral_pow]
+  have hwork := overlapWork
+  rw [hleft] at hwork
+  intro heq
+  rw [hleft] at heq
+  norm_num at hwork
+  linarith
 
 
 def releasedModel : Model 3 2 0 2 where
