@@ -586,9 +586,11 @@ example (q : Coordinate beam → ℝ) :
 
 example : (∃ q : Coordinate beam → ℝ, equilibrium beam (pointActions slots forceComponents) support q) ∧
     (∃ q : Coordinate loadedBeam → ℝ, equilibrium loadedBeam (pointActions slots momentComponents) support q) := by
+  have forceContract : ExactContract beam (pointActions slots forceComponents) support noCuts properties properties properties :=
+    (exact_contract_unchanged beam 0 0 0 0 slots 0 forceComponents support noCuts properties properties properties).mp cantileverContract
   obtain ⟨baseContract, baseStable, hfirst, hsecond⟩ :=
     same_boundary_original_stable_solutions beam loadedBeam support slots noCuts properties properties properties
-      forceComponents momentComponents boundaryMatches cantileverContract cantileverStable
+      forceComponents momentComponents boundaryMatches forceContract cantileverStable
   exact ⟨⟨_, hfirst⟩, ⟨_, hsecond⟩⟩
 
 def axialCase : LoadCase 1 1 := ⟨⟨0, 0⟩, forceComponents⟩
