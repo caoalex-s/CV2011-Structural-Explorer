@@ -290,7 +290,7 @@ example : (∫ t in ${ou}..${ov}, overlapDensity.eval t) ≠
   rw [hleft] at hwork
   intro heq
   rw [hleft] at heq
-  norm_num at hwork
+  norm_num at hwork heq
   linarith
 
 
