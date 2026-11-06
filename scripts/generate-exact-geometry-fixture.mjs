@@ -81,6 +81,126 @@ example : emittedAxisCos^2 + emittedAxisSin^2 = 1 := by
   simpa [emittedAxisCos, emittedAxisSin, emittedAngle, degreeCos, degreeSin] using h
 example : reversedLength = emittedLength ∧ reversedCos = -emittedCos ∧ reversedSin = -emittedSin := by
   norm_num [reversedLength, reversedCos, reversedSin, emittedLength, emittedCos, emittedSin]
+-- A finite model instance. The structural obligations are explicit and are
+-- discharged for this synthetic encoding only; they do not verify a builder.
+def syntheticModel : Model 2 2 1 3 where
+  joints := fun _ => ⟨.rigid, 1, none⟩
+  member := fun m => if m = 0 then ⟨0, 1, ⟨emittedCos, emittedSin⟩, none, none⟩
+    else ⟨1, 0, ⟨reversedCos, reversedSin⟩, some ⟨.released, .spring 7, .released⟩, none⟩
+  segmentMember := fun s => if s = 2 then 1 else 0
+  segmentLeft := fun s => if s = 0 then .endSide (0, false) else if s = 1 then .interior 0 0 else .endSide (1, false)
+  segmentRight := fun s => if s = 0 then .interior 0 0 else if s = 1 then .endSide (0, true) else .endSide (1, true)
+  segmentLength := fun s => if s = 2 then emittedLength else emittedLength/2
+  segmentEA := fun _ => 2
+  segmentEI := fun _ => 3
+  segmentVerticalStart := fun _ => 0
+  segmentVerticalEnd := fun _ => 0
+
+def cutParam : Fin 2 → Fin 1 → ℝ := fun _ _ => emittedCut1
+def syntheticActions : Fin 1 → PointAction 2 1 := fun _ => ⟨.interior 0 0, ![0, 1, 0]⟩
+def syntheticSupports : Fin 2 → SupportInput 2 1 := fun s => if s = 0 then
+  ⟨.interior 0 0, .guided, emittedAxisCos, emittedAxisSin, false, false, false⟩
+  else ⟨.endSide (1, false), .custom, 0, 0, true, false, false⟩
+def nodePos : Fin 2 → Point := fun n => if n = 0 then a else b
+def memberEA : Fin 2 → ℝ := fun _ => 2
+def memberEI : Fin 2 → ℝ := fun _ => 3
+def segmentStart : Fin 3 → Point := fun s => if s = 0 then a else if s = 1 then emittedPoint1 else b
+def segmentEnd : Fin 3 → Point := fun s => if s = 0 then emittedPoint1 else if s = 1 then b else a
+def supportAngles : Fin 2 → ℝ := fun _ => emittedAngle
+
+example : supportDirections (syntheticSupports 0) =
+    [![0, 0, 1], ![emittedAxisCos, emittedAxisSin, 0]] := by rfl
+example : supportDirections (syntheticSupports 1) = [![1, 0, 0]] := by rfl
+example : ¬ 0 < distance a a := by norm_num [distance, dx, dy]
+example : ¬ 0 < (0:ℝ) ∧ ¬ 0 < (-1:ℝ) := by norm_num
+example : ¬ ((-2:ℝ) > 0) ∧ ¬ ((-7:ℝ) > 0) := by norm_num
+example : (1:ℝ)^2 + (1:ℝ)^2 ≠ 1 := by norm_num
+example : distance a b * (1:ℝ) ≠ dx a b := by
+  have hs := distance_squared a b
+  norm_num [a, b, dx, dy] at hs ⊢
+  nlinarith
+
+theorem syntheticStructure : StructuralPremises syntheticModel syntheticActions syntheticSupports cutParam := by
+  constructor
+  · intro segment
+    fin_cases segment <;> simp [segmentOwnershipValid, locationBelongs, syntheticModel]
+  · intro segment
+    fin_cases segment <;> norm_num [syntheticModel, locationParameter, cutParam, emittedCut1]
+  · intro member t ht0 ht1
+    fin_cases member
+    · by_cases ht : t ≤ 1/2
+      · refine ⟨0, ?_⟩
+        norm_num [syntheticModel, locationParameter, cutParam, emittedCut1]
+        constructor <;> linarith
+      · refine ⟨1, ?_⟩
+        norm_num [syntheticModel, locationParameter, cutParam, emittedCut1]
+        constructor <;> linarith
+    · refine ⟨2, ?_⟩
+      norm_num [syntheticModel, locationParameter]
+      exact ⟨ht0, ht1⟩
+  · intro x y hxy hm
+    fin_cases x <;> fin_cases y <;> norm_num [syntheticModel, locationParameter, cutParam, emittedCut1] at *
+  · intro member left right hl hr hleft hright hpos
+    have lc : left = .endSide (0, false) ∨ left = .interior 0 0 ∨ left = .endSide (0, true) ∨
+        left = .endSide (1, false) ∨ left = .endSide (1, true) := by
+      obtain ⟨i, hi⟩ := hleft
+      fin_cases i <;> simp [syntheticModel] at hi <;> aesop
+    have rc : right = .endSide (0, false) ∨ right = .interior 0 0 ∨ right = .endSide (0, true) ∨
+        right = .endSide (1, false) ∨ right = .endSide (1, true) := by
+      obtain ⟨i, hi⟩ := hright
+      fin_cases i <;> simp [syntheticModel] at hi <;> aesop
+    rcases lc with rfl | rfl | rfl | rfl | rfl <;> rcases rc with rfl | rfl | rfl | rfl | rfl <;>
+      fin_cases member <;> norm_num [locationBelongs, locationParameter, cutParam, emittedCut1] at *
+  · intro member
+    fin_cases member
+    · exact ⟨⟨0, Or.inl rfl⟩, ⟨1, Or.inr rfl⟩⟩
+    · exact ⟨⟨2, Or.inl rfl⟩, ⟨2, Or.inr rfl⟩⟩
+  · intro member cut hc
+    fin_cases member <;> fin_cases cut <;> norm_num [cutParam, emittedCut1]
+  · intro action
+    fin_cases action
+    exact ⟨0, Or.inr rfl⟩
+  · intro support
+    fin_cases support
+    · exact ⟨0, Or.inr rfl⟩
+    · exact ⟨2, Or.inl rfl⟩
+
+theorem syntheticGeometry : GeometryCorrespondence syntheticModel nodePos cutParam memberEA memberEI segmentStart segmentEnd := by
+  constructor
+  · intro m
+    fin_cases m <;> simp [syntheticModel, nodePos, direction, distance, dx, dy, a, b,
+      emittedCos, emittedSin, reversedCos, reversedSin, emittedLength]
+  · intro s
+    fin_cases s <;> norm_num [syntheticModel, segmentStart, nodePos, position, locationParameter,
+      cutParam, emittedCut1, emittedPoint1, a, b, dx, dy]
+  · intro s
+    fin_cases s <;> norm_num [syntheticModel, segmentEnd, nodePos, position, locationParameter,
+      cutParam, emittedCut1, emittedPoint1, a, b, dx, dy]
+  · intro s
+    fin_cases s <;> norm_num [syntheticModel, segmentStart, segmentEnd, emittedLength,
+      emittedPoint1, distance, dx, dy, a, b]
+  · intro s
+    fin_cases s <;> norm_num [syntheticModel, memberEA, memberEI]
+
+theorem syntheticSupportAxes : SupportAxisCorrespondence syntheticSupports supportAngles := by
+  intro s hs
+  fin_cases s <;> norm_num [syntheticSupports, supportAngles, emittedAngle, emittedAxisCos, emittedAxisSin,
+    degreeCos, degreeSin] at *
+
+theorem syntheticSprings : EffectiveSpringPositive syntheticModel := by
+  intro side direction stiffness active law
+  rcases side with ⟨member, ending⟩
+  fin_cases member <;> cases ending <;> fin_cases direction <;>
+    norm_num [directionLaw, endConnection, referenceMember, incident, endNode, syntheticModel, rigidConnection] at *
+
+example : ExactContract syntheticModel syntheticActions syntheticSupports cutParam
+    (memberDistance syntheticModel nodePos) memberEA memberEI := by
+  have h := compose_exact_contract syntheticModel syntheticActions syntheticSupports cutParam
+    nodePos memberEA memberEI segmentStart segmentEnd supportAngles syntheticStructure syntheticGeometry
+    (by intro m; fin_cases m <;> norm_num [syntheticModel, nodePos, a, b])
+    (by intro m; norm_num [memberEA]) (by intro m; norm_num [memberEI]) syntheticSupportAxes syntheticSprings
+  exact h.1
+
 example (v : Triple) : toGlobal emittedCos emittedSin (toLocal emittedCos emittedSin v) = v := by
   apply inverse_transform
   have h := direction_normalized a b (by norm_num [a,b])

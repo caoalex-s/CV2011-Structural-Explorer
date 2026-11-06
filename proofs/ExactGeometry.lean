@@ -109,7 +109,7 @@ theorem segment_direction (a b : Point) (_h : a ≠ b) (u v : ℝ) (huv : u < v)
   have hw : v-u ≠ 0 := ne_of_gt (sub_pos.mpr huv)
   unfold direction
   rw [hd.1, hd.2, segment_distance a b u v huv]
-  congr 1 <;> field_simp
+  congr 1 <;> field_simp [hw, ne_of_gt (distance_positive a b _h)]
 
 theorem position_reverse (a b : Point) (t : ℝ) : position b a (1-t) = position a b t := by
   apply Prod.ext <;> simp [position, dx, dy] <;> ring

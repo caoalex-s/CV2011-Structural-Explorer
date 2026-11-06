@@ -23,5 +23,6 @@ export function emitExactExpression(value) {
         !Object.hasOwn(operations, value.op)) throw Error('Unknown expression');
     const operation = operations[value.op];
     if (value.args.length !== operation.arity) throw Error('Wrong expression arity');
+    if (value.op === 'divide' && value.args[1]?.numerator === '0') throw Error('Zero divisor');
     return operation.emit(value.args.map(emitExactExpression));
 }
