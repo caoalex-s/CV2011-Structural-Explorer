@@ -50,9 +50,30 @@ const first = artifact.members[0], second = artifact.members[1], guided = artifa
 if (first.cuts.length !== 4 || first.intervals.length !== 3 || guided.cutIndex !== 1 ||
     second.endLaws[0].transverse.kind !== 'spring') throw Error('Synthetic fixture topology changed');
 const position = cut => `(${emit(cut.position.x)}, ${emit(cut.position.y)})`;
+// The contract fixture has its own adapter snapshot: every point action and
+// support in this snapshot is represented by the finite model below. The
+// separate first snapshot exercises a second, very close interior cut.
+const contractModel = structuredClone(model);
+contractModel.loads[0].t = 0.5;
+const contractEnvelope = await createEvidenceEnvelope(contractModel, query);
+const contractArtifact = await adaptEvidenceSnapshot(contractEnvelope);
+await verifyExactCutArtifact(contractEnvelope, contractArtifact);
+const contractForward = contractArtifact.members[0], contractReverse = contractArtifact.members[1];
+const contractAction = contractArtifact.actions[0];
+if (contractForward.cuts.length !== 3 || contractForward.intervals.length !== 2 ||
+    contractReverse.cuts.length !== 2 || contractArtifact.actions.length !== 1 || contractArtifact.supports.length !== 2 ||
+    contractAction.location.kind !== 'interior' || contractAction.location.memberIndex !== 0 || contractAction.cutIndex !== 1 ||
+    contractArtifact.supports[0].location.kind !== 'interior' || contractArtifact.supports[0].cutIndex !== 1 ||
+    contractArtifact.supports[1].location.kind !== 'endSide' || contractArtifact.supports[1].location.memberIndex !== 1 ||
+    contractForward.startNodeId !== artifact.nodes[0].id || contractForward.endNodeId !== artifact.nodes[1].id ||
+    contractReverse.startNodeId !== artifact.nodes[1].id || contractReverse.endNodeId !== artifact.nodes[0].id ||
+    contractReverse.endLaws[0].axial.kind !== 'free' || contractReverse.endLaws[0].transverse.kind !== 'spring' ||
+    contractReverse.endLaws[0].rotation.kind !== 'free') throw Error('Synthetic contract ownership changed');
+if (!/^[a-f0-9]{64}$/.test(contractArtifact.artifactDigest)) throw Error('Invalid contract artifact digest');
 const artifactHash = artifact.artifactDigest;
 if (!/^[a-f0-9]{64}$/.test(artifactHash)) throw Error('Invalid artifact digest');
-const source = `-- Synthetic adapter artifact SHA-256: ${artifactHash}
+const source = `-- Synthetic geometry artifact SHA-256: ${artifactHash}
+-- Synthetic contract artifact SHA-256: ${contractArtifact.artifactDigest}
 import ExactGeometry
 open Polynomial FrameInterfaces FrameTransform FrameAssemblyModel ExactGeometry
 noncomputable section
@@ -109,8 +130,8 @@ def syntheticModel : Model 2 2 1 3 where
   segmentVerticalStart := fun _ => 0
   segmentVerticalEnd := fun _ => 0
 
-def cutParam : Fin 2 → Fin 1 → ℝ := fun _ _ => emittedCut1
-def syntheticActions : Fin 1 → PointAction 2 1 := fun _ => ⟨.interior 0 0, ![0, 1, 0]⟩
+def cutParam : Fin 2 → Fin 1 → ℝ := fun _ _ => ${emit(contractForward.cuts[1].parameter)}
+def syntheticActions : Fin 1 → PointAction 2 1 := fun _ => ⟨.interior 0 0, ![${emit(contractAction.components.fx)}, ${emit(contractAction.components.fy)}, ${emit(contractAction.components.mz)}]⟩
 def syntheticSupports : Fin 2 → SupportInput 2 1 := fun s => if s.val = 0 then
   ⟨.interior 0 0, .guided, emittedAxisCos, emittedAxisSin, false, false, false⟩
   else ⟨.endSide (1, false), .custom, 0, 0, true, false, false⟩
