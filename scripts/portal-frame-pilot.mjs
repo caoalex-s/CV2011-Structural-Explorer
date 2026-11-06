@@ -23,7 +23,9 @@ const BASELINE = '584d32e1d78fc6e2c7baf439e5c048170a687f21';
 const BASELINE_ENGINE_SHA256 = '90c90f26aa1e806cbca6b1bb324212837c5ba194537a3ec81ae9d01351cc6799';
 const sha256 = text => createHash('sha256').update(text).digest('hex');
 const json = value => JSON.stringify(value, null, 2) + '\n';
-const vector = values => `![${values.join(', ')}]`;
+// Explicit index tests let norm_num reduce composed node/member lookups too.
+const vector = values => `fun i => ${values.slice(0, -1).map((value, index) =>
+    `if i.val = ${index} then ${value} else `).join('')}${values.at(-1)}`;
 const realVector = values => vector(values.map(emitExactExpression));
 
 /** Emit only bounded indices. No source ID or arbitrary text enters Lean. */

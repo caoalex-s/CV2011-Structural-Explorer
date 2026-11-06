@@ -109,7 +109,11 @@ theorem portalContract : ExactContract model actions supports cutParameter
     (memberDistance nodePosition drawingStart drawingEnd) sourceEA sourceEI := by
   exact (compose_exact_contract model actions supports cutParameter nodePosition drawingStart drawingEnd
     sourceEA sourceEI segmentStart segmentEnd supportAngles structuralWitness geometryWitness
-    (by intro m; fin_cases m <;> norm_num [nodePosition, drawingStart, drawingEnd])
+    (by
+      intro m h
+      have hx := congrArg Prod.fst h
+      have hy := congrArg Prod.snd h
+      fin_cases m <;> norm_num [nodePosition, drawingStart, drawingEnd] at hx hy)
     (by intro m; fin_cases m <;> norm_num [sourceEA])
     (by intro m; fin_cases m <;> norm_num [sourceEI])
     supportAxesWitness springInputsWitness).1
