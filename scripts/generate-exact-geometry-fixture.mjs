@@ -125,6 +125,16 @@ example : supportDirections (syntheticSupports 0) =
     [![0, 0, 1], ![emittedAxisCos, emittedAxisSin, 0]] := by rfl
 example : supportDirections (syntheticSupports 1) = [![1, 0, 0]] := by rfl
 example : ¬ 0 < distance a a := by norm_num [distance, dx, dy]
+example : distance (position a b emittedCut1) (position a b emittedCut1) = 0 := by
+  norm_num [distance, dx, dy]
+example : ¬ (∀ m : Fin 2, 0 < (fun _ : Fin 2 => (-2 : ℝ)) m) := by
+  intro positive
+  have h := positive 0
+  norm_num at h
+example : ¬ (∀ m : Fin 2, 0 < (fun _ : Fin 2 => (-3 : ℝ)) m) := by
+  intro positive
+  have h := positive 0
+  norm_num at h
 example : ¬ 0 < (0:ℝ) ∧ ¬ 0 < (-1:ℝ) := by norm_num
 example : ¬ ((-2:ℝ) > 0) ∧ ¬ ((-7:ℝ) > 0) := by norm_num
 example : (1:ℝ)^2 + (1:ℝ)^2 ≠ 1 := by norm_num
