@@ -1,0 +1,21 @@
+import MemberCutAdapter
+
+#print axioms MemberCutAdapter.chain_endpoints_ordered
+#print axioms MemberCutAdapter.chain_interval_bounds
+#print axioms MemberCutAdapter.chain_coverage
+#print axioms MemberCutAdapter.chain_disjoint_interiors
+#print axioms MemberCutAdapter.affine_restriction
+#print axioms MemberCutAdapter.successive_restriction
+#print axioms MemberCutAdapter.overlap_restriction
+#print axioms MemberCutAdapter.resultant_split
+#print axioms MemberCutAdapter.first_moment_split
+#print axioms MemberCutAdapter.polynomial_work_restriction
+#print axioms MemberCutAdapter.local_vertical_consistent_work
+#print axioms MemberCutAdapter.vertical_rotation
+#print axioms MemberCutAdapter.affine_restriction_in_original_coordinate
+#print axioms MemberCutAdapter.resultant_restricted_split
+#print axioms MemberCutAdapter.first_moment_restricted_split
+#print axioms MemberCutAdapter.chain_polynomial_work
+#print axioms MemberCutAdapter.consistent_load_chain_work
+#print axioms MemberCutAdapter.chain_resultant
+#print axioms MemberCutAdapter.chain_first_moment

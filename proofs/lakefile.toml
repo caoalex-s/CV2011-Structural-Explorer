@@ -1,6 +1,6 @@
 name = "StructuralProofs"
 version = "0.1.0"
-defaultTargets = ["StructuralProofs", "BeamCertificate", "RealBeamFields", "FrameInterfaces", "LocalFrameFields", "FrameTransform", "FrameEnergy", "FrameVirtualWork", "FramePotential", "FrameAssemblyModel", "FrameAssembly", "FrameDeformation", "FrameReuse"]
+defaultTargets = ["StructuralProofs", "BeamCertificate", "RealBeamFields", "FrameInterfaces", "LocalFrameFields", "FrameTransform", "FrameEnergy", "FrameVirtualWork", "FramePotential", "FrameAssemblyModel", "FrameAssembly", "FrameDeformation", "FrameReuse", "MemberCutAdapter"]
 
 [[require]]
 name = "mathlib"
@@ -45,3 +45,6 @@ name = "FrameDeformation"
 
 [[lean_lib]]
 name = "FrameReuse"
+
+[[lean_lib]]
+name = "MemberCutAdapter"

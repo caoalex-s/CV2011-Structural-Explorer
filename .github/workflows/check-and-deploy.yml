@@ -21,7 +21,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        if: ${{ inputs.proof_only != true }}
         with:
           node-version: '24'
       - uses: pnpm/action-setup@v4
@@ -146,6 +145,15 @@ jobs:
         run: |
           lake env lean FrameReuseAudit.lean > reuse-axioms.log
           python ../scripts/audit_real_axioms.py reuse-axioms.log FrameReuse
+      - name: Check synthetic member-cut adapter proofs
+        run: python -m unittest discover -s tests -p 'test_member_cut_adapter_proofs.py' -v
+        env:
+          REQUIRE_LEAN: '1'
+      - name: Audit member-cut adapter theorem axioms
+        working-directory: proofs
+        run: |
+          lake env lean MemberCutAdapterAudit.lean > member-cut-axioms.log
+          python ../scripts/audit_real_axioms.py member-cut-axioms.log MemberCutAdapter
       - name: Check public course examples
         if: ${{ inputs.proof_only != true }}
         run: python -m scripts.check_worked_examples
