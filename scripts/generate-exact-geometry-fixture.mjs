@@ -57,8 +57,8 @@ import ExactGeometry
 open Polynomial FrameInterfaces FrameTransform FrameAssemblyModel ExactGeometry
 noncomputable section
 
-def a : Point := (2, 3)
-def b : Point := (3, 4)
+def a : Point := (${emit(artifact.nodes[0].x)}, ${emit(artifact.nodes[0].y)})
+def b : Point := (${emit(artifact.nodes[1].x)}, ${emit(artifact.nodes[1].y)})
 def emittedDX : ℝ := ${emit(first.geometry.dx)}
 def emittedDY : ℝ := ${emit(first.geometry.dy)}
 def emittedLength : ℝ := ${emit(first.geometry.length)}
@@ -99,13 +99,13 @@ example : reversedLength = emittedLength ∧ reversedCos = -emittedCos ∧ rever
 def syntheticModel : Model 2 2 1 3 where
   joints := fun _ => ⟨.rigid, 1, none⟩
   member := fun m => if m.val = 0 then ⟨0, 1, ⟨emittedCos, emittedSin⟩, none, none⟩
-    else ⟨1, 0, ⟨reversedCos, reversedSin⟩, some ⟨.released, .spring 7, .released⟩, none⟩
+    else ⟨1, 0, ⟨reversedCos, reversedSin⟩, some ⟨.released, .spring ${emit(second.endLaws[0].transverse.stiffness)}, .released⟩, none⟩
   segmentMember := fun s => if s.val = 2 then 1 else 0
   segmentLeft := fun s => if s.val = 0 then .endSide (0, false) else if s.val = 1 then .interior 0 0 else .endSide (1, false)
   segmentRight := fun s => if s.val = 0 then .interior 0 0 else if s.val = 1 then .endSide (0, true) else .endSide (1, true)
   segmentLength := fun s => if s.val = 0 then distance a emittedPoint1 else if s.val = 1 then distance emittedPoint1 b else distance b a
-  segmentEA := fun _ => 2
-  segmentEI := fun _ => 3
+  segmentEA := fun _ => ${emit(first.intervals[0].EA)}
+  segmentEI := fun _ => ${emit(first.intervals[0].EI)}
   segmentVerticalStart := fun _ => 0
   segmentVerticalEnd := fun _ => 0
 
@@ -115,8 +115,8 @@ def syntheticSupports : Fin 2 → SupportInput 2 1 := fun s => if s.val = 0 then
   ⟨.interior 0 0, .guided, emittedAxisCos, emittedAxisSin, false, false, false⟩
   else ⟨.endSide (1, false), .custom, 0, 0, true, false, false⟩
 def nodePos : Fin 2 → Point := fun n => if n.val = 0 then a else b
-def memberEA : Fin 2 → ℝ := fun _ => 2
-def memberEI : Fin 2 → ℝ := fun _ => 3
+def memberEA : Fin 2 → ℝ := fun _ => ${emit(first.intervals[0].EA)}
+def memberEI : Fin 2 → ℝ := fun _ => ${emit(first.intervals[0].EI)}
 def segmentStart : Fin 3 → Point := fun s => if s.val = 0 then a else if s.val = 1 then emittedPoint1 else b
 def segmentEnd : Fin 3 → Point := fun s => if s.val = 0 then emittedPoint1 else if s.val = 1 then b else a
 def supportAngles : Fin 2 → ℝ := fun _ => emittedAngle
@@ -220,10 +220,7 @@ example : ¬ GeometryCorrespondence badLengthModel nodePos cutParam memberEA mem
   intro geometry
   have h := geometry.length 0
   norm_num [badLengthModel, segmentStart, segmentEnd, emittedLength, emittedPoint1, distance, dx, dy, a, b] at h
-  have hs := Real.sq_sqrt (show (0:ℝ) ≤ 2 by norm_num)
-  have hp := Real.sqrt_pos.2 (show (0:ℝ) < 2 by norm_num)
   field_simp at h
-  nlinarith
 
 def badSpringModel : Model 2 2 1 3 := { syntheticModel with member := fun m => if m.val = 0 then
   ⟨0, 1, ⟨emittedCos, emittedSin⟩, none, none⟩
@@ -245,7 +242,7 @@ theorem syntheticSprings : SpringInputPositive syntheticModel := by
     rcases side with ⟨member, ending⟩
     fin_cases member <;> cases ending <;> simp [syntheticModel] at choice
     all_goals cases choice
-    all_goals fin_cases direction <;> norm_num [directionLaw] at law ⊢
+    all_goals fin_cases direction <;> simp [directionLaw] at law <;> subst stiffness <;> norm_num
   · intro node h
     fin_cases node <;> simp [syntheticModel] at h
 
