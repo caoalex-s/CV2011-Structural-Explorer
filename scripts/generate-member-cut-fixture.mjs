@@ -42,6 +42,40 @@ const leftStart = real(member.intervals[0].verticalEndpoints[0]), leftEnd = real
 const rightStart = real(member.intervals[1].verticalEndpoints[0]), rightEnd = real(member.intervals[1].verticalEndpoints[1]);
 const pointFy = real(artifact.actions[0].components.fy);
 if (!/^[a-f0-9]{64}$/.test(artifact.artifactDigest)) throw Error('Invalid synthetic artifact digest');
+// A separate fixed synthetic model checks partial overlapping sources and an
+// end-side release. Every emitted literal is validated and read from the adapter.
+const detailedModel = {
+    nodes: [{ id: 'shared', x: 0, y: 0 }, { id: 'left', x: -1, y: 0 }, { id: 'right', x: 1, y: 0 }],
+    members: [
+        { id: 'reference', a: 'left', b: 'shared', EA: 1, EI: 1 },
+        { id: 'released', a: 'shared', b: 'right', EA: 1, EI: 1,
+            connectionA: { axial: 'free', transverse: 7, rotation: 'free' } },
+    ],
+    supports: [{ id: 'side-support', member: 'released', t: 0, kind: 'fixed', angle: 0 }],
+    loads: [
+        { id: 'first', member: 'released', kind: 'distributed', t: 0.25, end: 0.75, fx: 0, fy: -2, mz: 0, qEnd: 2 },
+        { id: 'second', member: 'released', kind: 'distributed', t: 0.5, end: 1, fx: 0, fy: 1, mz: 0, qEnd: -1 },
+        { id: 'couple', member: 'released', kind: 'moment', t: 0, end: 1, fx: 0, fy: 0, mz: 5, qEnd: 0 },
+    ],
+};
+const detailed = await adaptEvidenceSnapshot(await createEvidenceEnvelope(detailedModel, { ...query, member: 'released' }));
+const detailedMember = detailed.members[1];
+const overlap = detailedMember.intervals.find(interval => interval.contributions.length === 2);
+const law = detailedMember.endLaws[0], detailedAction = detailed.actions[0], detailedSupport = detailed.supports[0];
+if (!overlap || law.axial.kind !== 'free' || law.transverse.kind !== 'spring' || law.rotation.kind !== 'free' ||
+    law.effectiveReference !== 'reference' || detailedAction.location.kind !== 'endSide' ||
+    detailedAction.location.memberIndex !== 1 || detailedAction.location.end !== 'a' ||
+    detailedSupport.location.kind !== 'endSide' || detailedSupport.location.memberIndex !== 1 || detailedSupport.location.end !== 'a')
+    throw Error('Detailed adapter ownership or source coverage changed');
+const [src0, src1] = overlap.contributions;
+const oa0 = real(src0.sourceInterval[0]), ob0 = real(src0.sourceInterval[1]);
+const oa1 = real(src1.sourceInterval[0]), ob1 = real(src1.sourceInterval[1]);
+const oq00 = real(src0.sourceEndpoints[0]), oq01 = real(src0.sourceEndpoints[1]);
+const oq10 = real(src1.sourceEndpoints[0]), oq11 = real(src1.sourceEndpoints[1]);
+const ou = real(overlap.from), ov = real(overlap.to);
+const oq0 = real(overlap.verticalEndpoints[0]), oq1 = real(overlap.verticalEndpoints[1]);
+const sideMoment = real(detailedAction.components.mz), sideSpring = real(law.transverse.stiffness);
+if (!/^[a-f0-9]{64}$/.test(detailed.artifactDigest)) throw Error('Invalid detailed artifact digest');
 const source = `-- Synthetic adapter artifact SHA-256: ${artifact.artifactDigest}
 import MemberCutAdapter
 open Polynomial MeasureTheory intervalIntegral FrameInterfaces FrameTransform FrameAssemblyModel MemberCutAdapter
@@ -147,6 +181,88 @@ example : resultant 1 0 1 1 1 = 1 ∧ firstMoment 1 0 1 1 1 = 1/2 := by
 example : resultant 1 0 (1/2) ${leftStart} ${leftEnd} + resultant 1 (1/2) 1 ${rightStart} ${rightEnd} = 1 ∧
     firstMoment 1 0 (1/2) ${leftStart} ${leftEnd} + firstMoment 1 (1/2) 1 ${rightStart} ${rightEnd} = 1/2 := by
   norm_num [resultant, firstMoment]
+
+-- Detailed adapter artifact SHA-256: ${detailed.artifactDigest}
+def sourceA : Fin 2 → ℝ := fun i => if i = 0 then ${oa0} else ${oa1}
+def sourceB : Fin 2 → ℝ := fun i => if i = 0 then ${ob0} else ${ob1}
+def sourceQ0 : Fin 2 → ℝ := fun i => if i = 0 then ${oq00} else ${oq10}
+def sourceQ1 : Fin 2 → ℝ := fun i => if i = 0 then ${oq01} else ${oq11}
+def overlapDensity : Polynomial ℝ := 4 * X^4 - X^3
+
+theorem overlapEndpoints :
+    (∑ i : Fin 2, affine (sourceA i) (sourceB i) (sourceQ0 i) (sourceQ1 i) ${ou}) = ${oq0} ∧
+    (∑ i : Fin 2, affine (sourceA i) (sourceB i) (sourceQ0 i) (sourceQ1 i) ${ov}) = ${oq1} := by
+  norm_num [Fin.sum_univ_succ, sourceA, sourceB, sourceQ0, sourceQ1, affine]
+
+example : (∫ t in ${ou}..${ov}, overlapDensity.eval t) =
+    (${ov}-${ou}) * (∫ z in (0:ℝ)..1, intervalAffine ${oq0} ${oq1} z *
+      (X^3 : Polynomial ℝ).eval (pullback ${ou} ${ov} z)) := by
+  have h := overlap_interval_work (Fin 2) sourceA sourceB sourceQ0 sourceQ1 ${ou} ${ov} 1
+    overlapDensity (X^3) (by norm_num) (by intro i; fin_cases i <;> norm_num [sourceA, sourceB])
+    (by intro i; fin_cases i <;> norm_num [sourceA, sourceB]) (by
+      intro t
+      simp [Fin.sum_univ_succ, sourceA, sourceB, sourceQ0, sourceQ1, overlapDensity, affine]
+      ring)
+  rw [overlapEndpoints.1, overlapEndpoints.2] at h
+  simpa using h
+
+example : (${ov}-${ou}) ≠ 1 := by norm_num
+example : ${oq0} ≠ ${oq1} := by norm_num
+
+def releasedModel : Model 3 2 0 2 where
+  joints := fun _ => ⟨.rigid, 1, none⟩
+  member := fun i => if i = 0 then ⟨1, 0, ⟨1, 0⟩, none, none⟩
+    else ⟨0, 2, ⟨1, 0⟩, some ⟨.released, .spring ${sideSpring}, .released⟩, none⟩
+  segmentMember := fun i => i
+  segmentLeft := fun i => .endSide (i, false)
+  segmentRight := fun i => .endSide (i, true)
+  segmentLength := fun _ => 1
+  segmentEA := fun _ => 1
+  segmentEI := fun _ => 1
+  segmentVerticalStart := fun _ => 0
+  segmentVerticalEnd := fun _ => 0
+
+def sideRotation : Coordinate releasedModel → ℝ := fun coordinate =>
+  match coordinate with
+  | .inl _ => 0
+  | .inr slip => if slip.val.1 = (1, false) ∧ slip.val.2 = 2 then 1 else 0
+
+def sideCouple : PointAction 2 0 := ⟨.endSide (1, false), ![0, 0, ${sideMoment}]⟩
+def hubCouple : PointAction 2 0 := ⟨.endSide (0, true), ![0, 0, ${sideMoment}]⟩
+def sideSupport : SupportInput 2 0 := ⟨.endSide (1, false), .fixed, 0, 0, false, false, false⟩
+def hubSupport : SupportInput 2 0 := ⟨.endSide (0, true), .fixed, 0, 0, false, false, false⟩
+
+theorem rotationReleased : directionLaw (endConnection releasedModel (1, false)) 2 = .released := by rfl
+example : directionLaw (endConnection releasedModel (1, false)) 0 = .released := by rfl
+example : directionLaw (endConnection releasedModel (1, false)) 1 = .spring ${sideSpring} := by rfl
+theorem rotationSlip : hasSlip releasedModel (1, false) 2 := by
+  constructor
+  · exact ⟨1, Or.inl rfl⟩
+  · rw [rotationReleased]
+    intro h
+    cases h
+
+theorem releasedSideMotion : sideMotion releasedModel sideRotation (.endSide (1, false)) = ![0, 0, 1] := by
+  classical
+  funext i
+  fin_cases i <;> simp [sideMotion, referenceMotion, endMotion, slipValue, sideRotation,
+    releasedModel, endNode, rotationSlip] <;> try split_ifs <;> try norm_num <;> try contradiction
+  all_goals exact rotationSlip
+
+theorem hubSideMotion : sideMotion releasedModel sideRotation (.endSide (0, true)) = 0 := by
+  classical
+  funext i
+  fin_cases i <;> simp [sideMotion, referenceMotion, endMotion, slipValue, sideRotation,
+    releasedModel, endNode] <;> split_ifs <;> norm_num
+
+example : pointActionWork releasedModel sideCouple sideRotation = ${sideMoment} := by
+  simp [pointActionWork, sideCouple, FrameTransform.work, releasedSideMotion]
+example : pointActionWork releasedModel hubCouple sideRotation = 0 := by
+  simp [pointActionWork, hubCouple, FrameTransform.work, hubSideMotion]
+example : supportRow releasedModel sideSupport (![0, 0, 1]) sideRotation = 1 := by
+  simp [supportRow, sideSupport, FrameTransform.work, releasedSideMotion]
+example : supportRow releasedModel hubSupport (![0, 0, 1]) sideRotation = 0 := by
+  simp [supportRow, hubSupport, FrameTransform.work, hubSideMotion]
 
 -- Equal resultant and first moment do not determine work against t^3.
 example : (∫ t in (0:ℝ)..1, t^3) = 1/4 := by

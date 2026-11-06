@@ -130,12 +130,68 @@ theorem polynomial_work_restriction (p : Polynomial ℝ) (L u v : ℝ) :
   unfold pullback
   ring
 
+/-- Work on an elementary interval from the sum of its active affine
+sources. The endpoints are those emitted by restriction; the same original
+polynomial virtual field is evaluated at the pulled-back coordinate. Source
+containment is explicit, so this statement does not justify extrapolation. -/
+theorem overlap_interval_work (ι : Type) [Fintype ι] (a b qa qb : ι → ℝ)
+    (u v L : ℝ) (p virtualField : Polynomial ℝ)
+    (_huv : u < v) (hsource : ∀ i, a i < b i)
+    (_hcontained : ∀ i, a i ≤ u ∧ v ≤ b i)
+    (hdensity : ∀ t, p.eval t = (∑ i, affine (a i) (b i) (qa i) (qb i) t) * virtualField.eval t) :
+    L * (∫ t in u..v, p.eval t) =
+      L * (v-u) * (∫ z in (0:ℝ)..1,
+        intervalAffine (∑ i, affine (a i) (b i) (qa i) (qb i) u)
+          (∑ i, affine (a i) (b i) (qa i) (qb i) v) z *
+          virtualField.eval (pullback u v z)) := by
+  rw [polynomial_work_restriction p L u v]
+  congr 2
+  apply intervalIntegral.integral_congr
+  intro z hz
+  rw [hdensity]
+  congr 1
+  rw [← overlap_restriction ι a b qa qb u v z (fun i => ne_of_lt (hsource i))]
+  simp [intervalAffine, Finset.sum_add_distrib, Finset.sum_sub_distrib, Finset.sum_mul]
+
+/-- The statement applies simultaneously to any finite family of elementary
+intervals, with each interval carrying its own active source parameters. -/
+theorem overlap_finite_interval_work (κ ι : Type) [Fintype κ] [Fintype ι]
+    (a b qa qb : κ → ι → ℝ) (u v : κ → ℝ) (L : ℝ)
+    (p : κ → Polynomial ℝ) (virtualField : Polynomial ℝ)
+    (huv : ∀ k, u k < v k) (hsource : ∀ k i, a k i < b k i)
+    (hcontained : ∀ k i, a k i ≤ u k ∧ v k ≤ b k i)
+    (hdensity : ∀ k t, (p k).eval t =
+      (∑ i, affine (a k i) (b k i) (qa k i) (qb k i) t) * virtualField.eval t) :
+    (∑ k, L * (∫ t in u k..v k, (p k).eval t)) =
+      ∑ k, L * (v k-u k) * (∫ z in (0:ℝ)..1,
+        intervalAffine (∑ i, affine (a k i) (b k i) (qa k i) (qb k i) (u k))
+          (∑ i, affine (a k i) (b k i) (qa k i) (qb k i) (v k)) z *
+          virtualField.eval (pullback (u k) (v k) z)) := by
+  apply Finset.sum_congr rfl
+  intro k hk
+  exact overlap_interval_work ι (a k) (b k) (qa k) (qb k) (u k) (v k) L
+    (p k) virtualField (huv k) (hsource k) (hcontained k) (hdensity k)
+
 /-- The existing exact consistent-load theorem applies to each local pair of
 rotated vertical-load endpoints and retains the physical segment length. -/
 theorem local_vertical_consistent_work (d : LocalDofs) (L c s q₀ q₁ : ℝ) :
     L * (∫ z in (0:ℝ)..1, (loadDensity d L (s*q₀) (s*q₁) (c*q₀) (c*q₁)).eval z) =
       ∑ i : Fin 6, LocalFrameFields.consistentLoad L (s*q₀) (s*q₁) (c*q₀) (c*q₁) i * d i := by
   exact consistent_load_virtual_work d L (s*q₀) (s*q₁) (c*q₀) (c*q₁)
+
+/-- When the pulled-back source density is the actual rotated local load
+density, its work is the existing consistent-load vector work. -/
+theorem overlap_rotated_consistent_work (ι : Type) [Fintype ι] (a b qa qb : ι → ℝ)
+    (d : LocalDofs) (L c s q₀ q₁ : ℝ) (virtualField : Polynomial ℝ)
+    (hsource : ∀ i, a i < b i) (hcontained : ∀ i, a i ≤ 0 ∧ (1:ℝ) ≤ b i)
+    (hdensity : ∀ t, (loadDensity d L (s*q₀) (s*q₁) (c*q₀) (c*q₁)).eval t =
+      (∑ i, affine (a i) (b i) (qa i) (qb i) t) * virtualField.eval t) :
+    (∑ i : Fin 6, LocalFrameFields.consistentLoad L (s*q₀) (s*q₁) (c*q₀) (c*q₁) i * d i) =
+      L * (1-0) * (∫ z in (0:ℝ)..1,
+        intervalAffine (∑ i, affine (a i) (b i) (qa i) (qb i) 0)
+          (∑ i, affine (a i) (b i) (qa i) (qb i) 1) z * virtualField.eval (pullback 0 1 z)) := by
+  rw [← local_vertical_consistent_work]
+  exact overlap_interval_work ι a b qa qb 0 1 L _ virtualField (by norm_num) hsource hcontained hdensity
 
 /-- A global vertical load uses the member-side axial and transverse signs. -/
 theorem vertical_rotation (c s q : ℝ) :
@@ -185,6 +241,16 @@ theorem chain_polynomial_work {a b : ℝ} {pieces : List (ℝ × ℝ)}
       (p.continuous.intervalIntegrable a c) (p.continuous.intervalIntegrable c b)
     rw [← hjoin]
     ring
+
+/-- Finite source contributions preserve their combined work on the same
+physical field when each contribution is restricted to the chain. -/
+theorem chain_polynomial_work_sum {a b : ℝ} {pieces : List (ℝ × ℝ)}
+    (h : IntervalChain a b pieces) (ι : Type) [Fintype ι]
+    (p : ι → Polynomial ℝ) (L : ℝ) :
+    (∑ i, chainWork (p i) L pieces) = ∑ i, L * (∫ t in a..b, (p i).eval t) := by
+  apply Finset.sum_congr rfl
+  intro i hi
+  exact chain_polynomial_work h (p i) L
 
 /-- The chain work for one physical field equals the actual local consistent
 load work. This does not identify independent child endpoint DOFs. -/

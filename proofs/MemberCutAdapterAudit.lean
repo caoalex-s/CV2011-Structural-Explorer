@@ -10,12 +10,16 @@ import MemberCutAdapter
 #print axioms MemberCutAdapter.resultant_split
 #print axioms MemberCutAdapter.first_moment_split
 #print axioms MemberCutAdapter.polynomial_work_restriction
+#print axioms MemberCutAdapter.overlap_interval_work
+#print axioms MemberCutAdapter.overlap_finite_interval_work
 #print axioms MemberCutAdapter.local_vertical_consistent_work
+#print axioms MemberCutAdapter.overlap_rotated_consistent_work
 #print axioms MemberCutAdapter.vertical_rotation
 #print axioms MemberCutAdapter.affine_restriction_in_original_coordinate
 #print axioms MemberCutAdapter.resultant_restricted_split
 #print axioms MemberCutAdapter.first_moment_restricted_split
 #print axioms MemberCutAdapter.chain_polynomial_work
+#print axioms MemberCutAdapter.chain_polynomial_work_sum
 #print axioms MemberCutAdapter.consistent_load_chain_work
 #print axioms MemberCutAdapter.chain_resultant
 #print axioms MemberCutAdapter.chain_first_moment
