@@ -43,7 +43,7 @@ theorem chain_coverage {a b : ℝ} {pieces : List (ℝ × ℝ)}
     (h : IntervalChain a b pieces) (x : ℝ) (ha : a ≤ x) (hb : x ≤ b) :
     ∃ piece ∈ pieces, piece.1 ≤ x ∧ x ≤ piece.2 := by
   induction h with
-  | single hab => exact ⟨(a, b), by simp, ha, hb⟩
+  | @single a b hab => exact ⟨(a, b), by simp, ha, hb⟩
   | @step a c b tail hac htail ih =>
     by_cases hx : x ≤ c
     · exact ⟨(a, c), by simp, ha, hx⟩
@@ -83,7 +83,7 @@ theorem successive_restriction (a b qa qb u v r s z : ℝ) (hab : a ≠ b) (huv 
       (affine u v (affine a b qa qb u) (affine a b qa qb v) s) z =
     affine a b qa qb (pullback r s z) := by
   unfold intervalAffine affine pullback
-  field_simp
+  field_simp [sub_ne_zero.mpr (Ne.symm hab), sub_ne_zero.mpr (Ne.symm huv)]
   ring
 
 /-- Restriction commutes with summing affine source contributions. -/
@@ -107,14 +107,14 @@ theorem resultant_split (L a b qa qb m : ℝ) (hab : a ≠ b) :
     resultant L a b qa qb = resultant L a m qa (affine a b qa qb m) +
       resultant L m b (affine a b qa qb m) qb := by
   unfold resultant affine
-  field_simp
+  field_simp [sub_ne_zero.mpr (Ne.symm hab)]
   ring
 
 theorem first_moment_split (L a b qa qb m : ℝ) (hab : a ≠ b) :
     firstMoment L a b qa qb = firstMoment L a m qa (affine a b qa qb m) +
       firstMoment L m b (affine a b qa qb m) qb := by
   unfold firstMoment affine
-  field_simp
+  field_simp [sub_ne_zero.mpr (Ne.symm hab)]
   ring
 
 /-- The exact Jacobian is L*(v-u), and the same polynomial physical field is
@@ -149,7 +149,7 @@ theorem affine_restriction_in_original_coordinate (a b qa qb u v t : ℝ)
     (hab : a ≠ b) (huv : u ≠ v) :
     affine u v (affine a b qa qb u) (affine a b qa qb v) t = affine a b qa qb t := by
   unfold affine
-  field_simp
+  field_simp [sub_ne_zero.mpr (Ne.symm hab), sub_ne_zero.mpr (Ne.symm huv)]
   ring
 
 theorem resultant_restricted_split (L a b qa qb u m v : ℝ) (hab : a ≠ b) (huv : u ≠ v) :
@@ -181,7 +181,7 @@ theorem chain_polynomial_work {a b : ℝ} {pieces : List (ℝ × ℝ)}
     simp only [chainWork, List.map_cons, List.sum_cons]
     change L * (∫ t in a..c, p.eval t) + chainWork p L tail = _
     rw [ih]
-    have hjoin := intervalIntegral.integral_add_adjacent_intervals
+    have hjoin := intervalIntegral.integral_add_adjacent_intervals (μ := volume)
       (p.continuous.intervalIntegrable a c) (p.continuous.intervalIntegrable c b)
     rw [← hjoin]
     ring

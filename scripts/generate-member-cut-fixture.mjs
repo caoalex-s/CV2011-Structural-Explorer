@@ -71,6 +71,15 @@ theorem generated_chain : IntervalChain ${cut0} ${cut2} [(${cut0}, ${cut1}), (${
   · apply IntervalChain.single
     norm_num
 
+example (t : ℝ) (h0 : ${cut0} ≤ t) (h1 : t ≤ ${cut2}) :
+    ∃ piece ∈ [(${cut0}, ${cut1}), (${cut1}, ${cut2})], piece.1 ≤ t ∧ t ≤ piece.2 := by
+  exact chain_coverage generated_chain t h0 h1
+
+example (p : Polynomial ℝ) :
+    chainWork p 1 [(${cut0}, ${cut1}), (${cut1}, ${cut2})] =
+      1 * (∫ t in ${cut0}..${cut2}, p.eval t) := by
+  exact chain_polynomial_work generated_chain p 1
+
 example : ExactContract model actions supports cutParameter properties properties properties := by
   constructor
   · intro segment

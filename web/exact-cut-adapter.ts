@@ -134,7 +134,7 @@ function sourceFields(load: Load) {
     return { t: encode(fromBinary64(load.t)), end: encode(fromBinary64(load.end)), fx: encode(fromBinary64(load.fx)),
         fy: encode(fromBinary64(load.fy)), mz: encode(fromBinary64(load.mz)), qEnd: encode(fromBinary64(load.qEnd)) };
 }
-function obligations(memberIndex: number, intervals: unknown[], cuts: unknown[], actions: unknown[], supports: unknown[]) {
+function obligations(memberIndex: number, intervals: unknown[], cuts: unknown[], actions: unknown[], supports: unknown[], geometry: unknown, endLaws: unknown, properties: unknown) {
     const entries = [
         ['ownership', 'preflight-witness', { memberIndex, intervals }],
         ['ordered', 'preflight-witness', { memberIndex, cuts }],
@@ -145,16 +145,18 @@ function obligations(memberIndex: number, intervals: unknown[], cuts: unknown[],
         ['interiorCuts', 'preflight-witness', { memberIndex, cuts }],
         ['actionLocations', 'preflight-witness', { memberIndex, actions }],
         ['supportLocations', 'preflight-witness', { memberIndex, supports }],
-        ['orientationNormalized', 'pending-geometry-proof', { memberIndex }],
+        ['orientationNormalized', 'pending-geometry-proof', { memberIndex, geometry }],
         ['supportNormalized', 'pending-trigonometric-proof', { memberIndex, supports }],
-        ['positiveMember', 'pending-expression-proof', { memberIndex }],
+        ['positiveMember', 'pending-expression-proof', { memberIndex, geometry, properties }],
         ['segmentLengthMatches', 'pending-expression-proof', { memberIndex, intervals }],
         ['segmentPropertiesMatch', 'preflight-witness', { memberIndex, intervals }],
-        ['positiveSpring', 'preflight-witness', { memberIndex }],
-        ['endpointGeometryCorrespondence', 'pending-geometry-proof', { memberIndex }],
+        ['positiveSpring', 'preflight-witness', { memberIndex, endLaws }],
+        ['endpointGeometryCorrespondence', 'pending-geometry-proof', { memberIndex, geometry, cuts }],
     ] as const;
+    const genericTheorems: Record<string, string> = { ordered: 'MemberCutAdapter.chain_interval_bounds',
+        coverage: 'MemberCutAdapter.chain_coverage', disjointInteriors: 'MemberCutAdapter.chain_disjoint_interiors' };
     return entries.map(([name, status, witness]) => ({ name, proposition: name === 'endpointGeometryCorrespondence' ? 'endpoint geometry correspondence (adapter schema)' : `ExactContract.${name}`,
-        status, theorem: null, witness, checkedInstance: false }));
+        status, theorem: genericTheorems[name] ?? null, witness, checkedInstance: false }));
 }
 
 /** Create a locally bound exact artifact. A digest identifies an untrusted
@@ -267,7 +269,10 @@ export async function adaptEvidenceSnapshot(input: Awaited<ReturnType<typeof cre
                 status: 'pending-exact-geometry' },
             endLaws: [endLaw(model, memberIndex, 'a'), endLaw(model, memberIndex, 'b')],
             interiorEncoding: { kind: 'symbolic-member-local', interiorCutCount: Math.max(0, cuts.length - 2), rectangularSlots: 'not-allocated' }, cuts, intervals,
-            obligations: obligations(memberIndex, intervals, cuts, memberActions, memberSupports) });
+            obligations: obligations(memberIndex, intervals, cuts, memberActions, memberSupports,
+                { origin: { x: encode(xa), y: encode(ya) }, dx: encode(dx), dy: encode(dy), length, cosine, sine },
+                [endLaw(model, memberIndex, 'a'), endLaw(model, memberIndex, 'b')],
+                { EA: encode(fromBinary64(member.EA)), EI: encode(fromBinary64(member.EI)) }) });
     }
     // Source arrays retain the input order; member cut tables alone are sorted.
     allActions.sort((a, b) => (a as { index: number }).index - (b as { index: number }).index);
