@@ -70,7 +70,7 @@ def intervalAffine (q₀ q₁ z : ℝ) : ℝ := q₀ + (q₁-q₀)*z
 
 /-- The endpoints of a restricted affine load determine its value at every
 point of the same pulled-back physical interval. -/
-theorem affine_restriction (a b qa qb u v z : ℝ) (hab : a ≠ b) :
+theorem affine_restriction (a b qa qb u v z : ℝ) (_hab : a ≠ b) :
     intervalAffine (affine a b qa qb u) (affine a b qa qb v) z =
       affine a b qa qb (pullback u v z) := by
   unfold intervalAffine affine pullback
