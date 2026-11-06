@@ -146,8 +146,7 @@ theorem overlap_interval_work (ι : Type) [Fintype ι] (a b qa qb : ι → ℝ)
           virtualField.eval (pullback u v z)) := by
   rw [polynomial_work_restriction p L u v]
   congr 2
-  apply intervalIntegral.integral_congr
-  intro z hz
+  funext z
   rw [hdensity]
   congr 1
   rw [← overlap_restriction ι a b qa qb u v z (fun i => ne_of_lt (hsource i))]
