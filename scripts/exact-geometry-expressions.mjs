@@ -15,7 +15,7 @@ export function emitExactExpression(value) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error('Expected expression object');
     if ('numerator' in value || 'denominator' in value) {
         if (Object.keys(value).length !== 2 || typeof value.numerator !== 'string' || typeof value.denominator !== 'string' ||
-            !/^-?(0|[1-9][0-9]*)$/.test(value.numerator) || !/^[1-9][0-9]*$/.test(value.denominator))
+            !/^(0|-?[1-9][0-9]*)$/.test(value.numerator) || !/^[1-9][0-9]*$/.test(value.denominator))
             throw Error('Malformed exact rational');
         return `((${value.numerator} : ℝ) / ${value.denominator})`;
     }

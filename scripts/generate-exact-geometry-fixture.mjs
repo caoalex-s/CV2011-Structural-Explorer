@@ -33,6 +33,19 @@ const artifact = await adaptEvidenceSnapshot(envelope);
 await verifyExactCutArtifact(envelope, artifact);
 if (artifact.status !== 'pending-not-formally-verified' || artifact.bindings.checker !== null || artifact.bindings.result !== null)
     throw Error('Synthetic evidence status changed');
+// Recompute binding rejects semantically altered synthetic expressions; this
+// is an untrusted consistency check, not a proof of the TypeScript compiler.
+for (const mutate of [
+    copy => { copy.members[0].geometry.cosine.args[0].numerator = '-1'; },
+    copy => { copy.supports[0].axes.cosine.args[0].args[1].args[1].numerator = '181'; },
+    copy => { copy.members[0].cuts[1].position.x.args[0].numerator = '3'; },
+]) {
+    const changed = structuredClone(artifact);
+    mutate(changed);
+    let rejected = false;
+    try { await verifyExactCutArtifact(envelope, changed); } catch { rejected = true; }
+    if (!rejected) throw Error('Altered synthetic geometry unexpectedly accepted');
+}
 const first = artifact.members[0], second = artifact.members[1], guided = artifact.supports[0];
 if (first.cuts.length !== 4 || first.intervals.length !== 3 || guided.cutIndex !== 1 ||
     second.endLaws[0].transverse.kind !== 'spring') throw Error('Synthetic fixture topology changed');
@@ -73,24 +86,24 @@ example : emittedPoint1 = position a b emittedCut1 ∧ emittedPoint2 = position 
 example : emittedCut1 < emittedCut2 := by norm_num [emittedCut1, emittedCut2]
 example : emittedSpan = distance (position a b emittedCut1) (position a b emittedCut2) := by
   rw [segment_distance a b emittedCut1 emittedCut2 (by norm_num [emittedCut1, emittedCut2])]
-  norm_num [emittedSpan, emittedCut1, emittedCut2, distance, dx, dy, a, b]
+  norm_num [emittedSpan, emittedCut1, emittedCut2, distance, dx, dy, a, b] <;> ring
 example : emittedAxisCos = degreeCos emittedAngle ∧ emittedAxisSin = degreeSin emittedAngle := by
   norm_num [emittedAxisCos, emittedAxisSin, emittedAngle, degreeCos, degreeSin]
 example : emittedAxisCos^2 + emittedAxisSin^2 = 1 := by
   have h := degree_axis_normalized emittedAngle
   simpa [emittedAxisCos, emittedAxisSin, emittedAngle, degreeCos, degreeSin] using h
 example : reversedLength = emittedLength ∧ reversedCos = -emittedCos ∧ reversedSin = -emittedSin := by
-  norm_num [reversedLength, reversedCos, reversedSin, emittedLength, emittedCos, emittedSin]
+  norm_num [reversedLength, reversedCos, reversedSin, emittedLength, emittedCos, emittedSin] <;> ring
 -- A finite model instance. The structural obligations are explicit and are
 -- discharged for this synthetic encoding only; they do not verify a builder.
 def syntheticModel : Model 2 2 1 3 where
   joints := fun _ => ⟨.rigid, 1, none⟩
-  member := fun m => if m = 0 then ⟨0, 1, ⟨emittedCos, emittedSin⟩, none, none⟩
+  member := fun m => if m.val = 0 then ⟨0, 1, ⟨emittedCos, emittedSin⟩, none, none⟩
     else ⟨1, 0, ⟨reversedCos, reversedSin⟩, some ⟨.released, .spring 7, .released⟩, none⟩
-  segmentMember := fun s => if s = 2 then 1 else 0
-  segmentLeft := fun s => if s = 0 then .endSide (0, false) else if s = 1 then .interior 0 0 else .endSide (1, false)
-  segmentRight := fun s => if s = 0 then .interior 0 0 else if s = 1 then .endSide (0, true) else .endSide (1, true)
-  segmentLength := fun s => if s = 2 then emittedLength else emittedLength/2
+  segmentMember := fun s => if s.val = 2 then 1 else 0
+  segmentLeft := fun s => if s.val = 0 then .endSide (0, false) else if s.val = 1 then .interior 0 0 else .endSide (1, false)
+  segmentRight := fun s => if s.val = 0 then .interior 0 0 else if s.val = 1 then .endSide (0, true) else .endSide (1, true)
+  segmentLength := fun s => if s.val = 0 then distance a emittedPoint1 else if s.val = 1 then distance emittedPoint1 b else distance b a
   segmentEA := fun _ => 2
   segmentEI := fun _ => 3
   segmentVerticalStart := fun _ => 0
@@ -98,14 +111,14 @@ def syntheticModel : Model 2 2 1 3 where
 
 def cutParam : Fin 2 → Fin 1 → ℝ := fun _ _ => emittedCut1
 def syntheticActions : Fin 1 → PointAction 2 1 := fun _ => ⟨.interior 0 0, ![0, 1, 0]⟩
-def syntheticSupports : Fin 2 → SupportInput 2 1 := fun s => if s = 0 then
+def syntheticSupports : Fin 2 → SupportInput 2 1 := fun s => if s.val = 0 then
   ⟨.interior 0 0, .guided, emittedAxisCos, emittedAxisSin, false, false, false⟩
   else ⟨.endSide (1, false), .custom, 0, 0, true, false, false⟩
-def nodePos : Fin 2 → Point := fun n => if n = 0 then a else b
+def nodePos : Fin 2 → Point := fun n => if n.val = 0 then a else b
 def memberEA : Fin 2 → ℝ := fun _ => 2
 def memberEI : Fin 2 → ℝ := fun _ => 3
-def segmentStart : Fin 3 → Point := fun s => if s = 0 then a else if s = 1 then emittedPoint1 else b
-def segmentEnd : Fin 3 → Point := fun s => if s = 0 then emittedPoint1 else if s = 1 then b else a
+def segmentStart : Fin 3 → Point := fun s => if s.val = 0 then a else if s.val = 1 then emittedPoint1 else b
+def segmentEnd : Fin 3 → Point := fun s => if s.val = 0 then emittedPoint1 else if s.val = 1 then b else a
 def supportAngles : Fin 2 → ℝ := fun _ => emittedAngle
 
 example : supportDirections (syntheticSupports 0) =
@@ -168,8 +181,8 @@ theorem syntheticStructure : StructuralPremises syntheticModel syntheticActions 
 theorem syntheticGeometry : GeometryCorrespondence syntheticModel nodePos cutParam memberEA memberEI segmentStart segmentEnd := by
   constructor
   · intro m
-    fin_cases m <;> simp [syntheticModel, nodePos, direction, distance, dx, dy, a, b,
-      emittedCos, emittedSin, reversedCos, reversedSin, emittedLength]
+    fin_cases m <;> norm_num [syntheticModel, nodePos, direction, distance, dx, dy, a, b,
+      emittedCos, emittedSin, reversedCos, reversedSin, emittedLength] <;> ring
   · intro s
     fin_cases s <;> norm_num [syntheticModel, segmentStart, nodePos, position, locationParameter,
       cutParam, emittedCut1, emittedPoint1, a, b, dx, dy]
@@ -177,15 +190,34 @@ theorem syntheticGeometry : GeometryCorrespondence syntheticModel nodePos cutPar
     fin_cases s <;> norm_num [syntheticModel, segmentEnd, nodePos, position, locationParameter,
       cutParam, emittedCut1, emittedPoint1, a, b, dx, dy]
   · intro s
-    fin_cases s <;> norm_num [syntheticModel, segmentStart, segmentEnd, emittedLength,
-      emittedPoint1, distance, dx, dy, a, b]
+    fin_cases s <;> simp [syntheticModel, segmentStart, segmentEnd]
   · intro s
     fin_cases s <;> norm_num [syntheticModel, memberEA, memberEI]
 
+example : segmentEnd 0 = segmentStart 1 := by
+  apply correspondence_shared_join syntheticModel nodePos cutParam memberEA memberEI segmentStart segmentEnd syntheticGeometry 0 1
+  · rfl
+  · rfl
+
+def badPropertyModel : Model 2 2 1 3 := { syntheticModel with segmentEA := fun _ => -2 }
+example : ¬ GeometryCorrespondence badPropertyModel nodePos cutParam memberEA memberEI segmentStart segmentEnd := by
+  intro geometry
+  have h := (geometry.properties 0).1
+  norm_num [badPropertyModel, memberEA] at h
+
+def badSpringModel : Model 2 2 1 3 := { syntheticModel with member := fun m => if m.val = 0 then
+  ⟨0, 1, ⟨emittedCos, emittedSin⟩, none, none⟩
+  else ⟨1, 0, ⟨reversedCos, reversedSin⟩, some ⟨.released, .spring (-7), .released⟩, none⟩ }
+example : ¬ EffectiveSpringPositive badSpringModel := by
+  intro positive
+  have h := positive (1, false) 1 (-7) (by exact ⟨2, Or.inl rfl⟩) (by rfl)
+  norm_num at h
+
 theorem syntheticSupportAxes : SupportAxisCorrespondence syntheticSupports supportAngles := by
   intro s hs
-  fin_cases s <;> norm_num [syntheticSupports, supportAngles, emittedAngle, emittedAxisCos, emittedAxisSin,
-    degreeCos, degreeSin] at *
+  fin_cases s
+  · norm_num [syntheticSupports, supportAngles, emittedAngle, emittedAxisCos, emittedAxisSin, degreeCos, degreeSin]
+  · simp [syntheticSupports] at hs
 
 theorem syntheticSprings : EffectiveSpringPositive syntheticModel := by
   intro side direction stiffness active law
@@ -204,7 +236,7 @@ example : ExactContract syntheticModel syntheticActions syntheticSupports cutPar
 example (v : Triple) : toGlobal emittedCos emittedSin (toLocal emittedCos emittedSin v) = v := by
   apply inverse_transform
   have h := direction_normalized a b (by norm_num [a,b])
-  simpa [emittedCos, emittedSin, direction, distance, dx, dy, a, b] using h
+  norm_num [emittedCos, emittedSin, direction, distance, dx, dy, a, b] at h ⊢
 `;
 await writeFile(target, source, 'utf8');
 console.log(`Generated synthetic geometry fixture from artifact ${artifactHash}`);

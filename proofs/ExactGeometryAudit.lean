@@ -16,4 +16,5 @@ import ExactGeometry
 #print axioms ExactGeometry.segment_positive
 #print axioms ExactGeometry.segment_direction
 #print axioms ExactGeometry.position_reverse
+#print axioms ExactGeometry.correspondence_shared_join
 #print axioms ExactGeometry.compose_exact_contract

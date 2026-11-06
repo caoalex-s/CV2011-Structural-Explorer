@@ -16,8 +16,8 @@ def dy (a b : Point) : ℝ := b.2 - a.2
 def distance (a b : Point) : ℝ := Real.sqrt (dx a b ^ 2 + dy a b ^ 2)
 def position (a b : Point) (t : ℝ) : Point := (a.1 + t * dx a b, a.2 + t * dy a b)
 def direction (a b : Point) : Orientation := ⟨dx a b / distance a b, dy a b / distance a b⟩
-def degreeCos (angle : ℝ) : ℝ := Real.cos (angle * Real.pi / 180)
-def degreeSin (angle : ℝ) : ℝ := Real.sin (angle * Real.pi / 180)
+def degreeCos (angle : ℝ) : ℝ := Real.cos (angle * (Real.pi / 180))
+def degreeSin (angle : ℝ) : ℝ := Real.sin (angle * (Real.pi / 180))
 
 theorem displacement_positive (a b : Point) (h : a ≠ b) : 0 < dx a b ^ 2 + dy a b ^ 2 := by
   have hx : 0 ≤ dx a b ^ 2 := sq_nonneg _
@@ -83,7 +83,7 @@ theorem transform_work_from_endpoints (a b : Point) (h : a ≠ b) (f v : Triple)
 
 theorem degree_axis_normalized (angle : ℝ) : degreeCos angle ^ 2 + degreeSin angle ^ 2 = 1 := by
   unfold degreeCos degreeSin
-  nlinarith [Real.sin_sq_add_cos_sq (angle * Real.pi / 180)]
+  nlinarith [Real.sin_sq_add_cos_sq (angle * (Real.pi / 180))]
 
 theorem position_interpolation (a b : Point) (u v z : ℝ) :
     position (position a b u) (position a b v) z = position a b (u+(v-u)*z) := by
@@ -133,6 +133,17 @@ structure GeometryCorrespondence (model : Model nodes members cuts segments)
   length : ∀ s, model.segmentLength s = distance (segmentStart s) (segmentEnd s)
   properties : ∀ s, model.segmentEA s = memberEA (model.segmentMember s) ∧
     model.segmentEI s = memberEI (model.segmentMember s)
+
+/-- Equal adjacent parameters on the same original member give the same
+external physical endpoint; this does not weld different member owners. -/
+theorem correspondence_shared_join (model : Model nodes members cuts segments)
+    (nodePosition : Fin nodes → Point) (cutParameter : Fin members → Fin cuts → ℝ)
+    (memberEA memberEI : Fin members → ℝ) (segmentStart segmentEnd : Fin segments → Point)
+    (geometry : GeometryCorrespondence model nodePosition cutParameter memberEA memberEI segmentStart segmentEnd)
+    (left right : Fin segments) (sameMember : model.segmentMember left = model.segmentMember right)
+    (sameParameter : locationParameter cutParameter (model.segmentRight left) =
+      locationParameter cutParameter (model.segmentLeft right)) : segmentEnd left = segmentStart right := by
+  rw [geometry.endPosition left, geometry.startPosition right, sameMember, sameParameter]
 
 /-- Only cut allocation, ownership and source representation are assumed here.
 Their construction from a TypeScript artifact is a separate open obligation. -/
