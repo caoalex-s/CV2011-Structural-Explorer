@@ -1,0 +1,27 @@
+name: Headerless subpath WASM hosting diagnostic
+on:
+  push:
+    branches: [codex/lean419-wasm-hosting]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  browser-only:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Check shim scope and response behavior without a browser
+        run: node --test qa/wasm-feasibility/test-hosting-shim.mjs
+      - name: Verify recovered bytes and run one headerless hosting diagnostic
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p .data/wasm-hosting
+          python3 qa/wasm-feasibility/hosting-diagnostic.py 2>&1 | tee .data/wasm-hosting/diagnostic.log
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: public-wasm-hosting
+          path: .data/wasm-hosting
