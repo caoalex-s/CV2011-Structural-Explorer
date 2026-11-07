@@ -13,10 +13,12 @@ import shutil
 import subprocess
 import sys
 import time
+from canonical_evidence import collect_manifest, archive_pass, clean_archived_build, compare_passes
 
 ROOT = Path.cwd()
 OUTPUT = ROOT / ".data/wasm-gate"
 WORK = ROOT / ".data/wasm-build"
+CANONICAL = WORK / "canonical"
 SOURCES = ROOT / "qa/wasm-feasibility"
 PINS = {
     "lean": "6caaee842e9495688c1567e78c0e68dbb96942aa",
@@ -27,7 +29,9 @@ PINS = {
     "playwright": "1.51.1",
 }
 receipt = {"pins": PINS, "stage": "setup", "passed": False,
-           "proof": "see separate axioms.log", "browser": "not reached"}
+           "proof": "see separate axioms.log and axiom-audit.json", "browser": "not reached",
+           "repeatability": False, "runtime_gate_passed": False,
+           "overall_gate_passed": False, "hosting_gate": "pending"}
 
 
 def run(arguments, *, cwd=ROOT, env=None, capture=False):
@@ -68,7 +72,7 @@ def generate_c(environment, native_lean, index):
     Only Init, Batteries and this checker are allowed in the runtime closure.
     Mathlib and Lean's elaborator/compiler stay in the proof/build environment.
     """
-    generated = OUTPUT / f"generated-{index}"
+    generated = CANONICAL / "generated"
     generated.mkdir()
     prefix = Path(run([native_lean, "--print-prefix"], env=environment, capture=True))
     roots = [ROOT / "proofs", ROOT / "proofs/.lake/packages/batteries", prefix / "src/lean"]
@@ -105,16 +109,14 @@ def generate_c(environment, native_lean, index):
 
 
 def build_artifact(index, environment, generated):
-    """Each pass has a fresh CMake/runtime/object directory; no object cache."""
-    build = WORK / f"build-{index}"
-    build.mkdir()
-    runtime = WORK / "runtime-probe" if index == 1 else build / "runtime"
-    if index != 1:
-        run(["emcmake", "cmake", "-S", WORK / "lean/src", "-B", runtime,
-             "-DSTAGE=1", "-DCMAKE_BUILD_TYPE=Release", "-DUSE_GMP=OFF",
-             "-DUSE_MIMALLOC=OFF", "-DMMAP=OFF", "-DUSE_LAKE=OFF", "-DCCACHE=OFF",
-             "-DPREV_STAGE=" + str(Path(receipt["native_lean"]).parent.parent)], env=environment)
-        run(["cmake", "--build", runtime, "--target", "leanrt", "-j2"], env=environment)
+    """Fresh products at the identical absolute paths on both passes."""
+    build = CANONICAL
+    runtime = build / "runtime"
+    run(["emcmake", "cmake", "-S", WORK / "lean/src", "-B", runtime,
+         "-DSTAGE=1", "-DCMAKE_BUILD_TYPE=Release", "-DUSE_GMP=OFF",
+         "-DUSE_MIMALLOC=OFF", "-DMMAP=OFF", "-DUSE_LAKE=OFF", "-DCCACHE=OFF",
+         "-DPREV_STAGE=" + str(Path(receipt["native_lean"]).parent.parent)], env=environment)
+    run(["cmake", "--build", runtime, "--target", "leanrt", "-j2"], env=environment)
     libuv = runtime / "libuv/src/libuv"
     assert run(["git", "rev-parse", "HEAD"], cwd=libuv, capture=True) == PINS["libuv"]
     # The only patched external source is the patch embedded in pinned Lean.
@@ -134,7 +136,7 @@ def build_artifact(index, environment, generated):
     wrapper = compile_c(SOURCES / "abi.c")
     archive = build / "checker-core.a"
     run(["emar", "rcs", archive, *compiled], env=environment)
-    assets = OUTPUT / f"assets-{index}"
+    assets = build / "assets"
     assets.mkdir()
     # The single authorized link experiment resolves this libc symbol before LTO.
     run(["em++", *flags, "-Wl,-u,ntohs", "--no-entry", wrapper, "-Wl,--start-group", archive,
@@ -182,28 +184,39 @@ def main():
     receipt["emcc_version"] = run(["emcc", "--version"], env=environment, capture=True)
     assert "3.1.44" in receipt["emcc_version"]
     receipt["emsdk_manifest_sha256"] = digest(WORK / "emsdk/emscripten-releases-tags.json")
-    receipt["stage"] = "runtime-build-1"
+    receipt["canonical_paths"] = {name: str(CANONICAL / name)
+                                  for name in ("generated", "runtime", "runtime/include", "objects", "assets")}
+    receipt["source_paths"] = {"lean": str(WORK / "lean"), "checker": str(ROOT / "proofs/SmokeChecker.lean"),
+                               "batteries": str(ROOT / "proofs/.lake/packages/batteries")}
+    receipt["source_date_epoch"] = environment["SOURCE_DATE_EPOCH"]
+    receipt["toolchain_cache_policy"] = "Pinned installed SDK and its system-library cache are shared; every Lean/libuv/checker generated file, header, object, archive and final output is freshly built. No project object cache is reused."
+    receipt["proof_audit_sha256"] = digest(OUTPUT / "axiom-audit.json")
+    manifests = []
+    for index in (1, 2):
+        if index == 2:
+            receipt["stage"] = "verify-archive-and-clean"
+            save_receipt()
+            receipt["cleanup"] = clean_archived_build(CANONICAL, ROOT, OUTPUT / "pass-1", manifests[0])
+        CANONICAL.mkdir()
+        receipt["stage"] = f"generate-import-closure-{index}"
+        save_receipt()
+        generated = generate_c(environment, native_lean, index)
+        receipt["stage"] = f"artifact-build-{index}"
+        save_receipt()
+        assets = build_artifact(index, environment, generated)
+        manifest = collect_manifest(ROOT, WORK, CANONICAL,
+                                    receipt[f"generated_modules_{index}"])
+        manifests.append(manifest)
+        archive_pass(ROOT, OUTPUT / f"pass-{index}", manifest)
+        receipt[f"manifest_{index}_sha256"] = digest(OUTPUT / f"pass-{index}/manifest.json")
+        save_receipt()
+    receipt["stage"] = "compare-clean-builds"
+    receipt["comparison"] = compare_passes(*manifests)
+    receipt["artifact_hashes"] = manifests[0]["layers"]["final_assets"]
+    receipt["repeat_hashes"] = manifests[1]["layers"]["final_assets"]
     save_receipt()
-    # Probe the upstream runtime before spending time compiling the import closure.
-    # The first artifact reuses this runtime; the second rebuild is independent.
-    probe = WORK / "runtime-probe"
-    run(["emcmake", "cmake", "-S", WORK / "lean/src", "-B", probe,
-         "-DSTAGE=1", "-DCMAKE_BUILD_TYPE=Release", "-DUSE_GMP=OFF", "-DUSE_MIMALLOC=OFF",
-         "-DMMAP=OFF", "-DUSE_LAKE=OFF", "-DCCACHE=OFF",
-         "-DPREV_STAGE=" + str(Path(native_lean).parent.parent)], env=environment)
-    run(["cmake", "--build", probe, "--target", "leanrt", "-j2"], env=environment)
-    receipt["stage"] = "generate-import-closure"
-    generated = generate_c(environment, native_lean, 1)
-    receipt["stage"] = "artifact-build-1"
-    first = build_artifact(1, environment, generated)
-    receipt["stage"] = "artifact-build-2"
-    regenerated = generate_c(environment, native_lean, 2)
-    assert receipt["generated_modules_1"] == receipt["generated_modules_2"]
-    second = build_artifact(2, environment, regenerated)
-    hashes = lambda directory: {p.name: digest(p) for p in sorted(directory.iterdir()) if p.is_file()}
-    receipt["artifact_hashes"] = hashes(first)
-    receipt["repeat_hashes"] = hashes(second)
-    assert receipt["artifact_hashes"] == receipt["repeat_hashes"], "Clean build artifacts differ."
+    assert receipt["comparison"]["equal"], "Canonical build mismatch: " + str(receipt["comparison"]["first_differing_layer"])
+    receipt["repeatability"] = True
     receipt["stage"] = "browser"
     browser = OUTPUT / "browser"
     browser.mkdir()
@@ -212,12 +225,15 @@ def main():
     run(["node", browser / "node_modules/playwright/cli.js", "install", "--with-deps", "chromium"])
     shutil.copy(SOURCES / "browser-test.mjs", browser / "browser-test.mjs")
     # Playwright uses the recorded CI host Node, not Emsdk's bundled Node 16.
-    run(["node", browser / "browser-test.mjs", first, SOURCES])
+    run(["node", browser / "browser-test.mjs", assets, SOURCES])
+    shutil.copyfile(CANONICAL / "browser-results.json", OUTPUT / "browser-results.json")
     receipt["browser"] = json.loads((OUTPUT / "browser-results.json").read_text())
     receipt["browser_package_lock_sha256"] = digest(browser / "package-lock.json")
     # Browser dependencies are test-only and are excluded from the published evidence zip.
     shutil.rmtree(browser / "node_modules")
     receipt["passed"] = True
+    receipt["runtime_gate_passed"] = True
+    # Hosting isolation and portal integration are still separate, pending gates.
     receipt["stage"] = "complete"
 
 

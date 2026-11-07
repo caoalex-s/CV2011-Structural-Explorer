@@ -1,7 +1,7 @@
-name: Lean 4.19 WASM feasibility
+name: Canonical-path WASM reproducibility
 on:
   push:
-    branches: [codex/lean419-wasm-feasibility]
+    branches: [codex/lean419-wasm-canonical]
   workflow_dispatch:
 permissions:
   contents: read
@@ -14,7 +14,7 @@ jobs:
       - name: Prepare evidence directory
         run: mkdir -p .data/wasm-gate
       - name: Check axiom-audit acceptance and rejection cases
-        run: python3 -m unittest discover -s qa/wasm-feasibility -p 'test_axiom_audit.py' -v
+        run: python3 -m unittest discover -s qa/wasm-feasibility -p 'test_*.py' -v
       - uses: leanprover/lean-action@ba3fdfe5c4476c925da13bf11a005ddb47e47aee
         with:
           lake-package-directory: proofs
@@ -37,7 +37,7 @@ jobs:
           git diff --exit-code -- lake-manifest.json lean-toolchain
           python3 ../qa/wasm-feasibility/audit_axioms.py ../.data/wasm-gate/axioms.log \
             --output ../.data/wasm-gate/axiom-audit.json
-      - name: Build pinned runtime and test browser artifact
+      - name: Compare two clean canonical builds and test the new browser artifact
         shell: bash
         run: |
           set -euo pipefail
@@ -45,5 +45,5 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: public-wasm-feasibility
+          name: public-wasm-canonical
           path: .data/wasm-gate
