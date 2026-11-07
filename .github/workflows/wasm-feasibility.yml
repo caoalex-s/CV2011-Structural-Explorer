@@ -1,0 +1,46 @@
+name: Lean 4.19 WASM feasibility
+on:
+  push:
+    branches: [codex/lean419-wasm-feasibility]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  synthetic-gate:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Prepare evidence directory
+        run: mkdir -p .data/wasm-gate
+      - uses: leanprover/lean-action@ba3fdfe5c4476c925da13bf11a005ddb47e47aee
+        with:
+          lake-package-directory: proofs
+          build: 'false'
+          test: 'false'
+          use-mathlib-cache: 'true'
+      - name: Prove the synthetic checker and emit its C code
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp qa/wasm-feasibility/Smoke{Checker,Soundness}.lean proofs/
+          cd proofs
+          lake build Batteries.Data.Rat.Basic
+          lake env bash -c '
+            set -euo pipefail
+            export LEAN_PATH="$PWD:$LEAN_PATH"
+            lean -o SmokeChecker.olean -c ../.data/wasm-gate/SmokeChecker.c SmokeChecker.lean
+            lean SmokeSoundness.lean | tee ../.data/wasm-gate/axioms.log
+          '
+          git diff --exit-code -- lake-manifest.json lean-toolchain
+          ! grep -E 'sorryAx|warning:.*sorry' ../.data/wasm-gate/axioms.log
+      - name: Build pinned runtime and test browser artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 qa/wasm-feasibility/gate.py 2>&1 | tee .data/wasm-gate/build.log
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: public-wasm-feasibility
+          path: .data/wasm-gate
