@@ -1,0 +1,21 @@
+{
+  "repository": "caoalex-s/CV2011-Structural-Explorer",
+  "source_commit": "2d08c5e659368c3083ffc346e27d7f62b2cc2ac6",
+  "run_id": 42336043765,
+  "artifact_id": 13559946895,
+  "artifact_name": "public-wasm-canonical",
+  "archive_sha256": "2f7c30b949e31e80d501abcde8444a94f64da65ee42734b4c0f8dcb5a3ea82cf",
+  "manifest_sha256": "4383ebb024aa2250dadc556d052388852def794a1d7abd5ca9a88ff86913cb58",
+  "wasm_sha256": "64b3115812023bc926599d50e64092b118d513b25dfff868b4a7d3c5252d5571",
+  "unchanged_source_sha256": {
+    "gate.py": "dca6d359cc42616f2341f2a8cb8e1bdca4eded1c10cbfb7bc31fd7ceb45b21d2",
+    "canonical_evidence.py": "9ec970b9fadac7224077570be66bf185d17446009a926af03ee1c5dbccd082c2",
+    "SmokeChecker.lean": "e18b5cb8c572b1ec76a95136b77ca39bbef4f18e2146525dbf194b3b3707a56b",
+    "SmokeSoundness.lean": "26de483be9a4c19e01cdbb55964053f754e8b23fe937caed84b21d9234a4555f",
+    "abi.c": "e44e3798ba65047ef24b8f6f89c20049d7d9bfc93b95a927b9ff7dbe7b6b61f1",
+    "browser-test.mjs": "20ceb9727752842191f8eacf3e08048f739f1c362d0fed52e3e219affe9902ed",
+    "worker.mjs": "b8344f463173ad8b901b1127f93bbcff8304c429e44ac3fba2c090901f957580",
+    "harness.mjs": "2a43efc64959b5e9237eac0661d5a4b613c7a7fb6269fb06183ed5ccf214ad81",
+    "audit_axioms.py": "ff1407f500ff8e9485ce9ad1fe6b7160298d15a1da3116d8580ccf503cccd2f7"
+  }
+}

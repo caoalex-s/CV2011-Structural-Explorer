@@ -1,0 +1,58 @@
+name: Canonical WASM artifact recovery
+on:
+  push:
+    branches: [codex/lean419-wasm-recovery]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  synthetic-recovery:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Prepare evidence directory
+        run: mkdir -p .data/wasm-gate
+      - name: Check audit, manifest and archive validation
+        run: python3 -m unittest discover -s qa/wasm-feasibility -p 'test_*.py' -v
+      - uses: leanprover/lean-action@ba3fdfe5c4476c925da13bf11a005ddb47e47aee
+        with:
+          lake-package-directory: proofs
+          build: 'false'
+          test: 'false'
+          use-mathlib-cache: 'true'
+      - name: Prove the synthetic checker and emit its C code
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp qa/wasm-feasibility/Smoke{Checker,Soundness}.lean proofs/
+          cd proofs
+          lake build Batteries.Data.Rat.Basic
+          lake env bash -c '
+            set -euo pipefail
+            export LEAN_PATH="$PWD:$LEAN_PATH"
+            lean -o SmokeChecker.olean -c ../.data/wasm-gate/SmokeChecker.c SmokeChecker.lean
+            lean SmokeSoundness.lean | tee ../.data/wasm-gate/axioms.log
+          '
+          git diff --exit-code -- lake-manifest.json lean-toolchain
+          python3 ../qa/wasm-feasibility/audit_axioms.py ../.data/wasm-gate/axioms.log \
+            --output ../.data/wasm-gate/axiom-audit.json
+      - name: Recover one exact canonical build and preflight its evidence
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 qa/wasm-feasibility/recover_artifact.py 2>&1 | tee .data/wasm-gate/build.log
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: public-wasm-recovery
+          path: |
+            .data/wasm-gate/recovered-evidence.tar.gz
+            .data/wasm-gate/package-index.json
+            .data/wasm-gate/package-preflight.json
+            .data/wasm-gate/receipt.json
+            .data/wasm-gate/build.log
+            .data/wasm-gate/axiom-audit.json
+            .data/wasm-gate/browser-results.json
