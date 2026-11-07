@@ -33,8 +33,10 @@ receipt = {"pins": PINS, "stage": "setup", "passed": False,
 def run(arguments, *, cwd=ROOT, env=None, capture=False):
     """Run explicit arguments without a shell; show commands but no environment."""
     print("+", " ".join(map(str, arguments)), flush=True)
+    # Keep stderr in the CI log even when collecting a command's stdout.
     result = subprocess.run(list(map(str, arguments)), cwd=cwd, env=env,
-                            check=True, text=True, capture_output=capture)
+                            check=True, text=True,
+                            stdout=subprocess.PIPE if capture else None)
     return result.stdout.strip() if capture else None
 
 
@@ -161,9 +163,13 @@ def main():
     # Read only the path settings required for tools, never log CI secrets.
     settings = run(["bash", "-c", 'source .data/wasm-build/emsdk/emsdk_env.sh >/dev/null 2>&1; '
                     'cd proofs; lake env python3 -c '
-                    '\'import json,os; print(json.dumps({k:os.environ.get(k, "") for k in '
-                    '["PATH","LEAN_PATH","EMSDK","EM_CONFIG","EMSDK_NODE"]}))\''], capture=True)
+                    '\'import json,os; print(json.dumps({k:os.environ[k] for k in '
+                    '["PATH","LEAN_PATH","EMSDK","EM_CONFIG","EMSDK_NODE"] if k in os.environ}))\''], capture=True)
     environment = {**os.environ, **json.loads(settings), "SOURCE_DATE_EPOCH": "1746057600"}
+    # Emscripten treats even an empty EM_CONFIG as an explicit filename. Use
+    # the SDK's generated config, never an empty placeholder for an unset key.
+    environment["EM_CONFIG"] = str(WORK / "emsdk/.emscripten")
+    receipt["emscripten_config_sha256"] = digest(Path(environment["EM_CONFIG"]))
     environment["LEAN_PATH"] = str(ROOT / "proofs") + ":" + environment["LEAN_PATH"]
     native_lean = shutil.which("lean", path=environment["PATH"])
     # Resolve elan's selected toolchain, not the dispatcher's executable hash.
@@ -204,7 +210,8 @@ def main():
          "playwright@" + PINS["playwright"]])
     run(["node", browser / "node_modules/playwright/cli.js", "install", "--with-deps", "chromium"])
     shutil.copy(SOURCES / "browser-test.mjs", browser / "browser-test.mjs")
-    run(["node", browser / "browser-test.mjs", first, SOURCES], env=environment)
+    # Playwright uses the recorded CI host Node, not Emsdk's bundled Node 16.
+    run(["node", browser / "browser-test.mjs", first, SOURCES])
     receipt["browser"] = json.loads((OUTPUT / "browser-results.json").read_text())
     receipt["browser_package_lock_sha256"] = digest(browser / "package-lock.json")
     # Browser dependencies are test-only and are excluded from the published evidence zip.
