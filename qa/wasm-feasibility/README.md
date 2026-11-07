@@ -4,7 +4,7 @@ This isolated CI experiment asks whether the pinned Lean rational checker can ru
 
 The build uses Lean 4.19.0 source and its native Linux compiler, Batteries from the existing dependency lock, Emscripten 3.1.44, and Lean's existing Emscripten/libuv build path. It regenerates the imported Lean modules as C, compiles the runtime and generated code, and repeats the build in a fresh directory. The only external source patch is the libuv patch already contained in the pinned Lean source. No additional runtime portability patch or version change is permitted by this gate.
 
-Run the `Lean 4.19 WASM feasibility` GitHub workflow on the isolated branch. The job has a 40-minute ceiling. One corrected run is allowed for a routine proof/build/harness error; missing platform implementations or substantial runtime porting end the gate. Do not run this script or install these runtimes on Windows. Only public synthetic inputs are used, and no deployment is included.
+Run the `Lean 4.19 WASM feasibility` GitHub workflow on the isolated branch. The original two-attempt budget ended at the final link with a late `ntohs` bitcode error. The coordinator authorized one further job, capped at 40 minutes, with only `-Wl,-u,ntohs` added to both clean link passes and a stricter axiom audit. Any next blocker ends this extension; further symbol changes or runtime variants are not authorized. Do not run this script or install these runtimes on Windows. Only public synthetic inputs are used, and no deployment is included.
 
 ## Interface and trust
 
@@ -14,10 +14,14 @@ The exported `input_ptr` and `input_capacity` describe a module-owned 4096-byte 
 
 The theorem covers parsed rational values. It does not prove the C decoder, Lean's compiler, generated-code ABI, C/C++ compiler, runtime, browser, loader or request-binding code correct. These are separate trusted components. The test harness checks those boundaries on the actual artifact, including malformed inputs, large integers, altered witnesses, invalid pointers/lengths, stale results and a terminated worker. Such tests provide evidence for the tested cases, not a proof of the compilation chain or decoder.
 
+The axiom audit requires exactly one report for each of `accepts_sound` and `accepts_complete`. It permits only the existing real-field policy's `propext`, `Classical.choice` and `Quot.sound`, or a report with no axioms. Missing, duplicate, unknown or malformed reports and all other axioms fail the gate. Positive and rejection tests run before the CI proof/build steps.
+
 ## Evidence and limits
 
 The workflow preserves the soundness/axiom log, generated C, source and artifact hashes, build commands and receipt. A pinned Playwright version supplies the actual headless Chromium test. After initialization, both the browser interception rule and the static harness server refuse further requests. The harness records startup, 100 steady-state compiled-call timings, payload sizes, initial memory, the 128 MiB memory ceiling, and a one-second per-request worker timeout. Startup includes navigation and artifact loading; check timings exclude messaging and hashing and may be limited by browser timer resolution.
 
 The CI host image and package installer remain build-environment trust assumptions; their resolved versions are recorded. Lean's native Linux release has no published release-asset digest in its GitHub metadata, so its installed compiler digest is recorded rather than checked against a separately authenticated checksum. The pinned source, fixed compiler version, recorded compiler digest and byte comparison of repeated builds make this distinction inspectable. A successful browser test alone cannot establish portal equilibrium, stability, reaction signs, loaded recovery, or a fresh kernel proof for each edit.
+
+This pthread build requires browser cross-origin isolation, as described in the [Emscripten pthread documentation](https://emscripten.org/docs/porting/pthreads.html). The synthetic CI server supplies COOP/COEP headers. A pass there would establish only that isolated test configuration; it would not demonstrate compatibility with the current GitHub Pages hosting. Production headers, service workers, hosting and deployment are outside this experiment.
 
 Status is pending until the exact-commit CI receipt and independent review are available. A failed runtime build is a failed feasibility gate, even if its Lean proof passes. Unreached artifact/browser checks must remain explicitly untested.

@@ -13,6 +13,8 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Prepare evidence directory
         run: mkdir -p .data/wasm-gate
+      - name: Check axiom-audit acceptance and rejection cases
+        run: python3 -m unittest discover -s qa/wasm-feasibility -p 'test_axiom_audit.py' -v
       - uses: leanprover/lean-action@ba3fdfe5c4476c925da13bf11a005ddb47e47aee
         with:
           lake-package-directory: proofs
@@ -33,7 +35,8 @@ jobs:
             lean SmokeSoundness.lean | tee ../.data/wasm-gate/axioms.log
           '
           git diff --exit-code -- lake-manifest.json lean-toolchain
-          ! grep -E 'sorryAx|warning:.*sorry' ../.data/wasm-gate/axioms.log
+          python3 ../qa/wasm-feasibility/audit_axioms.py ../.data/wasm-gate/axioms.log \
+            --output ../.data/wasm-gate/axiom-audit.json
       - name: Build pinned runtime and test browser artifact
         shell: bash
         run: |

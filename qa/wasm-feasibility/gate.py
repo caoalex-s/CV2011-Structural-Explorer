@@ -136,7 +136,8 @@ def build_artifact(index, environment, generated):
     run(["emar", "rcs", archive, *compiled], env=environment)
     assets = OUTPUT / f"assets-{index}"
     assets.mkdir()
-    run(["em++", *flags, "--no-entry", wrapper, "-Wl,--start-group", archive,
+    # The single authorized link experiment resolves this libc symbol before LTO.
+    run(["em++", *flags, "-Wl,-u,ntohs", "--no-entry", wrapper, "-Wl,--start-group", archive,
          runtime / "lib/lean/libleanrt.a", libuv / "libuv.a", "-Wl,--end-group",
          "-sMODULARIZE=1", "-sEXPORT_ES6=1", "-sEXPORT_NAME=createChecker",
          "-sENVIRONMENT=web,worker", "-sALLOW_MEMORY_GROWTH=1",
