@@ -1,0 +1,107 @@
+{
+  "candidate_commit": "9c0a1ac36253f429fa4ba2908ca67dc03b7f7a5d",
+  "baseline_commit": "584d32e1d78fc6e2c7baf439e5c048170a687f21",
+  "target_url": "https://caoalex-s.github.io/CV2011-Structural-Explorer/checker-preview/64b31158/",
+  "baseline_index_sha256": "93aeb21c9297a9d0d691a946614db086b525b9502ab93a826cfd696b210afca4",
+  "files": {
+    "LICENSE": {
+      "sha256": "3ee2c88cec9f3036fd4b0cba94e94485bb8b4673be7b8e0f3b1496c5baff75cb",
+      "bytes": 1070,
+      "mime": [
+        "text/plain",
+        "application/octet-stream"
+      ]
+    },
+    "checker.mjs": {
+      "sha256": "c52697607b8c951fc189fe8da3f4870b09cc643203a97bca839c72a300f0ef06",
+      "bytes": 99672,
+      "mime": [
+        "text/javascript",
+        "application/javascript"
+      ]
+    },
+    "checker.mjs.symbols": {
+      "sha256": "15a8a9f3fe145c36206fb462ef533a8dddac8d7813a93bed1308271d0ee8e1dc",
+      "bytes": 128554,
+      "mime": [
+        "text/plain",
+        "application/octet-stream"
+      ]
+    },
+    "checker.wasm": {
+      "sha256": "64b3115812023bc926599d50e64092b118d513b25dfff868b4a7d3c5252d5571",
+      "bytes": 1712994,
+      "mime": [
+        "application/wasm"
+      ]
+    },
+    "checker.worker.js": {
+      "sha256": "622849d7b03eed12b8a2b3f10e9960e3a641590ecd1d660d3846c4808e1a0280",
+      "bytes": 2103,
+      "mime": [
+        "text/javascript",
+        "application/javascript"
+      ]
+    },
+    "harness.mjs": {
+      "sha256": "81e92651dd758838813268a79a4dfab28cb81358461d7c741c9aacbec04fcfc9",
+      "bytes": 2761,
+      "mime": [
+        "text/javascript",
+        "application/javascript"
+      ]
+    },
+    "index.html": {
+      "sha256": "28340c98f1e38a8ab8dd28d2b1f14e4de3c4e1e5a569189d13181c67aa735209",
+      "bytes": 2562,
+      "mime": [
+        "text/html"
+      ]
+    },
+    "isolation-sw.js": {
+      "sha256": "1bfda4eb89400d82fe2065b26a9f33f08c252bb5728e22d8850aa10b4af0016f",
+      "bytes": 1408,
+      "mime": [
+        "text/javascript",
+        "application/javascript"
+      ]
+    },
+    "manifest.json": {
+      "sha256": "4020f9a7e0d0c1b3e3726ce881a5c7f0da4cc1ec4b974facc4b3cf76ec0c53a9",
+      "bytes": 358,
+      "mime": [
+        "application/json"
+      ]
+    },
+    "preview.css": {
+      "sha256": "1ccf001514a818a29a2122355d1487348ba4d641f1f19fefcae923169e34b9cd",
+      "bytes": 1306,
+      "mime": [
+        "text/css"
+      ]
+    },
+    "preview.mjs": {
+      "sha256": "0be7e8b3ccb9a49307c18cfd70559915e7dcec3669761c3a3b0915ebcfdf60b2",
+      "bytes": 6601,
+      "mime": [
+        "text/javascript",
+        "application/javascript"
+      ]
+    },
+    "provenance.json": {
+      "sha256": "e07eb42b946ea02428d7df0911bec6d52f0dd4851245f2ca821f40ae9569f7f5",
+      "bytes": 1302,
+      "mime": [
+        "application/json"
+      ]
+    },
+    "worker.mjs": {
+      "sha256": "9e62611c5745981ec8c009411a09e215c72a6d901d3d28af8cf5a67d93ab88b2",
+      "bytes": 2197,
+      "mime": [
+        "text/javascript",
+        "application/javascript"
+      ]
+    }
+  }
+}
