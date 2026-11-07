@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Rational checker preview</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="./preview.css">
+</head>
+<body>
+  <main>
+    <p class="eyebrow">Synthetic browser experiment · 64b31158</p>
+    <h1>Rational checker preview</h1>
+    <p>This preview checks the equation <strong>2 × x = a</strong> using the recovered compiled checker. Choose a fixed example to inspect acceptance, rejection, or malformed input. Structural-model checking is outside this preview.</p>
+    <section aria-labelledby="activation-heading">
+      <h2 id="activation-heading">Activate this preview</h2>
+      <p>Activation enables isolation for this preview directory and reloads the page once. Deactivation removes only this preview’s service-worker registration and returns to the main site. Other registrations and stored data are left in place.</p>
+      <div class="actions">
+        <button id="activate" type="button">Activate preview</button>
+        <button id="deactivate" type="button">Deactivate and leave</button>
+      </div>
+      <p id="status" role="status" aria-live="polite">Inactive. Activation requires your selection.</p>
+    </section>
+    <section aria-labelledby="example-heading">
+      <h2 id="example-heading">Check an example</h2>
+      <label for="example">Fixed synthetic input</label>
+      <select id="example">
+        <option value="zero">Zero: a = 0, x = 0</option>
+        <option value="positive" selected>Positive: a = 10, x = 5</option>
+        <option value="negative">Negative: a = −10, x = −5</option>
+        <option value="fraction">Fraction: a = 3/7, x = 3/14</option>
+        <option value="large">Large integer with x = a/2</option>
+        <option value="wrong">Wrong value: a = 10, x = 6</option>
+        <option value="malformed">Malformed input: zero denominator</option>
+      </select>
+      <div class="actions">
+        <button id="check" type="button" disabled>Check example</button>
+        <button id="reset" type="button" disabled>Reset checker</button>
+      </div>
+      <output aria-live="polite">No check has run.</output>
+    </section>
+    <footer>Compiled artifact and source history: <a href="./provenance.json">provenance</a> · <a href="./manifest.json">asset hashes</a> · <a href="./LICENSE">shim license</a></footer>
+  </main>
+  <script type="module" src="./preview.mjs"></script>
+</body>
+</html>
