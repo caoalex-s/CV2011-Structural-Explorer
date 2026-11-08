@@ -1,0 +1,47 @@
+name: One approved normal-origin preview test
+on:
+  push:
+    branches: [codex/checker-preview-https-a1271d30]
+permissions:
+  contents: read
+  actions: read
+  deployments: read
+concurrency:
+  group: preview-https-a1271d30
+  cancel-in-progress: false
+jobs:
+  test:
+    if: github.event.created == true && github.run_attempt == 1
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: eabc90e0a4a548b31a8d1f50f8dd1309336d272e
+          path: .data/reviewed-bundle
+          persist-credentials: false
+      - name: Bind this test to the reviewed successful deployment and exact artifact
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 qa/public-preview-https/verify-binding.py
+      - name: Install the reviewed browser dependency
+        run: |
+          npm install --prefix .data/preview-tools --ignore-scripts --save-exact playwright@1.51.1
+          node .data/preview-tools/node_modules/playwright/cli.js install --with-deps chromium
+      - name: Execute the unchanged HTTPS test once
+        run: |
+          cp .data/reviewed-bundle/checker-preview-review/https-test.mjs .data/preview-tools/https-test.mjs
+          timeout 240s node .data/preview-tools/https-test.mjs .data/preview-lock.json .data/publication-approval.json .data/public-preview-result
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: normal-preview-https-evidence
+          path: |
+            .data/public-preview-result/
+            .data/binding-verification.json
+            .data/preview-lock.json
+            .data/preview-tools/package-lock.json
