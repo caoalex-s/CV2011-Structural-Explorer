@@ -1,0 +1,41 @@
+name: Live portal structural checker
+on:
+  push:
+    branches: [codex/live-portal-checker]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  proof:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - run: mkdir -p .data/live-portal
+      - uses: leanprover/lean-action@ba3fdfe5c4476c925da13bf11a005ddb47e47aee
+        with:
+          lake-package-directory: proofs
+          build: 'false'
+          test: 'false'
+          use-mathlib-cache: 'true'
+      - name: Compile the exact structural checker and actual-model bridge
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd proofs
+          lake build ExactGeometry FrameReuse
+          lake env bash -c '
+            set -euo pipefail
+            export LEAN_PATH="$PWD:$LEAN_PATH"
+            for module in PortalTables PortalChecker PortalFramePilot PortalSoundness; do
+              lean -o "$module.olean" "$module.lean" 2>&1 | tee "../.data/live-portal/$module.log"
+            done
+          '
+          git diff --exit-code -- lake-manifest.json lean-toolchain
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: live-portal-proof
+          path: .data/live-portal

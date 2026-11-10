@@ -1,0 +1,28 @@
+{
+  "repository": "caoalex-s/CV2011-Structural-Explorer",
+  "run_id": 42331943144,
+  "artifact_id": 13558446370,
+  "artifact_name": "public-wasm-feasibility",
+  "source_commit": "e06eabb30fdc23094af515a9ffe43a36adc51da8",
+  "archive_sha256": "d33223f5cf51be810ca8607c7f460f6e7539849ac7bac611c604cef590784078",
+  "entries": {
+    "assets-1/checker.wasm": "dadb554a7a85972c258563b65b4c0e3ad5ee355ee980af4296c0ce03003d8b78",
+    "assets-1/checker.mjs": "c52697607b8c951fc189fe8da3f4870b09cc643203a97bca839c72a300f0ef06",
+    "assets-1/checker.worker.js": "622849d7b03eed12b8a2b3f10e9960e3a641590ecd1d660d3846c4808e1a0280",
+    "assets-1/checker.mjs.symbols": "15a8a9f3fe145c36206fb462ef533a8dddac8d7813a93bed1308271d0ee8e1dc",
+    "receipt.json": "199f9eb923debbfc74720be6c8d9e829f417dc2785c0a4999b2a8f71d33c2997",
+    "axiom-audit.json": "5413254fbbe5a8c664133e98289670de10a308d1695ed1dc3610826af031d018",
+    "axioms.log": "0fd321d2918cda08aca8d598af3016316c3364114c044b52bc7101ab0d262e72",
+    "SmokeChecker.c": "c4ab71a530ddd4139fbcd8b8ea85be0e426de1768db1fc912c30b28facb8c46d"
+  },
+  "harness_sha256": {
+    "browser-test.mjs": "20ceb9727752842191f8eacf3e08048f739f1c362d0fed52e3e219affe9902ed",
+    "harness.mjs": "2a43efc64959b5e9237eac0661d5a4b613c7a7fb6269fb06183ed5ccf214ad81",
+    "worker.mjs": "b8344f463173ad8b901b1127f93bbcff8304c429e44ac3fba2c090901f957580"
+  },
+  "proof_source_sha256": {
+    "SmokeChecker.lean": "e18b5cb8c572b1ec76a95136b77ca39bbef4f18e2146525dbf194b3b3707a56b",
+    "SmokeSoundness.lean": "26de483be9a4c19e01cdbb55964053f754e8b23fe937caed84b21d9234a4555f"
+  },
+  "playwright_version": "1.51.1"
+}

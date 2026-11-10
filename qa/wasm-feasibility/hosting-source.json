@@ -1,0 +1,38 @@
+{
+  "repository": "caoalex-s/CV2011-Structural-Explorer",
+  "source_commit": "33c4d5b0dd2a526ae291464cf266252cd3a67cbd",
+  "run_id": 42348453079,
+  "artifact_id": 13564533701,
+  "artifact_name": "public-wasm-recovery",
+  "outer_zip_sha256": "5487b99099448656bfbf4d1c97c00f828f119ef1c62d9637566a454434a41928",
+  "tar_sha256": "3af9d3b4359196161897b50ccf679ba2ca887f8412e367a2e26cdfd4c0d49f4c",
+  "index_sha256": "7ab888c0991a7ab7727a911eab4729168bfbd5302becf45f2d22c9da016cf78e",
+  "manifest_sha256": "4383ebb024aa2250dadc556d052388852def794a1d7abd5ca9a88ff86913cb58",
+  "final_assets": {
+    "checker.mjs": {
+      "sha256": "c52697607b8c951fc189fe8da3f4870b09cc643203a97bca839c72a300f0ef06",
+      "bytes": 99672
+    },
+    "checker.mjs.symbols": {
+      "sha256": "15a8a9f3fe145c36206fb462ef533a8dddac8d7813a93bed1308271d0ee8e1dc",
+      "bytes": 128554
+    },
+    "checker.wasm": {
+      "sha256": "64b3115812023bc926599d50e64092b118d513b25dfff868b4a7d3c5252d5571",
+      "bytes": 1712994
+    },
+    "checker.worker.js": {
+      "sha256": "622849d7b03eed12b8a2b3f10e9960e3a641590ecd1d660d3846c4808e1a0280",
+      "bytes": 2103
+    }
+  },
+  "playwright_version": "1.51.1",
+  "upstream_shim": {
+    "repository": "gzuidhof/coi-serviceworker",
+    "commit": "7b1d2a092d0d2dd2b7270b6f12f13605de26f214",
+    "sha256": "e97bbac6017322d48aa54a5bc7ce473c725a4b7376ff245002e0ba71c3dcdd7e"
+  },
+  "shim_sha256": "1bfda4eb89400d82fe2065b26a9f33f08c252bb5728e22d8850aa10b4af0016f",
+  "scope_path": "/CV2011-Structural-Explorer/synthetic-isolation/",
+  "review": "Inspected upstream source and this narrow derivative. Same-origin in-scope responses only; require-corp; no caches, messages, automatic page reload, external code loading or application update scheduling. Registration, one reload, same-byte update check, reset and unregister are explicitly controlled by the CI harness. Browser-native service-worker update checks may still occur; the served bytes remain pinned."
+}

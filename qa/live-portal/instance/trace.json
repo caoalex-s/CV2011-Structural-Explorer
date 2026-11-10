@@ -1,0 +1,2995 @@
+{
+  "schema": "cv2011-portal-frame-pilot",
+  "version": 1,
+  "identity": {
+    "baseline": "584d32e1d78fc6e2c7baf439e5c048170a687f21",
+    "source": "web/engine.ts: example('frame')",
+    "menuLabel": "Portal frame",
+    "sourceFileSha256LF": "90c90f26aa1e806cbca6b1bb324212837c5ba194537a3ec81ae9d01351cc6799",
+    "rawExportSha256": "7bf62f84822db6993cc1a9608d18242381bd71def295148604f1b06be5e4967b",
+    "parserDefaults": "Absent joint becomes rigid; absent custom-support flags become false. Mechanics are unchanged.",
+    "unchangedOriginalModel": {
+      "nodes": [
+        {
+          "id": "A",
+          "x": 0,
+          "y": 0
+        },
+        {
+          "id": "B",
+          "x": 0,
+          "y": 4
+        },
+        {
+          "id": "C",
+          "x": 6,
+          "y": 4
+        },
+        {
+          "id": "D",
+          "x": 6,
+          "y": 0
+        }
+      ],
+      "members": [
+        {
+          "id": "AB",
+          "a": "A",
+          "b": "B",
+          "EA": 2000000,
+          "EI": 20000
+        },
+        {
+          "id": "BC",
+          "a": "B",
+          "b": "C",
+          "EA": 2000000,
+          "EI": 20000
+        },
+        {
+          "id": "CD",
+          "a": "C",
+          "b": "D",
+          "EA": 2000000,
+          "EI": 20000
+        }
+      ],
+      "supports": [
+        {
+          "id": "S1",
+          "member": "AB",
+          "t": 0,
+          "kind": "fixed",
+          "angle": 90
+        },
+        {
+          "id": "S2",
+          "member": "CD",
+          "t": 1,
+          "kind": "fixed",
+          "angle": 90
+        }
+      ],
+      "loads": [
+        {
+          "id": "q1",
+          "member": "BC",
+          "kind": "distributed",
+          "t": 0,
+          "end": 1,
+          "fx": 0,
+          "fy": -5,
+          "mz": 0,
+          "qEnd": -5
+        }
+      ]
+    }
+  },
+  "binding": {
+    "rawSource": "7bf62f84822db6993cc1a9608d18242381bd71def295148604f1b06be5e4967b",
+    "mechanical": "b83cb345ff6090eca76c1f467335ef719380a8b484c0c3a8190b28058a7ce02f",
+    "display": "046ebd2125984b6a95af2657c7837c4585b5ae389e759d78e05cd286edc73de0",
+    "query": "aa78b75a4ea4ce7eb247c7158d92793f468a2206c2b1d300364e94791383bb71",
+    "exactAdapter": null,
+    "theoremBundle": null,
+    "checker": null,
+    "result": null,
+    "artifactDigest": "a072a4e35797aed384d12ea8534f129a5ef6b1b356a6e93f1c30139fdb33d75e",
+    "generatedLeanSha256": "9d7496661f735889b17f0069547bf9e1a0c1f9b0cd6c4704490d97e57dec6c45",
+    "meaning": "Digests identify inputs and emitted proof text; they are not a verified parser/emitter theorem."
+  },
+  "finiteEncoding": {
+    "nodes": 4,
+    "members": 3,
+    "interiorSlotsPerMember": 0,
+    "segments": 3,
+    "pointActions": 0,
+    "supports": 2,
+    "nodeOrder": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "memberOrder": [
+      "AB",
+      "BC",
+      "CD"
+    ],
+    "segmentOwnership": "segment i belongs to member i; one full [0,1] interval per member",
+    "queryIsNotAnExtraCut": true
+  },
+  "exactInputs": {
+    "nodes": [
+      {
+        "index": 0,
+        "id": "A",
+        "x": {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        "y": {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        "joint": "rigid",
+        "rotationStiffness": null,
+        "requestedReference": null
+      },
+      {
+        "index": 1,
+        "id": "B",
+        "x": {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        "y": {
+          "numerator": "4",
+          "denominator": "1"
+        },
+        "joint": "rigid",
+        "rotationStiffness": null,
+        "requestedReference": null
+      },
+      {
+        "index": 2,
+        "id": "C",
+        "x": {
+          "numerator": "6",
+          "denominator": "1"
+        },
+        "y": {
+          "numerator": "4",
+          "denominator": "1"
+        },
+        "joint": "rigid",
+        "rotationStiffness": null,
+        "requestedReference": null
+      },
+      {
+        "index": 3,
+        "id": "D",
+        "x": {
+          "numerator": "6",
+          "denominator": "1"
+        },
+        "y": {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        "joint": "rigid",
+        "rotationStiffness": null,
+        "requestedReference": null
+      }
+    ],
+    "supports": [
+      {
+        "index": 0,
+        "id": "S1",
+        "kind": "fixed",
+        "cutIndex": 0,
+        "location": {
+          "kind": "endSide",
+          "memberIndex": 0,
+          "end": "a",
+          "nodeId": "A"
+        },
+        "axes": {
+          "angleDegrees": {
+            "numerator": "90",
+            "denominator": "1"
+          },
+          "cosine": {
+            "op": "cos",
+            "args": [
+              {
+                "op": "multiply",
+                "args": [
+                  {
+                    "numerator": "90",
+                    "denominator": "1"
+                  },
+                  {
+                    "op": "divide",
+                    "args": [
+                      {
+                        "op": "pi",
+                        "args": []
+                      },
+                      {
+                        "numerator": "180",
+                        "denominator": "1"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "sine": {
+            "op": "sin",
+            "args": [
+              {
+                "op": "multiply",
+                "args": [
+                  {
+                    "numerator": "90",
+                    "denominator": "1"
+                  },
+                  {
+                    "op": "divide",
+                    "args": [
+                      {
+                        "op": "pi",
+                        "args": []
+                      },
+                      {
+                        "numerator": "180",
+                        "denominator": "1"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "status": "not-required"
+        },
+        "rows": [
+          [
+            {
+              "numerator": "1",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0",
+              "denominator": "1"
+            }
+          ],
+          [
+            {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            {
+              "numerator": "1",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0",
+              "denominator": "1"
+            }
+          ],
+          [
+            {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            {
+              "numerator": "1",
+              "denominator": "1"
+            }
+          ]
+        ],
+        "custom": {
+          "fixX": false,
+          "fixY": false,
+          "fixRotation": false
+        }
+      },
+      {
+        "index": 1,
+        "id": "S2",
+        "kind": "fixed",
+        "cutIndex": 1,
+        "location": {
+          "kind": "endSide",
+          "memberIndex": 2,
+          "end": "b",
+          "nodeId": "D"
+        },
+        "axes": {
+          "angleDegrees": {
+            "numerator": "90",
+            "denominator": "1"
+          },
+          "cosine": {
+            "op": "cos",
+            "args": [
+              {
+                "op": "multiply",
+                "args": [
+                  {
+                    "numerator": "90",
+                    "denominator": "1"
+                  },
+                  {
+                    "op": "divide",
+                    "args": [
+                      {
+                        "op": "pi",
+                        "args": []
+                      },
+                      {
+                        "numerator": "180",
+                        "denominator": "1"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "sine": {
+            "op": "sin",
+            "args": [
+              {
+                "op": "multiply",
+                "args": [
+                  {
+                    "numerator": "90",
+                    "denominator": "1"
+                  },
+                  {
+                    "op": "divide",
+                    "args": [
+                      {
+                        "op": "pi",
+                        "args": []
+                      },
+                      {
+                        "numerator": "180",
+                        "denominator": "1"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "status": "not-required"
+        },
+        "rows": [
+          [
+            {
+              "numerator": "1",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0",
+              "denominator": "1"
+            }
+          ],
+          [
+            {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            {
+              "numerator": "1",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0",
+              "denominator": "1"
+            }
+          ],
+          [
+            {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            {
+              "numerator": "1",
+              "denominator": "1"
+            }
+          ]
+        ],
+        "custom": {
+          "fixX": false,
+          "fixY": false,
+          "fixRotation": false
+        }
+      }
+    ],
+    "actions": [],
+    "members": [
+      {
+        "index": 0,
+        "id": "AB",
+        "startNodeId": "A",
+        "endNodeId": "B",
+        "geometry": {
+          "origin": {
+            "x": {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            "y": {
+              "numerator": "0",
+              "denominator": "1"
+            }
+          },
+          "dx": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "dy": {
+            "numerator": "4",
+            "denominator": "1"
+          },
+          "length": {
+            "op": "sqrt",
+            "args": [
+              {
+                "op": "add",
+                "args": [
+                  {
+                    "op": "square",
+                    "args": [
+                      {
+                        "numerator": "0",
+                        "denominator": "1"
+                      }
+                    ]
+                  },
+                  {
+                    "op": "square",
+                    "args": [
+                      {
+                        "numerator": "4",
+                        "denominator": "1"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "cosine": {
+            "op": "divide",
+            "args": [
+              {
+                "numerator": "0",
+                "denominator": "1"
+              },
+              {
+                "op": "sqrt",
+                "args": [
+                  {
+                    "op": "add",
+                    "args": [
+                      {
+                        "op": "square",
+                        "args": [
+                          {
+                            "numerator": "0",
+                            "denominator": "1"
+                          }
+                        ]
+                      },
+                      {
+                        "op": "square",
+                        "args": [
+                          {
+                            "numerator": "4",
+                            "denominator": "1"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "sine": {
+            "op": "divide",
+            "args": [
+              {
+                "numerator": "4",
+                "denominator": "1"
+              },
+              {
+                "op": "sqrt",
+                "args": [
+                  {
+                    "op": "add",
+                    "args": [
+                      {
+                        "op": "square",
+                        "args": [
+                          {
+                            "numerator": "0",
+                            "denominator": "1"
+                          }
+                        ]
+                      },
+                      {
+                        "op": "square",
+                        "args": [
+                          {
+                            "numerator": "4",
+                            "denominator": "1"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "status": "pending-exact-geometry"
+        },
+        "endLaws": [
+          {
+            "end": "a",
+            "nodeId": "A",
+            "requestedReference": null,
+            "effectiveReference": "AB",
+            "referenceReason": "first-incident",
+            "reason": "reference-rigid",
+            "axial": {
+              "kind": "rigid"
+            },
+            "transverse": {
+              "kind": "rigid"
+            },
+            "rotation": {
+              "kind": "rigid"
+            }
+          },
+          {
+            "end": "b",
+            "nodeId": "B",
+            "requestedReference": null,
+            "effectiveReference": "AB",
+            "referenceReason": "first-incident",
+            "reason": "reference-rigid",
+            "axial": {
+              "kind": "rigid"
+            },
+            "transverse": {
+              "kind": "rigid"
+            },
+            "rotation": {
+              "kind": "rigid"
+            }
+          }
+        ],
+        "cuts": [
+          {
+            "index": 0,
+            "parameter": {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            "location": {
+              "kind": "endSide",
+              "memberIndex": 0,
+              "end": "a",
+              "nodeId": "A"
+            },
+            "sources": [
+              {
+                "kind": "member-end",
+                "index": 0,
+                "id": "AB",
+                "role": "a"
+              },
+              {
+                "kind": "support",
+                "index": 0,
+                "id": "S1",
+                "role": "location"
+              }
+            ],
+            "adjacentIntervals": [
+              null,
+              0
+            ],
+            "position": {
+              "x": {
+                "op": "add",
+                "args": [
+                  {
+                    "numerator": "0",
+                    "denominator": "1"
+                  },
+                  {
+                    "op": "multiply",
+                    "args": [
+                      {
+                        "numerator": "0",
+                        "denominator": "1"
+                      },
+                      {
+                        "numerator": "0",
+                        "denominator": "1"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "y": {
+                "op": "add",
+                "args": [
+                  {
+                    "numerator": "0",
+                    "denominator": "1"
+                  },
+                  {
+                    "op": "multiply",
+                    "args": [
+                      {
+                        "numerator": "0",
+                        "denominator": "1"
+                      },
+                      {
+                        "numerator": "4",
+                        "denominator": "1"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "index": 1,
+            "parameter": {
+              "numerator": "1",
+              "denominator": "1"
+            },
+            "location": {
+              "kind": "endSide",
+              "memberIndex": 0,
+              "end": "b",
+              "nodeId": "B"
+            },
+            "sources": [
+              {
+                "kind": "member-end",
+                "index": 0,
+                "id": "AB",
+                "role": "b"
+              }
+            ],
+            "adjacentIntervals": [
+              0,
+              null
+            ],
+            "position": {
+              "x": {
+                "op": "add",
+                "args": [
+                  {
+                    "numerator": "0",
+                    "denominator": "1"
+                  },
+                  {
+                    "op": "multiply",
+                    "args": [
+                      {
+                        "numerator": "1",
+                        "denominator": "1"
+                      },
+                      {
+                        "numerator": "0",
+                        "denominator": "1"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "y": {
+                "op": "add",
+                "args": [
+                  {
+                    "numerator": "0",
+                    "denominator": "1"
+                  },
+                  {
+                    "op": "multiply",
+                    "args": [
+                      {
+                        "numerator": "1",
+                        "denominator": "1"
+                      },
+                      {
+                        "numerator": "4",
+                        "denominator": "1"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "intervals": [
+          {
+            "index": 0,
+            "memberIndex": 0,
+            "memberId": "AB",
+            "leftCut": 0,
+            "rightCut": 1,
+            "from": {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            "to": {
+              "numerator": "1",
+              "denominator": "1"
+            },
+            "left": {
+              "kind": "endSide",
+              "memberIndex": 0,
+              "end": "a",
+              "nodeId": "A"
+            },
+            "right": {
+              "kind": "endSide",
+              "memberIndex": 0,
+              "end": "b",
+              "nodeId": "B"
+            },
+            "length": {
+              "op": "multiply",
+              "args": [
+                {
+                  "op": "sqrt",
+                  "args": [
+                    {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "square",
+                          "args": [
+                            {
+                              "numerator": "0",
+                              "denominator": "1"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "square",
+                          "args": [
+                            {
+                              "numerator": "4",
+                              "denominator": "1"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "numerator": "1",
+                  "denominator": "1"
+                }
+              ]
+            },
+            "EA": {
+              "numerator": "2000000",
+              "denominator": "1"
+            },
+            "EI": {
+              "numerator": "20000",
+              "denominator": "1"
+            },
+            "cosine": {
+              "op": "divide",
+              "args": [
+                {
+                  "numerator": "0",
+                  "denominator": "1"
+                },
+                {
+                  "op": "sqrt",
+                  "args": [
+                    {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "square",
+                          "args": [
+                            {
+                              "numerator": "0",
+                              "denominator": "1"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "square",
+                          "args": [
+                            {
+                              "numerator": "4",
+                              "denominator": "1"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            "sine": {
+              "op": "divide",
+              "args": [
+                {
+                  "numerator": "4",
+                  "denominator": "1"
+                },
+                {
+                  "op": "sqrt",
+                  "args": [
+                    {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "square",
+                          "args": [
+                            {
+                              "numerator": "0",
+                              "denominator": "1"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "square",
+                          "args": [
+                            {
+                              "numerator": "4",
+                              "denominator": "1"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            "contributions": [],
+            "verticalEndpoints": [
+              {
+                "numerator": "0",
+                "denominator": "1"
+              },
+              {
+                "numerator": "0",
+                "denominator": "1"
+              }
+            ],
+            "localAxialEndpoints": [
+              {
+                "op": "multiply",
+                "args": [
+                  {
+                    "op": "divide",
+                    "args": [
+                      {
+                        "numerator": "4",
+                        "denominator": "1"
+                      },
+                      {
+                        "op": "sqrt",
+                        "args": [
+                          {
+                            "op": "add",
+                            "args": [
+                              {
+                                "op": "square",
+                                "args": [
+                                  {
+                                    "numerator": "0",
+                                    "denominator": "1"
+                                  }
+                                ]
+                              },
+                              {
+                                "op": "square",
+                                "args": [
+                                  {
+                                    "numerator": "4",
+                                    "denominator": "1"
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "numerator": "0",
+                    "denominator": "1"
+                  }
+                ]
+              },
+              {
+                "op": "multiply",
+                "args": [
+                  {
+                    "op": "divide",
+                    "args": [
+                      {
+                        "numerator": "4",
+                        "denominator": "1"
+                      },
+                      {
+                        "op": "sqrt",
+                        "args": [
+                          {
+                            "op": "add",
+                            "args": [
+                              {
+                                "op": "square",
+                                "args": [
+                                  {
+                                    "numerator": "0",
+                                    "denominator": "1"
+                                  }
+                                ]
+                              },
+                              {
+                                "op": "square",
+                                "args": [
+                                  {
+                                    "numerator": "4",
+                                    "denominator": "1"
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "numerator": "0",
+                    "denominator": "1"
+                  }
+                ]
+              }
+            ],
+            "localTransverseEndpoints": [
+              {
+                "op": "multiply",
+                "args": [
+                  {
+                    "op": "divide",
+                    "args": [
+                      {
+                        "numerator": "0",
+                        "denominator": "1"
+                      },
+                      {
+                        "op": "sqrt",
+                        "args": [
+                          {
+                            "op": "add",
+                            "args": [
+                              {
+                                "op": "square",
+                                "args": [
+                                  {
+                                    "numerator": "0",
+                                    "denominator": "1"
+                                  }
+                                ]
+                              },
+                              {
+                                "op": "square",
+                                "args": [
+                                  {
+                                    "numerator": "4",
+                                    "denominator": "1"
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "numerator": "0",
+                    "denominator": "1"
+                  }
+                ]
+              },
+              {
+                "op": "multiply",
+                "args": [
+                  {
+                    "op": "divide",
+                    "args": [
+                      {
+                        "numerator": "0",
+                        "denominator": "1"
+                      },
+                      {
+                        "op": "sqrt",
+                        "args": [
+                          {
+                            "op": "add",
+                            "args": [
+                              {
+                                "op": "square",
+                                "args": [
+                                  {
+                                    "numerator": "0",
+                                    "denominator": "1"
+                                  }
+                                ]
+                              },
+                              {
+                                "op": "square",
+                                "args": [
+                                  {
+                                    "numerator": "4",
+                                    "denominator": "1"
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "numerator": "0",
+                    "denominator": "1"
+                  }
+                ]
+              }
+            ],
+            "resultant": {
+              "op": "multiply",
+              "args": [
+                {
+                  "op": "sqrt",
+                  "args": [
+                    {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "square",
+                          "args": [
+                            {
+                              "numerator": "0",
+                              "denominator": "1"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "square",
+                          "args": [
+                            {
+                              "numerator": "4",
+                              "denominator": "1"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "numerator": "0",
+                  "denominator": "1"
+                }
+              ]
+            },
+            "firstMomentAboutOriginalStart": {
+              "op": "multiply",
+              "args": [
+                {
+                  "op": "square",
+                  "args": [
+                    {
+                      "op": "sqrt",
+                      "args": [
+                        {
+                          "op": "add",
+                          "args": [
+                            {
+                              "op": "square",
+                              "args": [
+                                {
+                                  "numerator": "0",
+                                  "denominator": "1"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "square",
+                              "args": [
+                                {
+                                  "numerator": "4",
+                                  "denominator": "1"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "numerator": "0",
+                  "denominator": "1"
+                }
+              ]
+            },
+            "globalMomentAboutOrigin": {
+              "op": "multiply",
+              "args": [
+                {
+                  "op": "sqrt",
+                  "args": [
+                    {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "square",
+                          "args": [
+                            {
+                              "numerator": "0",
+                              "denominator": "1"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "square",
+                          "args": [
+                            {
+                              "numerator": "4",
+                              "denominator": "1"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "numerator": "0",
+                  "denominator": "1"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "index": 1,
+        "id": "BC",
+        "startNodeId": "B",
+        "endNodeId": "C",
+        "geometry": {
+          "origin": {
+            "x": {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            "y": {
+              "numerator": "4",
+              "denominator": "1"
+            }
+          },
+          "dx": {
+            "numerator": "6",
+            "denominator": "1"
+          },
+          "dy": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "length": {
+            "op": "sqrt",
+            "args": [
+              {
+                "op": "add",
+                "args": [
+                  {
+                    "op": "square",
+                    "args": [
+                      {
+                        "numerator": "6",
+                        "denominator": "1"
+                      }
+                    ]
+                  },
+                  {
+                    "op": "square",
+                    "args": [
+                      {
+                        "numerator": "0",
+                        "denominator": "1"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "cosine": {
+            "op": "divide",
+            "args": [
+              {
+                "numerator": "6",
+                "denominator": "1"
+              },
+              {
+                "op": "sqrt",
+                "args": [
+                  {
+                    "op": "add",
+                    "args": [
+                      {
+                        "op": "square",
+                        "args": [
+                          {
+                            "numerator": "6",
+                            "denominator": "1"
+                          }
+                        ]
+                      },
+                      {
+                        "op": "square",
+                        "args": [
+                          {
+                            "numerator": "0",
+                            "denominator": "1"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "sine": {
+            "op": "divide",
+            "args": [
+              {
+                "numerator": "0",
+                "denominator": "1"
+              },
+              {
+                "op": "sqrt",
+                "args": [
+                  {
+                    "op": "add",
+                    "args": [
+                      {
+                        "op": "square",
+                        "args": [
+                          {
+                            "numerator": "6",
+                            "denominator": "1"
+                          }
+                        ]
+                      },
+                      {
+                        "op": "square",
+                        "args": [
+                          {
+                            "numerator": "0",
+                            "denominator": "1"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "status": "pending-exact-geometry"
+        },
+        "endLaws": [
+          {
+            "end": "a",
+            "nodeId": "B",
+            "requestedReference": null,
+            "effectiveReference": "AB",
+            "referenceReason": "first-incident",
+            "reason": "rigid-default",
+            "axial": {
+              "kind": "rigid"
+            },
+            "transverse": {
+              "kind": "rigid"
+            },
+            "rotation": {
+              "kind": "rigid"
+            }
+          },
+          {
+            "end": "b",
+            "nodeId": "C",
+            "requestedReference": null,
+            "effectiveReference": "BC",
+            "referenceReason": "first-incident",
+            "reason": "reference-rigid",
+            "axial": {
+              "kind": "rigid"
+            },
+            "transverse": {
+              "kind": "rigid"
+            },
+            "rotation": {
+              "kind": "rigid"
+            }
+          }
+        ],
+        "cuts": [
+          {
+            "index": 0,
+            "parameter": {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            "location": {
+              "kind": "endSide",
+              "memberIndex": 1,
+              "end": "a",
+              "nodeId": "B"
+            },
+            "sources": [
+              {
+                "kind": "member-end",
+                "index": 1,
+                "id": "BC",
+                "role": "a"
+              },
+              {
+                "kind": "distributed",
+                "index": 0,
+                "id": "q1",
+                "role": "start"
+              }
+            ],
+            "adjacentIntervals": [
+              null,
+              0
+            ],
+            "position": {
+              "x": {
+                "op": "add",
+                "args": [
+                  {
+                    "numerator": "0",
+                    "denominator": "1"
+                  },
+                  {
+                    "op": "multiply",
+                    "args": [
+                      {
+                        "numerator": "0",
+                        "denominator": "1"
+                      },
+                      {
+                        "numerator": "6",
+                        "denominator": "1"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "y": {
+                "op": "add",
+                "args": [
+                  {
+                    "numerator": "4",
+                    "denominator": "1"
+                  },
+                  {
+                    "op": "multiply",
+                    "args": [
+                      {
+                        "numerator": "0",
+                        "denominator": "1"
+                      },
+                      {
+                        "numerator": "0",
+                        "denominator": "1"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "index": 1,
+            "parameter": {
+              "numerator": "1",
+              "denominator": "1"
+            },
+            "location": {
+              "kind": "endSide",
+              "memberIndex": 1,
+              "end": "b",
+              "nodeId": "C"
+            },
+            "sources": [
+              {
+                "kind": "member-end",
+                "index": 1,
+                "id": "BC",
+                "role": "b"
+              },
+              {
+                "kind": "distributed",
+                "index": 0,
+                "id": "q1",
+                "role": "end"
+              }
+            ],
+            "adjacentIntervals": [
+              0,
+              null
+            ],
+            "position": {
+              "x": {
+                "op": "add",
+                "args": [
+                  {
+                    "numerator": "0",
+                    "denominator": "1"
+                  },
+                  {
+                    "op": "multiply",
+                    "args": [
+                      {
+                        "numerator": "1",
+                        "denominator": "1"
+                      },
+                      {
+                        "numerator": "6",
+                        "denominator": "1"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "y": {
+                "op": "add",
+                "args": [
+                  {
+                    "numerator": "4",
+                    "denominator": "1"
+                  },
+                  {
+                    "op": "multiply",
+                    "args": [
+                      {
+                        "numerator": "1",
+                        "denominator": "1"
+                      },
+                      {
+                        "numerator": "0",
+                        "denominator": "1"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "intervals": [
+          {
+            "index": 0,
+            "memberIndex": 1,
+            "memberId": "BC",
+            "leftCut": 0,
+            "rightCut": 1,
+            "from": {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            "to": {
+              "numerator": "1",
+              "denominator": "1"
+            },
+            "left": {
+              "kind": "endSide",
+              "memberIndex": 1,
+              "end": "a",
+              "nodeId": "B"
+            },
+            "right": {
+              "kind": "endSide",
+              "memberIndex": 1,
+              "end": "b",
+              "nodeId": "C"
+            },
+            "length": {
+              "op": "multiply",
+              "args": [
+                {
+                  "op": "sqrt",
+                  "args": [
+                    {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "square",
+                          "args": [
+                            {
+                              "numerator": "6",
+                              "denominator": "1"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "square",
+                          "args": [
+                            {
+                              "numerator": "0",
+                              "denominator": "1"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "numerator": "1",
+                  "denominator": "1"
+                }
+              ]
+            },
+            "EA": {
+              "numerator": "2000000",
+              "denominator": "1"
+            },
+            "EI": {
+              "numerator": "20000",
+              "denominator": "1"
+            },
+            "cosine": {
+              "op": "divide",
+              "args": [
+                {
+                  "numerator": "6",
+                  "denominator": "1"
+                },
+                {
+                  "op": "sqrt",
+                  "args": [
+                    {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "square",
+                          "args": [
+                            {
+                              "numerator": "6",
+                              "denominator": "1"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "square",
+                          "args": [
+                            {
+                              "numerator": "0",
+                              "denominator": "1"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            "sine": {
+              "op": "divide",
+              "args": [
+                {
+                  "numerator": "0",
+                  "denominator": "1"
+                },
+                {
+                  "op": "sqrt",
+                  "args": [
+                    {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "square",
+                          "args": [
+                            {
+                              "numerator": "6",
+                              "denominator": "1"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "square",
+                          "args": [
+                            {
+                              "numerator": "0",
+                              "denominator": "1"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            "contributions": [
+              {
+                "sourceIndex": 0,
+                "sourceId": "q1",
+                "sourceInterval": [
+                  {
+                    "numerator": "0",
+                    "denominator": "1"
+                  },
+                  {
+                    "numerator": "1",
+                    "denominator": "1"
+                  }
+                ],
+                "sourceEndpoints": [
+                  {
+                    "numerator": "-5",
+                    "denominator": "1"
+                  },
+                  {
+                    "numerator": "-5",
+                    "denominator": "1"
+                  }
+                ],
+                "restrictedEndpoints": [
+                  {
+                    "numerator": "-5",
+                    "denominator": "1"
+                  },
+                  {
+                    "numerator": "-5",
+                    "denominator": "1"
+                  }
+                ],
+                "sourceFields": {
+                  "t": {
+                    "numerator": "0",
+                    "denominator": "1"
+                  },
+                  "end": {
+                    "numerator": "1",
+                    "denominator": "1"
+                  },
+                  "fx": {
+                    "numerator": "0",
+                    "denominator": "1"
+                  },
+                  "fy": {
+                    "numerator": "-5",
+                    "denominator": "1"
+                  },
+                  "mz": {
+                    "numerator": "0",
+                    "denominator": "1"
+                  },
+                  "qEnd": {
+                    "numerator": "-5",
+                    "denominator": "1"
+                  }
+                }
+              }
+            ],
+            "verticalEndpoints": [
+              {
+                "numerator": "-5",
+                "denominator": "1"
+              },
+              {
+                "numerator": "-5",
+                "denominator": "1"
+              }
+            ],
+            "localAxialEndpoints": [
+              {
+                "op": "multiply",
+                "args": [
+                  {
+                    "op": "divide",
+                    "args": [
+                      {
+                        "numerator": "0",
+                        "denominator": "1"
+                      },
+                      {
+                        "op": "sqrt",
+                        "args": [
+                          {
+                            "op": "add",
+                            "args": [
+                              {
+                                "op": "square",
+                                "args": [
+                                  {
+                                    "numerator": "6",
+                                    "denominator": "1"
+                                  }
+                                ]
+                              },
+                              {
+                                "op": "square",
+                                "args": [
+                                  {
+                                    "numerator": "0",
+                                    "denominator": "1"
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "numerator": "-5",
+                    "denominator": "1"
+                  }
+                ]
+              },
+              {
+                "op": "multiply",
+                "args": [
+                  {
+                    "op": "divide",
+                    "args": [
+                      {
+                        "numerator": "0",
+                        "denominator": "1"
+                      },
+                      {
+                        "op": "sqrt",
+                        "args": [
+                          {
+                            "op": "add",
+                            "args": [
+                              {
+                                "op": "square",
+                                "args": [
+                                  {
+                                    "numerator": "6",
+                                    "denominator": "1"
+                                  }
+                                ]
+                              },
+                              {
+                                "op": "square",
+                                "args": [
+                                  {
+                                    "numerator": "0",
+                                    "denominator": "1"
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "numerator": "-5",
+                    "denominator": "1"
+                  }
+                ]
+              }
+            ],
+            "localTransverseEndpoints": [
+              {
+                "op": "multiply",
+                "args": [
+                  {
+                    "op": "divide",
+                    "args": [
+                      {
+                        "numerator": "6",
+                        "denominator": "1"
+                      },
+                      {
+                        "op": "sqrt",
+                        "args": [
+                          {
+                            "op": "add",
+                            "args": [
+                              {
+                                "op": "square",
+                                "args": [
+                                  {
+                                    "numerator": "6",
+                                    "denominator": "1"
+                                  }
+                                ]
+                              },
+                              {
+                                "op": "square",
+                                "args": [
+                                  {
+                                    "numerator": "0",
+                                    "denominator": "1"
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "numerator": "-5",
+                    "denominator": "1"
+                  }
+                ]
+              },
+              {
+                "op": "multiply",
+                "args": [
+                  {
+                    "op": "divide",
+                    "args": [
+                      {
+                        "numerator": "6",
+                        "denominator": "1"
+                      },
+                      {
+                        "op": "sqrt",
+                        "args": [
+                          {
+                            "op": "add",
+                            "args": [
+                              {
+                                "op": "square",
+                                "args": [
+                                  {
+                                    "numerator": "6",
+                                    "denominator": "1"
+                                  }
+                                ]
+                              },
+                              {
+                                "op": "square",
+                                "args": [
+                                  {
+                                    "numerator": "0",
+                                    "denominator": "1"
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "numerator": "-5",
+                    "denominator": "1"
+                  }
+                ]
+              }
+            ],
+            "resultant": {
+              "op": "multiply",
+              "args": [
+                {
+                  "op": "sqrt",
+                  "args": [
+                    {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "square",
+                          "args": [
+                            {
+                              "numerator": "6",
+                              "denominator": "1"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "square",
+                          "args": [
+                            {
+                              "numerator": "0",
+                              "denominator": "1"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "numerator": "-5",
+                  "denominator": "1"
+                }
+              ]
+            },
+            "firstMomentAboutOriginalStart": {
+              "op": "multiply",
+              "args": [
+                {
+                  "op": "square",
+                  "args": [
+                    {
+                      "op": "sqrt",
+                      "args": [
+                        {
+                          "op": "add",
+                          "args": [
+                            {
+                              "op": "square",
+                              "args": [
+                                {
+                                  "numerator": "6",
+                                  "denominator": "1"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "square",
+                              "args": [
+                                {
+                                  "numerator": "0",
+                                  "denominator": "1"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "numerator": "-5",
+                  "denominator": "2"
+                }
+              ]
+            },
+            "globalMomentAboutOrigin": {
+              "op": "multiply",
+              "args": [
+                {
+                  "op": "sqrt",
+                  "args": [
+                    {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "square",
+                          "args": [
+                            {
+                              "numerator": "6",
+                              "denominator": "1"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "square",
+                          "args": [
+                            {
+                              "numerator": "0",
+                              "denominator": "1"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "numerator": "-15",
+                  "denominator": "1"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "index": 2,
+        "id": "CD",
+        "startNodeId": "C",
+        "endNodeId": "D",
+        "geometry": {
+          "origin": {
+            "x": {
+              "numerator": "6",
+              "denominator": "1"
+            },
+            "y": {
+              "numerator": "4",
+              "denominator": "1"
+            }
+          },
+          "dx": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "dy": {
+            "numerator": "-4",
+            "denominator": "1"
+          },
+          "length": {
+            "op": "sqrt",
+            "args": [
+              {
+                "op": "add",
+                "args": [
+                  {
+                    "op": "square",
+                    "args": [
+                      {
+                        "numerator": "0",
+                        "denominator": "1"
+                      }
+                    ]
+                  },
+                  {
+                    "op": "square",
+                    "args": [
+                      {
+                        "numerator": "-4",
+                        "denominator": "1"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "cosine": {
+            "op": "divide",
+            "args": [
+              {
+                "numerator": "0",
+                "denominator": "1"
+              },
+              {
+                "op": "sqrt",
+                "args": [
+                  {
+                    "op": "add",
+                    "args": [
+                      {
+                        "op": "square",
+                        "args": [
+                          {
+                            "numerator": "0",
+                            "denominator": "1"
+                          }
+                        ]
+                      },
+                      {
+                        "op": "square",
+                        "args": [
+                          {
+                            "numerator": "-4",
+                            "denominator": "1"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "sine": {
+            "op": "divide",
+            "args": [
+              {
+                "numerator": "-4",
+                "denominator": "1"
+              },
+              {
+                "op": "sqrt",
+                "args": [
+                  {
+                    "op": "add",
+                    "args": [
+                      {
+                        "op": "square",
+                        "args": [
+                          {
+                            "numerator": "0",
+                            "denominator": "1"
+                          }
+                        ]
+                      },
+                      {
+                        "op": "square",
+                        "args": [
+                          {
+                            "numerator": "-4",
+                            "denominator": "1"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "status": "pending-exact-geometry"
+        },
+        "endLaws": [
+          {
+            "end": "a",
+            "nodeId": "C",
+            "requestedReference": null,
+            "effectiveReference": "BC",
+            "referenceReason": "first-incident",
+            "reason": "rigid-default",
+            "axial": {
+              "kind": "rigid"
+            },
+            "transverse": {
+              "kind": "rigid"
+            },
+            "rotation": {
+              "kind": "rigid"
+            }
+          },
+          {
+            "end": "b",
+            "nodeId": "D",
+            "requestedReference": null,
+            "effectiveReference": "CD",
+            "referenceReason": "first-incident",
+            "reason": "reference-rigid",
+            "axial": {
+              "kind": "rigid"
+            },
+            "transverse": {
+              "kind": "rigid"
+            },
+            "rotation": {
+              "kind": "rigid"
+            }
+          }
+        ],
+        "cuts": [
+          {
+            "index": 0,
+            "parameter": {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            "location": {
+              "kind": "endSide",
+              "memberIndex": 2,
+              "end": "a",
+              "nodeId": "C"
+            },
+            "sources": [
+              {
+                "kind": "member-end",
+                "index": 2,
+                "id": "CD",
+                "role": "a"
+              }
+            ],
+            "adjacentIntervals": [
+              null,
+              0
+            ],
+            "position": {
+              "x": {
+                "op": "add",
+                "args": [
+                  {
+                    "numerator": "6",
+                    "denominator": "1"
+                  },
+                  {
+                    "op": "multiply",
+                    "args": [
+                      {
+                        "numerator": "0",
+                        "denominator": "1"
+                      },
+                      {
+                        "numerator": "0",
+                        "denominator": "1"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "y": {
+                "op": "add",
+                "args": [
+                  {
+                    "numerator": "4",
+                    "denominator": "1"
+                  },
+                  {
+                    "op": "multiply",
+                    "args": [
+                      {
+                        "numerator": "0",
+                        "denominator": "1"
+                      },
+                      {
+                        "numerator": "-4",
+                        "denominator": "1"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "index": 1,
+            "parameter": {
+              "numerator": "1",
+              "denominator": "1"
+            },
+            "location": {
+              "kind": "endSide",
+              "memberIndex": 2,
+              "end": "b",
+              "nodeId": "D"
+            },
+            "sources": [
+              {
+                "kind": "member-end",
+                "index": 2,
+                "id": "CD",
+                "role": "b"
+              },
+              {
+                "kind": "support",
+                "index": 1,
+                "id": "S2",
+                "role": "location"
+              }
+            ],
+            "adjacentIntervals": [
+              0,
+              null
+            ],
+            "position": {
+              "x": {
+                "op": "add",
+                "args": [
+                  {
+                    "numerator": "6",
+                    "denominator": "1"
+                  },
+                  {
+                    "op": "multiply",
+                    "args": [
+                      {
+                        "numerator": "1",
+                        "denominator": "1"
+                      },
+                      {
+                        "numerator": "0",
+                        "denominator": "1"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "y": {
+                "op": "add",
+                "args": [
+                  {
+                    "numerator": "4",
+                    "denominator": "1"
+                  },
+                  {
+                    "op": "multiply",
+                    "args": [
+                      {
+                        "numerator": "1",
+                        "denominator": "1"
+                      },
+                      {
+                        "numerator": "-4",
+                        "denominator": "1"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "intervals": [
+          {
+            "index": 0,
+            "memberIndex": 2,
+            "memberId": "CD",
+            "leftCut": 0,
+            "rightCut": 1,
+            "from": {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            "to": {
+              "numerator": "1",
+              "denominator": "1"
+            },
+            "left": {
+              "kind": "endSide",
+              "memberIndex": 2,
+              "end": "a",
+              "nodeId": "C"
+            },
+            "right": {
+              "kind": "endSide",
+              "memberIndex": 2,
+              "end": "b",
+              "nodeId": "D"
+            },
+            "length": {
+              "op": "multiply",
+              "args": [
+                {
+                  "op": "sqrt",
+                  "args": [
+                    {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "square",
+                          "args": [
+                            {
+                              "numerator": "0",
+                              "denominator": "1"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "square",
+                          "args": [
+                            {
+                              "numerator": "-4",
+                              "denominator": "1"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "numerator": "1",
+                  "denominator": "1"
+                }
+              ]
+            },
+            "EA": {
+              "numerator": "2000000",
+              "denominator": "1"
+            },
+            "EI": {
+              "numerator": "20000",
+              "denominator": "1"
+            },
+            "cosine": {
+              "op": "divide",
+              "args": [
+                {
+                  "numerator": "0",
+                  "denominator": "1"
+                },
+                {
+                  "op": "sqrt",
+                  "args": [
+                    {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "square",
+                          "args": [
+                            {
+                              "numerator": "0",
+                              "denominator": "1"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "square",
+                          "args": [
+                            {
+                              "numerator": "-4",
+                              "denominator": "1"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            "sine": {
+              "op": "divide",
+              "args": [
+                {
+                  "numerator": "-4",
+                  "denominator": "1"
+                },
+                {
+                  "op": "sqrt",
+                  "args": [
+                    {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "square",
+                          "args": [
+                            {
+                              "numerator": "0",
+                              "denominator": "1"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "square",
+                          "args": [
+                            {
+                              "numerator": "-4",
+                              "denominator": "1"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            "contributions": [],
+            "verticalEndpoints": [
+              {
+                "numerator": "0",
+                "denominator": "1"
+              },
+              {
+                "numerator": "0",
+                "denominator": "1"
+              }
+            ],
+            "localAxialEndpoints": [
+              {
+                "op": "multiply",
+                "args": [
+                  {
+                    "op": "divide",
+                    "args": [
+                      {
+                        "numerator": "-4",
+                        "denominator": "1"
+                      },
+                      {
+                        "op": "sqrt",
+                        "args": [
+                          {
+                            "op": "add",
+                            "args": [
+                              {
+                                "op": "square",
+                                "args": [
+                                  {
+                                    "numerator": "0",
+                                    "denominator": "1"
+                                  }
+                                ]
+                              },
+                              {
+                                "op": "square",
+                                "args": [
+                                  {
+                                    "numerator": "-4",
+                                    "denominator": "1"
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "numerator": "0",
+                    "denominator": "1"
+                  }
+                ]
+              },
+              {
+                "op": "multiply",
+                "args": [
+                  {
+                    "op": "divide",
+                    "args": [
+                      {
+                        "numerator": "-4",
+                        "denominator": "1"
+                      },
+                      {
+                        "op": "sqrt",
+                        "args": [
+                          {
+                            "op": "add",
+                            "args": [
+                              {
+                                "op": "square",
+                                "args": [
+                                  {
+                                    "numerator": "0",
+                                    "denominator": "1"
+                                  }
+                                ]
+                              },
+                              {
+                                "op": "square",
+                                "args": [
+                                  {
+                                    "numerator": "-4",
+                                    "denominator": "1"
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "numerator": "0",
+                    "denominator": "1"
+                  }
+                ]
+              }
+            ],
+            "localTransverseEndpoints": [
+              {
+                "op": "multiply",
+                "args": [
+                  {
+                    "op": "divide",
+                    "args": [
+                      {
+                        "numerator": "0",
+                        "denominator": "1"
+                      },
+                      {
+                        "op": "sqrt",
+                        "args": [
+                          {
+                            "op": "add",
+                            "args": [
+                              {
+                                "op": "square",
+                                "args": [
+                                  {
+                                    "numerator": "0",
+                                    "denominator": "1"
+                                  }
+                                ]
+                              },
+                              {
+                                "op": "square",
+                                "args": [
+                                  {
+                                    "numerator": "-4",
+                                    "denominator": "1"
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "numerator": "0",
+                    "denominator": "1"
+                  }
+                ]
+              },
+              {
+                "op": "multiply",
+                "args": [
+                  {
+                    "op": "divide",
+                    "args": [
+                      {
+                        "numerator": "0",
+                        "denominator": "1"
+                      },
+                      {
+                        "op": "sqrt",
+                        "args": [
+                          {
+                            "op": "add",
+                            "args": [
+                              {
+                                "op": "square",
+                                "args": [
+                                  {
+                                    "numerator": "0",
+                                    "denominator": "1"
+                                  }
+                                ]
+                              },
+                              {
+                                "op": "square",
+                                "args": [
+                                  {
+                                    "numerator": "-4",
+                                    "denominator": "1"
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "numerator": "0",
+                    "denominator": "1"
+                  }
+                ]
+              }
+            ],
+            "resultant": {
+              "op": "multiply",
+              "args": [
+                {
+                  "op": "sqrt",
+                  "args": [
+                    {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "square",
+                          "args": [
+                            {
+                              "numerator": "0",
+                              "denominator": "1"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "square",
+                          "args": [
+                            {
+                              "numerator": "-4",
+                              "denominator": "1"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "numerator": "0",
+                  "denominator": "1"
+                }
+              ]
+            },
+            "firstMomentAboutOriginalStart": {
+              "op": "multiply",
+              "args": [
+                {
+                  "op": "square",
+                  "args": [
+                    {
+                      "op": "sqrt",
+                      "args": [
+                        {
+                          "op": "add",
+                          "args": [
+                            {
+                              "op": "square",
+                              "args": [
+                                {
+                                  "numerator": "0",
+                                  "denominator": "1"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "square",
+                              "args": [
+                                {
+                                  "numerator": "-4",
+                                  "denominator": "1"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "numerator": "0",
+                  "denominator": "1"
+                }
+              ]
+            },
+            "globalMomentAboutOrigin": {
+              "op": "multiply",
+              "args": [
+                {
+                  "op": "sqrt",
+                  "args": [
+                    {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "square",
+                          "args": [
+                            {
+                              "numerator": "0",
+                              "denominator": "1"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "square",
+                          "args": [
+                            {
+                              "numerator": "-4",
+                              "denominator": "1"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "numerator": "0",
+                  "denominator": "1"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "formalInstance": {
+    "status": "emitted-not-checked-by-this-script",
+    "intendedChecks": [
+      "finite structural witness",
+      "endpoint geometry correspondence",
+      "exact input contract",
+      "fixed support rows and rigid end laws",
+      "distributed-load restriction and resultant",
+      "consistent load virtual work",
+      "local recovery for arbitrary encoded end movements",
+      "conditional equilibrium/reaction interface",
+      "standard axiom audit"
+    ],
+    "globalSolutionCertificate": "not-constructed",
+    "browserStatus": "pending-not-formally-verified"
+  },
+  "numerical": {
+    "status": "numerical-only-not-a-formal-solution-certificate",
+    "engineStatus": "stable",
+    "units": "m, kN, kN m, radians; global y upward, rotation counterclockwise",
+    "engineResidual": 3.1382304162737757e-15,
+    "degree": 3,
+    "reactions": [
+      {
+        "x": 0,
+        "y": 0,
+        "fx": 4.208393406850328,
+        "fy": 15,
+        "mz": -5.595409733858081,
+        "supports": [
+          "S1"
+        ]
+      },
+      {
+        "x": 6,
+        "y": 0,
+        "fx": -4.20839340685033,
+        "fy": 15,
+        "mz": 5.5954097338580855,
+        "supports": [
+          "S2"
+        ]
+      }
+    ],
+    "memberEndpoints": [
+      {
+        "member": "AB",
+        "start": {
+          "x": 0,
+          "y": 0,
+          "t": 0,
+          "N": -15,
+          "V": -4.208393406850328,
+          "M": 5.595409733858081,
+          "ux": 0,
+          "uy": 0,
+          "rotation": 0
+        },
+        "end": {
+          "x": 0,
+          "y": 4,
+          "t": 1,
+          "N": -15,
+          "V": -4.208393406850328,
+          "M": -11.23816389354323,
+          "ux": 0.000006312590110275806,
+          "uy": -0.00003,
+          "rotation": -0.0005642754159685149
+        }
+      },
+      {
+        "member": "BC",
+        "start": {
+          "x": 0,
+          "y": 4,
+          "t": 0,
+          "N": -4.208393406850283,
+          "V": 15,
+          "M": -11.238163893543236,
+          "ux": 0.000006312590110275616,
+          "uy": -0.00003,
+          "rotation": -0.0005642754159685148
+        },
+        "end": {
+          "x": 6,
+          "y": 4,
+          "t": 1,
+          "N": -4.208393406850283,
+          "V": -15,
+          "M": -11.23816389354323,
+          "ux": -0.0000063125901102752334,
+          "uy": -0.000030000000000001813,
+          "rotation": 0.0005642754159685146
+        }
+      },
+      {
+        "member": "CD",
+        "start": {
+          "x": 6,
+          "y": 4,
+          "t": 0,
+          "N": -15,
+          "V": 4.20839340685033,
+          "M": -11.238163893543234,
+          "ux": -0.000006312590110275234,
+          "uy": -0.00003,
+          "rotation": 0.000564275415968515
+        },
+        "end": {
+          "x": 6,
+          "y": 0,
+          "t": 1,
+          "N": -15,
+          "V": 4.20839340685033,
+          "M": 5.595409733858087,
+          "ux": 4.336808689942018e-19,
+          "uy": 0,
+          "rotation": 3.2526065174565133e-19
+        }
+      }
+    ],
+    "beamMidpoint": {
+      "x": 3,
+      "y": 4,
+      "t": 0.5,
+      "N": -4.208393406850283,
+      "V": 0,
+      "M": 11.261836106456762,
+      "ux": 1.9142944607947188e-19,
+      "uy": -0.0017201631239527723,
+      "rotation": -1.0842021724855044e-19
+    },
+    "globalBalanceResiduals": {
+      "fx": -2.6645352591003757e-15,
+      "fy": 0,
+      "momentAboutA": 0
+    },
+    "jointContinuityResiduals": [
+      {
+        "node": "B",
+        "ux": 1.8973538018496328e-19,
+        "uy": 0,
+        "rotation": -1.0842021724855044e-19
+      },
+      {
+        "node": "C",
+        "ux": 8.470329472543003e-22,
+        "uy": -1.8126505071242027e-18,
+        "rotation": -4.336808689942018e-19
+      }
+    ],
+    "checks": "balance < 1e-7; continuity and fixed-base motions < 1e-10"
+  },
+  "unresolved": [
+    "General parser, binary64 decoder, hashing and emitter correctness.",
+    "General cut builder and finite encoding/source-provenance correctness; this is one explicit instance.",
+    "A portal displacement vector bound to the exact Coordinate model, admissibility and equilibrium proof.",
+    "Exact support-reaction and requested-section certificates for that vector; numerical engine equivalence and error bounds."
+  ]
+}

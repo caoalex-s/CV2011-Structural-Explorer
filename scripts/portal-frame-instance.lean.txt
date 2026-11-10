@@ -1,0 +1,192 @@
+-- Shipped example('frame'); exact adapter SHA-256: @@ARTIFACT_DIGEST@@
+-- Generated numeric expressions only. Source IDs are recorded in trace.json.
+import ExactGeometry
+open Polynomial MeasureTheory intervalIntegral FrameInterfaces FrameTransform
+open FrameAssemblyModel FrameAssembly ExactGeometry MemberCutAdapter
+noncomputable section
+namespace PortalFramePilot
+
+def nodePosition : Fin 4 → ExactGeometry.Point := @@NODES@@
+def drawingStart : Fin 3 → Fin 4 := @@START_NODES@@
+def drawingEnd : Fin 3 → Fin 4 := @@END_NODES@@
+def cosine : Fin 3 → ℝ := @@COSINES@@
+def sine : Fin 3 → ℝ := @@SINES@@
+def lengths : Fin 3 → ℝ := @@LENGTHS@@
+def axialRigidity : Fin 3 → ℝ := @@EA@@
+def flexuralRigidity : Fin 3 → ℝ := @@EI@@
+def sourceEA : Fin 3 → ℝ := @@MEMBER_EA@@
+def sourceEI : Fin 3 → ℝ := @@MEMBER_EI@@
+def verticalStart : Fin 3 → ℝ := @@Q_START@@
+def verticalEnd : Fin 3 → ℝ := @@Q_END@@
+def segmentStart : Fin 3 → ExactGeometry.Point := @@SEGMENT_STARTS@@
+def segmentEnd : Fin 3 → ExactGeometry.Point := @@SEGMENT_ENDS@@
+
+-- No interior slot is invented for the midpoint query. There is one segment
+-- per original member, including the original downward direction of CD.
+def model : Model 4 3 0 3 where
+  joints := fun _ => ⟨.rigid, 1, none⟩
+  member := fun m => ⟨drawingStart m, drawingEnd m, ⟨cosine m, sine m⟩, none, none⟩
+  segmentMember := id
+  segmentLeft := @@LEFT_LOCATIONS@@
+  segmentRight := @@RIGHT_LOCATIONS@@
+  segmentLength := lengths
+  segmentEA := axialRigidity
+  segmentEI := flexuralRigidity
+  segmentVerticalStart := verticalStart
+  segmentVerticalEnd := verticalEnd
+
+def cutParameter : Fin 3 → Fin 0 → ℝ := fun _ => Fin.elim0
+def actions : Fin 0 → PointAction 3 0 := Fin.elim0
+def supports : Fin 2 → SupportInput 3 0 := @@SUPPORTS@@
+def supportAngles : Fin 2 → ℝ := @@ANGLES@@
+
+theorem structuralWitness : StructuralPremises model actions supports cutParameter := by
+  constructor
+  · intro segment
+    fin_cases segment <;> simp [segmentOwnershipValid, locationBelongs, model]
+  · intro segment
+    fin_cases segment <;> norm_num [model, locationParameter]
+  · intro member t ht0 ht1
+    refine ⟨member, ?_⟩
+    fin_cases member <;> simpa [model, locationParameter] using And.intro ht0 ht1
+  · intro a b hne hmember
+    exact False.elim (hne hmember)
+  · intro member left right hl hr _ _ hp
+    cases left with
+    | interior owner cut => exact Fin.elim0 cut
+    | endSide lhs =>
+      cases right with
+      | interior owner cut => exact Fin.elim0 cut
+      | endSide rhs =>
+        rcases lhs with ⟨lm, le⟩
+        rcases rhs with ⟨rm, re⟩
+        cases le <;> cases re <;> simp_all [locationBelongs, locationParameter]
+  · intro member
+    fin_cases member
+    · exact ⟨⟨0, Or.inl rfl⟩, ⟨0, Or.inr rfl⟩⟩
+    · exact ⟨⟨1, Or.inl rfl⟩, ⟨1, Or.inr rfl⟩⟩
+    · exact ⟨⟨2, Or.inl rfl⟩, ⟨2, Or.inr rfl⟩⟩
+  · intro member cut
+    exact Fin.elim0 cut
+  · intro action
+    exact Fin.elim0 action
+  · intro support
+    fin_cases support
+    · exact ⟨0, Or.inl rfl⟩
+    · exact ⟨2, Or.inr rfl⟩
+
+theorem geometryWitness : GeometryCorrespondence model nodePosition drawingStart drawingEnd
+    cutParameter sourceEA sourceEI segmentStart segmentEnd := by
+  constructor
+  · intro m; exact ⟨rfl, rfl⟩
+  · intro m
+    fin_cases m <;> norm_num [model, nodePosition, drawingStart, drawingEnd, cosine, sine,
+      direction, distance, dx, dy]
+  · intro s
+    fin_cases s <;> norm_num [model, segmentStart, nodePosition, drawingStart, drawingEnd,
+      locationParameter, position, dx, dy]
+  · intro s
+    fin_cases s <;> norm_num [model, segmentEnd, nodePosition, drawingStart, drawingEnd,
+      locationParameter, position, dx, dy]
+  · intro s
+    fin_cases s <;> norm_num [model, lengths, segmentStart, segmentEnd, distance, dx, dy]
+  · intro s
+    fin_cases s <;> norm_num [model, axialRigidity, flexuralRigidity, sourceEA, sourceEI]
+
+theorem supportAxesWitness : SupportAxisCorrespondence supports supportAngles := by
+  intro s hs
+  fin_cases s <;> simp [supports] at hs
+
+theorem springInputsWitness : SpringInputPositive model := by
+  constructor
+  · intro side connection direction stiffness choice _
+    cases side with
+    | mk member ending => cases ending <;> simp [model] at choice
+  · intro node h
+    simp [model] at h
+
+theorem portalContract : ExactContract model actions supports cutParameter
+    (memberDistance nodePosition drawingStart drawingEnd) sourceEA sourceEI := by
+  exact (compose_exact_contract model actions supports cutParameter nodePosition drawingStart drawingEnd
+    sourceEA sourceEI segmentStart segmentEnd supportAngles structuralWitness geometryWitness
+    (by
+      intro m h
+      have hx := congrArg Prod.fst h
+      have hy := congrArg Prod.snd h
+      fin_cases m <;> norm_num [nodePosition, drawingStart, drawingEnd] at hx hy)
+    (by intro m; fin_cases m <;> norm_num [sourceEA])
+    (by intro m; fin_cases m <;> norm_num [sourceEI])
+    supportAxesWitness springInputsWitness).1
+
+theorem positivePortalSegments : positiveSegments model :=
+  contract_positive_segments model actions supports cutParameter
+    (memberDistance nodePosition drawingStart drawingEnd) sourceEA sourceEI portalContract
+
+-- Actual fixed rows and reference/default laws, including both sides at B/C.
+theorem fixedSupportRows (s : Fin 2) : supportDirections (supports s) =
+    [![1, 0, 0], ![0, 1, 0], ![0, 0, 1]] := by
+  fin_cases s <;> rfl
+
+theorem referenceOrder : referenceMember model 0 = some 0 ∧ referenceMember model 1 = some 0 ∧
+    referenceMember model 2 = some 1 ∧ referenceMember model 3 = some 2 := by
+  exact ⟨rfl, rfl, rfl, rfl⟩
+
+theorem rigidEndLaws (m : Fin 3) (ending : Bool) :
+    endConnection model (m, ending) = FrameAssemblyModel.rigidConnection := by
+  fin_cases m <;> cases ending <;> rfl
+
+-- Source restriction stays distributed; no replacement by a point resultant.
+def sourceA : ℝ := @@SOURCE_A@@
+def sourceB : ℝ := @@SOURCE_B@@
+def sourceStart : ℝ := @@SOURCE_Q_START@@
+def sourceEnd : ℝ := @@SOURCE_Q_END@@
+def emittedResultant : ℝ := @@RESULTANT@@
+def emittedGlobalMoment : ℝ := @@GLOBAL_MOMENT@@
+
+theorem portalLoadRestriction (t : ℝ) :
+    intervalAffine (model.segmentVerticalStart 1) (model.segmentVerticalEnd 1) t =
+      affine sourceA sourceB sourceStart sourceEnd t := by
+  norm_num [model, verticalStart, verticalEnd, intervalAffine, affine, sourceA, sourceB, sourceStart, sourceEnd]
+
+theorem portalLoadTotals : emittedResultant = -30 ∧ emittedGlobalMoment = -90 := by
+  norm_num [emittedResultant, emittedGlobalMoment]
+
+theorem portalLocalLoads :
+    (∀ s : Fin 3, sine s * verticalStart s = 0 ∧ sine s * verticalEnd s = 0) ∧
+    (∀ s : Fin 3, cosine s * verticalStart s = verticalStart s ∧
+      cosine s * verticalEnd s = verticalEnd s) := by
+  constructor <;> intro s <;> fin_cases s <;> norm_num [sine, cosine, verticalStart, verticalEnd]
+
+theorem portalConsistentWork (d : LocalDofs) :
+    lengths 1 * (∫ z in (0:ℝ)..1,
+      (FrameVirtualWork.loadDensity d (lengths 1) (sine 1 * verticalStart 1)
+        (sine 1 * verticalEnd 1) (cosine 1 * verticalStart 1) (cosine 1 * verticalEnd 1)).eval z) =
+    ∑ i : Fin 6, LocalFrameFields.consistentLoad (lengths 1) (sine 1 * verticalStart 1)
+      (sine 1 * verticalEnd 1) (cosine 1 * verticalStart 1) (cosine 1 * verticalEnd 1) i * d i :=
+  local_vertical_consistent_work d (lengths 1) (cosine 1) (sine 1) (verticalStart 1) (verticalEnd 1)
+
+-- Local recovery is checked for any supplied model coordinate vector. This
+-- statement does not assert that the browser vector satisfies equilibrium.
+theorem portalLocalRecovery (q : Coordinate model → ℝ) (s : Fin 3) :
+    Nonempty (LocalFrameFields.SegmentSolution (segmentDofs model q s)
+      (model.segmentLength s) (model.segmentEA s) (model.segmentEI s)
+      ((model.member (model.segmentMember s)).orientation.sine * model.segmentVerticalStart s)
+      ((model.member (model.segmentMember s)).orientation.sine * model.segmentVerticalEnd s)
+      ((model.member (model.segmentMember s)).orientation.cosine * model.segmentVerticalStart s)
+      ((model.member (model.segmentMember s)).orientation.cosine * model.segmentVerticalEnd s)) :=
+  recovered_segment_exists model q s positivePortalSegments
+
+theorem portalConditionalReaction (q : Coordinate model → ℝ) :
+    equilibrium model actions supports q ↔ admissible model supports q ∧
+      ∃ reaction : Module.Dual ℝ (ConstraintIndex supports → ℝ),
+        ∀ variation, residualFunctional model actions q variation =
+          reaction (constraintMap model supports variation) :=
+  contract_equilibrium_reaction model actions supports cutParameter
+    (memberDistance nodePosition drawingStart drawingEnd) sourceEA sourceEI portalContract q
+
+-- Kernel-checked rejection: a normalized axis is still wrong for downward CD.
+theorem rejectUpwardCD : (model.member 2).orientation.sine ≠ 1 := by
+  change sine (⟨2, by decide⟩ : Fin 3) ≠ 1
+  norm_num [sine]
+
+end PortalFramePilot

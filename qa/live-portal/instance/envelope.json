@@ -1,0 +1,110 @@
+{
+  "schema": "cv2011-local-evidence",
+  "version": 1,
+  "numericSemantics": "parsed-finite-binary64-as-exact-binary-rational; signed-zero-normalized",
+  "status": "pending-not-formally-verified",
+  "model": {
+    "nodes": [
+      {
+        "id": "A",
+        "x": 0,
+        "y": 0,
+        "joint": "rigid"
+      },
+      {
+        "id": "B",
+        "x": 0,
+        "y": 4,
+        "joint": "rigid"
+      },
+      {
+        "id": "C",
+        "x": 6,
+        "y": 4,
+        "joint": "rigid"
+      },
+      {
+        "id": "D",
+        "x": 6,
+        "y": 0,
+        "joint": "rigid"
+      }
+    ],
+    "members": [
+      {
+        "id": "AB",
+        "a": "A",
+        "b": "B",
+        "EA": 2000000,
+        "EI": 20000
+      },
+      {
+        "id": "BC",
+        "a": "B",
+        "b": "C",
+        "EA": 2000000,
+        "EI": 20000
+      },
+      {
+        "id": "CD",
+        "a": "C",
+        "b": "D",
+        "EA": 2000000,
+        "EI": 20000
+      }
+    ],
+    "supports": [
+      {
+        "id": "S1",
+        "member": "AB",
+        "t": 0,
+        "kind": "fixed",
+        "angle": 90,
+        "fixX": false,
+        "fixY": false,
+        "fixRotation": false
+      },
+      {
+        "id": "S2",
+        "member": "CD",
+        "t": 1,
+        "kind": "fixed",
+        "angle": 90,
+        "fixX": false,
+        "fixY": false,
+        "fixRotation": false
+      }
+    ],
+    "loads": [
+      {
+        "id": "q1",
+        "member": "BC",
+        "kind": "distributed",
+        "t": 0,
+        "end": 1,
+        "fx": 0,
+        "fy": -5,
+        "mz": 0,
+        "qEnd": -5
+      }
+    ]
+  },
+  "query": {
+    "member": "BC",
+    "parameter": 0.5,
+    "cutSide": "left",
+    "quantity": "M",
+    "units": "kN m",
+    "signConvention": "sagging positive"
+  },
+  "bindings": {
+    "rawSource": "7bf62f84822db6993cc1a9608d18242381bd71def295148604f1b06be5e4967b",
+    "mechanical": "b83cb345ff6090eca76c1f467335ef719380a8b484c0c3a8190b28058a7ce02f",
+    "display": "046ebd2125984b6a95af2657c7837c4585b5ae389e759d78e05cd286edc73de0",
+    "query": "aa78b75a4ea4ce7eb247c7158d92793f468a2206c2b1d300364e94791383bb71",
+    "exactAdapter": null,
+    "theoremBundle": null,
+    "checker": null,
+    "result": null
+  }
+}
