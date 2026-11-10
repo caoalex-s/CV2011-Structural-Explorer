@@ -8,6 +8,25 @@ open scoped BigOperators
 namespace PortalSoundness
 noncomputable section
 
+-- Normalize finite numerals explicitly, as in the accepted portal incidence fixture.
+@[local simp] theorem index3_2 : (2 : Fin 3) = ⟨2, by decide⟩ := rfl
+@[local simp] theorem index4_2 : (2 : Fin 4) = ⟨2, by decide⟩ := rfl
+@[local simp] theorem index4_3 : (3 : Fin 4) = ⟨3, by decide⟩ := rfl
+@[local simp] theorem index6_2 : (2 : Fin 6) = ⟨2, by decide⟩ := rfl
+@[local simp] theorem index6_3 : (3 : Fin 6) = ⟨3, by decide⟩ := rfl
+@[local simp] theorem index6_4 : (4 : Fin 6) = ⟨4, by decide⟩ := rfl
+@[local simp] theorem index6_5 : (5 : Fin 6) = ⟨5, by decide⟩ := rfl
+@[local simp] theorem index12_2 : (2 : Fin 12) = ⟨2, by decide⟩ := rfl
+@[local simp] theorem index12_3 : (3 : Fin 12) = ⟨3, by decide⟩ := rfl
+@[local simp] theorem index12_4 : (4 : Fin 12) = ⟨4, by decide⟩ := rfl
+@[local simp] theorem index12_5 : (5 : Fin 12) = ⟨5, by decide⟩ := rfl
+@[local simp] theorem index12_6 : (6 : Fin 12) = ⟨6, by decide⟩ := rfl
+@[local simp] theorem index12_7 : (7 : Fin 12) = ⟨7, by decide⟩ := rfl
+@[local simp] theorem index12_8 : (8 : Fin 12) = ⟨8, by decide⟩ := rfl
+@[local simp] theorem index12_9 : (9 : Fin 12) = ⟨9, by decide⟩ := rfl
+@[local simp] theorem index12_10 : (10 : Fin 12) = ⟨10, by decide⟩ := rfl
+@[local simp] theorem index12_11 : (11 : Fin 12) = ⟨11, by decide⟩ := rfl
+
 /-- Exactly the accepted portal, changing only the uniform BC intensity. -/
 def model (a : ℝ) : Model 4 3 0 3 :=
   { PortalFramePilot.model with
@@ -208,6 +227,7 @@ theorem residual_equilibrium (a : ℝ) (u : Fin 12 → ℝ)
   change residual a u 7 = 0 at h4
   change residual a u 8 = 0 at h5
   simp [lift, Fin.sum_univ_succ, Fin.instOfNat, Fin.ofNat', Fin.succ] at *
+  simp_all
 
 theorem accepted_equilibrium (a : Rat) (q : PortalChecker.Motion)
     (r : PortalChecker.Reactions) (m u : Rat) (h : PortalChecker.accepts a q r m u = true) :
@@ -232,6 +252,151 @@ theorem actual_midpoint (a : ℝ) (u : Fin 12 → ℝ) :
     norm_num [elementMotion, LocalFrameFields.moment, LocalFrameFields.rotation,
       LocalFrameFields.transverseDisplacement, LocalFrameFields.coordinate,
       Polynomial.derivative_mul, Polynomial.derivative_pow, Fin.instOfNat, Fin.ofNat', Fin.succ] <;> ring
+
+/-- The accepted positive contract is unchanged by the sole load parameter. -/
+theorem physical_contract (a : ℝ) :
+    ExactContract (model a) actions supports PortalFramePilot.cutParameter
+      (ExactGeometry.memberDistance PortalFramePilot.nodePosition PortalFramePilot.drawingStart PortalFramePilot.drawingEnd)
+      PortalFramePilot.sourceEA PortalFramePilot.sourceEI := by
+  have h := PortalFramePilot.portalContract
+  exact ⟨h.ownership, h.ordered, h.coverage, h.disjointInteriors, h.canonicalLocations,
+    h.memberEnds, h.interiorCuts, h.actionLocations, h.supportLocations,
+    h.orientationNormalized, h.supportNormalized, h.positiveMember, h.segmentLengthMatches,
+    h.segmentPropertiesMatch, h.positiveSpring⟩
+
+theorem positive_segments (a : ℝ) : positiveSegments (model a) :=
+  contract_positive_segments _ _ _ _ _ _ _ (physical_contract a)
+
+/-- No hidden slip or base motion remains in the actual admissible kernel.
+    This uses the physical deformation map, not a floating determinant. -/
+theorem no_mechanism (a : ℝ) (q : Coordinate (model a) → ℝ)
+    (hadmissible : admissible (model a) supports q)
+    (hzero : FrameDeformation.deformationMap (model a) q = 0) : q = 0 := by
+  obtain ⟨z, rfl⟩ := (lift_image a q).mp hadmissible
+  have h (s : Fin 3) (d : Fin 3) := congrFun hzero (Sum.inl (s, d))
+  have h00 := h 0 0
+  have h01 := h 0 1
+  have h02 := h 0 2
+  have h20 := h 2 0
+  have h21 := h 2 1
+  have h22 := h 2 2
+  simp only [FrameDeformation.deformationMap, FrameDeformation.segmentDeformation,
+    actual_element_motion] at h00 h01 h02 h20 h21 h22
+  norm_num [FrameDeformation.memberDeformation, FrameEnergy.relativeRotationLeft,
+    FrameEnergy.relativeRotationRight, elementMotion, lift, model, PortalFramePilot.model,
+    PortalFramePilot.lengths, Fin.instOfNat, Fin.ofNat', Fin.succ] at h00 h01 h02 h20 h21 h22
+  have hz : z = 0 := by
+    funext i
+    fin_cases i <;> simp [Fin.instOfNat, Fin.ofNat'] at * <;> linarith
+  rw [hz]
+  have hlift : lift (0 : Fin 6 → ℝ) = 0 := by
+    funext i
+    fin_cases i <;> rfl
+  rw [hlift]
+  exact coordinates_total a (0 : Coordinate (model a) → ℝ)
+
+theorem unique_equilibrium (a : ℝ) (q v : Coordinate (model a) → ℝ)
+    (hq : equilibrium (model a) actions supports q)
+    (hv : equilibrium (model a) actions supports v) : q = v :=
+  FrameDeformation.equilibrium_unique_if_no_mechanism _ _ _ _ _ _ _
+    (physical_contract a) (no_mechanism a) q v hq hv
+
+theorem accepted_midpoint (a : Rat) (q : PortalChecker.Motion) (r : PortalChecker.Reactions)
+    (m u : Rat) (h : PortalChecker.accepts a q r m u = true) :
+    (m : ℝ) = (LocalFrameFields.moment
+      (segmentDofs (model a) (motion a (fun i => (q i : ℝ))) 1) 6 20000 a a).eval 3 ∧
+    (u : ℝ) = (LocalFrameFields.transverseDisplacement
+      (segmentDofs (model a) (motion a (fun i => (q i : ℝ))) 1) 6 20000 a a).eval 3 := by
+  have valid := acceptance_predicate a q r m u h
+  have fields := actual_midpoint (a : ℝ) (fun i => (q i : ℝ))
+  rw [fields.1, fields.2]
+  constructor
+  · rw [valid.2.2.2.1]
+    simp [PortalChecker.midpointMoment]
+  · rw [valid.2.2.2.2]
+    simp [PortalChecker.midpointDisplacement]
+
+theorem accepted_reactions (a : Rat) (q : PortalChecker.Motion) (r : PortalChecker.Reactions)
+    (m u : Rat) (h : PortalChecker.accepts a q r m u = true) (i : Fin 6) :
+    (r i : ℝ) = residual a (fun j => (q j : ℝ)) (PortalChecker.baseIndex i) := by
+  rw [← rational_residual_cast, (acceptance_predicate a q r m u h).2.2.1 i]
+
+/-- One acceptance statement combines actual equilibrium, uniqueness and loaded
+    field values. The grouped support interpretation is proved separately below. -/
+theorem acceptance_actual_portal (a : Rat) (q : PortalChecker.Motion)
+    (r : PortalChecker.Reactions) (m u : Rat) (h : PortalChecker.accepts a q r m u = true) :
+    equilibrium (model a) actions supports (motion a (fun i => (q i : ℝ))) ∧
+    (∀ v, equilibrium (model a) actions supports v → v = motion a (fun i => (q i : ℝ))) ∧
+    (∀ i, (r i : ℝ) = residual a (fun j => (q j : ℝ)) (PortalChecker.baseIndex i)) ∧
+    (m : ℝ) = (LocalFrameFields.moment
+      (segmentDofs (model a) (motion a (fun i => (q i : ℝ))) 1) 6 20000 a a).eval 3 ∧
+    (u : ℝ) = (LocalFrameFields.transverseDisplacement
+      (segmentDofs (model a) (motion a (fun i => (q i : ℝ))) 1) 6 20000 a a).eval 3 := by
+  have heq := accepted_equilibrium a q r m u h
+  exact ⟨heq, fun v hv => unique_equilibrium _ _ _ hv heq,
+    accepted_reactions a q r m u h, accepted_midpoint a q r m u h⟩
+
+theorem coordinate_injective (a : ℝ) : Function.Injective (coordinate a) := by
+  intro i j h
+  have hv := congrArg (motion a (fun k => (k.val : ℝ))) h
+  simp only [motion_coordinate] at hv
+  apply Fin.ext
+  exact_mod_cast hv
+
+theorem motion_basis (a : ℝ) (i : Fin 12) :
+    motion a (fun j => if j = i then 1 else 0) = coordinateBasis (model a) (coordinate a i) := by
+  classical
+  rw [← coordinates_total a (coordinateBasis (model a) (coordinate a i))]
+  apply congrArg (motion a)
+  funext j
+  simp [coordinateBasis, (coordinate_injective a).eq_iff]
+
+theorem actual_stiffness_entry (a : ℝ) (i j : Fin 12) :
+    stiffnessEntry (model a) (coordinate a i) (coordinate a j) = K i j := by
+  classical
+  rw [stiffnessEntry, ← motion_basis, ← motion_basis, actual_stiffness_work]
+  simp
+
+theorem actual_force_entry (a : ℝ) (i : Fin 12) :
+    forceEntry (model a) actions (coordinate a i) = F a i := by
+  classical
+  rw [forceEntry, ← motion_basis, actual_force_work]
+  simp
+
+def baseHub (i : Fin 6) : Fin 4 := if i.val < 3 then 0 else 3
+def baseDirection (i : Fin 6) : Fin 3 := ⟨i.val % 3, by omega⟩
+
+theorem base_coordinate (a : ℝ) (i : Fin 6) :
+    coordinate a (PortalChecker.baseIndex i) = .inl (hub a (baseHub i), baseDirection i) := by
+  fin_cases i <;> rfl
+
+/-- These are grouped ground actions at the actual A/D hubs, including Kq−F.
+    The original AB-start/CD-end support ownership is retained by `supports`. -/
+theorem accepted_grouped_reactions (a : Rat) (q : PortalChecker.Motion)
+    (r : PortalChecker.Reactions) (m u : Rat) (h : PortalChecker.accepts a q r m u = true) :
+    ∃ coefficients : ConstraintIndex supports → ℝ,
+      residualFunctional (model a) actions (motion a (fun i => (q i : ℝ))) =
+        aggregateReaction (model a) supports coefficients ∧
+      ∀ i : Fin 6, groupedGroundAction (model a) supports coefficients
+        (hub a (baseHub i)) (baseDirection i) = (r i : ℝ) := by
+  classical
+  obtain ⟨_, coefficients, hcoefficients⟩ :=
+    (equilibrium_iff_reaction_coefficients (model a) actions supports _ (positive_segments a)).mp
+      (accepted_equilibrium a q r m u h)
+  refine ⟨coefficients, hcoefficients, ?_⟩
+  intro i
+  rw [groupedGroundAction, ← hcoefficients,
+    residual_functional_apply _ _ _ _ (positive_segments a), ← base_coordinate, ← motion_basis,
+    actual_residual_work]
+  simpa using (accepted_reactions a q r m u h i).symm
+
+#print axioms acceptance_actual_portal
+#print axioms accepted_grouped_reactions
+#print axioms actual_stiffness_entry
+#print axioms actual_force_entry
+#print axioms lift_image
+#print axioms no_mechanism
+#print axioms fixed_inverse
 
 end
 end PortalSoundness
