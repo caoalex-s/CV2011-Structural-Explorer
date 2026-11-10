@@ -91,6 +91,9 @@ theorem actual_element_motion (a : ℝ) (u : Fin 12 → ℝ) (s : Fin 3) :
       PortalFramePilot.drawingStart, PortalFramePilot.drawingEnd, PortalFramePilot.cosine,
       PortalFramePilot.sine, endNode, endMotion, toLocal6, elementMotion,
       reference_motion, zero_slip]
+  all_goals simp only [actual_side_motion, reference_motion]
+  all_goals norm_num [endNode, model, PortalFramePilot.model, PortalFramePilot.drawingStart,
+    PortalFramePilot.drawingEnd, Fin.instOfNat, Fin.ofNat', Fin.succ]
 
 def K (i j : Fin 12) : ℝ := (PortalChecker.stiffness i j : ℝ)
 def F (a : ℝ) (i : Fin 12) : ℝ := a * (PortalChecker.force i : ℝ)
@@ -107,7 +110,7 @@ theorem actual_stiffness_work (a : ℝ) (u v : Fin 12 → ℝ) :
     PortalFramePilot.axialRigidity, PortalFramePilot.flexuralRigidity,
     LocalFrameFields.stiffness, elementMotion, K, PortalChecker.stiffness,
     PortalChecker.stiffnessRows, Fin.sum_univ_succ, rigid, springStiffness,
-    directionLaw, rigidConnection]
+    directionLaw, rigidConnection, Fin.instOfNat, Fin.ofNat', Fin.succ]
   <;> ring
 
 set_option maxHeartbeats 2000000 in
@@ -133,7 +136,10 @@ theorem actual_admissibility (a : ℝ) (u : Fin 12 → ℝ) :
   norm_num [endNode, model, PortalFramePilot.model,
     PortalFramePilot.drawingStart, PortalFramePilot.drawingEnd, PortalFramePilot.cosine,
     PortalFramePilot.sine, PortalChecker.baseIndex, reference_motion, zero_slip,
-    FrameTransform.work]
+    FrameTransform.work, Fin.instOfNat, Fin.ofNat', Fin.succ]
+  simp only [actual_side_motion, reference_motion]
+  norm_num [endNode, model, PortalFramePilot.model, PortalFramePilot.drawingStart,
+    PortalFramePilot.drawingEnd, Fin.instOfNat, Fin.ofNat', Fin.succ]
 
 def lift (z : Fin 6 → ℝ) : Fin 12 → ℝ :=
   ![0, 0, 0, z 0, z 1, z 2, z 3, z 4, z 5, 0, 0, 0]
@@ -164,14 +170,15 @@ theorem acceptance_predicate (a : Rat) (q : PortalChecker.Motion)
     (r : PortalChecker.Reactions) (m u : Rat) (h : PortalChecker.accepts a q r m u = true) :
     PortalChecker.Valid a q r m u := of_decide_eq_true h
 
-/-- The fixed inverse is a kernel-checked witness, also valid at zero load. -/
 set_option maxHeartbeats 4000000 in
+/-- The fixed inverse is a kernel-checked witness, also valid at zero load. -/
 theorem fixed_inverse (i j : Fin 6) :
     (∑ k : Fin 6, (PortalChecker.inverse i k : ℝ) *
       K (PortalChecker.freeIndex k) (PortalChecker.freeIndex j)) = if i = j then 1 else 0 := by
   fin_cases i <;> fin_cases j <;>
     norm_num [PortalChecker.inverse, PortalChecker.inverseRows, PortalChecker.freeIndex,
-      K, PortalChecker.stiffness, PortalChecker.stiffnessRows, Fin.sum_univ_succ]
+      K, PortalChecker.stiffness, PortalChecker.stiffnessRows, Fin.sum_univ_succ,
+      Fin.instOfNat, Fin.ofNat', Fin.succ]
 
 theorem rational_residual_cast (a : Rat) (q : PortalChecker.Motion) (i : Fin 12) :
     (PortalChecker.residual a q i : ℝ) = residual a (fun j => (q j : ℝ)) i := by
@@ -194,8 +201,13 @@ theorem residual_equilibrium (a : ℝ) (u : Fin 12 → ℝ)
   have h3 := hfree 3
   have h4 := hfree 4
   have h5 := hfree 5
-  norm_num [PortalChecker.freeIndex] at h0 h1 h2 h3 h4 h5
-  simp [lift, Fin.sum_univ_succ, h0, h1, h2, h3, h4, h5]
+  change residual a u 3 = 0 at h0
+  change residual a u 4 = 0 at h1
+  change residual a u 5 = 0 at h2
+  change residual a u 6 = 0 at h3
+  change residual a u 7 = 0 at h4
+  change residual a u 8 = 0 at h5
+  simp [lift, Fin.sum_univ_succ, Fin.instOfNat, Fin.ofNat', Fin.succ] at *
 
 theorem accepted_equilibrium (a : Rat) (q : PortalChecker.Motion)
     (r : PortalChecker.Reactions) (m u : Rat) (h : PortalChecker.accepts a q r m u = true) :
@@ -208,8 +220,8 @@ theorem accepted_equilibrium (a : Rat) (q : PortalChecker.Motion)
     rw [← rational_residual_cast]
     exact_mod_cast hfree i
 
-/-- Both formulas include the nonzero uniform-load particular field. -/
 set_option maxHeartbeats 2000000 in
+/-- Both formulas include the nonzero uniform-load particular field. -/
 theorem actual_midpoint (a : ℝ) (u : Fin 12 → ℝ) :
     (LocalFrameFields.moment (segmentDofs (model a) (motion a u) 1) 6 20000 a a).eval 3 =
       (20000 / 6) * (u 8 - u 5) - (3 / 2) * a ∧
@@ -219,7 +231,7 @@ theorem actual_midpoint (a : ℝ) (u : Fin 12 → ℝ) :
   constructor <;>
     norm_num [elementMotion, LocalFrameFields.moment, LocalFrameFields.rotation,
       LocalFrameFields.transverseDisplacement, LocalFrameFields.coordinate,
-      Polynomial.derivative_mul, Polynomial.derivative_pow] <;> ring
+      Polynomial.derivative_mul, Polynomial.derivative_pow, Fin.instOfNat, Fin.ofNat', Fin.succ] <;> ring
 
 end
 end PortalSoundness
