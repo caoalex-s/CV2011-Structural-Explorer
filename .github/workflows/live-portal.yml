@@ -87,6 +87,8 @@ jobs:
           path: |
             .data/live-portal-build
             .data/wasm-build/canonical/browser-trace.zip
+            .data/wasm-build/canonical/portal-accepted.png
+            .data/wasm-build/canonical/browser-results.json
             public/portal-checker/bundle
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()

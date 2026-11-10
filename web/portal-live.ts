@@ -8,6 +8,11 @@ import type { CheckerResult } from './portal-runtime.js';
 export const isPortalWorkspace = location.pathname.replace(/index\.html$/, '').endsWith('/portal-checker/');
 export const portalStorageKey = 'cv2011-checked-portal-model/v1';
 const scope = new URL('./', location.href);
+const isolationScript = new URL('isolation-sw.js', scope).href;
+function ownsRegistration(registration: ServiceWorkerRegistration): boolean {
+    return registration.scope === scope.href &&
+        [registration.active, registration.waiting, registration.installing].some(worker => worker?.scriptURL === isolationScript);
+}
 
 export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad: (value: number) => void) {
     if (!isPortalWorkspace) return { update(_member: string, _parameter: number) {} };
@@ -104,8 +109,11 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
             localStorage.setItem(portalStorageKey, JSON.stringify(modelAtPresent()));
             const existing = await navigator.serviceWorker.getRegistrations();
             if (existing.some(registration => scope.href.startsWith(registration.scope) && registration.scope !== scope.href)) throw new Error('Another service worker controls this workspace.');
-            const registration = await navigator.serviceWorker.register(new URL('isolation-sw.js', scope), { scope: scope.href });
+            if (existing.some(registration => registration.scope === scope.href && !ownsRegistration(registration))) throw new Error('Another service worker owns this scope.');
+            const registration = await navigator.serviceWorker.register(isolationScript, { scope: scope.href });
             if (registration.scope !== scope.href) throw new Error('Unexpected checker scope');
+            // An activation error must still leave an exact-scope cleanup path.
+            deactivate.hidden = false;
             await navigator.serviceWorker.ready;
             if (!navigator.serviceWorker.controller) await new Promise<void>((resolve, reject) => {
                 const timer = setTimeout(() => reject(new Error('Activation timeout')), 10000);
@@ -118,12 +126,12 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
         stop(); clear('Disabling local checking…');
         localStorage.setItem(portalStorageKey, JSON.stringify(modelAtPresent()));
         for (const registration of await navigator.serviceWorker.getRegistrations()) {
-            if (registration.scope === scope.href) await registration.unregister();
+            if (ownsRegistration(registration)) await registration.unregister();
         }
         location.href = new URL('../', scope).href;
     };
     reset.onclick = () => void start();
-    if (navigator.serviceWorker.controller?.scriptURL === new URL('isolation-sw.js', scope).href) {
+    if (navigator.serviceWorker.controller?.scriptURL === isolationScript) {
         deactivate.hidden = false;
         if (crossOriginIsolated) void start();
     }

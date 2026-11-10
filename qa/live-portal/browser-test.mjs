@@ -73,14 +73,21 @@ try {
     await page.locator('a[href="portal-checker/"]').click();
     assert.equal(page.url(), url);
     assert.equal(await page.evaluate(() => crossOriginIsolated), false);
-    const original = await page.evaluate(() => JSON.parse(localStorage.getItem('cv2011-checked-portal-model/v1') ?? 'null'));
     await page.locator('#portal-amplitude').fill('-5');
     const model = await page.evaluate(() => JSON.parse(localStorage.getItem('cv2011-checked-portal-model/v1')));
+    await page.locator('#section-position').evaluate(element => { element.value = '400'; });
+    await page.locator('#section-position').dispatchEvent('input');
     await Promise.all([page.waitForNavigation(), page.locator('#portal-activate').click()]);
+    assert.equal(await page.locator('#section-position').inputValue(), '400');
+    await page.waitForFunction(() => document.getElementById('portal-status').textContent.includes('Unsupported query'));
+    assert.equal(await page.locator('#portal-certificate').textContent(), '');
+    await page.locator('#section-position').evaluate(element => { element.value = '500'; });
+    await page.locator('#section-position').dispatchEvent('input');
     const first = await accepted();
     assert.equal(await page.evaluate(() => crossOriginIsolated), true);
     assert.deepEqual(first.amplitude, { numerator: '-5', denominator: '1' });
     assert.match(await page.locator('#portal-readouts').textContent(), /11\.262.*-1\.720/s);
+    await page.screenshot({ path: resolve(output, 'portal-accepted.png'), fullPage: true });
     assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('cv2011-checked-portal-model/v1'))), model);
     result.cases.push('baseline-and-activation-state');
 
@@ -157,6 +164,26 @@ try {
     assert.deepEqual(latest.amplitude, { numerator: '-5', denominator: '1' });
     assert.deepEqual(result.offlineRequests, []);
     result.cases.push('rapid-edit-revert-current-result-offline');
+    const watchdog = await page.evaluate(async () => {
+        const { PortalRuntime } = await import('./portal-runtime.js');
+        // Test-only stalled browser worker exercises the production host's
+        // watchdog without introducing a stall command into the shipped ABI.
+        const workerURL = URL.createObjectURL(new Blob([
+            "postMessage({ready:true,isolated:crossOriginIsolated,artifact:'watchdog-fixture',bundle:'fixture'}); onmessage=()=>{for(;;){}};",
+        ], { type: 'text/javascript' }));
+        const runtime = new PortalRuntime(new URL(workerURL));
+        try { await runtime.ready; return await runtime.check(new Uint8Array([1])); }
+        finally { runtime.dispose(); URL.revokeObjectURL(workerURL); }
+    });
+    assert.equal(watchdog.state, 'timeout');
+    result.cases.push('browser-worker-watchdog');
+    const downloadPromise = page.waitForEvent('download');
+    await page.locator('#export-model').click();
+    const download = await downloadPromise;
+    const exported = JSON.parse(await readFile(await download.path(), 'utf8'));
+    assert.equal(exported.model.loads[0].fy, -5);
+    assert.equal(exported.model.loads[0].qEnd, -5);
+    result.cases.push('local-model-export');
     offline = false; await context.setOffline(false);
     await page.locator('#portal-reset').click(); await accepted();
     await page.locator('#portal-deactivate').click(); await page.waitForURL(origin + base);

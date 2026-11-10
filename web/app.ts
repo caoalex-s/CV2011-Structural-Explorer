@@ -57,6 +57,25 @@ let drag: {
 } | null = null;
 const history: Model[] = [], future: Model[] = [];
 let currentMember = isPortalWorkspace ? 'BC' : model.members[0]?.id || '', sectionT = 0.5;
+if (isPortalWorkspace) {
+    // Activation reloads this page once. Restore its view/query only for the
+    // identical saved model; a certificate is always checked afresh.
+    const stateKey = portalStorageKey + '/view';
+    try {
+        const saved = sessionStorage.getItem(stateKey);
+        sessionStorage.removeItem(stateKey);
+        const state = saved ? JSON.parse(saved) : null;
+        if (state?.model === JSON.stringify(model) && model.members.some(member => member.id === state.member)
+            && Number.isFinite(state.parameter) && state.parameter >= 0 && state.parameter <= 1) {
+            currentMember = state.member; sectionT = state.parameter;
+            layer = state.layer; mode = state.mode; side = state.side; view = state.view;
+        }
+    } catch { /* Ignore stale view state; the model has its own recovery above. */ }
+    window.addEventListener('beforeunload', () => {
+        sessionStorage.setItem(stateKey, JSON.stringify({ model: JSON.stringify(model),
+            member: currentMember, parameter: sectionT, layer, mode, side, view }));
+    });
+}
 let portalPanel: ReturnType<typeof createPortalPanel> | undefined;
 let portalSignature = '';
 const evidenceRequests = new EvidenceRequests();
