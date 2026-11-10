@@ -113,6 +113,7 @@ theorem actual_element_motion (a : ℝ) (u : Fin 12 → ℝ) (s : Fin 3) :
   all_goals simp only [actual_side_motion, reference_motion]
   all_goals norm_num [endNode, model, PortalFramePilot.model, PortalFramePilot.drawingStart,
     PortalFramePilot.drawingEnd, Fin.instOfNat, Fin.ofNat', Fin.succ]
+  all_goals rfl
 
 def K (i j : Fin 12) : ℝ := (PortalChecker.stiffness i j : ℝ)
 def F (a : ℝ) (i : Fin 12) : ℝ := a * (PortalChecker.force i : ℝ)
@@ -130,7 +131,7 @@ theorem actual_stiffness_work (a : ℝ) (u v : Fin 12 → ℝ) :
     LocalFrameFields.stiffness, elementMotion, K, PortalChecker.stiffness,
     PortalChecker.stiffnessRows, Fin.sum_univ_succ, rigid, springStiffness,
     directionLaw, rigidConnection, Fin.instOfNat, Fin.ofNat', Fin.succ]
-  <;> ring
+  <;> ring!
 
 set_option maxHeartbeats 2000000 in
 theorem actual_force_work (a : ℝ) (v : Fin 12 → ℝ) :
@@ -159,6 +160,10 @@ theorem actual_admissibility (a : ℝ) (u : Fin 12 → ℝ) :
   simp only [actual_side_motion, reference_motion]
   norm_num [endNode, model, PortalFramePilot.model, PortalFramePilot.drawingStart,
     PortalFramePilot.drawingEnd, Fin.instOfNat, Fin.ofNat', Fin.succ]
+  change ((u 0 + 0 * u 2 = 0 ∧ u 1 + 0 * u 2 = 0 ∧ ((1 : ℝ) = 0 ∨ u 2 = 0)) ∧
+    u 9 + 0 * u 11 = 0 ∧ u 10 + 0 * u 11 = 0 ∧ ((1 : ℝ) = 0 ∨ u 11 = 0)) ↔
+    u 0 = 0 ∧ u 1 = 0 ∧ u 2 = 0 ∧ u 9 = 0 ∧ u 10 = 0 ∧ u 11 = 0
+  simp [and_assoc]
 
 def lift (z : Fin 6 → ℝ) : Fin 12 → ℝ :=
   ![0, 0, 0, z 0, z 1, z 2, z 3, z 4, z 5, 0, 0, 0]
@@ -251,7 +256,7 @@ theorem actual_midpoint (a : ℝ) (u : Fin 12 → ℝ) :
   constructor <;>
     norm_num [elementMotion, LocalFrameFields.moment, LocalFrameFields.rotation,
       LocalFrameFields.transverseDisplacement, LocalFrameFields.coordinate,
-      Polynomial.derivative_mul, Polynomial.derivative_pow, Fin.instOfNat, Fin.ofNat', Fin.succ] <;> ring
+      Polynomial.derivative_mul, Polynomial.derivative_pow, Fin.instOfNat, Fin.ofNat', Fin.succ] <;> ring!
 
 /-- The accepted positive contract is unchanged by the sole load parameter. -/
 theorem physical_contract (a : ℝ) :
