@@ -57,7 +57,7 @@ jobs:
           python3 -m unittest discover -s qa/live-portal -p 'test_*.py' -v
       - name: Reject a corrupted stiffness table through the actual-model proof
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_wasm }}
-        run: cd proofs && lake env bash -c 'cd ..; python3 qa/live-portal/negative-table.py'
+        run: cd proofs && lake env python3 ../qa/live-portal/negative-table.py
       - uses: pnpm/action-setup@v4
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_wasm }}
         with:
@@ -84,12 +84,14 @@ jobs:
         if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.build_wasm }}
         with:
           name: live-portal-compiled
+          include-hidden-files: true
           path: |
             .data/live-portal-build
             .data/wasm-build/canonical/browser-trace.zip
             .data/wasm-build/canonical/portal-accepted.png
             .data/wasm-build/canonical/browser-results.json
             public/portal-checker/bundle
+            !.data/live-portal-build/browser/node_modules
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:

@@ -12,7 +12,7 @@ import subprocess
 import sys
 
 assert sys.platform == 'linux' and os.environ.get('GITHUB_ACTIONS') == 'true'
-root = Path.cwd()
+root = Path(__file__).resolve().parents[2]
 folder = root / '.data/live-portal/table-negative'
 folder.mkdir()
 source = (root / 'proofs/PortalTables.lean').read_text()
@@ -23,7 +23,10 @@ mutant = source.replace(needle, '(1011253 / 3)', 1)
 for name in ['PortalChecker.lean', 'PortalSoundness.lean']:
     (folder / name).write_bytes((root / 'proofs' / name).read_bytes())
 environment = dict(os.environ)
-environment['LEAN_PATH'] = str(folder) + ':' + str(root / 'proofs') + ':' + environment.get('LEAN_PATH', '')
+# Lake supplies package paths relative to the proofs directory. Resolve them
+# before launching Lean in the separate mutation directory.
+package_paths = [str(Path(path).resolve()) for path in environment.get('LEAN_PATH', '').split(os.pathsep) if path]
+environment['LEAN_PATH'] = os.pathsep.join([str(folder), str(root / 'proofs'), *package_paths])
 for module in ['PortalTables', 'PortalChecker']:
     subprocess.run(['lean', '-o', module + '.olean', module + '.lean'], cwd=folder, env=environment, check=True, timeout=120)
 result = subprocess.run(['lean', 'PortalSoundness.lean'], cwd=folder, env=environment,
