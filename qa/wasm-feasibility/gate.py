@@ -16,10 +16,14 @@ import time
 from canonical_evidence import collect_manifest, archive_pass, clean_archived_build, compare_passes
 
 ROOT = Path.cwd()
-OUTPUT = ROOT / ".data/wasm-gate"
+PORTAL = sys.argv[1:] == ["--portal"]
+assert not sys.argv[1:] or PORTAL, "Use no arguments for historical smoke, or --portal."
+CHECKER_MODULE = "PortalChecker" if PORTAL else "SmokeChecker"
+CHECKER_MODULES = {"PortalChecker", "PortalTables"} if PORTAL else {"SmokeChecker"}
+OUTPUT = ROOT / (".data/live-portal-build" if PORTAL else ".data/wasm-gate")
 WORK = ROOT / ".data/wasm-build"
 CANONICAL = WORK / "canonical"
-SOURCES = ROOT / "qa/wasm-feasibility"
+SOURCES = ROOT / ("qa/live-portal" if PORTAL else "qa/wasm-feasibility")
 PINS = {
     "lean": "6caaee842e9495688c1567e78c0e68dbb96942aa",
     "emsdk": "a896e3d066448b3530dbcaa48869fafefd738f57",
@@ -76,13 +80,13 @@ def generate_c(environment, native_lean, index):
     generated.mkdir()
     prefix = Path(run([native_lean, "--print-prefix"], env=environment, capture=True))
     roots = [ROOT / "proofs", ROOT / "proofs/.lake/packages/batteries", prefix / "src/lean"]
-    pending = ["SmokeChecker"]
+    pending = [CHECKER_MODULE]
     modules = {}
     while pending:
         module = pending.pop()
         if module in modules:
             continue
-        assert module == "SmokeChecker" or module == "Init" or module.startswith(("Init.", "Batteries.")), module
+        assert module in CHECKER_MODULES or module == "Init" or module.startswith(("Init.", "Batteries.")), module
         relative = Path(*module.split(".")).with_suffix(".lean")
         source_root = next(root for root in roots if (root / relative).is_file())
         source = source_root / relative
@@ -104,7 +108,7 @@ def generate_c(environment, native_lean, index):
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
         receipt[f"generated_modules_{index}"] = dict(pool.map(compile_module, sorted(modules.items())))
-    assert digest(generated / "SmokeChecker.c") == digest(OUTPUT / "SmokeChecker.c")
+    assert digest(generated / (CHECKER_MODULE + ".c")) == digest(OUTPUT / (CHECKER_MODULE + ".c"))
     return generated
 
 
@@ -186,7 +190,7 @@ def main():
     receipt["emsdk_manifest_sha256"] = digest(WORK / "emsdk/emscripten-releases-tags.json")
     receipt["canonical_paths"] = {name: str(CANONICAL / name)
                                   for name in ("generated", "runtime", "runtime/include", "objects", "assets")}
-    receipt["source_paths"] = {"lean": str(WORK / "lean"), "checker": str(ROOT / "proofs/SmokeChecker.lean"),
+    receipt["source_paths"] = {"lean": str(WORK / "lean"), "checker": str(ROOT / ("proofs/" + CHECKER_MODULE + ".lean")),
                                "batteries": str(ROOT / "proofs/.lake/packages/batteries")}
     receipt["source_date_epoch"] = environment["SOURCE_DATE_EPOCH"]
     receipt["toolchain_cache_policy"] = "Pinned installed SDK and its system-library cache are shared; every Lean/libuv/checker generated file, header, object, archive and final output is freshly built. No project object cache is reused."
@@ -233,6 +237,9 @@ def main():
     shutil.rmtree(browser / "node_modules")
     receipt["passed"] = True
     receipt["runtime_gate_passed"] = True
+    if PORTAL:
+        receipt["overall_gate_passed"] = receipt["repeatability"] and receipt["browser"]["passed"]
+        receipt["hosting_gate"] = "accepted scoped method reused; no public deployment"
     # Hosting isolation and portal integration are still separate, pending gates.
     receipt["stage"] = "complete"
 

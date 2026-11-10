@@ -1318,3 +1318,9 @@ dialog::backdrop {
         animation: none;
     }
 }
+/* The exact response panel is separate from numerical diagram readouts. */
+.portal-certificate { margin: 1rem 0; padding: 1rem; border: 1px solid var(--line, #ccd3dc); border-radius: .5rem; background: var(--panel, #fff); }
+.portal-certificate h2 { margin-top: 0; }
+.portal-certificate label { display: inline-flex; gap: .5rem; align-items: center; margin-right: 1rem; }
+.portal-certificate input { width: 8rem; }
+.portal-certificate pre { max-height: 22rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }

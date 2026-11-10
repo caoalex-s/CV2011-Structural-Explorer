@@ -20,16 +20,17 @@ import { createLearningSession } from './learning-session.js';
 import { createEvidenceEnvelope, EvidenceRequests, parseEvidenceModel } from './model-evidence.js';
 import type { Attempt } from './learning-session.js';
 import { lessonContext } from './lesson-beam.js';
+import { createPortalPanel, isPortalWorkspace, portalStorageKey } from './portal-live.js';
 const clone = <T>(value: T): T => structuredClone(value);
 const id = (prefix: string) => `${prefix}${crypto.randomUUID().slice(0, 6)}`;
 renderCourseConventions();
 const lesson = lessonContext(location.search);
-const modelStorageKey = lesson?.storageKey || 'cv2011-model';
+const modelStorageKey = isPortalWorkspace ? portalStorageKey : lesson?.storageKey || 'cv2011-model';
 if (lesson) {
     $('workspace').insertAdjacentHTML('afterbegin', '<p class="lesson-banner"><a href="learn/beam-basics/">← Back to the beam lesson</a> · Lesson workspace · <a href="./#sandbox">Return to your saved sandbox</a> · <button id="restart-lesson" class="quiet">Restart lesson example</button></p>');
     $('restart-lesson').onclick = () => { commit(() => { model = clone(lesson.model); }); fit(); render(); };
 }
-let model: Model = lesson?.model || example();
+let model: Model = isPortalWorkspace ? example('frame') : lesson?.model || example();
 try {
     const saved = localStorage.getItem(modelStorageKey);
     if (saved) {
@@ -55,13 +56,22 @@ let drag: {
     cy: number;
 } | null = null;
 const history: Model[] = [], future: Model[] = [];
-let currentMember = model.members[0]?.id || '', sectionT = 0.5;
+let currentMember = isPortalWorkspace ? 'BC' : model.members[0]?.id || '', sectionT = 0.5;
+let portalPanel: ReturnType<typeof createPortalPanel> | undefined;
+let portalSignature = '';
 const evidenceRequests = new EvidenceRequests();
 let evidenceRawSource: string | undefined;
 const evidenceQuery = () => ({ member: currentMember, parameter: sectionT, cutSide: 'unspecified' as const, quantity: 'section-response', units: 'kN, kN m, m, rad', signConvention: 'global y upward; rotation counterclockwise; tension N positive; sagging M positive; dM/dx = V' });
 function updateEvidenceBinding() {
     try { evidenceRequests.update(model, evidenceQuery()); }
     catch { evidenceRequests.invalidate(); }
+    // Render-only changes do not repeatedly launch checks. Mechanical/query
+    // changes, including a revert, synchronously remove the previous result.
+    const signature = JSON.stringify([model, currentMember, sectionT]);
+    if (signature !== portalSignature) {
+        portalSignature = signature;
+        portalPanel?.update(currentMember, sectionT);
+    }
 }
 let solutionStep = 'reaction_left', solutionRevealed = false, hintUsed = false, practiceResultsVisible = false;
 let proofStatus = { lean: 'pending', scope: 'Scaled reaction equilibrium identities and plotting-side inversion.' };
@@ -726,6 +736,9 @@ const controls = createWorkspaceControls({
     selectMode: setMode,
 });
 const session = createLearningSession({ notify: toast, onConnectionChange: render });
+portalPanel = createPortalPanel(() => model, value => commit(() => {
+    if (model.loads.length === 1) { model.loads[0].fy = value; model.loads[0].qEnd = value; }
+}));
 fit();
 setMode(location.hash.slice(1) || 'sandbox');
 void session.connect();

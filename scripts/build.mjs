@@ -64,4 +64,27 @@ if (verification.realBeam?.status === 'checked') {
   await writeFile(verificationPath, JSON.stringify(verification));
 }
 await import('./check_lessons.mjs');
+// Reuse the same built workspace under its narrowly isolated checker scope.
+// This copies build outputs, never forks the application source. Immutable
+// checker assets, when reviewed and present, already occupy its bundle folder.
+async function workspaceFiles(directory, prefix = '') {
+  const files = [];
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const relative = prefix + entry.name;
+    if (!prefix && ['portal-checker', 'checker-preview'].includes(entry.name)) continue;
+    if (entry.isDirectory()) files.push(...await workspaceFiles(`${directory}/${entry.name}`, `${relative}/`));
+    else files.push(relative);
+  }
+  return files;
+}
+const portalFiles = await workspaceFiles('dist');
+for (const relative of portalFiles) {
+  const destination = `dist/portal-checker/${relative}`;
+  await mkdir(destination.slice(0, destination.lastIndexOf('/')), { recursive: true });
+  await copyFile(`dist/${relative}`, destination);
+}
+await copyFile('qa/wasm-feasibility/isolation-sw.js', 'dist/portal-checker/isolation-sw.js');
+await copyFile('qa/wasm-feasibility/coi-LICENSE', 'dist/portal-checker/isolation-LICENSE');
+const portalIndex = await readFile('dist/portal-checker/index.html', 'utf8');
+await writeFile('dist/portal-checker/index.html', portalIndex.replace('href="portal-checker/"', 'href="../"').replace('>Checked portal</a>', '>Main workspace</a>'));
 console.log('Built static application in dist/');

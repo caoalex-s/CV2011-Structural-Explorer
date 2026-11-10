@@ -168,6 +168,28 @@ theorem actual_admissibility (a : ℝ) (u : Fin 12 → ℝ) :
 def lift (z : Fin 6 → ℝ) : Fin 12 → ℝ :=
   ![0, 0, 0, z 0, z 1, z 2, z 3, z 4, z 5, 0, 0, 0]
 
+theorem lift_injective : Function.Injective lift := by
+  intro z w h
+  funext i
+  have hi := congrFun h (PortalChecker.freeIndex i)
+  fin_cases i <;> exact hi
+
+def reducedStiffness (i j : Fin 6) : ℝ :=
+  K (PortalChecker.freeIndex i) (PortalChecker.freeIndex j)
+
+theorem reduced_stiffness_work (a : ℝ) (z w : Fin 6 → ℝ) :
+    stiffnessWork (model a) (motion a (lift z)) (motion a (lift w)) =
+      ∑ i, w i * ∑ j, reducedStiffness i j * z j := by
+  rw [actual_stiffness_work]
+  norm_num [lift, reducedStiffness, PortalChecker.freeIndex, Fin.sum_univ_succ,
+    Fin.instOfNat, Fin.ofNat', Fin.succ]
+  <;> ring!
+
+theorem upward_free_load (a : ℝ) (i : Fin 6) :
+    F a (PortalChecker.freeIndex i) = a * (![0, 3, 3, 0, 3, -3] : Fin 6 → ℝ) i := by
+  fin_cases i <;> norm_num [F, PortalChecker.freeIndex, PortalChecker.force, PortalChecker.unitForce]
+  all_goals rfl
+
 theorem lift_image (a : ℝ) (q : Coordinate (model a) → ℝ) :
     admissible (model a) supports q ↔ ∃ z, q = motion a (lift z) := by
   rw [← coordinates_total a q, actual_admissibility]

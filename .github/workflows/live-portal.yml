@@ -3,17 +3,28 @@ on:
   push:
     branches: [codex/live-portal-checker]
   workflow_dispatch:
+    inputs:
+      build_wasm:
+        description: Deliberately build the proved portal checker twice and test the actual browser artifact
+        type: boolean
+        required: true
+        default: false
 permissions:
   contents: read
 jobs:
   proof:
     runs-on: ubuntu-22.04
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
       - run: mkdir -p .data/live-portal
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Check profile, exact candidates and revision binding
+        run: node --test tests/portal-live.test.mjs tests/portal-runtime.test.mjs tests/model-evidence.test.mjs tests/portal-frame-pilot.test.mjs
       - uses: leanprover/lean-action@ba3fdfe5c4476c925da13bf11a005ddb47e47aee
         with:
           lake-package-directory: proofs
@@ -34,6 +45,49 @@ jobs:
             done
           '
           git diff --exit-code -- lake-manifest.json lean-toolchain
+      - name: Audit every structural checker bridge theorem
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 qa/live-portal/audit.py --emit .data/live-portal/PortalAudit.lean
+          cd proofs
+          lake env bash -c 'export LEAN_PATH="$PWD:$LEAN_PATH"; lean ../.data/live-portal/PortalAudit.lean' | tee ../.data/live-portal/axioms.log
+          cd ..
+          python3 qa/live-portal/audit.py --check .data/live-portal/axioms.log --output .data/live-portal/axiom-audit.json
+          python3 -m unittest discover -s qa/live-portal -p 'test_*.py' -v
+      - name: Reject a corrupted stiffness table through the actual-model proof
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_wasm }}
+        run: cd proofs && lake env bash -c 'cd ..; python3 qa/live-portal/negative-table.py'
+      - uses: pnpm/action-setup@v4
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_wasm }}
+        with:
+          version: '11.25.0'
+      - name: Prepare the deliberate structural artifact build
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_wasm }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile --ignore-scripts
+          pnpm check
+          pnpm test
+          mkdir -p .data/live-portal-build
+          cp .data/live-portal/axiom-audit.json .data/live-portal-build/
+          cd proofs
+          lake env bash -c 'export LEAN_PATH="$PWD:$LEAN_PATH"; lean -c ../.data/live-portal-build/PortalChecker.c PortalChecker.lean'
+      - name: Reproduce the structural WASM and test the live portal workspace
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_wasm }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 qa/wasm-feasibility/gate.py --portal 2>&1 | tee .data/live-portal-build/build.log
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.build_wasm }}
+        with:
+          name: live-portal-compiled
+          path: |
+            .data/live-portal-build
+            .data/wasm-build/canonical/browser-trace.zip
+            public/portal-checker/bundle
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
