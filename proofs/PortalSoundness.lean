@@ -76,11 +76,18 @@ def elementMotion (u : Fin 12 → ℝ) : Fin 3 → FrameInterfaces.LocalDofs :=
     ![u 3, u 4, u 5, u 6, u 7, u 8],
     ![-u 7, u 6, u 8, -u 10, u 9, u 11]]
 
+theorem actual_side_motion (a : ℝ) (u : Fin 12 → ℝ) (side : MemberEnd 3) :
+    sideMotion (model a) (motion a u) (.endSide side) =
+      referenceMotion (model a) (motion a u) (.inl (endNode (model a) side)) := by
+  funext d
+  fin_cases d <;> simp [sideMotion, zero_slip, endMotion]
+
 theorem actual_element_motion (a : ℝ) (u : Fin 12 → ℝ) (s : Fin 3) :
     segmentDofs (model a) (motion a u) s = elementMotion u s := by
   funext d
   fin_cases s <;> fin_cases d <;>
-    simp [segmentDofs, segmentMotion, sideMotion, model, PortalFramePilot.model,
+    simp only [segmentDofs, segmentMotion, actual_side_motion, reference_motion, toLocal6]
+  all_goals norm_num [model, PortalFramePilot.model,
       PortalFramePilot.drawingStart, PortalFramePilot.drawingEnd, PortalFramePilot.cosine,
       PortalFramePilot.sine, endNode, endMotion, toLocal6, elementMotion,
       reference_motion, zero_slip]
@@ -95,7 +102,8 @@ theorem actual_stiffness_work (a : ℝ) (u v : Fin 12 → ℝ) :
     stiffnessWork (model a) (motion a u) (motion a v) =
       ∑ i, v i * ∑ j, K i j * u j := by
   simp only [stiffnessWork, internalVirtualWork, actual_element_motion]
-  simp [model, PortalFramePilot.model, PortalFramePilot.lengths,
+  simp only [zero_slip, mul_zero, Finset.sum_const_zero, add_zero]
+  norm_num [model, PortalFramePilot.model, PortalFramePilot.lengths,
     PortalFramePilot.axialRigidity, PortalFramePilot.flexuralRigidity,
     LocalFrameFields.stiffness, elementMotion, K, PortalChecker.stiffness,
     PortalChecker.stiffnessRows, Fin.sum_univ_succ, rigid, springStiffness,
@@ -120,11 +128,12 @@ theorem actual_residual_work (a : ℝ) (u v : Fin 12 → ℝ) :
 theorem actual_admissibility (a : ℝ) (u : Fin 12 → ℝ) :
     admissible (model a) supports (motion a u) ↔
       ∀ i : Fin 6, u (PortalChecker.baseIndex i) = 0 := by
-  simp [admissible, supports, PortalFramePilot.supports, supportDirections,
-    supportRow, sideMotion, endMotion, endNode, model, PortalFramePilot.model,
+  simp only [admissible, Fin.forall_fin_succ, supports, PortalFramePilot.supports,
+    supportDirections, supportRow, actual_side_motion, reference_motion]
+  norm_num [endNode, model, PortalFramePilot.model,
     PortalFramePilot.drawingStart, PortalFramePilot.drawingEnd, PortalFramePilot.cosine,
     PortalFramePilot.sine, PortalChecker.baseIndex, reference_motion, zero_slip,
-    Fin.forall_fin_succ, FrameTransform.work]
+    FrameTransform.work]
 
 def lift (z : Fin 6 → ℝ) : Fin 12 → ℝ :=
   ![0, 0, 0, z 0, z 1, z 2, z 3, z 4, z 5, 0, 0, 0]
@@ -137,9 +146,14 @@ theorem lift_image (a : ℝ) (q : Coordinate (model a) → ℝ) :
     refine ⟨fun i => q (coordinate a (PortalChecker.freeIndex i)), ?_⟩
     apply congrArg (motion a)
     funext i
-    have h0 := h 0; have h1 := h 1; have h2 := h 2
-    have h3 := h 3; have h4 := h 4; have h5 := h 5
-    fin_cases i <;> simp_all [lift, PortalChecker.freeIndex, PortalChecker.baseIndex]
+    have h0 := h 0
+    have h1 := h 1
+    have h2 := h 2
+    have h3 := h 3
+    have h4 := h 4
+    have h5 := h 5
+    norm_num [PortalChecker.baseIndex] at h0 h1 h2 h3 h4 h5
+    fin_cases i <;> first | exact h0 | exact h1 | exact h2 | exact h3 | exact h4 | exact h5 | rfl
   · rintro ⟨z, hz⟩
     have heq := motion_injective a hz
     intro i
@@ -150,4 +164,62 @@ theorem acceptance_predicate (a : Rat) (q : PortalChecker.Motion)
     (r : PortalChecker.Reactions) (m u : Rat) (h : PortalChecker.accepts a q r m u = true) :
     PortalChecker.Valid a q r m u := of_decide_eq_true h
 
+/-- The fixed inverse is a kernel-checked witness, also valid at zero load. -/
+set_option maxHeartbeats 4000000 in
+theorem fixed_inverse (i j : Fin 6) :
+    (∑ k : Fin 6, (PortalChecker.inverse i k : ℝ) *
+      K (PortalChecker.freeIndex k) (PortalChecker.freeIndex j)) = if i = j then 1 else 0 := by
+  fin_cases i <;> fin_cases j <;>
+    norm_num [PortalChecker.inverse, PortalChecker.inverseRows, PortalChecker.freeIndex,
+      K, PortalChecker.stiffness, PortalChecker.stiffnessRows, Fin.sum_univ_succ]
+
+theorem rational_residual_cast (a : Rat) (q : PortalChecker.Motion) (i : Fin 12) :
+    (PortalChecker.residual a q i : ℝ) = residual a (fun j => (q j : ℝ)) i := by
+  fin_cases i <;>
+    norm_num [PortalChecker.residual, PortalChecker.dotRow, List.finRange,
+      PortalChecker.stiffness, PortalChecker.stiffnessRows, PortalChecker.force,
+      PortalChecker.unitForce, residual, K, F, Fin.sum_univ_succ] <;> push_cast <;> ring
+
+theorem residual_equilibrium (a : ℝ) (u : Fin 12 → ℝ)
+    (hbase : ∀ i, u (PortalChecker.baseIndex i) = 0)
+    (hfree : ∀ i, residual a u (PortalChecker.freeIndex i) = 0) :
+    equilibrium (model a) actions supports (motion a u) := by
+  refine ⟨(actual_admissibility a u).mpr hbase, ?_⟩
+  intro v hv
+  obtain ⟨z, rfl⟩ := (lift_image a v).mp hv
+  rw [actual_residual_work]
+  have h0 := hfree 0
+  have h1 := hfree 1
+  have h2 := hfree 2
+  have h3 := hfree 3
+  have h4 := hfree 4
+  have h5 := hfree 5
+  norm_num [PortalChecker.freeIndex] at h0 h1 h2 h3 h4 h5
+  simp [lift, Fin.sum_univ_succ, h0, h1, h2, h3, h4, h5]
+
+theorem accepted_equilibrium (a : Rat) (q : PortalChecker.Motion)
+    (r : PortalChecker.Reactions) (m u : Rat) (h : PortalChecker.accepts a q r m u = true) :
+    equilibrium (model a) actions supports (motion a (fun i => (q i : ℝ))) := by
+  obtain ⟨hbase, hfree, _, _, _⟩ := acceptance_predicate a q r m u h
+  apply residual_equilibrium
+  · intro i
+    exact_mod_cast hbase i
+  · intro i
+    rw [← rational_residual_cast]
+    exact_mod_cast hfree i
+
+/-- Both formulas include the nonzero uniform-load particular field. -/
+set_option maxHeartbeats 2000000 in
+theorem actual_midpoint (a : ℝ) (u : Fin 12 → ℝ) :
+    (LocalFrameFields.moment (segmentDofs (model a) (motion a u) 1) 6 20000 a a).eval 3 =
+      (20000 / 6) * (u 8 - u 5) - (3 / 2) * a ∧
+    (LocalFrameFields.transverseDisplacement (segmentDofs (model a) (motion a u) 1) 6 20000 a a).eval 3 =
+      (u 4 + u 7) / 2 + (3 / 4) * (u 5 - u 8) + (27 / 160000) * a := by
+  rw [actual_element_motion]
+  constructor <;>
+    norm_num [elementMotion, LocalFrameFields.moment, LocalFrameFields.rotation,
+      LocalFrameFields.transverseDisplacement, LocalFrameFields.coordinate,
+      Polynomial.derivative_mul, Polynomial.derivative_pow] <;> ring
+
+end
 end PortalSoundness
