@@ -48,9 +48,9 @@ theorem support_constraints (data : Compiled) (valid : PartitionValid data)
   rcases kinds with pin | fixed | roller
   · simp [supportDirections, supports, pin, blocksDirection, Fin.forall_fin_succ]
   · simp [supportDirections, supports, fixed, blocksDirection, Fin.forall_fin_succ]
-  · rcases semantics.2.2 roller with zero | ninety | opposite | downward
+  · rcases semantics.2.2 roller with angle | angle | angle | angle
     all_goals simp [supportDirections, supports, roller, blocksDirection,
-      zero, ninety, opposite, downward, Fin.forall_fin_succ]
+      angle, Fin.forall_fin_succ]
 
 end
 end RationalFrame.Constraints
