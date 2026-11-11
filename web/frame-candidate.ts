@@ -66,6 +66,8 @@ export function validateFrame(input: unknown, query: EvidenceQuery): Model {
     if (!model.members.some(member => member.id === query.member) || !Number.isFinite(query.parameter) || query.parameter < 0 || query.parameter > 1)
         throw Error('Malformed query: select an existing member and a parameter in [0,1].');
     if (!['left', 'right'].includes(query.cutSide)) unsupported('select an explicit left or right cut side.');
+    if ((query.parameter === 0 && query.cutSide !== 'right') || (query.parameter === 1 && query.cutSide !== 'left'))
+        unsupported('endpoint queries use the interior limit: right at t=0 and left at t=1.');
     for (const field of ['quantity', 'units', 'signConvention'] as const) {
         if (query[field] !== frameQueryConvention[field]) unsupported('the query units and sign convention must use the supported frame convention.');
     }

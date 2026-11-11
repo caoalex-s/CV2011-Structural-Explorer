@@ -6,7 +6,7 @@ registerHooks({ resolve(specifier, context, next) {
     return next(specifier, context);
 } });
 const { compileFrame, FrameCandidates, frameQueryConvention } = await import('../web/frame-candidate.ts');
-const { encoded, dot, zero, equal, mul, div, integer, binary64 } = await import('../web/frame-rational.ts');
+const { encoded, dot, zero, equal, mul, div, sub, integer, binary64 } = await import('../web/frame-rational.ts');
 const { portalCandidate } = await import('../web/portal-candidate.ts');
 const { example } = await import('../web/engine.ts');
 const query = (member, parameter = 0.5, cutSide = 'left') => ({ member, parameter, cutSide, ...frameQueryConvention });
@@ -118,4 +118,17 @@ test('unsupported geometry and restraint semantics are never rounded into the cl
     }
     assert.throws(() => binary64(Number.MIN_VALUE), /Limit/);
     assert.deepEqual(encoded(binary64(0.1)), { numerator: '3602879701896397', denominator: '36028797018963968' });
+});
+
+test('endpoint queries reject the exterior side and retain interior point-action jumps', () => {
+    const model = twoSpans(true);
+    assert.throws(() => compileFrame(model, query('beam', 0, 'left')), /interior limit/);
+    assert.throws(() => compileFrame(model, query('beam', 1, 'right')), /interior limit/);
+    solve(model, query('beam', 0, 'right'));
+    solve(model, query('beam', 1, 'left'));
+    model.loads.push({ id: 'P', member: 'beam', kind: 'force', t: 0.25, end: 1, fx: 0, fy: -7, mz: 0, qEnd: 0 });
+    const left = solve(model, query('beam', 0.25, 'left')).candidate.readouts;
+    const right = solve(model, query('beam', 0.25, 'right')).candidate.readouts;
+    assert.ok(equal(sub(right[1], left[1]), integer(-7)));
+    assert.ok(equal(left[2], right[2]));
 });

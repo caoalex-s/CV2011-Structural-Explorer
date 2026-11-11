@@ -2,7 +2,7 @@ import Batteries.Data.Rat.Basic
 
 /-! Executable source-derived model for the bounded rigid axis-aligned class.
     No stiffness, force, constraint, cut, or geometry table is a caller input.
-    The real-model interpretation is proved separately in RationalFrameSoundness.
+    The real-model interpretation belongs in a separate soundness module.
     Original nodes and member-owned interior cuts have distinct point identities. -/
 namespace RationalFrame
 
@@ -160,7 +160,7 @@ def compileModel (source : Source) : Option Compiled := Id.run do
       else
         if points.size ≥ 16 then return none
         indices := indices.push points.size
-        points := points.push { owner := some m, index := m, t,
+        points := points.push { owner := some m, index := m, t := t,
           x := a.x + t * dx, y := a.y + t * dy }
     for i in [:cuts.size - 1] do
       if segments.size ≥ 16 then return none
@@ -170,11 +170,11 @@ def compileModel (source : Source) : Option Compiled := Id.run do
         if load.member == m && load.kind == 2 && load.t ≤ left && right ≤ load.ending
         then total + load.fy else total) 0
       segments := segments.push { member := m, a := indices[i]!, b := indices[i + 1]!,
-        left, right, length := length * (right - left), cosine, sine,
-        EA := member.EA, EI := member.EI, vertical }
-  return some { source, points, segments }
+        left := left, right := right, length := length * (right - left), cosine := cosine, sine := sine,
+        EA := member.EA, EI := member.EI, vertical := vertical }
+  return some { source := source, points := points, segments := segments }
 
-def dofs (model : Compiled) : Nat := 3 * model.points.size
+def Compiled.dofs (model : Compiled) : Nat := 3 * model.points.size
 def sumFin (n : Nat) (f : Fin n → Rat) : Rat := ((List.finRange n).map f).foldr (· + ·) 0
 def sumSegments (model : Compiled) (f : Segment → Rat) : Rat :=
   (model.segments.toList.map f).foldr (· + ·) 0
@@ -183,8 +183,8 @@ def sumSegments (model : Compiled) (f : Segment → Rat) : Rat :=
 def localStiffness (s : Segment) (i j : Fin 6) : Rat :=
   let L := s.length
   let a := s.EA / L
-  let b := 12 * s.EI / L^3
-  let c := 6 * s.EI / L^2
+  let b := 12 * s.EI / (L * L * L)
+  let c := 6 * s.EI / (L * L)
   let d := 4 * s.EI / L
   let e := 2 * s.EI / L
   let rows : Array (Array Rat) :=
@@ -195,7 +195,7 @@ def localStiffness (s : Segment) (i j : Fin 6) : Rat :=
 def localForce (s : Segment) (i : Fin 6) : Rat :=
   let axial := s.sine * s.vertical * s.length / 2
   let transverse := s.cosine * s.vertical * s.length / 2
-  let moment := s.cosine * s.vertical * s.length^2 / 12
+  let moment := s.cosine * s.vertical * (s.length * s.length) / 12
   (#[axial, transverse, moment, axial, transverse, -moment] : Array Rat)[i.val]!
 
 /-- For the supported axes each local coordinate is one signed global coordinate. -/
@@ -256,6 +256,7 @@ def selectedSegment (model : Compiled) (query : Query) : Option Segment :=
 
 def queryValid (model : Compiled) (query : Query) : Bool :=
   query.member < model.source.members.size && inUnit query.t && query.convention == 1 &&
+    (query.t != 0 || query.right) && (query.t != 1 || !query.right) &&
     (selectedSegment model query).isSome
 
 /-- Loaded field values, ordered N,V,M,rotation,ux,uy with original member axes. -/
@@ -266,12 +267,15 @@ def recover (model : Compiled) (query : Query) (motion : Array Rat) : Array Rat 
   let x := s.length * (query.t - s.left) / (s.right - s.left)
   let p := s.sine * s.vertical
   let q := s.cosine * s.vertical
+  let x2 := x*x
+  let x3 := x2*x
+  let x4 := x2*x2
   let normal := -action 0 - p*x
   let shear := action 1 + q*x
-  let moment := -action 2 + action 1*x + q*x^2/2
-  let axial := d 0 + (-action 0*x - p*x^2/2)/s.EA
-  let transverse := d 1 + d 2*x + (-action 2*x^2/2 + action 1*x^3/6 + q*x^4/24)/s.EI
-  let rotation := d 2 + (-action 2*x + action 1*x^2/2 + q*x^3/6)/s.EI
+  let moment := -action 2 + action 1*x + q*x2/2
+  let axial := d 0 + (-action 0*x - p*x2/2)/s.EA
+  let transverse := d 1 + d 2*x + (-action 2*x2/2 + action 1*x3/6 + q*x4/24)/s.EI
+  let rotation := d 2 + (-action 2*x + action 1*x2/2 + q*x3/6)/s.EI
   return #[normal, shear, moment, rotation,
     s.cosine*axial - s.sine*transverse, s.sine*axial + s.cosine*transverse]
 
