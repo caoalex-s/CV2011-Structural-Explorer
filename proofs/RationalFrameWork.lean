@@ -38,7 +38,7 @@ theorem stiffness_work (data : Compiled) (valid : PartitionValid data)
   intro j _
   rw [stiffness_operator_apply, stiffness_work_symmetric]
   rw [Assembly.stiffness_entry]
-  rfl
+  simp [FrameAssembly.stiffnessEntry, mul_comm]
 
 theorem external_work (data : Compiled) (valid : PartitionValid data) (variation : Fin data.dofs → ℝ) :
     externalWork (model data valid) (actions data valid) (motion data valid variation) =
