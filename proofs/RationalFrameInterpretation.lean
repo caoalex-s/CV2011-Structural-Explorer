@@ -30,6 +30,11 @@ theorem supports_valid (data : Compiled) (valid : PartitionValid data)
     let support := data.source.supports[i.val]!
     LocationValid data support.member support.t (locationIndex data support.member support.t) := by
   rcases valid with ⟨_, _, _, _, _, _, _, _, _, _, _, supports, _⟩
+  exact (supports i).1
+
+theorem support_semantics (data : Compiled) (valid : PartitionValid data)
+    (i : Fin data.source.supports.size) : SupportValid data data.source.supports[i.val]! := by
+  rcases valid with ⟨_, _, _, _, _, _, _, _, _, _, _, supports, _⟩
   exact supports i
 
 theorem loads_valid (data : Compiled) (valid : PartitionValid data)

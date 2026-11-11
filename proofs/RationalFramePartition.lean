@@ -66,6 +66,13 @@ def chainFrom (start : Rat) : List Segment → Bool
 def memberSegments (model : Compiled) (member : Nat) : List Segment :=
   model.segments.toList.filter (fun segment => segment.member == member)
 
+/-- The postcondition exposes standard support semantics to the real-model
+    bridge, in addition to the source validator's executable class gate. -/
+def SupportValid (model : Compiled) (support : Support) : Prop :=
+  LocationValid model support.member support.t (locationIndex model support.member support.t) ∧
+  support.kind ≤ 2 ∧
+  (support.kind = 2 → support.angle = 0 ∨ support.angle = 90 ∨ support.angle = 180 ∨ support.angle = 270)
+
 def PartitionValid (model : Compiled) : Prop :=
   0 < model.source.nodes.size ∧ 0 < model.source.members.size ∧
   model.source.nodes.size ≤ model.points.size ∧ model.points.size ≤ 16 ∧ model.segments.size ≤ 16 ∧
@@ -84,8 +91,7 @@ def PartitionValid (model : Compiled) : Prop :=
   (∀ i : Fin model.segments.size, SegmentValid model model.segments[i.val]!) ∧
   (∀ i : Fin model.source.members.size, chainFrom 0 (memberSegments model i.val) = true) ∧
   (∀ i : Fin model.source.supports.size,
-    let support := model.source.supports[i.val]!
-    LocationValid model support.member support.t (locationIndex model support.member support.t)) ∧
+    SupportValid model model.source.supports[i.val]!) ∧
   (∀ i : Fin model.source.loads.size,
     let load := model.source.loads[i.val]!
     LocationValid model load.member load.t (locationIndex model load.member load.t) ∧
@@ -100,6 +106,9 @@ instance (model : Compiled) (member : Nat) (t : Rat) (index : Nat) : Decidable (
   infer_instance
 instance (model : Compiled) (segment : Segment) : Decidable (SegmentValid model segment) := by
   unfold SegmentValid
+  infer_instance
+instance (model : Compiled) (support : Support) : Decidable (SupportValid model support) := by
+  unfold SupportValid
   infer_instance
 instance (model : Compiled) : Decidable (PartitionValid model) := by
   unfold PartitionValid
