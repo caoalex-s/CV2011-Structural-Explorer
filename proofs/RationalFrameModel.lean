@@ -276,12 +276,14 @@ def forceEntry (model : Compiled) (row : Nat) : Rat :=
 def forceVector (model : Compiled) : Array Rat :=
   ((List.range model.dofs).map fun row => forceEntry model row).toArray
 
+def blocksDirection (support : Support) (direction : Nat) : Bool :=
+  support.kind == 1 || (support.kind == 0 && direction < 2) ||
+    (support.kind == 2 && direction == if support.angle == 0 || support.angle == 180 then 0 else 1)
+
 def blocked (model : Compiled) (i : Nat) : Bool :=
   model.source.supports.any fun support =>
     let point := locationIndex model support.member support.t
-    let d := i % 3
-    i / 3 == point && (support.kind == 1 || (support.kind == 0 && d < 2) ||
-      (support.kind == 2 && d == if support.angle == 0 || support.angle == 180 then 0 else 1))
+    i / 3 == point && blocksDirection support (i % 3)
 
 def freeIndices (model : Compiled) : Array Nat :=
   ((List.range model.dofs).filter (fun i => !blocked model i)).toArray
