@@ -18,7 +18,7 @@ theorem freeIndices_complete (model : Compiled) (i : Nat) :
   simp [freeIndices, List.mem_filter, Bool.not_eq_true]
 
 theorem freeIndices_no_duplicates (model : Compiled) : (freeIndices model).toList.Nodup := by
-  simpa [freeIndices] using (List.nodup_range model.dofs).filter (fun i => !blocked model i)
+  simpa [freeIndices] using (show (List.range model.dofs).Nodup from List.nodup_range).filter (fun i => !blocked model i)
 
 /-- Back substitution proves that a unit upper triangular map has no kernel.
     The induction is on distance from the last row, so n=0 is included. -/
@@ -73,7 +73,7 @@ theorem positiveLDL {n : Nat} (lower : Matrix (Fin n) (Fin n) ℝ) (pivot : Fin 
     apply htranspose
     simpa only [Matrix.mulVec_transpose] using h
   have hd : (Matrix.diagonal pivot).PosDef := by
-    refine ⟨Matrix.isHermitian_diagonal_of_self_adjoint _ (fun i => by simp [IsSelfAdjoint]), ?_⟩
+    refine ⟨Matrix.isHermitian_diagonal_of_self_adjoint _ (by rfl), ?_⟩
     intro x hx
     obtain ⟨i, hi⟩ := Function.ne_iff.mp hx
     have hsum : 0 < ∑ j : Fin n, pivot j * (x j)^2 :=
@@ -87,10 +87,10 @@ theorem positiveLDL {n : Nat} (lower : Matrix (Fin n) (Fin n) ℝ) (pivot : Fin 
     reals. It does not posit a separate inverse, factor, or matrix equality. -/
 theorem checked_factor_positive (matrix : Array (Array Rat)) (free : Array Nat) (certificate : Certificate)
     (checked : FactorValid matrix free certificate) :
-    (fun i j : Fin free.size => (matrix[free[i.val]!]![free[j.val]!]! : ℝ)).PosDef := by
+    (fun i j : Fin free.size => ((matrix[free[i.val]!]!)[free[j.val]!]! : ℝ)).PosDef := by
   rcases checked with ⟨_, _, _, hdiagonal, htriangle, hfactor⟩
   let lower : Matrix (Fin free.size) (Fin free.size) ℝ :=
-    fun i j => (certificate.lower[i.val]![j.val]! : ℝ)
+    fun i j => ((certificate.lower[i.val]!)[j.val]! : ℝ)
   let pivot : Fin free.size → ℝ := fun i => (certificate.diagonal[i.val]! : ℝ)
   have htri : ∀ i j, i < j → lower i j = 0 := by
     intro i j hij
@@ -101,7 +101,7 @@ theorem checked_factor_positive (matrix : Array (Array Rat)) (free : Array Nat) 
   have hpos : ∀ i, 0 < pivot i := by
     intro i
     exact_mod_cast (hdiagonal i).1
-  have heq : (fun i j : Fin free.size => (matrix[free[i.val]!]![free[j.val]!]! : ℝ)) =
+  have heq : (fun i j : Fin free.size => ((matrix[free[i.val]!]!)[free[j.val]!]! : ℝ)) =
       lower * Matrix.diagonal pivot * lower.transpose := by
     ext i j
     have h := congrArg (fun value : Rat => (value : ℝ)) (hfactor i j)
