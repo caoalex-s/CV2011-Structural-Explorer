@@ -29,6 +29,9 @@ def rational (fields : Array String) : Decoder Rat := do
   let numerator ← token fields
   let denominator ← token fields
   if numerator.isEmpty || denominator.isEmpty || numerator.length > 129 || denominator.length > 128 then throw ()
+  let digits := if numerator.startsWith "-" then numerator.drop 1 else numerator
+  if digits.isEmpty || digits.length > 128 || !(digits.toList.all Char.isDigit) then throw ()
+  if !(denominator.toList.all Char.isDigit) then throw ()
   let some n := numerator.toInt? | throw ()
   let some d := denominator.toNat? | throw ()
   if d == 0 || toString n != numerator || toString d != denominator then throw ()

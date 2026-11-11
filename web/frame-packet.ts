@@ -6,7 +6,7 @@
  */
 import type { EvidenceQuery } from './model-evidence.js';
 import { type FrameCertificate, frameLimits, validateFrame } from './frame-candidate.js';
-import { type Fraction, binary64, fraction } from './frame-rational.js';
+import { type Fraction, binary64, fraction, maxRationalDigits } from './frame-rational.js';
 
 export const framePacketVersion = 'CV2011_FRAME_1';
 
@@ -19,7 +19,7 @@ export function framePacket(input: unknown, query: EvidenceQuery, witness: Frame
         fields.push(String(value));
     };
     const rational = (value: Fraction) => {
-        const normalized = fraction(value.n, value.d);
+        const normalized = fraction(value.n, value.d, maxRationalDigits);
         fields.push(String(normalized.n), String(normalized.d));
     };
     const number = (value: number) => rational(binary64(value));

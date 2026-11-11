@@ -51,7 +51,7 @@ for (const cap of [128, 256, 512]) {
     for (const name of sourceNames) {
         let content = source[name];
         if (name === 'frame-rational.ts') content = content
-            .replace('export const maxRationalDigits = 128;', `export const maxRationalDigits = ${cap};\nexport const digitGrowth = { normalized: 0, raw: 0 };`)
+            .replace('export const maxIntermediateDigits = 256;', `export const maxIntermediateDigits = ${cap};\nexport const digitGrowth = { normalized: 0, raw: 0 };`)
             .replace(marker, marker + '\n    const digits = (value: bigint) => (value < 0n ? -value : value).toString().length;\n    digitGrowth.normalized = Math.max(digitGrowth.normalized, digits(numerator), digits(denominator));\n    digitGrowth.raw = Math.max(digitGrowth.raw, digits(n), digits(d));');
         await writeFile(join(folder, name), content);
     }
@@ -87,6 +87,6 @@ for (const cap of [128, 256, 512]) {
     }
 }
 const report = { environment: { node: process.version, platform: process.platform, arch: process.arch },
-    note: 'Single candidate measurements on this host, including first-call overhead. Not a WASM timing guarantee. Production cap unchanged.', rows };
+    note: 'Single candidate measurements on this host, including first-call overhead. Not a WASM timing guarantee. Source and witness caps remain 128.', rows };
 await writeFile(join(destination, 'candidate-growth.json'), JSON.stringify(report, null, 2));
 console.log(JSON.stringify(report, null, 2));

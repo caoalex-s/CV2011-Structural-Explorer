@@ -6,6 +6,7 @@ export type Fraction = { n: bigint; d: bigint };
 export const zero: Fraction = Object.freeze({ n: 0n, d: 1n });
 export const one: Fraction = Object.freeze({ n: 1n, d: 1n });
 export const maxRationalDigits = 128;
+export const maxIntermediateDigits = 256;
 
 function gcd(a: bigint, b: bigint): bigint {
     while (b !== 0n) [a, b] = [b, a % b];
@@ -13,13 +14,18 @@ function gcd(a: bigint, b: bigint): bigint {
 }
 
 /** Normalize after every operation; excessive growth is a resource limit. */
-export function fraction(n: bigint, d = 1n): Fraction {
+export function fraction(n: bigint, d = 1n, maximumDigits = maxIntermediateDigits): Fraction {
     if (d === 0n) throw Error('Malformed rational: zero denominator.');
     if (d < 0n) { n = -n; d = -d; }
+    // Products of two bounded operands need twice the normalized budget;
+    // addition can require one further digit before exact GCD reduction.
+    const rawLimit = 2 * maxIntermediateDigits + 1;
+    if ((n < 0n ? -n : n).toString().length > rawLimit || d.toString().length > rawLimit)
+        throw Error(`Limit: unreduced rational arithmetic exceeds ${rawLimit} digits.`);
     const divisor = gcd(n < 0n ? -n : n, d);
     const numerator = n / divisor, denominator = d / divisor;
-    if ((numerator < 0n ? -numerator : numerator).toString().length > maxRationalDigits ||
-        denominator.toString().length > maxRationalDigits) throw Error('Limit: rational arithmetic exceeds 128 digits.');
+    if ((numerator < 0n ? -numerator : numerator).toString().length > maximumDigits ||
+        denominator.toString().length > maximumDigits) throw Error(`Limit: rational arithmetic exceeds ${maximumDigits} digits.`);
     return { n: numerator, d: denominator };
 }
 export const add = (a: Fraction, b: Fraction): Fraction => fraction(a.n * b.d + b.n * a.d, a.d * b.d);
@@ -50,7 +56,8 @@ export function binary64(value: number): Fraction {
     let numerator = exponent === 0 ? mantissa : mantissa + (1n << 52n);
     const power = exponent === 0 ? -1074 : exponent - 1023 - 52;
     if (negative) numerator = -numerator;
-    return power >= 0 ? fraction(numerator << BigInt(power)) : fraction(numerator, 1n << BigInt(-power));
+    return power >= 0 ? fraction(numerator << BigInt(power), 1n, maxRationalDigits) :
+        fraction(numerator, 1n << BigInt(-power), maxRationalDigits);
 }
 
 export function sum(values: Iterable<Fraction>): Fraction {

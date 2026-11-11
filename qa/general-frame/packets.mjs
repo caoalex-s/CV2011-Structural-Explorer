@@ -49,6 +49,12 @@ edited.loads.push({ ...edited.loads[0], id: 'overlap', t: 0.375, end: 1, fy: -2,
 edited.loads.push({ id: 'couple', member: 'beam', kind: 'moment', t: 0.625, end: 1, fx: 0, fy: 0, mz: 3, qEnd: 0 });
 await save('1_overlap_couple_left', edited, selected('beam', 0.625, 'left'));
 await save('1_overlap_couple_right', edited, selected('beam', 0.625, 'right'));
+const decimal = copy(edited);
+decimal.supports[1].t = 0.4;
+decimal.loads[0].t = 0.2; decimal.loads[0].end = 0.8;
+decimal.loads[1].t = 0.4;
+decimal.loads[2].t = 0.6;
+await save('1_common_decimal_edits', decimal, selected('beam', 0.6));
 const singular = copy(beam);
 singular.supports = []; singular.loads = [];
 await save('1_zero_load_mechanism', singular, query);
@@ -78,5 +84,7 @@ for (const [name, text] of [
     ['extra', packet + '\n0'],
     ['zero_denominator', packet.replace('\n0\n1\n', '\n0\n0\n')],
     ['noncanonical', packet.replace('\n0\n1\n', '\n-0\n1\n')],
+    ['source_digits', packet.replace('\n0\n1\n', '\n1' + '0'.repeat(128) + '\n1\n')],
+    ['witness_digits', packet.slice(0, -3) + '1' + '0'.repeat(128) + '\n1'],
 ]) await writeFile(join(output, '2_' + name + '.packet'), text);
 console.log('Wrote source/witness packets to ' + output);

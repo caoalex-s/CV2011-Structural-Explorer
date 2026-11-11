@@ -6,7 +6,8 @@ registerHooks({ resolve(specifier, context, next) {
     return next(specifier, context);
 } });
 const { compileFrame, FrameCandidates, frameQueryConvention } = await import('../web/frame-candidate.ts');
-const { encoded, dot, zero, equal, mul, div, sub, integer, binary64 } = await import('../web/frame-rational.ts');
+const { encoded, dot, zero, equal, mul, div, sub, integer, binary64, fraction } = await import('../web/frame-rational.ts');
+const { framePacket } = await import('../web/frame-packet.ts');
 const { portalCandidate } = await import('../web/portal-candidate.ts');
 const { example } = await import('../web/engine.ts');
 const query = (member, parameter = 0.5, cutSide = 'left') => ({ member, parameter, cutSide, ...frameQueryConvention });
@@ -133,12 +134,25 @@ test('endpoint queries reject the exterior side and retain interior point-action
     assert.ok(equal(left[2], right[2]));
 });
 
-test('exact arithmetic growth has an explicit limit outcome, never a mechanism verdict', () => {
+test('common decimal interior edits fit 256-digit intermediates and the 128-digit final packet', () => {
     const model = twoSpans(true);
     model.nodes[1].x = 10;
     model.supports[1].t = 0.4;
     model.loads = [udl('first', 'beam', 0.2, 0.8), udl('second', 'beam', 0.4, 1, -2),
         { id: 'couple', member: 'beam', kind: 'moment', t: 0.6, end: 1, fx: 0, fy: 0, mz: 3, qEnd: 0 }];
-    const frame = compileFrame(model, query('beam'));
-    assert.throws(() => new FrameCandidates().produce(frame), /Limit: rational arithmetic exceeds 128 digits/);
+    const selected = query('beam', 0.6);
+    const { candidate } = solve(model, selected);
+    assert.ok(framePacket(model, selected, candidate).length < 10000);
+});
+
+test('intermediate overflow and oversized source/witness values remain explicit limits', () => {
+    const value = fraction(10n ** 127n);
+    const squared = mul(value, value);
+    assert.throws(() => mul(squared, integer(100)), /Limit: rational arithmetic exceeds 256 digits/);
+    assert.throws(() => fraction(10n ** 513n, 10n ** 513n), /Limit: unreduced rational arithmetic exceeds 513 digits/);
+    assert.throws(() => binary64(1e128), /Limit: rational arithmetic exceeds 128 digits/);
+    const model = twoSpans(true), selected = query('beam');
+    const { candidate } = solve(model, selected);
+    candidate.motion[2] = fraction(10n ** 128n);
+    assert.throws(() => framePacket(model, selected, candidate), /Limit: rational arithmetic exceeds 128 digits/);
 });
