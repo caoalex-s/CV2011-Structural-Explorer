@@ -87,19 +87,22 @@ theorem positiveLDL {n : Nat} (lower : Matrix (Fin n) (Fin n) ℝ) (pivot : Fin 
     reals. It does not posit a separate inverse, factor, or matrix equality. -/
 theorem checked_factor_positive (matrix : Array (Array Rat)) (free : Array Nat) (certificate : Certificate)
     (checked : FactorValid matrix free certificate) :
-    (fun i j : Fin free.size => ((matrix[free[i.val]!]!)[free[j.val]!]! : ℝ)).PosDef := by
+    Matrix.PosDef (fun i j : Fin free.size => ((matrix[free[i.val]!]!)[free[j.val]!]! : ℝ)) := by
   rcases checked with ⟨_, _, _, hdiagonal, htriangle, hfactor⟩
   let lower : Matrix (Fin free.size) (Fin free.size) ℝ :=
     fun i j => ((certificate.lower[i.val]!)[j.val]! : ℝ)
   let pivot : Fin free.size → ℝ := fun i => (certificate.diagonal[i.val]! : ℝ)
   have htri : ∀ i j, i < j → lower i j = 0 := by
     intro i j hij
+    dsimp only [lower]
     exact_mod_cast htriangle i j hij
   have hunit : ∀ i, lower i i = 1 := by
     intro i
+    dsimp only [lower]
     exact_mod_cast (hdiagonal i).2
   have hpos : ∀ i, 0 < pivot i := by
     intro i
+    dsimp only [pivot]
     exact_mod_cast (hdiagonal i).1
   have heq : (fun i j : Fin free.size => ((matrix[free[i.val]!]!)[free[j.val]!]! : ℝ)) =
       lower * Matrix.diagonal pivot * lower.transpose := by
@@ -107,7 +110,7 @@ theorem checked_factor_positive (matrix : Array (Array Rat)) (free : Array Nat) 
     have h := congrArg (fun value : Rat => (value : ℝ)) (hfactor i j)
     rw [sumFin_eq_sum] at h
     push_cast at h
-    simpa [Matrix.mul_apply, Matrix.mul_diagonal, Matrix.transpose_apply, lower, pivot] using h.symm
+    simpa [Matrix.mul_apply, Matrix.diagonal, Matrix.transpose_apply, lower, pivot] using h.symm
   rw [heq]
   exact positiveLDL lower pivot htri hunit hpos
 
