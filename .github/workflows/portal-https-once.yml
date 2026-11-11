@@ -1,0 +1,45 @@
+name: One approved published portal check
+on:
+  push:
+    branches: [codex/portal-https-e36129a-r2]
+permissions:
+  contents: read
+  actions: read
+  deployments: read
+concurrency:
+  group: portal-https-e36129a-r2
+  cancel-in-progress: false
+jobs:
+  test:
+    if: github.event.created == true && github.run_attempt == 1
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Bind to the accepted normal publication and served assets
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 qa/portal-published/verify-binding.py
+      - name: Install the accepted browser tooling
+        run: |
+          npm install --prefix .data/portal-https-tools --ignore-scripts --save-exact playwright@1.51.1
+          node .data/portal-https-tools/node_modules/playwright/cli.js install --with-deps chromium
+      - name: Check the actual published portal once
+        run: |
+          cp qa/portal-published/browser-test.mjs .data/portal-https-tools/browser-test.mjs
+          timeout 240s node .data/portal-https-tools/browser-test.mjs qa/portal-published/binding.json .data/portal-https
+      - name: Confirm publication identity after the test
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 qa/portal-published/verify-binding.py --after
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: published-portal-evidence
+          path: |
+            .data/portal-https/
+            .data/portal-https-tools/package-lock.json
