@@ -141,15 +141,16 @@ theorem location_parameter (data : Compiled) (member : Fin data.source.members.s
 /-- The finite source coordinate allocation maps to the original-node or
     original-member-owned point in FrameAssemblyModel. -/
 def point (data : Compiled) (valid : PartitionValid data) (i : Fin data.points.size) :
-    FrameAssemblyModel.Point data.source.nodes.size data.source.members.size data.points.size := by
-  have hp := points_valid data valid i
-  cases ho : data.points[i.val]!.owner with
-  | none =>
-    simp only [PointValid, ho] at hp
-    exact .inl ⟨i.val, hp.2.1⟩
-  | some owner =>
-    simp only [PointValid, ho] at hp
-    exact .inr (⟨owner, hp.2.1⟩, i)
+    FrameAssemblyModel.Point data.source.nodes.size data.source.members.size data.points.size :=
+  match ho : data.points[i.val]!.owner with
+  | none => .inl ⟨i.val, by
+      have hp := points_valid data valid i
+      simp only [PointValid, ho] at hp
+      exact hp.2.1⟩
+  | some owner => .inr (⟨owner, by
+      have hp := points_valid data valid i
+      simp only [PointValid, ho] at hp
+      exact hp.2.1⟩, i)
 
 theorem point_prefix (data : Compiled) (valid : PartitionValid data) (i : Fin data.points.size)
     (bound : i.val < data.source.nodes.size) : point data valid i = .inl ⟨i.val, bound⟩ := by
@@ -171,9 +172,7 @@ theorem location_point (data : Compiled) (valid : PartitionValid data)
       rw [hi]
       exact (members_bounded data valid member).1
     rw [point_prefix data valid index bound]
-    simp only [location, hzero, ↓reduceIte, locationPoint, endNode, Bool.false_eq_true, ↓reduceIte, model]
-    congr 1
-    exact Fin.ext hi.symm
+    simp [location, hzero, locationPoint, endNode, model, hi]
   · by_cases hone : t = 1
     · have hi : index.val = data.source.members[member.val]!.b := by
         simpa [hzero, hone] using represented.2.2
@@ -181,9 +180,7 @@ theorem location_point (data : Compiled) (valid : PartitionValid data)
         rw [hi]
         exact (members_bounded data valid member).2.1
       rw [point_prefix data valid index bound]
-      simp only [location, hzero, hone, ↓reduceIte, locationPoint, endNode, model]
-      congr 1
-      exact Fin.ext hi.symm
+      simp [location, hone, locationPoint, endNode, model, hi]
     · have owned : data.points[index.val]!.owner = some member.val := by
         have hi := represented.2.2
         simp only [hzero, hone, ↓reduceIte] at hi
@@ -197,7 +194,10 @@ theorem point_active (data : Compiled) (valid : PartitionValid data) (i : Fin da
     rcases valid with ⟨_, _, _, _, _, _, _, _, active, _⟩
     have hi := active i
     push_neg at hi
-    exact hi
+    obtain ⟨segment, hsegment⟩ := hi
+    by_cases hstart : data.segments[segment.val]!.a = i.val
+    · exact ⟨segment, Or.inl hstart⟩
+    · exact ⟨segment, Or.inr (hsegment hstart)⟩
   obtain ⟨segment, hstart | hend⟩ := represented
   · refine ⟨segment, Or.inl ?_⟩
     change locationPoint (model data valid)
@@ -254,7 +254,11 @@ theorem coordinatePair_bijective (data : Compiled) (valid : PartitionValid data)
   constructor
   · intro i j h
     have hp := Sum.inl.inj h
-    exact Prod.ext (active_injective data valid (congrArg Prod.fst hp)) (congrArg Prod.snd hp)
+    have hfirst : active data valid i.1 = active data valid j.1 :=
+      congrArg (fun pair : ActivePoint (model data valid) × Fin 3 => pair.1) hp
+    have hsecond : i.2 = j.2 :=
+      congrArg (fun pair : ActivePoint (model data valid) × Fin 3 => pair.2) hp
+    exact Prod.ext (active_injective data valid hfirst) hsecond
   · intro coordinate
     rcases coordinate with ⟨p, direction⟩ | slip
     · obtain ⟨i, hi⟩ := active_surjective data valid p
