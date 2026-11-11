@@ -96,7 +96,15 @@ def generate_c(environment, native_lean, index):
         for line in dependencies.splitlines():
             dependency = line.strip().replace("\\", "/")
             assert dependency.endswith(".olean"), dependency
-            relative_dependency = dependency.rsplit("/lib/lean/", 1)[-1]
+            if "/lib/lean/" in dependency:
+                relative_dependency = dependency.rsplit("/lib/lean/", 1)[-1]
+            else:
+                # PortalChecker imports its companion tables from the local
+                # proof root, whereas installed modules live under lib/lean.
+                dependency_path = Path(dependency)
+                if not dependency_path.is_absolute():
+                    dependency_path = ROOT / "proofs" / dependency_path
+                relative_dependency = dependency_path.relative_to(ROOT / "proofs").as_posix()
             pending.append(relative_dependency[:-6].replace("/", "."))
 
     def compile_module(item):

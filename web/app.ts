@@ -57,6 +57,7 @@ let drag: {
 } | null = null;
 const history: Model[] = [], future: Model[] = [];
 let currentMember = isPortalWorkspace ? 'BC' : model.members[0]?.id || '', sectionT = 0.5;
+let restoredPortalView = false;
 if (isPortalWorkspace) {
     // Activation reloads this page once. Restore its view/query only for the
     // identical saved model; a certificate is always checked afresh.
@@ -66,9 +67,15 @@ if (isPortalWorkspace) {
         sessionStorage.removeItem(stateKey);
         const state = saved ? JSON.parse(saved) : null;
         if (state?.model === JSON.stringify(model) && model.members.some(member => member.id === state.member)
-            && Number.isFinite(state.parameter) && state.parameter >= 0 && state.parameter <= 1) {
+            && Number.isFinite(state.parameter) && state.parameter >= 0 && state.parameter <= 1
+            && ['M', 'V', 'N', 'displacement', 'none'].includes(state.layer)
+            && ['sandbox', 'practice', 'insights'].includes(state.mode)
+            && ['tension', 'compression'].includes(state.side)
+            && Number.isFinite(state.view?.scale) && state.view.scale > 0
+            && Number.isFinite(state.view?.cx) && Number.isFinite(state.view?.cy)) {
             currentMember = state.member; sectionT = state.parameter;
             layer = state.layer; mode = state.mode; side = state.side; view = state.view;
+            restoredPortalView = true;
         }
     } catch { /* Ignore stale view state; the model has its own recovery above. */ }
     window.addEventListener('beforeunload', () => {
@@ -82,6 +89,7 @@ const evidenceRequests = new EvidenceRequests();
 let evidenceRawSource: string | undefined;
 const evidenceQuery = () => ({ member: currentMember, parameter: sectionT, cutSide: 'unspecified' as const, quantity: 'section-response', units: 'kN, kN m, m, rad', signConvention: 'global y upward; rotation counterclockwise; tension N positive; sagging M positive; dM/dx = V' });
 function updateEvidenceBinding() {
+    if (isPortalWorkspace) $<HTMLInputElement>('section-position').value = String(sectionT * 1000);
     try { evidenceRequests.update(model, evidenceQuery()); }
     catch { evidenceRequests.invalidate(); }
     // Render-only changes do not repeatedly launch checks. Mechanical/query
@@ -758,7 +766,8 @@ const session = createLearningSession({ notify: toast, onConnectionChange: rende
 portalPanel = createPortalPanel(() => model, value => commit(() => {
     if (model.loads.length === 1) { model.loads[0].fy = value; model.loads[0].qEnd = value; }
 }));
-fit();
-setMode(location.hash.slice(1) || 'sandbox');
+if (!restoredPortalView) fit();
+controls.showLayer(layer);
+setMode(restoredPortalView ? mode : location.hash.slice(1) || 'sandbox');
 void session.connect();
 void fetch('verification.json').then(r => r.json()).then(v => { proofStatus = v; }).catch(() => { });

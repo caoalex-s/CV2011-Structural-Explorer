@@ -11,15 +11,26 @@ export class PortalRuntime {
     private stopped = false;
     artifact = '';
     bundle = '';
+    onFailure: (reason: string) => void = () => {};
     readonly ready: Promise<void>;
 
     constructor(url = new URL('./bundle/worker.mjs', location.href)) {
         this.worker = new Worker(url, { type: 'module' });
         this.ready = new Promise((resolve, reject) => {
             const timer = setTimeout(() => { this.dispose(); reject(new Error('Checker startup timeout')); }, 30000);
-            this.worker.onerror = () => { clearTimeout(timer); this.dispose(); reject(new Error('Checker worker failed')); };
+            this.worker.onerror = () => {
+                clearTimeout(timer); this.dispose();
+                this.onFailure('Checker worker failed. Reset to continue.');
+                reject(new Error('Checker worker failed'));
+            };
             this.worker.onmessage = ({ data }) => {
                 if (data.ready) {
+                    if (this.artifact) {
+                        if (data.artifact !== this.artifact || data.bundle !== this.bundle) {
+                            this.dispose(); this.onFailure('Checker identity changed. Reset to continue.');
+                        }
+                        return;
+                    }
                     clearTimeout(timer);
                     if (data.isolated !== true || typeof data.artifact !== 'string' || typeof data.bundle !== 'string') {
                         this.dispose(); reject(new Error('Checker isolation or identity missing')); return;
@@ -46,7 +57,10 @@ export class PortalRuntime {
         const inputDigest = await sha256(captured);
         if (id !== this.sequence) return { state: 'stale' };
         return new Promise(resolve => {
-            const timer = setTimeout(() => { this.current = null; this.stopped = true; this.worker.terminate(); resolve({ state: 'timeout' }); }, 1000);
+            const timer = setTimeout(() => {
+                this.current = null; this.stopped = true; this.worker.terminate();
+                this.onFailure('Checker timed out. Reset to continue.'); resolve({ state: 'timeout' });
+            }, 1000);
             this.current = { id, inputDigest, resolve, timer };
             this.worker.postMessage({ id, artifact: this.artifact, bytes: captured });
         });

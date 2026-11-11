@@ -45,6 +45,10 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
         stop(); clear('Starting local checker…');
         runtime = new PortalRuntime();
         const starting = runtime;
+        starting.onFailure = reason => {
+            if (starting !== runtime) return;
+            requests.invalidate(); enabled = false; reset.hidden = false; clear(reason);
+        };
         try {
             await starting.ready;
             if (starting !== runtime) return;
@@ -70,6 +74,8 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
         certificate.textContent = JSON.stringify({ profile: profileId, query: portalQuery, ...token,
             bindings: envelope.bindings, artifact: result.artifact, bundle: runtime?.bundle, inputDigest: result.inputDigest,
             theorem: 'PortalSoundness.acceptance_actual_portal', amplitude: checked[0],
+            stabilityWitness: 'PortalSoundness.fixed_inverse',
+            reactionTheorem: 'PortalSoundness.accepted_grouped_reactions',
             values: Object.fromEntries(outputIds.map((name, i) => [name, checked[i + 1]])) }, null, 2);
     }
     function update(nextMember: string, nextParameter: number) {

@@ -26,7 +26,13 @@ const proofFiles = {};
 for (const name of ['PortalChecker.lean', 'PortalTables.lean', 'PortalSoundness.lean', 'PortalFramePilot.lean', 'lean-toolchain', 'lake-manifest.json']) {
     proofFiles[name] = digest(await readFile(resolve('proofs', name)));
 }
+const buildReceipt = JSON.parse(await readFile('.data/live-portal-build/receipt.json', 'utf8'));
+assert.equal(buildReceipt.repeatability, true);
 const manifest = { status: 'proved-compiled', theorem: 'PortalSoundness.acceptance_actual_portal',
+    sourceCommit: buildReceipt.commit, pins: buildReceipt.pins,
+    buildManifests: [buildReceipt.manifest_1_sha256, buildReceipt.manifest_2_sha256],
+    stabilityWitness: 'PortalSoundness.fixed_inverse',
+    groupedReactions: 'PortalSoundness.accepted_grouped_reactions',
     files, proofFiles, workerSha256: digest(await readFile(resolve(bundle, 'worker.mjs'))),
     abiSha256: digest(await readFile(resolve(source, 'abi.c'))),
     axiomAuditSha256: digest(await readFile('.data/live-portal-build/axiom-audit.json')),
@@ -42,6 +48,11 @@ const server = createServer(async (request, response) => {
         const url = new URL(request.url, 'http://localhost');
         if (!url.pathname.startsWith(base)) { response.writeHead(404).end(); return; }
         const relative = decodeURIComponent(url.pathname.slice(base.length));
+        if (relative === 'neighbor/sentinel-sw.js') {
+            response.writeHead(200, { 'Content-Type': 'text/javascript' });
+            response.end("self.addEventListener('install', () => self.skipWaiting());");
+            return;
+        }
         const path = resolve(dist, relative + (relative.endsWith('/') ? 'index.html' : ''));
         if (!path.startsWith(dist + '/')) { response.writeHead(403).end(); return; }
         const bytes = await readFile(path);
@@ -70,6 +81,10 @@ async function importModel(model) {
 try {
     await page.goto(origin + base);
     assert.equal(await page.evaluate(() => navigator.serviceWorker.controller), null);
+    const sentinelScope = origin + base + 'neighbor/';
+    await page.evaluate(async scope => {
+        await navigator.serviceWorker.register(scope + 'sentinel-sw.js', { scope });
+    }, sentinelScope);
     await page.locator('a[href="portal-checker/"]').click();
     assert.equal(page.url(), url);
     assert.equal(await page.evaluate(() => crossOriginIsolated), false);
@@ -188,7 +203,12 @@ try {
     await page.locator('#portal-reset').click(); await accepted();
     await page.locator('#portal-deactivate').click(); await page.waitForURL(origin + base);
     assert.equal(await page.evaluate(() => navigator.serviceWorker.controller), null);
-    assert.deepEqual(await page.evaluate(async () => (await navigator.serviceWorker.getRegistrations()).map(r => r.scope)), []);
+    assert.deepEqual(await page.evaluate(async () => (await navigator.serviceWorker.getRegistrations()).map(r => r.scope)), [sentinelScope]);
+    await page.evaluate(async scope => {
+        for (const registration of await navigator.serviceWorker.getRegistrations()) {
+            if (registration.scope === scope) await registration.unregister();
+        }
+    }, sentinelScope);
     result.cases.push('reset-exact-scope-cleanup-root-neighbor');
     assert.deepEqual(result.errors, []);
     result.passed = true;

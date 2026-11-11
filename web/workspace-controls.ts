@@ -58,11 +58,12 @@ export function createWorkspaceControls(actions: ControlActions) {
             || 'Click a member to place this object. Select it to edit its properties.';
         actions.selectTool(tool);
     });
-    bindChoiceGroup(element('layers'), 'layer', actions.selectLayer);
+    const showLayer = bindChoiceGroup(element('layers'), 'layer', actions.selectLayer);
     const showMode = bindChoiceGroup(document.querySelector('nav')!, 'mode', actions.selectMode);
 
     return {
         showMode,
+        showLayer,
         setHistory(canUndo: boolean, canRedo: boolean): void {
             element<HTMLButtonElement>('undo').disabled = !canUndo;
             element<HTMLButtonElement>('redo').disabled = !canRedo;

@@ -43,3 +43,18 @@ test('watchdog terminates the worker, removes acceptance and requires a fresh in
     const replacement = WorkerFixture.instances.at(-1); replacement.ready('replacement'); await reset.ready;
     assert.equal(reset.artifact, 'replacement'); reset.dispose();
 });
+
+test('worker failure and a changed theorem bundle notify the display even while idle', async () => {
+    for (const failure of ['worker', 'bundle']) {
+        const runtime = new PortalRuntime(new URL('https://example.invalid/worker.mjs'));
+        const worker = WorkerFixture.instances.at(-1);
+        worker.ready(); await runtime.ready;
+        const notices = [];
+        runtime.onFailure = reason => notices.push(reason);
+        if (failure === 'worker') worker.onerror();
+        else worker.onmessage({ data: { ready: true, isolated: true, artifact: runtime.artifact, bundle: 'changed-tables-or-theorem' } });
+        assert.equal(notices.length, 1);
+        assert.equal(worker.terminated, true);
+        assert.equal((await runtime.check(new Uint8Array([1]))).state, 'reset-required');
+    }
+});
