@@ -56,7 +56,7 @@ def SegmentValid (model : Compiled) (segment : Segment) : Prop :=
   segment.sine = memberSine model.source segment.member ∧
   segment.cosine * segment.cosine + segment.sine * segment.sine = 1 ∧
   (segment.cosine = 0 ∨ segment.sine = 0) ∧
-  segment.vertical = restrictedVertical model.source segment
+  segment.vertical = restrictedVertical model.source segment ∧ segment.a ≠ segment.b
 
 /-- Every member's filtered segment list is a positive chain ending at 1. -/
 def chainFrom (start : Rat) : List Segment → Bool

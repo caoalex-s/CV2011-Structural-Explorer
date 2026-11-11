@@ -214,32 +214,47 @@ def coordinateSign (s : Segment) (i : Fin 6) : Rat :=
 def mapping (s : Segment) (i : Fin 6) (j : Nat) : Rat :=
   if globalIndex s i = j then coordinateSign s i else 0
 
-/-- The scattered matrix is constructed once per request before witness checks. -/
-def stiffnessMatrix (model : Compiled) : Array (Array Rat) := Id.run do
-  let mut matrix := Array.replicate model.dofs (Array.replicate model.dofs (0 : Rat))
-  for segment in model.segments do
-    for i in List.finRange 6 do
-      let row := globalIndex segment i
-      for j in List.finRange 6 do
-        let column := globalIndex segment j
-        let value := coordinateSign segment i * localStiffness segment i j * coordinateSign segment j
-        matrix := matrix.set! row ((matrix[row]!).set! column (matrix[row]![column]! + value))
-  return matrix
+/-- Invert the signed axis permutation for one global coordinate. Validated
+    segments have distinct ends, so at most one local coordinate contributes. -/
+def localAt (segment : Segment) (coordinate : Nat) : Option (Fin 6) :=
+  let globalDirection := coordinate % 3
+  let localDirection := if globalDirection = 2 then 2
+    else if segment.cosine ≠ 0 then globalDirection else 1 - globalDirection
+  if coordinate / 3 = segment.a then some ⟨localDirection, by dsimp [localDirection, globalDirection]; split_ifs <;> omega⟩
+  else if coordinate / 3 = segment.b then some ⟨localDirection + 3, by dsimp [localDirection, globalDirection]; split_ifs <;> omega⟩
+  else none
 
-def forceVector (model : Compiled) : Array Rat := Id.run do
-  let mut force := Array.replicate model.dofs (0 : Rat)
-  for segment in model.segments do
-    for i in List.finRange 6 do
-      let row := globalIndex segment i
-      force := force.set! row (force[row]! + coordinateSign segment i * localForce segment i)
-  for load in model.source.loads do
-    if load.kind < 2 then
-      let point := locationIndex model load.member load.t
-      let action : Array Rat := if load.kind == 0 then #[load.fx, load.fy, 0] else #[0, 0, load.mz]
-      for d in [:3] do
-        let row := 3 * point + d
-        force := force.set! row (force[row]! + action[d]!)
-  return force
+def segmentStiffnessEntry (segment : Segment) (row column : Nat) : Rat :=
+  match localAt segment row, localAt segment column with
+  | some i, some j => coordinateSign segment i * localStiffness segment i j * coordinateSign segment j
+  | _, _ => 0
+
+def stiffnessEntry (model : Compiled) (row column : Nat) : Rat :=
+  sumSegments model (fun segment => segmentStiffnessEntry segment row column)
+
+/-- Functional assembly exposes each exact entry to the proof. Coefficients
+    are only evaluated for incident segment ends; no caller matrix is used. -/
+def stiffnessMatrix (model : Compiled) : Array (Array Rat) :=
+  ((List.range model.dofs).map fun row =>
+    ((List.range model.dofs).map fun column => stiffnessEntry model row column).toArray).toArray
+
+def segmentForceEntry (segment : Segment) (row : Nat) : Rat :=
+  match localAt segment row with
+  | some i => coordinateSign segment i * localForce segment i
+  | none => 0
+
+def pointForceEntry (model : Compiled) (load : Load) (row : Nat) : Rat :=
+  if row / 3 = locationIndex model load.member load.t then
+    if load.kind = 0 then if row % 3 = 0 then load.fx else if row % 3 = 1 then load.fy else 0
+    else if load.kind = 1 && row % 3 = 2 then load.mz else 0
+  else 0
+
+def forceEntry (model : Compiled) (row : Nat) : Rat :=
+  sumSegments model (fun segment => segmentForceEntry segment row) +
+    ((model.source.loads.toList.map fun load => pointForceEntry model load row).foldr (· + ·) 0)
+
+def forceVector (model : Compiled) : Array Rat :=
+  ((List.range model.dofs).map fun row => forceEntry model row).toArray
 
 def blocked (model : Compiled) (i : Nat) : Bool :=
   model.source.supports.any fun support =>
