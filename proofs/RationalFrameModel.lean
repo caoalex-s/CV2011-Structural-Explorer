@@ -220,8 +220,15 @@ def localAt (segment : Segment) (coordinate : Nat) : Option (Fin 6) :=
   let globalDirection := coordinate % 3
   let localDirection := if globalDirection = 2 then 2
     else if segment.cosine ≠ 0 then globalDirection else 1 - globalDirection
-  if coordinate / 3 = segment.a then some ⟨localDirection, by dsimp [localDirection, globalDirection]; split_ifs <;> omega⟩
-  else if coordinate / 3 = segment.b then some ⟨localDirection + 3, by dsimp [localDirection, globalDirection]; split_ifs <;> omega⟩
+  have directionBound : localDirection < 3 := by
+    dsimp only [localDirection]
+    split
+    · decide
+    · split
+      · exact Nat.mod_lt coordinate (by decide)
+      · omega
+  if coordinate / 3 = segment.a then some ⟨localDirection, by omega⟩
+  else if coordinate / 3 = segment.b then some ⟨localDirection + 3, by omega⟩
   else none
 
 def segmentStiffnessEntry (segment : Segment) (row column : Nat) : Rat :=

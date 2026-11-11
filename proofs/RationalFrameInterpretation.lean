@@ -20,6 +20,11 @@ theorem segments_valid (data : Compiled) (valid : PartitionValid data)
   rcases valid with ⟨_, _, _, _, _, _, _, _, _, segments, _⟩
   exact segments i
 
+theorem points_valid (data : Compiled) (valid : PartitionValid data)
+    (i : Fin data.points.size) : PointValid data i := by
+  rcases valid with ⟨_, _, _, _, _, _, points, _⟩
+  exact points i
+
 theorem supports_valid (data : Compiled) (valid : PartitionValid data)
     (i : Fin data.source.supports.size) :
     let support := data.source.supports[i.val]!
@@ -111,11 +116,7 @@ def actions (data : Compiled) (valid : PartitionValid data) (i : Fin data.source
 
 theorem rigid (data : Compiled) (valid : PartitionValid data)
     (side : MemberEnd data.source.members.size) : endConnection (model data valid) side = rigidConnection := by
-  simp only [endConnection]
-  split_ifs
-  · rfl
-  · rcases side with ⟨member, ending⟩
-    cases ending <;> rfl
+  simp [endConnection, model]
 
 theorem no_slip (data : Compiled) (valid : PartitionValid data)
     (side : MemberEnd data.source.members.size) (direction : Fin 3) :
@@ -136,6 +137,82 @@ theorem location_parameter (data : Compiled) (member : Fin data.source.members.s
   · have hp := valid.2.2
     simp only [hzero, hone, ↓reduceIte] at hp
     simpa [locationParameter, cutParameter] using congrArg (fun value : Rat => (value : ℝ)) hp.2
+
+/-- The finite source coordinate allocation maps to the original-node or
+    original-member-owned point in FrameAssemblyModel. -/
+def point (data : Compiled) (valid : PartitionValid data) (i : Fin data.points.size) :
+    FrameAssemblyModel.Point data.source.nodes.size data.source.members.size data.points.size := by
+  have hp := points_valid data valid i
+  cases ho : data.points[i.val]!.owner with
+  | none =>
+    simp only [PointValid, ho] at hp
+    exact .inl ⟨i.val, hp.2.1⟩
+  | some owner =>
+    simp only [PointValid, ho] at hp
+    exact .inr (⟨owner, hp.2.1⟩, i)
+
+theorem point_prefix (data : Compiled) (valid : PartitionValid data) (i : Fin data.points.size)
+    (bound : i.val < data.source.nodes.size) : point data valid i = .inl ⟨i.val, bound⟩ := by
+  cases ho : data.points[i.val]!.owner with
+  | none => simp [point, ho]
+  | some owner =>
+    have hp := points_valid data valid i
+    simp only [PointValid, ho] at hp
+    exact False.elim (Nat.not_le_of_lt bound hp.1)
+
+theorem location_point (data : Compiled) (valid : PartitionValid data)
+    (member : Fin data.source.members.size) (t : Rat) (index : Fin data.points.size)
+    (represented : LocationValid data member.val t index.val) :
+    locationPoint (model data valid) (location data member t index) = point data valid index := by
+  by_cases hzero : t = 0
+  · have hi : index.val = data.source.members[member.val]!.a := by
+      simpa [LocationValid, hzero] using represented.2.2
+    have bound : index.val < data.source.nodes.size := by
+      rw [hi]
+      exact (members_bounded data valid member).1
+    rw [point_prefix data valid index bound]
+    simp only [location, hzero, ↓reduceIte, locationPoint, endNode, Bool.false_eq_true, ↓reduceIte, model]
+    congr 1
+    exact Fin.ext hi.symm
+  · by_cases hone : t = 1
+    · have hi : index.val = data.source.members[member.val]!.b := by
+        simpa [hzero, hone] using represented.2.2
+      have bound : index.val < data.source.nodes.size := by
+        rw [hi]
+        exact (members_bounded data valid member).2.1
+      rw [point_prefix data valid index bound]
+      simp only [location, hzero, hone, ↓reduceIte, locationPoint, endNode, model]
+      congr 1
+      exact Fin.ext hi.symm
+    · have owned : data.points[index.val]!.owner = some member.val := by
+        have hi := represented.2.2
+        simp only [hzero, hone, ↓reduceIte] at hi
+        exact hi.1
+      simp [location, hzero, hone, locationPoint, point, owned]
+
+theorem point_active (data : Compiled) (valid : PartitionValid data) (i : Fin data.points.size) :
+    activePoint (model data valid) (point data valid i) := by
+  have represented : ∃ segment : Fin data.segments.size,
+      data.segments[segment.val]!.a = i.val ∨ data.segments[segment.val]!.b = i.val := by
+    rcases valid with ⟨_, _, _, _, _, _, _, _, active, _⟩
+    have hi := active i
+    push_neg at hi
+    exact hi
+  obtain ⟨segment, hstart | hend⟩ := represented
+  · refine ⟨segment, Or.inl ?_⟩
+    change locationPoint (model data valid)
+      (location data (segmentMember data valid segment) data.segments[segment.val]!.left
+        (segmentStart data valid segment)) = point data valid i
+    rw [location_point data valid _ _ _ (segments_valid data valid segment).2.1]
+    congr 1
+    exact Fin.ext hstart
+  · refine ⟨segment, Or.inr ?_⟩
+    change locationPoint (model data valid)
+      (location data (segmentMember data valid segment) data.segments[segment.val]!.right
+        (segmentEnd data valid segment)) = point data valid i
+    rw [location_point data valid _ _ _ (segments_valid data valid segment).2.2.1]
+    congr 1
+    exact Fin.ext hend
 
 theorem positive_segments (data : Compiled) (valid : PartitionValid data) : FrameAssembly.positiveSegments (model data valid) := by
   intro i

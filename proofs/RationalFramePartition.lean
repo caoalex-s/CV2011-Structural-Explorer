@@ -79,7 +79,8 @@ def PartitionValid (model : Compiled) : Prop :=
     model.points[i.val]!.index = model.points[j.val]!.index →
     model.points[i.val]!.t = model.points[j.val]!.t → i = j) ∧
   (∀ i : Fin model.points.size,
-    model.segments.any (fun segment => segment.a == i.val || segment.b == i.val) = true) ∧
+    ¬ ∀ segment : Fin model.segments.size,
+      model.segments[segment.val]!.a ≠ i.val ∧ model.segments[segment.val]!.b ≠ i.val) ∧
   (∀ i : Fin model.segments.size, SegmentValid model model.segments[i.val]!) ∧
   (∀ i : Fin model.source.members.size, chainFrom 0 (memberSegments model i.val) = true) ∧
   (∀ i : Fin model.source.supports.size,
