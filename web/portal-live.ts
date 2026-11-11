@@ -43,7 +43,8 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
     function stop() { clearTimeout(debounce); requests.invalidate(); runtime?.dispose(); runtime = null; enabled = false; }
     async function start() {
         stop(); clear('Starting local checker…');
-        runtime = new PortalRuntime();
+        try { runtime = new PortalRuntime(); }
+        catch (error) { reset.hidden = false; clear(`Checking unavailable: ${String(error)}`); return; }
         const starting = runtime;
         starting.onFailure = reason => {
             if (starting !== runtime) return;
@@ -108,6 +109,9 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
         const value = amplitude.valueAsNumber;
         if (!Number.isFinite(value)) { requests.invalidate(); runtime?.invalidate(); clear('Enter a finite uniform load.'); return; }
         changeUniformLoad(value);
+        // A blank/nonfinite edit invalidates without changing the stored model.
+        // Re-entering that same finite value must still start a fresh request.
+        update(member, parameter);
     };
     activate.onclick = async () => {
         stop(); clear('Enabling local checking…');

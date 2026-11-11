@@ -120,6 +120,11 @@ try {
     await page.screenshot({ path: resolve(output, 'portal-accepted.png'), fullPage: true });
     assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('cv2011-checked-portal-model/v1'))), model);
     result.cases.push('baseline-and-activation-state');
+    await page.locator('#portal-amplitude').fill('');
+    assert.equal(await page.locator('#portal-certificate').textContent(), '');
+    await page.locator('#portal-amplitude').fill('-5');
+    assert.ok((await accepted()).request > first.request);
+    result.cases.push('blank-input-invalidation-and-same-value-recovery');
 
     // Load the test entry once before cutting the network. ABI calls below use
     // the actual newly compiled module, including malformed pointer/length tests.
