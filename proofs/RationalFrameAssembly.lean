@@ -53,5 +53,55 @@ theorem segment_dofs (data : Compiled) (valid : PartitionValid data)
   · have vertical : data.segments[segment.val]!.sine = 0 := haxis.resolve_left horizontal
     fin_cases i <;> simp [toLocal6, coordinateSign, globalIndex, horizontal, vertical]
 
+/-- Distinct endpoints make the axis permutation invertible on its six
+    incident coordinates. Coordinates elsewhere have no local preimage. -/
+theorem localAt_eq (segment : Segment) (different : segment.a ≠ segment.b)
+    (row : Nat) (i : Fin 6) :
+    localAt segment row = some i ↔ globalIndex segment i = row := by
+  fin_cases i <;> by_cases horizontal : segment.cosine = 0 <;>
+    simp [localAt, globalIndex, horizontal] <;> split_ifs <;> simp_all <;> omega
+
+theorem mapping_at (segment : Segment) (different : segment.a ≠ segment.b)
+    (row : Nat) (i : Fin 6) :
+    mapping segment i row =
+      if localAt segment row = some i then coordinateSign segment i else 0 := by
+  simp only [mapping, localAt_eq segment different]
+
+/-- A sparse assembled row is precisely the finite sum of the actual local
+    coordinate projections, including the zero contribution off the member. -/
+theorem projection_sum (segment : Segment) (different : segment.a ≠ segment.b)
+    (row : Nat) (values : Fin 6 → ℝ) :
+    (∑ i : Fin 6, (mapping segment i row : ℝ) * values i) =
+      match localAt segment row with
+      | none => 0
+      | some i => (coordinateSign segment i : ℝ) * values i := by
+  simp_rw [mapping_at segment different]
+  cases found : localAt segment row with
+  | none => simp
+  | some selected => simp [eq_comm]
+
+theorem segment_stiffness_sum (segment : Segment) (different : segment.a ≠ segment.b)
+    (row column : Nat) :
+    (segmentStiffnessEntry segment row column : ℝ) =
+      ∑ i : Fin 6, (mapping segment i row : ℝ) *
+        (∑ j : Fin 6, (localStiffness segment i j : ℝ) * (mapping segment j column : ℝ)) := by
+  have columnSum (i : Fin 6) :
+      (∑ j : Fin 6, (localStiffness segment i j : ℝ) * (mapping segment j column : ℝ)) =
+      match localAt segment column with
+      | none => 0
+      | some j => (coordinateSign segment j : ℝ) * (localStiffness segment i j : ℝ) := by
+    simpa only [mul_comm] using projection_sum segment different column
+      (fun j => (localStiffness segment i j : ℝ))
+  simp_rw [columnSum]
+  rw [projection_sum segment different]
+  cases hr : localAt segment row <;> cases hc : localAt segment column <;>
+    simp [segmentStiffnessEntry, hr, hc] <;> ring
+
+theorem segment_force_sum (segment : Segment) (different : segment.a ≠ segment.b) (row : Nat) :
+    (segmentForceEntry segment row : ℝ) =
+      ∑ i : Fin 6, (mapping segment i row : ℝ) * (localForce segment i : ℝ) := by
+  rw [projection_sum segment different]
+  cases found : localAt segment row <;> simp [segmentForceEntry, found]
+
 end
 end RationalFrame.Assembly
