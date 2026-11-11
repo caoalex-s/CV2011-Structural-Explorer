@@ -1,0 +1,39 @@
+{
+  "status": "proved-compiled",
+  "theorem": "PortalSoundness.acceptance_actual_portal",
+  "sourceCommit": "93669d97b13edc7512d32b6cd4d37c39b2a115f1",
+  "pins": {
+    "lean": "6caaee842e9495688c1567e78c0e68dbb96942aa",
+    "emsdk": "a896e3d066448b3530dbcaa48869fafefd738f57",
+    "emscripten": "3.1.44",
+    "libuv": "e9f29cb984231524e3931aa0ae2c5dae1a32884e",
+    "batteries": "f5d04a9c4973d401c8c92500711518f7c656f034",
+    "playwright": "1.51.1"
+  },
+  "buildManifests": [
+    "36401a72c137aece334da276c23d035fdd32816393d7911af1e57433d9783dd4",
+    "36401a72c137aece334da276c23d035fdd32816393d7911af1e57433d9783dd4"
+  ],
+  "stabilityWitness": "PortalSoundness.fixed_inverse",
+  "groupedReactions": "PortalSoundness.accepted_grouped_reactions",
+  "files": {
+    "checker.wasm": "8efdf2e865e7bc64d8eba43eb38df904cc3d913031ae7d5b0ff53e51c7664e2f",
+    "checker.mjs": "f044bac0056e924a02b7f3d5df0ab3a4643a78ca1217a3406173a40eb20e4263",
+    "checker.worker.js": "622849d7b03eed12b8a2b3f10e9960e3a641590ecd1d660d3846c4808e1a0280",
+    "checker.mjs.symbols": "f568d022f572882328b33f44debb04a6f84b6521c9560719f00f29b4541cc3a1"
+  },
+  "proofFiles": {
+    "PortalChecker.lean": "de0eb31289d7adc6b24c865c4290f99fe619f15c813125f9eb532bc08f691bc1",
+    "PortalTables.lean": "77a2020e7f9df2a70eaa171e2496866f1298223b2f40fa14e019945a43818452",
+    "PortalSoundness.lean": "65efbe94c1134926941fcf631186b5a15c2c928ed59f5ba59766613e9770c9a2",
+    "PortalFramePilot.lean": "9d7496661f735889b17f0069547bf9e1a0c1f9b0cd6c4704490d97e57dec6c45",
+    "lean-toolchain": "55e97be96000b5e9e290c9e74482e5e317861499a5540353ce845471bded8cea",
+    "lake-manifest.json": "05c98622ffe3af67458c2315093b408f6d8c1b6da4549fab493a305ab4f0ba31"
+  },
+  "workerSha256": "8ee3d05c23f96a447c7e02c1acaa83280830cf7c0583fbe9446907536f37d48a",
+  "abiSha256": "a7ec81da8ffa3885b61035de531d8999cfe9cce333dc45ce14f8064494c3e590",
+  "axiomAuditSha256": "cd6f41d0f18a8b1076e187f308a42923f2cb43c767d96d228e214d4b96dd98ac",
+  "buildArchiveSha256": "5da60491a14ebdc19eae190228b40728fa8e902267ae281a036a1ac19b220459",
+  "buildReceiptSha256": "12950a546fe9a85cffa4413e5a321feeb3a781a09b64b65a5a51e1eba5a2cc4f",
+  "trust": "Pinned Lean 4.19/C/Emscripten compilation, runtime, decoder and input binding. No kernel invocation per edit."
+}

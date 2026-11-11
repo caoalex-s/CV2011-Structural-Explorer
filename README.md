@@ -85,6 +85,20 @@ The stability classification concerns free motion in the small-displacement mode
 
 ## Supported analysis
 
+### Checked portal workspace
+
+The **Checked portal** entry opens the same drawing workspace at `portal-checker/`. Select **Enable local checking** to load the compiled checker and activate isolation for this subpath. Activation preserves the model and section selection through one reload, while **Disable local checking** removes only this checker's registration and returns to the main workspace.
+
+The supported model is the original A–B–C–D portal with both bases fixed and one uniform vertical load on BC. Its signed amplitude is upward-positive and is interpreted as the exact binary64 value stored by the editor. After each supported edit, the checker verifies all 12 joint displacement components, six grouped base reactions, and the BC midpoint bending moment and vertical displacement. The panel rounds its displayed values from the accepted exact rationals, which remain available in the certificate. Other diagram values retain their numerical interpretation.
+
+`PortalChecker.lean` implements the rational acceptance predicate. `PortalSoundness.lean` connects its stiffness, loading, constraints, grouped reactions, and loaded midpoint recovery to the actual portal model and proves stability and unique equilibrium. The browser uses the compiled predicate without running the Lean kernel on each edit. Its compiler, runtime, bounded decoder, and current-input binding remain part of the trust boundary.
+
+The ABI accepts 21 rationals with at most 128 decimal digits per integer field. A worker watchdog bounds each check to one second. Unsupported mechanical or section edits, resource limits, worker failures, and stale requests clear the certificate. The dedicated workspace keeps its model separate from the main sandbox and requires no per-edit network request or verifier service.
+
+The `live-portal.yml` workflow audits every named bridge theorem and tests the installed bundle against its source hashes before exercising the actual browser checker. Its explicit `build_wasm` input additionally builds the structural artifact twice through the pinned Lean 4.19/C/Emscripten chain and compares every recorded build layer. The manifest identifies the compilation source commit, proof and ABI hashes, stability witness, and exact asset bytes. Local checks do not execute Lean or WASM.
+
+### Numerical model
+
 The numerical engine uses linear-elastic, prismatic Euler–Bernoulli frame elements with axial deformation and small displacements. Supports and load boundaries subdivide members while preserving rotational continuity. Linearly varying distributed loads include their consistent nodal loads and polynomial displacement terms. Stability is checked from the rank of the restrained stiffness matrix before solving.
 
 This release supports rigid joints, internal hinges, finite connection springs, member-specific releases, inclined rollers, fixed supports, guided supports, point forces, point couples, and vertical distributed loads. Ideal truss elements, shear deformation, buckling, plasticity, and large-displacement mechanisms are outside its scope. The mechanism display shows a linear free motion. Near-singular systems can be reported as unstable or poorly conditioned according to the numerical tolerance.

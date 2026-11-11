@@ -9,35 +9,50 @@ import { chromium } from 'playwright';
 
 assert.equal(process.env.GITHUB_ACTIONS, 'true');
 assert.equal(process.platform, 'linux');
-const [assets, source] = process.argv.slice(2);
+const [assets, source, installedOutput] = process.argv.slice(2);
 const root = process.cwd();
-const output = dirname(assets);
+const output = installedOutput ? resolve(installedOutput) : dirname(assets);
 const bundle = resolve('public/portal-checker/bundle');
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 await mkdir(bundle, { recursive: true });
+await mkdir(output, { recursive: true });
 const files = {};
 for (const name of ['checker.wasm', 'checker.mjs', 'checker.worker.js', 'checker.mjs.symbols']) {
     const bytes = await readFile(resolve(assets, name));
     files[name] = digest(bytes);
-    await writeFile(resolve(bundle, name), bytes);
+    if (!installedOutput) await writeFile(resolve(bundle, name), bytes);
 }
-await copyFile(resolve(source, 'worker.mjs'), resolve(bundle, 'worker.mjs'));
+if (!installedOutput) await copyFile(resolve(source, 'worker.mjs'), resolve(bundle, 'worker.mjs'));
 const proofFiles = {};
 for (const name of ['PortalChecker.lean', 'PortalTables.lean', 'PortalSoundness.lean', 'PortalFramePilot.lean', 'lean-toolchain', 'lake-manifest.json']) {
     proofFiles[name] = digest(await readFile(resolve('proofs', name)));
 }
-const buildReceipt = JSON.parse(await readFile('.data/live-portal-build/receipt.json', 'utf8'));
-assert.equal(buildReceipt.repeatability, true);
-const manifest = { status: 'proved-compiled', theorem: 'PortalSoundness.acceptance_actual_portal',
-    sourceCommit: buildReceipt.commit, pins: buildReceipt.pins,
-    buildManifests: [buildReceipt.manifest_1_sha256, buildReceipt.manifest_2_sha256],
-    stabilityWitness: 'PortalSoundness.fixed_inverse',
-    groupedReactions: 'PortalSoundness.accepted_grouped_reactions',
-    files, proofFiles, workerSha256: digest(await readFile(resolve(bundle, 'worker.mjs'))),
-    abiSha256: digest(await readFile(resolve(source, 'abi.c'))),
-    axiomAuditSha256: digest(await readFile('.data/live-portal-build/axiom-audit.json')),
-    trust: 'Pinned Lean 4.19/C/Emscripten compilation, runtime, decoder and input binding. No kernel invocation per edit.' };
-await writeFile(resolve(bundle, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
+if (installedOutput) {
+    // Delivery checks reuse the immutable compiled bytes. Current source and
+    // fresh kernel audit must agree before testing the final workspace build.
+    const manifest = JSON.parse(await readFile(resolve(bundle, 'manifest.json'), 'utf8'));
+    assert.equal(manifest.status, 'proved-compiled');
+    assert.equal(manifest.theorem, 'PortalSoundness.acceptance_actual_portal');
+    assert.deepEqual(manifest.files, files);
+    assert.deepEqual(manifest.proofFiles, proofFiles);
+    assert.equal(manifest.workerSha256, digest(await readFile(resolve(bundle, 'worker.mjs'))));
+    assert.equal(manifest.workerSha256, digest(await readFile(resolve(source, 'worker.mjs'))));
+    assert.equal(manifest.abiSha256, digest(await readFile(resolve(source, 'abi.c'))));
+    assert.equal(manifest.axiomAuditSha256, digest(await readFile('.data/live-portal/axiom-audit.json')));
+} else {
+    const buildReceipt = JSON.parse(await readFile('.data/live-portal-build/receipt.json', 'utf8'));
+    assert.equal(buildReceipt.repeatability, true);
+    const manifest = { status: 'proved-compiled', theorem: 'PortalSoundness.acceptance_actual_portal',
+        sourceCommit: buildReceipt.commit, pins: buildReceipt.pins,
+        buildManifests: [buildReceipt.manifest_1_sha256, buildReceipt.manifest_2_sha256],
+        stabilityWitness: 'PortalSoundness.fixed_inverse',
+        groupedReactions: 'PortalSoundness.accepted_grouped_reactions',
+        files, proofFiles, workerSha256: digest(await readFile(resolve(bundle, 'worker.mjs'))),
+        abiSha256: digest(await readFile(resolve(source, 'abi.c'))),
+        axiomAuditSha256: digest(await readFile('.data/live-portal-build/axiom-audit.json')),
+        trust: 'Pinned Lean 4.19/C/Emscripten compilation, runtime, decoder and input binding. No kernel invocation per edit.' };
+    await writeFile(resolve(bundle, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
+}
 assert.equal(spawnSync('node', ['scripts/build.mjs'], { stdio: 'inherit' }).status, 0);
 
 const dist = resolve('dist');

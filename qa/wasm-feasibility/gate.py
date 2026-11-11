@@ -230,6 +230,7 @@ def main():
     assert receipt["comparison"]["equal"], "Canonical build mismatch: " + str(receipt["comparison"]["first_differing_layer"])
     receipt["repeatability"] = True
     receipt["stage"] = "browser"
+    save_receipt()
     browser = OUTPUT / "browser"
     browser.mkdir()
     run(["npm", "install", "--prefix", browser, "--ignore-scripts", "--save-exact",

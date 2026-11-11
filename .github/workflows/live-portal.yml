@@ -59,9 +59,18 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_wasm }}
         run: cd proofs && lake env python3 ../qa/live-portal/negative-table.py
       - uses: pnpm/action-setup@v4
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_wasm }}
+        if: ${{ (github.event_name == 'workflow_dispatch' && inputs.build_wasm) || hashFiles('public/portal-checker/bundle/manifest.json') != '' }}
         with:
           version: '11.25.0'
+      - name: Test the installed structural bundle in the final workspace
+        if: ${{ hashFiles('public/portal-checker/bundle/manifest.json') != '' && !(github.event_name == 'workflow_dispatch' && inputs.build_wasm) }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile --ignore-scripts
+          pnpm check
+          pnpm test
+          python3 qa/live-portal/check-installed.py
       - name: Prepare the deliberate structural artifact build
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_wasm }}
         shell: bash
@@ -92,6 +101,15 @@ jobs:
             .data/wasm-build/canonical/browser-results.json
             public/portal-checker/bundle
             !.data/live-portal-build/browser/node_modules
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: ${{ always() && hashFiles('public/portal-checker/bundle/manifest.json') != '' && !(github.event_name == 'workflow_dispatch' && inputs.build_wasm) }}
+        with:
+          name: live-portal-browser
+          path: |
+            .data/live-portal-browser/browser-results.json
+            .data/live-portal-browser/browser-trace.zip
+            .data/live-portal-browser/portal-accepted.png
+            .data/live-portal-browser/package-lock.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
