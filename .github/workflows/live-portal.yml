@@ -40,7 +40,7 @@ jobs:
           lake env bash -c '
             set -euo pipefail
             export LEAN_PATH="$PWD:$LEAN_PATH"
-            for module in PortalTables PortalChecker PortalFramePilot PortalSoundness RationalFrameModel RationalFrameChecker RationalFrameWire RationalFrameAlgebra; do
+            for module in PortalTables PortalChecker PortalFramePilot PortalSoundness RationalFrameModel RationalFrameChecker RationalFrameWire; do
               lean -o "$module.olean" "$module.lean" 2>&1 | tee "../.data/live-portal/$module.log"
             done
           '
@@ -52,6 +52,19 @@ jobs:
           node qa/general-frame/packets.mjs
           cd proofs
           lake env bash -c 'export LEAN_PATH="$PWD:$LEAN_PATH"; lean --run ../qa/general-frame/NativePackets.lean ../.data/general-frame-packets' | tee ../.data/live-portal/generic-packets.log
+      - name: Measure bounded exact-arithmetic growth on the three fixed cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          node qa/general-frame/measure-growth.mjs | tee .data/live-portal/generic-candidate-growth.json
+          cd proofs
+          lake env bash -c 'export LEAN_PATH="$PWD:$LEAN_PATH"; lean --run ../qa/general-frame/MeasurePackets.lean ../.data/general-frame-growth' | tee ../.data/live-portal/generic-checker-timing.log
+      - name: Check generic finite factor algebra
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd proofs
+          lake env bash -c 'export LEAN_PATH="$PWD:$LEAN_PATH"; lean -o RationalFrameAlgebra.olean RationalFrameAlgebra.lean' | tee ../.data/live-portal/RationalFrameAlgebra.log
       - name: Audit every structural checker bridge theorem
         shell: bash
         run: |

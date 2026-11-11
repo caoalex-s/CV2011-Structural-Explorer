@@ -52,7 +52,7 @@ def SolutionValid (model : Compiled) (query : Query) (certificate : Certificate)
 def MechanismValid (model : Compiled) (certificate : Certificate) : Prop :=
   let matrix := stiffnessMatrix model
   let force := forceVector model
-  (∃ i : Fin model.dofs, certificate.motion[i.val]! ≠ 0) ∧
+  (¬ ∀ i : Fin model.dofs, certificate.motion[i.val]! = 0) ∧
   (∀ i : Fin model.dofs, arrayDot matrix[i.val]! certificate.motion = 0) ∧
   certificate.loadWork = arrayDot force certificate.motion ∧
   certificate.reactions = #[] ∧ certificate.lower = #[] ∧ certificate.diagonal = #[] ∧ certificate.readouts = #[]
@@ -86,7 +86,7 @@ theorem acceptance_source (source : Source) (query : Query) (certificate : Certi
   cases hc : compileModel source with
   | none => simp [hc] at h
   | some model =>
-    refine ⟨model, hc, ?_⟩
+    refine ⟨model, rfl, ?_⟩
     cases hm : certificate.mechanism <;>
       simpa [hc, acceptsCompiled, hm, Bool.and_eq_true, and_assoc] using h
 
