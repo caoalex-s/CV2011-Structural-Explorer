@@ -1,7 +1,7 @@
 name: Live portal structural checker
 on:
   push:
-    branches: [codex/live-portal-checker]
+    branches: [codex/live-portal-checker, codex/general-frame-checker]
   workflow_dispatch:
     inputs:
       build_wasm:
@@ -24,7 +24,7 @@ jobs:
         with:
           node-version: '24'
       - name: Check profile, exact candidates and revision binding
-        run: node --test tests/portal-live.test.mjs tests/portal-runtime.test.mjs tests/model-evidence.test.mjs tests/portal-frame-pilot.test.mjs
+        run: node --test tests/portal-live.test.mjs tests/portal-runtime.test.mjs tests/model-evidence.test.mjs tests/portal-frame-pilot.test.mjs tests/frame-candidate.test.mjs
       - uses: leanprover/lean-action@ba3fdfe5c4476c925da13bf11a005ddb47e47aee
         with:
           lake-package-directory: proofs
@@ -40,7 +40,7 @@ jobs:
           lake env bash -c '
             set -euo pipefail
             export LEAN_PATH="$PWD:$LEAN_PATH"
-            for module in PortalTables PortalChecker PortalFramePilot PortalSoundness; do
+            for module in PortalTables PortalChecker PortalFramePilot PortalSoundness RationalFrameModel RationalFrameChecker; do
               lean -o "$module.olean" "$module.lean" 2>&1 | tee "../.data/live-portal/$module.log"
             done
           '
