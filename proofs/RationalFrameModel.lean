@@ -189,16 +189,29 @@ def localStiffness (s : Segment) (i j : Fin 6) : Rat :=
   let c := 6 * s.EI / (L * L)
   let d := 4 * s.EI / L
   let e := 2 * s.EI / L
-  let rows : Array (Array Rat) :=
-    #[#[a,0,0,-a,0,0], #[0,b,c,0,-b,c], #[0,c,d,0,-c,e],
-      #[-a,0,0,a,0,0], #[0,-b,-c,0,b,-c], #[0,c,e,0,-c,d]]
-  rows[i.val]![j.val]!
+  -- Axial block, transverse block, bending/rotation couplings, rotations.
+  -- Pattern matching avoids constructing a 6×6 array for each scalar entry.
+  match i.val, j.val with
+  | 0, 0 | 3, 3 => a
+  | 0, 3 | 3, 0 => -a
+  | 1, 1 | 4, 4 => b
+  | 1, 4 | 4, 1 => -b
+  | 1, 2 | 2, 1 | 1, 5 | 5, 1 => c
+  | 2, 4 | 4, 2 | 4, 5 | 5, 4 => -c
+  | 2, 2 | 5, 5 => d
+  | 2, 5 | 5, 2 => e
+  | _, _ => 0
 
 def localForce (s : Segment) (i : Fin 6) : Rat :=
   let axial := s.sine * s.vertical * s.length / 2
   let transverse := s.cosine * s.vertical * s.length / 2
   let moment := s.cosine * s.vertical * (s.length * s.length) / 12
-  (#[axial, transverse, moment, axial, transverse, -moment] : Array Rat)[i.val]!
+  match i.val with
+  | 0 | 3 => axial
+  | 1 | 4 => transverse
+  | 2 => moment
+  | 5 => -moment
+  | _ => 0
 
 /-- For the supported axes each local coordinate is one signed global coordinate. -/
 def globalIndex (s : Segment) (i : Fin 6) : Nat :=
