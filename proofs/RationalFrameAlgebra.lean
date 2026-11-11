@@ -8,6 +8,18 @@ open scoped BigOperators Matrix
 namespace RationalFrame.Algebra
 noncomputable section
 
+theorem sumFin_eq_sum (n : Nat) (f : Fin n → Rat) : sumFin n f = ∑ i, f i := by
+  rw [Fin.sum_univ_def]
+  rfl
+
+/-- The source-derived mask enumerates every free coordinate and no other one. -/
+theorem freeIndices_complete (model : Compiled) (i : Nat) :
+    i ∈ (freeIndices model).toList ↔ i < model.dofs ∧ blocked model i = false := by
+  simp [freeIndices, List.mem_filter, Bool.not_eq_true]
+
+theorem freeIndices_no_duplicates (model : Compiled) : (freeIndices model).toList.Nodup := by
+  simpa [freeIndices] using (List.nodup_range model.dofs).filter (fun i => !blocked model i)
+
 /-- Back substitution proves that a unit upper triangular map has no kernel.
     The induction is on distance from the last row, so n=0 is included. -/
 theorem unitUpper_kernel {n : Nat} (matrix : Matrix (Fin n) (Fin n) ℝ)
@@ -59,10 +71,45 @@ theorem positiveLDL {n : Nat} (lower : Matrix (Fin n) (Fin n) ℝ) (pivot : Fin 
   have hinjective : Function.Injective lower.vecMul := by
     intro x y h
     apply htranspose
-    simpa only [Matrix.mulVec, Matrix.vecMul, Matrix.transpose_apply,
-      dotProduct, mul_comm] using h
-  have hp := (Matrix.PosDef.diagonal positive).mul_mul_conjTranspose_same hinjective
+    simpa only [Matrix.mulVec_transpose] using h
+  have hd : (Matrix.diagonal pivot).PosDef := by
+    refine ⟨Matrix.isHermitian_diagonal_of_self_adjoint _ (fun i => by simp [IsSelfAdjoint]), ?_⟩
+    intro x hx
+    obtain ⟨i, hi⟩ := Function.ne_iff.mp hx
+    have hsum : 0 < ∑ j : Fin n, pivot j * (x j)^2 :=
+      Finset.sum_pos' (fun j _ => mul_nonneg (positive j).le (sq_nonneg (x j)))
+        ⟨i, Finset.mem_univ i, mul_pos (positive i) (sq_pos_of_ne_zero hi)⟩
+    simpa [Matrix.mulVec_diagonal, dotProduct, pow_two, mul_assoc, mul_comm, mul_left_comm] using hsum
+  have hp := hd.mul_mul_conjTranspose_same hinjective
   simpa [Matrix.conjTranspose] using hp
+
+/-- This uses the actual predicate's rational factor entries, cast exactly to
+    reals. It does not posit a separate inverse, factor, or matrix equality. -/
+theorem checked_factor_positive (matrix : Array (Array Rat)) (free : Array Nat) (certificate : Certificate)
+    (checked : FactorValid matrix free certificate) :
+    (fun i j : Fin free.size => (matrix[free[i.val]!]![free[j.val]!]! : ℝ)).PosDef := by
+  rcases checked with ⟨_, _, _, hdiagonal, htriangle, hfactor⟩
+  let lower : Matrix (Fin free.size) (Fin free.size) ℝ :=
+    fun i j => (certificate.lower[i.val]![j.val]! : ℝ)
+  let pivot : Fin free.size → ℝ := fun i => (certificate.diagonal[i.val]! : ℝ)
+  have htri : ∀ i j, i < j → lower i j = 0 := by
+    intro i j hij
+    exact_mod_cast htriangle i j hij
+  have hunit : ∀ i, lower i i = 1 := by
+    intro i
+    exact_mod_cast (hdiagonal i).2
+  have hpos : ∀ i, 0 < pivot i := by
+    intro i
+    exact_mod_cast (hdiagonal i).1
+  have heq : (fun i j : Fin free.size => (matrix[free[i.val]!]![free[j.val]!]! : ℝ)) =
+      lower * Matrix.diagonal pivot * lower.transpose := by
+    ext i j
+    have h := congrArg (fun value : Rat => (value : ℝ)) (hfactor i j)
+    rw [sumFin_eq_sum] at h
+    push_cast at h
+    simpa [Matrix.mul_apply, Matrix.mul_diagonal, Matrix.transpose_apply, lower, pivot] using h.symm
+  rw [heq]
+  exact positiveLDL lower pivot htri hunit hpos
 
 end
 end RationalFrame.Algebra

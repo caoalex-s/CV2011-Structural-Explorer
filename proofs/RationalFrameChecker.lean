@@ -1,4 +1,4 @@
-import RationalFrameModel
+import RationalFramePartition
 
 /-! Executable generic witness checking. An accepted record concerns the
     source-derived model, never matrices or support masks supplied by a caller. -/
@@ -71,18 +71,21 @@ def acceptsCompiled (model : Compiled) (query : Query) (certificate : Certificat
     else decide (SolutionValid model query certificate)
 
 def accepts (source : Source) (query : Query) (certificate : Certificate) : Bool :=
-  match compileModel source with
+  sourceValid source && match compileModel source with
   | none => false
-  | some model => acceptsCompiled model query certificate
+  | some model => decide (model.source = source) && decide (PartitionValid model) && acceptsCompiled model query certificate
 
 /-- The public source-level entry cannot bypass source compilation. This is
     an executable-boundary lemma, not yet the actual structural-model theorem. -/
 theorem acceptance_source (source : Source) (query : Query) (certificate : Certificate)
     (h : accepts source query certificate = true) :
-    ∃ model, compileModel source = some model ∧ queryValid model query = true ∧
+    sourceValid source = true ∧ ∃ model, compileModel source = some model ∧ model.source = source ∧
+      PartitionValid model ∧ queryValid model query = true ∧
       Admissible model certificate.motion ∧
       (if certificate.mechanism then MechanismValid model certificate else SolutionValid model query certificate) := by
-  unfold accepts at h
+  simp only [accepts, Bool.and_eq_true] at h
+  refine ⟨h.1, ?_⟩
+  have h := h.2
   cases hc : compileModel source with
   | none => simp [hc] at h
   | some model =>

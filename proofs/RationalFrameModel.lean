@@ -13,7 +13,7 @@ structure Node where
   joint : Nat
   reference : Option Nat
   rotationStiffness : Rat
-  deriving Inhabited, Repr
+  deriving Inhabited, Repr, DecidableEq
 
 structure Member where
   id : String
@@ -22,7 +22,7 @@ structure Member where
   EA : Rat
   EI : Rat
   rigidEnds : Bool
-  deriving Inhabited, Repr
+  deriving Inhabited, Repr, DecidableEq
 
 structure Support where
   id : String
@@ -31,7 +31,7 @@ structure Support where
   /-- 0 pin, 1 fixed, 2 roller. -/
   kind : Nat
   angle : Rat
-  deriving Inhabited, Repr
+  deriving Inhabited, Repr, DecidableEq
 
 structure Load where
   id : String
@@ -44,14 +44,14 @@ structure Load where
   fy : Rat
   mz : Rat
   qEnd : Rat
-  deriving Inhabited, Repr
+  deriving Inhabited, Repr, DecidableEq
 
 structure Source where
   nodes : Array Node
   members : Array Member
   supports : Array Support
   loads : Array Load
-  deriving Inhabited, Repr
+  deriving Inhabited, Repr, DecidableEq
 
 structure Query where
   member : Nat
