@@ -68,7 +68,7 @@ const server = createServer(async (request, response) => {
             response.end("self.addEventListener('install', () => self.skipWaiting());");
             return;
         }
-        const path = resolve(dist, relative + (relative.endsWith('/') ? 'index.html' : ''));
+        const path = resolve(dist, relative + (!relative || relative.endsWith('/') ? 'index.html' : ''));
         if (!path.startsWith(dist + '/')) { response.writeHead(403).end(); return; }
         const bytes = await readFile(path);
         response.writeHead(200, { 'Content-Type': types[extname(path)] ?? 'application/octet-stream', 'Cache-Control': 'no-store' });
@@ -94,7 +94,8 @@ async function importModel(model) {
     await page.locator('#model-file').setInputFiles({ name: 'public-portal.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ version: 2, model })) });
 }
 try {
-    await page.goto(origin + base);
+    const rootResponse = await page.goto(origin + base);
+    assert.equal(rootResponse.status(), 200);
     assert.equal(await page.evaluate(() => navigator.serviceWorker.controller), null);
     const sentinelScope = origin + base + 'neighbor/';
     await page.evaluate(async scope => {
