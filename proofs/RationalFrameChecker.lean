@@ -18,7 +18,7 @@ structure Certificate where
   deriving Inhabited, Repr
 
 def arrayDot (a b : Array Rat) : Rat :=
-  ((List.range a.size).map (fun i => a[i]! * b[i]!)).foldr (· + ·) 0
+  sumFin a.size (fun i => a[i.val]! * b[i.val]!)
 
 def residual (matrix : Array (Array Rat)) (force motion : Array Rat) : Array Rat :=
   matrix.mapIdx fun i row => arrayDot row motion - force[i]!
