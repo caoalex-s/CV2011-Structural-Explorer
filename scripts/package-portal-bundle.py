@@ -62,9 +62,15 @@ with zipfile.ZipFile(args.archive) as archive:
         (bundle / name).write_bytes(data)
     worker = Path('qa/live-portal/worker.mjs').read_bytes()
     (bundle / 'worker.mjs').write_bytes(worker)
-    proof_files = {name: digest((Path('proofs') / name).read_bytes()) for name in
-                   ['PortalChecker.lean', 'PortalTables.lean', 'PortalSoundness.lean',
-                    'PortalFramePilot.lean', 'lean-toolchain', 'lake-manifest.json']}
+    # Use the committed text bytes used by Linux CI. Windows generators may
+    # leave CRLF in a worktree even when Git's declared storage format is LF.
+    proof_files = {}
+    for name in ['PortalChecker.lean', 'PortalTables.lean', 'PortalSoundness.lean',
+                 'PortalFramePilot.lean', 'lean-toolchain', 'lake-manifest.json']:
+        committed = subprocess.run(['git', 'show', args.source_commit + ':proofs/' + name],
+                                   capture_output=True, check=True).stdout
+        assert (Path('proofs') / name).read_bytes().replace(b'\r\n', b'\n') == committed
+        proof_files[name] = digest(committed)
     manifest = {
         'status': 'proved-compiled', 'theorem': 'PortalSoundness.acceptance_actual_portal',
         'sourceCommit': receipt['commit'], 'pins': receipt['pins'],
