@@ -70,6 +70,9 @@ for (const [name, mutate] of [
     ['field', c => { c.readouts[5] = zero; c.readouts[2] = add(c.readouts[2], one); }],
     ['factor', c => { c.lower[1][0] = add(c.lower[1][0], one); }],
     ['pivot', c => { c.diagonal[0] = neg(c.diagonal[0]); }],
+    ['point_order', c => { [c.points[0], c.points[1]] = [c.points[1], c.points[0]]; }],
+    ['point_parameter', c => { c.points[2].t = zero; }],
+    ['point_coordinate', c => { c.points[2].x = add(c.points[2].x, one); }],
 ]) {
     const corrupted = copy(baseline); mutate(corrupted);
     await save('0_corrupt_' + name, beam, query, corrupted);

@@ -10,7 +10,10 @@ import { type Fraction, binary64, fraction, maxRationalDigits } from './frame-ra
 
 export const framePacketVersion = 'CV2011_FRAME_1';
 
-/** Encode the source itself; never serialize candidate cuts, K, F or a mask. */
+/** Encode the source and witness, including claimed display identities.
+ * Lean derives its own cuts and rejects a different display map. No candidate
+ * stiffness, force or restraint mask is an authoritative packet input.
+ */
 export function framePacket(input: unknown, query: EvidenceQuery, witness: FrameCertificate): Uint8Array {
     const model = validateFrame(input, query);
     const fields: string[] = [framePacketVersion];
@@ -59,6 +62,13 @@ export function framePacket(input: unknown, query: EvidenceQuery, witness: Frame
     natural(mechanism ? 1 : 0, 1);
     natural(witness.motion.length, frameLimits.coordinates);
     natural(witness.diagonal.length, frameLimits.coordinates);
+    natural(witness.points.length, frameLimits.points);
+    if (witness.motion.length !== 3 * witness.points.length) throw Error('Malformed point-map dimensions.');
+    for (const point of witness.points) {
+        natural(point.owner === 'node' ? 0 : 1, 1);
+        natural(point.index, (point.owner === 'node' ? model.nodes.length : model.members.length) - 1);
+        rational(point.t); rational(point.x); rational(point.y);
+    }
     witness.motion.forEach(rational);
     if (mechanism) {
         if (witness.reactions.length || witness.lower.length || witness.diagonal.length || witness.readouts.length)

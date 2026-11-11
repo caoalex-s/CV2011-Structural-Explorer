@@ -25,7 +25,7 @@ export interface CompiledFrame {
     supportPoints: number[]; structuralKey: string; boundaryKey: string;
 }
 export interface FrameCertificate {
-    kind: 'solution' | 'mechanism'; motion: Fraction[]; reactions: Fraction[];
+    kind: 'solution' | 'mechanism'; points: FramePoint[]; motion: Fraction[]; reactions: Fraction[];
     lower: Fraction[][]; diagonal: Fraction[]; readouts: Fraction[]; loadWork: Fraction;
 }
 
@@ -253,7 +253,7 @@ export class FrameCandidates {
         if (!factors) {
             const mechanism = nullVector(reduced);
             frame.free.forEach((index, i) => { motion[index] = mechanism[i]; });
-            return { kind: 'mechanism', motion, reactions: [], lower: [], diagonal: [], readouts: [], loadWork: dot(frame.force, motion) };
+            return { kind: 'mechanism', points: frame.points, motion, reactions: [], lower: [], diagonal: [], readouts: [], loadWork: dot(frame.force, motion) };
         }
         this.cache = { key: frame.boundaryKey, ...factors };
         const { lower, diagonal } = factors;
@@ -267,7 +267,7 @@ export class FrameCandidates {
             motion[frame.free[row]] = reducedMotion[row];
         }
         const reactions = frame.stiffness.map((row, i) => sub(dot(row, motion), frame.force[i]));
-        return { kind: 'solution', motion, reactions, lower, diagonal, readouts: recoverFrame(frame, motion), loadWork: zero };
+        return { kind: 'solution', points: frame.points, motion, reactions, lower, diagonal, readouts: recoverFrame(frame, motion), loadWork: zero };
     }
 }
 

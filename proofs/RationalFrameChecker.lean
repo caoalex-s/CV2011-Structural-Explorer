@@ -7,6 +7,8 @@ namespace RationalFrame
 structure Certificate where
   /-- false is a stable solution, true is a proposed mechanism. -/
   mechanism : Bool
+  /-- Claimed display identities; checked against the derived point order. -/
+  points : Array Point
   motion : Array Rat
   reactions : Array Rat
   lower : Array (Array Rat)
@@ -66,7 +68,7 @@ instance (model : Compiled) (certificate : Certificate) : Decidable (MechanismVa
 
 /-- Finite source/certificate validation, with no floating acceptance flags. -/
 def acceptsCompiled (model : Compiled) (query : Query) (certificate : Certificate) : Bool :=
-  queryValid model query && decide (Admissible model certificate.motion) &&
+  decide (certificate.points = model.points) && queryValid model query && decide (Admissible model certificate.motion) &&
     if certificate.mechanism then decide (MechanismValid model certificate)
     else decide (SolutionValid model query certificate)
 
@@ -80,7 +82,7 @@ def accepts (source : Source) (query : Query) (certificate : Certificate) : Bool
 theorem acceptance_source (source : Source) (query : Query) (certificate : Certificate)
     (h : accepts source query certificate = true) :
     sourceValid source = true ∧ ∃ model, compileModel source = some model ∧ model.source = source ∧
-      PartitionValid model ∧ queryValid model query = true ∧
+      PartitionValid model ∧ certificate.points = model.points ∧ queryValid model query = true ∧
       Admissible model certificate.motion ∧
       (if certificate.mechanism then MechanismValid model certificate else SolutionValid model query certificate) := by
   simp only [accepts, Bool.and_eq_true] at h

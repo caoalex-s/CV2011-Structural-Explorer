@@ -69,7 +69,7 @@ structure Point where
   t : Rat
   x : Rat
   y : Rat
-  deriving Inhabited, Repr
+  deriving Inhabited, Repr, DecidableEq
 
 structure Segment where
   member : Nat

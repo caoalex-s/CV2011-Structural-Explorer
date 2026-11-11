@@ -109,6 +109,17 @@ def packet (fields : Array String) : Decoder Packet := do
   let mechanism ← natural fields 1
   let motionCount ← natural fields 48
   let freeCount ← natural fields 48
+  let pointCount ← natural fields 16
+  if motionCount != 3 * pointCount then throw ()
+  let mut points : Array Point := #[]
+  for _ in [:pointCount] do
+    let owned ← natural fields 1
+    let index ← natural fields (if owned == 0 then nodeCount - 1 else memberCount - 1)
+    let parameter ← rational fields
+    let x ← rational fields
+    let y ← rational fields
+    points := points.push { owner := if owned == 0 then none else some index,
+      index := index, t := parameter, x := x, y := y }
   let motion ← vector fields motionCount
   let mut reactions := #[]
   let mut lower := #[]
@@ -126,7 +137,7 @@ def packet (fields : Array String) : Decoder Packet := do
     source := { nodes := nodes, members := members, supports := supports, loads := loads }
     query := { member := member, t := t, right := right == 1, convention := convention }
     certificate := {
-      mechanism := mechanism == 1, motion := motion, reactions := reactions,
+      mechanism := mechanism == 1, points := points, motion := motion, reactions := reactions,
       lower := lower, diagonal := diagonal, readouts := readouts, loadWork := loadWork } }
 
 /-- The C entry performs the same byte/line caps before constructing a String.
