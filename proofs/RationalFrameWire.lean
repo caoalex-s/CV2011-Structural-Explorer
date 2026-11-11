@@ -118,7 +118,8 @@ def packet (fields : Array String) : Decoder Packet := do
     let parameter ← rational fields
     let x ← rational fields
     let y ← rational fields
-    points := points.push { owner := if owned == 0 then none else some index,
+    points := points.push {
+      owner := if owned == 0 then none else some index,
       index := index, t := parameter, x := x, y := y }
   let motion ← vector fields motionCount
   let mut reactions := #[]
