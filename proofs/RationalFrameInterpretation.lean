@@ -304,6 +304,39 @@ theorem motion_injective (data : Compiled) (valid : PartitionValid data) : Funct
   funext i
   simpa only [motion_coordinate] using congrFun h (coordinateEquiv data valid i)
 
+/-- A packet triple is exactly the corresponding physical point movement. -/
+theorem motion_pair (data : Compiled) (valid : PartitionValid data)
+    (q : Fin data.dofs → ℝ) (index : Fin data.points.size) (direction : Fin 3) :
+    motion data valid q (coordinatePair data valid (index, direction)) =
+      q ((flatEquiv data).symm (index, direction)) := by
+  have mapped : coordinateEquiv data valid ((flatEquiv data).symm (index, direction)) =
+      coordinatePair data valid (index, direction) := by
+    simp [coordinateEquiv]
+  rw [← mapped, motion_coordinate]
+
+theorem reference_motion (data : Compiled) (valid : PartitionValid data)
+    (values : Nat → ℝ) (index : Fin data.points.size) (direction : Fin 3) :
+    referenceMotion (model data valid) (motion data valid (fun i => values i.val))
+      (point data valid index) direction = values (3 * index.val + direction.val) := by
+  simp only [referenceMotion, dif_pos (point_active data valid index)]
+  change motion data valid (fun i => values i.val) (coordinatePair data valid (index, direction)) = _
+  rw [motion_pair]
+  rfl
+
+/-- No hidden relative end movement remains in the supported rigid class. -/
+theorem side_reference (data : Compiled) (valid : PartitionValid data)
+    (q : Coordinate (model data valid) → ℝ) (at : Location data.source.members.size data.points.size) :
+    sideMotion (model data valid) q at = referenceMotion (model data valid) q
+      (locationPoint (model data valid) at) := by
+  cases at with
+  | interior member cut => rfl
+  | endSide side =>
+    have zeroSlip : slipValue (model data valid) q side = fun _ => 0 := by
+      funext direction
+      simp [slipValue, no_slip]
+    simp only [sideMotion, locationPoint, zeroSlip]
+    exact rigid_end _ _ _
+
 theorem positive_segments (data : Compiled) (valid : PartitionValid data) : FrameAssembly.positiveSegments (model data valid) := by
   intro i
   rcases segments_valid data valid i with ⟨_, _, _, _, _, _, _, hlength, hEA, hEI, _⟩
