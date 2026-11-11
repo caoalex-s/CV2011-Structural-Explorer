@@ -52,5 +52,48 @@ theorem support_constraints (data : Compiled) (valid : PartitionValid data)
     all_goals simp [supportDirections, supports, roller, blocksDirection,
       angle, Fin.forall_fin_succ]
 
+theorem blocked_exists (data : Compiled) (row : Nat) :
+    blocked data row = true ↔ ∃ support : Fin data.source.supports.size,
+      row / 3 = locationIndex data data.source.supports[support.val]!.member
+        data.source.supports[support.val]!.t ∧
+      blocksDirection data.source.supports[support.val]! (row % 3) = true := by
+  simp only [blocked, Array.any_eq_true, Bool.and_eq_true, beq_iff_eq]
+  constructor
+  · rintro ⟨support, hmember, hpoint, hdirection⟩
+    obtain ⟨index, hindex, heq⟩ := Array.mem_iff_getElem.mp hmember
+    refine ⟨⟨index, hindex⟩, ?_, ?_⟩ <;> simpa [getElem!_pos, heq] using_assumption
+  · rintro ⟨index, hpoint, hdirection⟩
+    refine ⟨data.source.supports[index.val]!, ?_, hpoint, hdirection⟩
+    simp [getElem!_pos]
+
+/-- The mask covers exactly the actual constraint kernel, not merely a
+    subset of sufficient fixed coordinates. This also handles repeated rows. -/
+theorem admissible_iff_mask (data : Compiled) (valid : PartitionValid data) (values : Nat → ℝ) :
+    FrameAssembly.admissible (model data valid) (supports data valid)
+      (motion data valid (fun i => values i.val)) ↔
+      ∀ i : Fin data.dofs, blocked data i.val = true → values i.val = 0 := by
+  change (∀ support, _) ↔ _
+  simp_rw [support_constraints]
+  constructor
+  · intro restraints i hi
+    obtain ⟨support, hpoint, hdirection⟩ := (blocked_exists data i.val).mp hi
+    have value := restraints support ⟨i.val % 3, by omega⟩ hdirection
+    have reconstruct : 3 * locationIndex data data.source.supports[support.val]!.member
+        data.source.supports[support.val]!.t + i.val % 3 = i.val := by omega
+    simpa only [reconstruct] using value
+  · intro mask support direction hdirection
+    let point := locationIndex data data.source.supports[support.val]!.member
+      data.source.supports[support.val]!.t
+    have bound : point < data.points.size := (supports_valid data valid support).2.1
+    have directionBound := direction.isLt
+    let i : Fin data.dofs := ⟨3*point+direction.val, by dsimp [Compiled.dofs]; omega⟩
+    apply mask i
+    apply (blocked_exists data i.val).mpr
+    refine ⟨support, ?_, ?_⟩
+    · change (3*point+direction.val)/3 = point
+      omega
+    · have hmod : i.val % 3 = direction.val := by dsimp [i]; omega
+      simpa only [hmod] using hdirection
+
 end
 end RationalFrame.Constraints
