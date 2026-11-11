@@ -214,6 +214,92 @@ theorem point_active (data : Compiled) (valid : PartitionValid data) (i : Fin da
     congr 1
     exact Fin.ext hend
 
+def pointIndex (data : Compiled) :
+    FrameAssemblyModel.Point data.source.nodes.size data.source.members.size data.points.size → Nat
+  | .inl node => node.val
+  | .inr (_, cut) => cut.val
+
+theorem point_index (data : Compiled) (valid : PartitionValid data) (i : Fin data.points.size) :
+    pointIndex data (point data valid i) = i.val := by
+  cases ho : data.points[i.val]!.owner <;> simp [point, ho, pointIndex]
+
+theorem point_injective (data : Compiled) (valid : PartitionValid data) : Function.Injective (point data valid) := by
+  intro i j h
+  have hv := congrArg (pointIndex data) h
+  simpa only [point_index, Fin.val_inj] using hv
+
+def active (data : Compiled) (valid : PartitionValid data) (i : Fin data.points.size) : ActivePoint (model data valid) :=
+  ⟨point data valid i, point_active data valid i⟩
+
+theorem active_injective (data : Compiled) (valid : PartitionValid data) : Function.Injective (active data valid) := by
+  intro i j h
+  exact point_injective data valid (congrArg Subtype.val h)
+
+theorem active_surjective (data : Compiled) (valid : PartitionValid data) : Function.Surjective (active data valid) := by
+  intro p
+  obtain ⟨segment, hleft | hright⟩ := p.property
+  · refine ⟨segmentStart data valid segment, ?_⟩
+    apply Subtype.ext
+    exact (location_point data valid _ _ _ (segments_valid data valid segment).2.1).symm.trans hleft
+  · refine ⟨segmentEnd data valid segment, ?_⟩
+    apply Subtype.ext
+    exact (location_point data valid _ _ _ (segments_valid data valid segment).2.2.1).symm.trans hright
+
+def coordinatePair (data : Compiled) (valid : PartitionValid data)
+    (pair : Fin data.points.size × Fin 3) : Coordinate (model data valid) :=
+  .inl (active data valid pair.1, pair.2)
+
+theorem coordinatePair_bijective (data : Compiled) (valid : PartitionValid data) :
+    Function.Bijective (coordinatePair data valid) := by
+  constructor
+  · intro i j h
+    have hp := Sum.inl.inj h
+    exact Prod.ext (active_injective data valid (congrArg Prod.fst hp)) (congrArg Prod.snd hp)
+  · intro coordinate
+    rcases coordinate with ⟨p, direction⟩ | slip
+    · obtain ⟨i, hi⟩ := active_surjective data valid p
+      exact ⟨(i, direction), by simp [coordinatePair, hi]⟩
+    · exact False.elim (no_slip data valid slip.val.1 slip.val.2 slip.property)
+
+/-- The packet order is ux,uy,rotation for each represented point. -/
+def flatEquiv (data : Compiled) : Fin data.dofs ≃ (Fin data.points.size × Fin 3) where
+  toFun := fun i => (⟨i.val / 3, by have := i.isLt; dsimp [Compiled.dofs] at this; omega⟩,
+    ⟨i.val % 3, by omega⟩)
+  invFun := fun pair => ⟨3 * pair.1.val + pair.2.val, by
+    have := pair.1.isLt
+    have := pair.2.isLt
+    dsimp [Compiled.dofs]
+    omega⟩
+  left_inv := by intro i; apply Fin.ext; dsimp; omega
+  right_inv := by
+    intro pair
+    have := pair.1.isLt
+    have := pair.2.isLt
+    apply Prod.ext <;> apply Fin.ext <;> dsimp <;> omega
+
+/-- All and only actual rigid-frame coordinates occur in the packet vector.
+    The surjectivity proof uses represented segment endpoints and excludes
+    slip coordinates through the checked rigid-end interpretation. -/
+def coordinateEquiv (data : Compiled) (valid : PartitionValid data) : Fin data.dofs ≃ Coordinate (model data valid) :=
+  (flatEquiv data).trans (Equiv.ofBijective (coordinatePair data valid) (coordinatePair_bijective data valid))
+
+def motion (data : Compiled) (valid : PartitionValid data) (q : Fin data.dofs → ℝ) : Coordinate (model data valid) → ℝ :=
+  fun coordinate => q ((coordinateEquiv data valid).symm coordinate)
+
+theorem motion_coordinate (data : Compiled) (valid : PartitionValid data) (q : Fin data.dofs → ℝ) (i : Fin data.dofs) :
+    motion data valid q (coordinateEquiv data valid i) = q i := by
+  simp [motion]
+
+theorem motion_complete (data : Compiled) (valid : PartitionValid data) (q : Coordinate (model data valid) → ℝ) :
+    motion data valid (fun i => q (coordinateEquiv data valid i)) = q := by
+  funext coordinate
+  simp [motion]
+
+theorem motion_injective (data : Compiled) (valid : PartitionValid data) : Function.Injective (motion data valid) := by
+  intro q r h
+  funext i
+  simpa only [motion_coordinate] using congrFun h (coordinateEquiv data valid i)
+
 theorem positive_segments (data : Compiled) (valid : PartitionValid data) : FrameAssembly.positiveSegments (model data valid) := by
   intro i
   rcases segments_valid data valid i with ⟨_, _, _, _, _, _, _, hlength, hEA, hEI, _⟩
