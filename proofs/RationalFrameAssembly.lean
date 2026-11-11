@@ -103,5 +103,56 @@ theorem segment_force_sum (segment : Segment) (different : segment.a ≠ segment
   rw [projection_sum segment different]
   cases found : localAt segment row <;> simp [segmentForceEntry, found]
 
+theorem basis_motion (data : Compiled) (valid : PartitionValid data) (row : Fin data.dofs) :
+    FrameAssembly.coordinateBasis (model data valid) (coordinateEquiv data valid row) =
+      motion data valid (fun i => if i.val = row.val then 1 else 0) := by
+  funext coordinate
+  obtain ⟨i, rfl⟩ := (coordinateEquiv data valid).surjective coordinate
+  rw [motion_coordinate]
+  simp [FrameAssembly.coordinateBasis, Fin.ext_iff]
+
+theorem segment_basis (data : Compiled) (valid : PartitionValid data)
+    (segment : Fin data.segments.size) (row : Fin data.dofs) (i : Fin 6) :
+    segmentDofs (model data valid)
+      (FrameAssembly.coordinateBasis (model data valid) (coordinateEquiv data valid row)) segment i =
+      (mapping data.segments[segment.val]! i row.val : ℝ) := by
+  rw [basis_motion, segment_dofs data valid (fun j => if j = row.val then 1 else 0)]
+  simp [mapping]
+
+theorem stiffness_coefficient (data : Compiled) (valid : PartitionValid data)
+    (segment : Fin data.segments.size) (i j : Fin 6) :
+    LocalFrameFields.stiffness ((model data valid).segmentLength segment)
+      ((model data valid).segmentEA segment) ((model data valid).segmentEI segment) i j =
+      (localStiffness data.segments[segment.val]! i j : ℝ) := by
+  exact (Fields.stiffness_cast _ i j).symm
+
+/-- Every computed matrix entry is the actual model's bilinear work on its
+    coordinate bases. The source-derived original-member interpretation is
+    fixed throughout; neither side accepts an independently supplied K. -/
+theorem stiffness_entry (data : Compiled) (valid : PartitionValid data)
+    (row column : Fin data.dofs) :
+    (RationalFrame.stiffnessEntry data row.val column.val : ℝ) =
+      FrameAssembly.stiffnessEntry (model data valid)
+        (coordinateEquiv data valid row) (coordinateEquiv data valid column) := by
+  unfold FrameAssembly.stiffnessEntry FrameAssembly.stiffnessWork FrameAssembly.internalVirtualWork
+  simp only [segment_basis, stiffness_coefficient]
+  have zeroSlip (q : Coordinate (model data valid) → ℝ)
+      (side : MemberEnd data.source.members.size) (direction : Fin 3) :
+      slipValue (model data valid) q side direction = 0 := by
+    simp [slipValue, no_slip]
+  simp only [zeroSlip, mul_zero, Finset.sum_const_zero, add_zero]
+  simp only [RationalFrame.stiffnessEntry, sumSegments, Algebra.sumFin_eq_sum, Rat.cast_sum]
+  apply Finset.sum_congr rfl
+  intro segment _
+  exact segment_stiffness_sum _ (segment_axes data valid segment).2.2.2 row.val column.val
+
+theorem load_coefficient (data : Compiled) (valid : PartitionValid data)
+    (segment : Fin data.segments.size) (i : Fin 6) :
+    segmentLoad (model data valid) segment i = (localForce data.segments[segment.val]! i : ℝ) := by
+  obtain ⟨hc, hs, _, _⟩ := segment_axes data valid segment
+  simp only [segmentLoad, model, segmentMember]
+  rw [← hc, ← hs]
+  simpa only [Rat.cast_mul] using (Fields.force_cast data.segments[segment.val]! i).symm
+
 end
 end RationalFrame.Assembly

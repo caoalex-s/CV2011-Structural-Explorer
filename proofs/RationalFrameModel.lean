@@ -179,7 +179,7 @@ def compileModel (source : Source) : Option Compiled := Id.run do
 def Compiled.dofs (model : Compiled) : Nat := 3 * model.points.size
 def sumFin (n : Nat) (f : Fin n → Rat) : Rat := ((List.finRange n).map f).foldr (· + ·) 0
 def sumSegments (model : Compiled) (f : Segment → Rat) : Rat :=
-  (model.segments.toList.map f).foldr (· + ·) 0
+  sumFin model.segments.size (fun i => f model.segments[i.val]!)
 
 /-- Exact local stiffness, with no cached input matrix. -/
 def localStiffness (s : Segment) (i j : Fin 6) : Rat :=
@@ -271,7 +271,7 @@ def pointForceEntry (model : Compiled) (load : Load) (row : Nat) : Rat :=
 
 def forceEntry (model : Compiled) (row : Nat) : Rat :=
   sumSegments model (fun segment => segmentForceEntry segment row) +
-    ((model.source.loads.toList.map fun load => pointForceEntry model load row).foldr (· + ·) 0)
+    sumFin model.source.loads.size (fun i => pointForceEntry model model.source.loads[i.val]! row)
 
 def forceVector (model : Compiled) : Array Rat :=
   ((List.range model.dofs).map fun row => forceEntry model row).toArray
