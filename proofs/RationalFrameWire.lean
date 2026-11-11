@@ -133,8 +133,12 @@ def packet (fields : Array String) : Decoder Packet := do
     These bounds also protect direct native calls used by the Linux CI tests. -/
 def decode (input : String) : Option Packet := do
   if input.utf8ByteSize > 1048576 then none else do
-    let fields := (input.splitOn "\n").toArray
-    if fields.size > 6000 then none else
+    -- Count and reject non-ASCII bytes before allocating the field array.
+    let limits := input.foldl (fun (state : Nat × Bool) character =>
+      (state.1 + (if character == '\n' then 1 else 0),
+       state.2 && (character == '\n' || (character ≥ ' ' && character ≤ '~')))) (1, true)
+    if limits.1 > 6000 || !limits.2 then none else do
+      let fields := (input.splitOn "\n").toArray
       match (packet fields).run 0 with
       | .error _ => none
       | .ok (value, _) => some value

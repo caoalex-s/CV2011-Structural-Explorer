@@ -45,6 +45,7 @@ jobs:
             done
           '
           git diff --exit-code -- lake-manifest.json lean-toolchain
+          lake env bash -c 'cc -fsyntax-only -I"$(lean --print-prefix)/include" ../qa/general-frame/abi.c'
       - name: Exercise the generic source decoder and exact predicate
         shell: bash
         run: |
