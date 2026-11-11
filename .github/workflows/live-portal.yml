@@ -40,7 +40,7 @@ jobs:
           lake env bash -c '
             set -euo pipefail
             export LEAN_PATH="$PWD:$LEAN_PATH"
-            for module in PortalTables PortalChecker PortalFramePilot PortalSoundness RationalFrameModel RationalFrameChecker RationalFrameWire; do
+            for module in PortalTables PortalChecker PortalFramePilot PortalSoundness RationalFrameModel RationalFrameChecker RationalFrameWire RationalFrameAlgebra; do
               lean -o "$module.olean" "$module.lean" 2>&1 | tee "../.data/live-portal/$module.log"
             done
           '
