@@ -61,7 +61,9 @@ theorem blocked_exists (data : Compiled) (row : Nat) :
   constructor
   · rintro ⟨support, hmember, hpoint, hdirection⟩
     obtain ⟨index, hindex, heq⟩ := Array.mem_iff_getElem.mp hmember
-    refine ⟨⟨index, hindex⟩, ?_, ?_⟩ <;> simpa [getElem!_pos, heq] using_assumption
+    refine ⟨⟨index, hindex⟩, ?_, ?_⟩
+    · simpa [getElem!_pos, heq] using hpoint
+    · simpa [getElem!_pos, heq] using hdirection
   · rintro ⟨index, hpoint, hdirection⟩
     refine ⟨data.source.supports[index.val]!, ?_, hpoint, hdirection⟩
     simp [getElem!_pos]
@@ -72,7 +74,7 @@ theorem admissible_iff_mask (data : Compiled) (valid : PartitionValid data) (val
     FrameAssembly.admissible (model data valid) (supports data valid)
       (motion data valid (fun i => values i.val)) ↔
       ∀ i : Fin data.dofs, blocked data i.val = true → values i.val = 0 := by
-  change (∀ support, _) ↔ _
+  unfold FrameAssembly.admissible
   simp_rw [support_constraints]
   constructor
   · intro restraints i hi
