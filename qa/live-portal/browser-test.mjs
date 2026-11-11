@@ -166,19 +166,39 @@ try {
         const order = structuredClone(candidate); [order[4], order[5]] = [order[5], order[4]];
         codes.push(run(fixture.encodeCandidate(order)));
         const sign = structuredClone(candidate); sign[0].numerator = '5'; codes.push(run(fixture.encodeCandidate(sign)));
+        const noLoad = structuredClone(candidate);
+        for (let i = 4; i <= 9; i++) noLoad[i] = { numerator: '0', denominator: '1' };
+        const shiftReadout = (index, numerator, denominator) => {
+            const changed = structuredClone(candidate), value = changed[index];
+            changed[index] = { numerator: String(BigInt(value.numerator) * denominator + numerator * BigInt(value.denominator)),
+                denominator: String(BigInt(value.denominator) * denominator) };
+            return run(fixture.encodeCandidate(changed));
+        };
+        const wrongUnits = structuredClone(candidate);
+        wrongUnits[20].numerator = String(BigInt(wrongUnits[20].numerator) * 1000n);
+        const flippedBase = structuredClone(candidate);
+        for (let i = 16; i <= 18; i++) flippedBase[i].numerator = String(-BigInt(flippedBase[i].numerator));
+        const omissions = { withoutFreeLoad: run(fixture.encodeCandidate(noLoad)),
+            withoutMomentParticular: shiftReadout(19, -15n, 2n),
+            withoutDisplacementParticular: shiftReadout(20, 27n, 32000n),
+            wrongDisplacementUnits: run(fixture.encodeCandidate(wrongUnits)),
+            reversedBaseSigns: run(fixture.encodeCandidate(flippedBase)) };
         const malformed = new TextEncoder().encode(new TextDecoder().decode(good).replace(/\n1\n/, '\n0\n'));
-        return { codes, malformed: run(malformed), pointer: module._checker_check(pointer + 1, good.length),
+        return { codes, omissions, malformed: run(malformed), pointer: module._checker_check(pointer + 1, good.length),
             oversized: module._checker_check(pointer, module._input_capacity() + 1) };
     });
     assert.equal(abi.codes[0], 1);
     assert.ok(abi.codes.slice(1).every(code => code === 0));
+    assert.ok(Object.values(abi.omissions).every(code => code === 0));
+    result.abiRejections = abi;
     assert.equal(abi.malformed, 2); assert.equal(abi.pointer, 2); assert.equal(abi.oversized, 3);
     result.cases.push('actual-abi-all-output-tampering-and-malformed-rejection');
 
     const edits = [m => m.loads[0].fy = -6, m => m.loads[0].t = 0.1,
         m => m.loads[0].member = 'AB', m => m.loads.push({ ...m.loads[0], id: 'extra' }),
         m => m.nodes[0].x = 0.1, m => m.members[0].EI++, m => m.supports[0].kind = 'pin',
-        m => m.members.reverse(), m => m.nodes[1].referenceMember = 'BC',
+        m => m.members.reverse(), m => [m.members[2].a, m.members[2].b] = [m.members[2].b, m.members[2].a],
+        m => m.nodes[1].referenceMember = 'BC',
         m => m.members[0].connectionB = { axial: 'rigid', transverse: 'rigid', rotation: 'free' }];
     for (const edit of edits) {
         const changed = structuredClone(model); edit(changed); await importModel(changed);
