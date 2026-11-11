@@ -58,8 +58,13 @@ theorem segment_dofs (data : Compiled) (valid : PartitionValid data)
 theorem localAt_eq (segment : Segment) (different : segment.a ≠ segment.b)
     (row : Nat) (i : Fin 6) :
     localAt segment row = some i ↔ globalIndex segment i = row := by
-  fin_cases i <;> by_cases horizontal : segment.cosine = 0 <;>
-    simp [localAt, globalIndex, horizontal] <;> split_ifs <;> simp_all <;> omega
+  have directions : row % 3 = 0 ∨ row % 3 = 1 ∨ row % 3 = 2 := by omega
+  rcases directions with direction | direction | direction
+  all_goals
+    fin_cases i <;> by_cases horizontal : segment.cosine = 0 <;>
+      by_cases atStart : row / 3 = segment.a <;>
+      by_cases atEnd : row / 3 = segment.b <;>
+      simp [localAt, globalIndex, horizontal, direction, atStart, atEnd] <;> omega
 
 theorem mapping_at (segment : Segment) (different : segment.a ≠ segment.b)
     (row : Nat) (i : Fin 6) :
@@ -78,7 +83,7 @@ theorem projection_sum (segment : Segment) (different : segment.a ≠ segment.b)
   simp_rw [mapping_at segment different]
   cases found : localAt segment row with
   | none => simp
-  | some selected => simp [eq_comm]
+  | some selected => simp [apply_ite, eq_comm]
 
 theorem segment_stiffness_sum (segment : Segment) (different : segment.a ≠ segment.b)
     (row column : Nat) :
@@ -117,7 +122,7 @@ theorem segment_basis (data : Compiled) (valid : PartitionValid data)
       (FrameAssembly.coordinateBasis (model data valid) (coordinateEquiv data valid row)) segment i =
       (mapping data.segments[segment.val]! i row.val : ℝ) := by
   rw [basis_motion, segment_dofs data valid (fun j => if j = row.val then 1 else 0)]
-  simp [mapping]
+  simp [mapping, apply_ite]
 
 theorem stiffness_coefficient (data : Compiled) (valid : PartitionValid data)
     (segment : Fin data.segments.size) (i j : Fin 6) :
