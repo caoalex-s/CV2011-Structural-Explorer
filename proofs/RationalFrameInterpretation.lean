@@ -142,24 +142,21 @@ theorem location_parameter (data : Compiled) (member : Fin data.source.members.s
     original-member-owned point in FrameAssemblyModel. -/
 def point (data : Compiled) (valid : PartitionValid data) (i : Fin data.points.size) :
     FrameAssemblyModel.Point data.source.nodes.size data.source.members.size data.points.size :=
-  match ho : data.points[i.val]!.owner with
-  | none => .inl ⟨i.val, by
+  if original : i.val < data.source.nodes.size then .inl ⟨i.val, original⟩
+  else .inr (⟨data.points[i.val]!.index, by
       have hp := points_valid data valid i
-      simp only [PointValid, ho] at hp
-      exact hp.2.1⟩
-  | some owner => .inr (⟨owner, by
-      have hp := points_valid data valid i
-      simp only [PointValid, ho] at hp
-      exact hp.2.1⟩, i)
+      cases ho : data.points[i.val]!.owner with
+      | none =>
+        simp only [PointValid, ho] at hp
+        exact False.elim (original hp.2.1)
+      | some owner =>
+        simp only [PointValid, ho] at hp
+        rw [hp.2.2.1]
+        exact hp.2.1⟩, i)
 
 theorem point_prefix (data : Compiled) (valid : PartitionValid data) (i : Fin data.points.size)
     (bound : i.val < data.source.nodes.size) : point data valid i = .inl ⟨i.val, bound⟩ := by
-  cases ho : data.points[i.val]!.owner with
-  | none => simp [point, ho]
-  | some owner =>
-    have hp := points_valid data valid i
-    simp only [PointValid, ho] at hp
-    exact False.elim (Nat.not_le_of_lt bound hp.1)
+  simp [point, bound]
 
 theorem location_point (data : Compiled) (valid : PartitionValid data)
     (member : Fin data.source.members.size) (t : Rat) (index : Fin data.points.size)
@@ -185,7 +182,9 @@ theorem location_point (data : Compiled) (valid : PartitionValid data)
         have hi := represented.2.2
         simp only [hzero, hone, ↓reduceIte] at hi
         exact hi.1
-      simp [location, hzero, hone, locationPoint, point, owned]
+      have hp := points_valid data valid index
+      simp only [PointValid, owned] at hp
+      simp [location, hzero, hone, locationPoint, point, Nat.not_lt.mpr hp.1, hp.2.2.1]
 
 theorem point_active (data : Compiled) (valid : PartitionValid data) (i : Fin data.points.size) :
     activePoint (model data valid) (point data valid i) := by
@@ -221,7 +220,8 @@ def pointIndex (data : Compiled) :
 
 theorem point_index (data : Compiled) (valid : PartitionValid data) (i : Fin data.points.size) :
     pointIndex data (point data valid i) = i.val := by
-  cases ho : data.points[i.val]!.owner <;> simp [point, ho, pointIndex]
+  unfold point
+  split_ifs <;> rfl
 
 theorem point_injective (data : Compiled) (valid : PartitionValid data) : Function.Injective (point data valid) := by
   intro i j h
@@ -325,10 +325,10 @@ theorem reference_motion (data : Compiled) (valid : PartitionValid data)
 
 /-- No hidden relative end movement remains in the supported rigid class. -/
 theorem side_reference (data : Compiled) (valid : PartitionValid data)
-    (q : Coordinate (model data valid) → ℝ) (at : Location data.source.members.size data.points.size) :
-    sideMotion (model data valid) q at = referenceMotion (model data valid) q
-      (locationPoint (model data valid) at) := by
-  cases at with
+    (q : Coordinate (model data valid) → ℝ) (selected : Location data.source.members.size data.points.size) :
+    sideMotion (model data valid) q selected = referenceMotion (model data valid) q
+      (locationPoint (model data valid) selected) := by
+  cases selected with
   | interior member cut => rfl
   | endSide side =>
     have zeroSlip : slipValue (model data valid) q side = fun _ => 0 := by
