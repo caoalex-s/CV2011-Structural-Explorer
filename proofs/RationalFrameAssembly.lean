@@ -154,5 +154,55 @@ theorem load_coefficient (data : Compiled) (valid : PartitionValid data)
   rw [← hc, ← hs]
   simpa only [Rat.cast_mul] using (Fields.force_cast data.segments[segment.val]! i).symm
 
+/-- Direct source actions act on the same owned point as the represented
+    physical action. A distributed source has no additional point action. -/
+theorem point_action_work (data : Compiled) (valid : PartitionValid data)
+    (loadIndex : Fin data.source.loads.size) (values : Nat → ℝ) :
+    let load := data.source.loads[loadIndex.val]!
+    let point := locationIndex data load.member load.t
+    pointActionWork (model data valid) (actions data valid loadIndex)
+      (motion data valid (fun i => values i.val)) =
+      if load.kind = 0 then (load.fx : ℝ) * values (3*point) + (load.fy : ℝ) * values (3*point+1)
+      else if load.kind = 1 then (load.mz : ℝ) * values (3*point+2) else 0 := by
+  dsimp only
+  simp only [pointActionWork, actions, side_reference]
+  rw [location_point data valid _ _ _ (loads_valid data valid loadIndex)]
+  simp only [work, reference_motion]
+  split_ifs <;> simp_all
+
+theorem point_force_basis (data : Compiled) (load : Load) (row : Nat) :
+    (pointForceEntry data load row : ℝ) =
+      if load.kind = 0 then
+        (load.fx : ℝ) * (if row = 3*locationIndex data load.member load.t then 1 else 0) +
+        (load.fy : ℝ) * (if row = 3*locationIndex data load.member load.t+1 then 1 else 0)
+      else if load.kind = 1 then
+        (load.mz : ℝ) * (if row = 3*locationIndex data load.member load.t+2 then 1 else 0) else 0 := by
+  have zeroDirection : row = 3*locationIndex data load.member load.t ↔
+      row / 3 = locationIndex data load.member load.t ∧ row % 3 = 0 := by omega
+  have oneDirection : row = 3*locationIndex data load.member load.t+1 ↔
+      row / 3 = locationIndex data load.member load.t ∧ row % 3 = 1 := by omega
+  have rotationDirection : row = 3*locationIndex data load.member load.t+2 ↔
+      row / 3 = locationIndex data load.member load.t ∧ row % 3 = 2 := by omega
+  simp only [zeroDirection, oneDirection, rotationDirection, pointForceEntry]
+  split_ifs <;> simp_all
+
+/-- Consistent distributed loads and all direct actions assemble to the
+    actual external-work functional, retaining overlaps and ownership. -/
+theorem force_entry (data : Compiled) (valid : PartitionValid data) (row : Fin data.dofs) :
+    (RationalFrame.forceEntry data row.val : ℝ) =
+      FrameAssembly.forceEntry (model data valid) (actions data valid) (coordinateEquiv data valid row) := by
+  unfold FrameAssembly.forceEntry FrameAssembly.externalWork
+  simp only [segment_basis, load_coefficient]
+  simp only [RationalFrame.forceEntry, sumSegments, Algebra.sumFin_eq_sum, Rat.cast_add, Rat.cast_sum]
+  congr 1
+  · apply Finset.sum_congr rfl
+    intro segment _
+    simpa only [mul_comm] using segment_force_sum data.segments[segment.val]!
+      (segment_axes data valid segment).2.2.2 row.val
+  · apply Finset.sum_congr rfl
+    intro loadIndex _
+    rw [basis_motion, point_action_work data valid loadIndex (fun i => if i = row.val then 1 else 0)]
+    simpa only [eq_comm] using point_force_basis data data.source.loads[loadIndex.val]! row.val
+
 end
 end RationalFrame.Assembly
