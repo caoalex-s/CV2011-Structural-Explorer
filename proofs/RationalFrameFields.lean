@@ -8,11 +8,12 @@ import LocalFrameFields
 namespace RationalFrame.Fields
 noncomputable section
 
+set_option maxHeartbeats 2000000 in
 theorem stiffness_cast (segment : Segment) (i j : Fin 6) :
     (localStiffness segment i j : ℝ) = LocalFrameFields.stiffness
       (segment.length : ℝ) (segment.EA : ℝ) (segment.EI : ℝ) i j := by
   fin_cases i <;> fin_cases j <;>
-    norm_num [localStiffness, LocalFrameFields.stiffness, pow_succ] <;> ring
+    simp [localStiffness, LocalFrameFields.stiffness, pow_succ] <;> ring
 
 theorem force_cast (segment : Segment) (i : Fin 6) :
     (localForce segment i : ℝ) = LocalFrameFields.consistentLoad (segment.length : ℝ)

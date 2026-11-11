@@ -65,9 +65,13 @@ jobs:
         run: |
           set -euo pipefail
           cd proofs
-          lake env bash -c 'export LEAN_PATH="$PWD:$LEAN_PATH"; lean -o RationalFrameAlgebra.olean RationalFrameAlgebra.lean' | tee ../.data/live-portal/RationalFrameAlgebra.log
-          lake env bash -c 'export LEAN_PATH="$PWD:$LEAN_PATH"; lean -o RationalFrameFields.olean RationalFrameFields.lean' | tee ../.data/live-portal/RationalFrameFields.log
-          lake env bash -c 'export LEAN_PATH="$PWD:$LEAN_PATH"; lean -o RationalFrameInterpretation.olean RationalFrameInterpretation.lean' | tee ../.data/live-portal/RationalFrameInterpretation.log
+          failed=0
+          for module in RationalFrameAlgebra RationalFrameFields RationalFrameInterpretation; do
+            if ! lake env bash -c 'export LEAN_PATH="$PWD:$LEAN_PATH"; lean -o "$1.olean" "$1.lean"' -- "$module" | tee "../.data/live-portal/$module.log"; then
+              failed=1
+            fi
+          done
+          exit "$failed"
       - name: Audit every structural checker bridge theorem
         shell: bash
         run: |
