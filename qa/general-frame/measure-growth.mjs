@@ -76,7 +76,7 @@ for (const cap of [128, 256, 512]) {
         let outputDigits = null, packetBytes = null;
         if (certificate) {
             const values = [certificate.motion, certificate.reactions, certificate.lower.flat(), certificate.diagonal,
-                certificate.readouts, [certificate.loadWork]].flat();
+                certificate.readouts, [certificate.loadWork], certificate.points.flatMap(point => [point.t, point.x, point.y])].flat();
             outputDigits = Math.max(...values.flatMap(value => [(value.n < 0n ? -value.n : value.n).toString().length, value.d.toString().length]));
             const packet = framePacket(item.model, query, certificate);
             packetBytes = packet.length;

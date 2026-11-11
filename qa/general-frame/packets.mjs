@@ -32,7 +32,42 @@ const beam = {
 };
 const query = selected('beam'), baseline = make(beam, query);
 await save('1_two_spans', beam, query, baseline);
+const joinedBeam = {
+    nodes: [beam.nodes[0], { id: 'middle', x: 4, y: 0 }, beam.nodes[1]],
+    members: [{ ...beam.members[0], id: 'first', b: 'middle' },
+        { ...beam.members[0], id: 'second', a: 'middle' }],
+    supports: [{ ...beam.supports[0], member: 'first' },
+        { ...beam.supports[1], member: 'first', t: 1 }, { ...beam.supports[2], member: 'second' }],
+    loads: [{ ...beam.loads[0], id: 'w1', member: 'first' }, { ...beam.loads[0], id: 'w2', member: 'second' }],
+};
+await save('1_two_original_members', joinedBeam, selected('first', 1));
+const reversed = copy(beam);
+[reversed.members[0].a, reversed.members[0].b] = [reversed.members[0].b, reversed.members[0].a];
+reversed.supports.forEach(support => { support.t = 1 - support.t; });
+await save('1_reversed_member', reversed, selected('beam', 0.5, 'right'));
+const duplicate = copy(beam);
+duplicate.supports.push({ ...duplicate.supports[1], id: 'duplicate-interior-restraint' });
+await save('1_duplicate_restraint', duplicate, query);
+const fullyRestrained = copy(beam);
+fullyRestrained.supports = [0, 1].map((t, index) => ({ id: 'fixed-' + index, member: 'beam', t, kind: 'fixed', angle: 90 }));
+await save('1_loaded_zero_free_space', fullyRestrained, query);
+const disconnected = copy(joinedBeam);
+disconnected.nodes = [
+    { id: 'a1', x: 0, y: 0 }, { id: 'b1', x: 4, y: 0 },
+    { id: 'a2', x: 0, y: 0 }, { id: 'b2', x: 4, y: 0 },
+];
+disconnected.members[0].a = 'a1'; disconnected.members[0].b = 'b1';
+disconnected.members[1].a = 'a2'; disconnected.members[1].b = 'b2';
+disconnected.supports = ['first', 'second'].flatMap(member => [
+    { id: member + '-a', member, t: 0, kind: 'pin', angle: 90 },
+    { id: member + '-b', member, t: 1, kind: 'roller', angle: 90 },
+]);
+disconnected.loads = [disconnected.loads[0]];
+await save('1_coincident_disconnected_members', disconnected, selected('first'));
 await save('1_original_portal', example('frame'), selected('BC'));
+const permuted = example('frame');
+for (const field of ['nodes', 'members', 'supports', 'loads']) permuted[field].reverse();
+await save('1_permuted_portal_records', permuted, selected('BC'));
 const resized = example('frame');
 resized.nodes[1].y = resized.nodes[2].y = 3.25;
 resized.nodes[2].x = resized.nodes[3].x = 7.5;
@@ -80,6 +115,11 @@ for (const [name, mutate] of [
 const omitted = copy(beam); omitted.loads = [];
 await save('0_omitted_load', beam, query, make(omitted, query));
 await save('0_stale_query', beam, selected('beam', 0.25), baseline);
+await save('0_wrong_query_side', beam, selected('beam', 0.5, 'right'), baseline);
+const wrongRestraint = copy(beam); wrongRestraint.supports[1].angle = 0;
+await save('0_changed_restraint_direction', wrongRestraint, query, baseline);
+const changedOwnership = copy(joinedBeam); changedOwnership.loads[1].member = 'first';
+await save('0_changed_load_owner', changedOwnership, selected('first', 1), make(joinedBeam, selected('first', 1)));
 const packet = new TextDecoder().decode(framePacket(beam, query, baseline));
 for (const [name, text] of [
     ['header', packet.replace('CV2011_FRAME_1', 'CV2011_FRAME_2')],
