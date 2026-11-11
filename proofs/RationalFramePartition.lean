@@ -33,7 +33,7 @@ def PointValid (model : Compiled) (i : Fin model.points.size) : Prop :=
       0 < p.t ∧ p.t < 1 ∧ p.x = a.x + p.t * (b.x-a.x) ∧ p.y = a.y + p.t * (b.y-a.y)
 
 def LocationValid (model : Compiled) (member : Nat) (t : Rat) (index : Nat) : Prop :=
-  index < model.points.size ∧
+  member < model.source.members.size ∧ index < model.points.size ∧
     if t = 0 then index = model.source.members[member]!.a
     else if t = 1 then index = model.source.members[member]!.b
     else model.points[index]!.owner = some member ∧ model.points[index]!.t = t
@@ -92,7 +92,8 @@ def PartitionValid (model : Compiled) : Prop :=
 
 instance (model : Compiled) (i : Fin model.points.size) : Decidable (PointValid model i) := by
   unfold PointValid
-  split <;> infer_instance
+  dsimp only
+  cases model.points[i.val]!.owner <;> infer_instance
 instance (model : Compiled) (member : Nat) (t : Rat) (index : Nat) : Decidable (LocationValid model member t index) := by
   unfold LocationValid
   infer_instance
