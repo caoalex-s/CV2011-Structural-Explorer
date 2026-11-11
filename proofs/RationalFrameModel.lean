@@ -94,7 +94,7 @@ structure Compiled where
 def absolute (a : Rat) : Rat := if a < 0 then -a else a
 def inUnit (a : Rat) : Bool := decide (0 ≤ a ∧ a ≤ 1)
 def uniqueIds (ids : Array String) : Bool :=
-  ids.toList.eraseDups.length == ids.size && ids.all (fun id => !id.isEmpty && id.length ≤ 256)
+  ids.toList.eraseDups.length == ids.size && ids.all (fun id => !id.isEmpty && id.length ≤ 1024)
 
 /-- Source checks use exact equality, never an axis or endpoint tolerance. -/
 def sourceValid (source : Source) : Bool := Id.run do
@@ -160,7 +160,8 @@ def compileModel (source : Source) : Option Compiled := Id.run do
       else
         if points.size ≥ 16 then return none
         indices := indices.push points.size
-        points := points.push { owner := some m, index := m, t := t,
+        points := points.push {
+          owner := some m, index := m, t := t,
           x := a.x + t * dx, y := a.y + t * dy }
     for i in [:cuts.size - 1] do
       if segments.size ≥ 16 then return none
@@ -169,7 +170,8 @@ def compileModel (source : Source) : Option Compiled := Id.run do
       let vertical := source.loads.foldl (fun total load =>
         if load.member == m && load.kind == 2 && load.t ≤ left && right ≤ load.ending
         then total + load.fy else total) 0
-      segments := segments.push { member := m, a := indices[i]!, b := indices[i + 1]!,
+      segments := segments.push {
+        member := m, a := indices[i]!, b := indices[i + 1]!,
         left := left, right := right, length := length * (right - left), cosine := cosine, sine := sine,
         EA := member.EA, EI := member.EI, vertical := vertical }
   return some { source := source, points := points, segments := segments }

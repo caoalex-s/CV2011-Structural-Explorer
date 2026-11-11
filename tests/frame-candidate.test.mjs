@@ -132,3 +132,13 @@ test('endpoint queries reject the exterior side and retain interior point-action
     assert.ok(equal(sub(right[1], left[1]), integer(-7)));
     assert.ok(equal(left[2], right[2]));
 });
+
+test('exact arithmetic growth has an explicit limit outcome, never a mechanism verdict', () => {
+    const model = twoSpans(true);
+    model.nodes[1].x = 10;
+    model.supports[1].t = 0.4;
+    model.loads = [udl('first', 'beam', 0.2, 0.8), udl('second', 'beam', 0.4, 1, -2),
+        { id: 'couple', member: 'beam', kind: 'moment', t: 0.6, end: 1, fx: 0, fy: 0, mz: 3, qEnd: 0 }];
+    const frame = compileFrame(model, query('beam'));
+    assert.throws(() => new FrameCandidates().produce(frame), /Limit: rational arithmetic exceeds 128 digits/);
+});

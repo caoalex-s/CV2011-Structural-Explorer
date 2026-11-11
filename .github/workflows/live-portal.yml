@@ -40,11 +40,18 @@ jobs:
           lake env bash -c '
             set -euo pipefail
             export LEAN_PATH="$PWD:$LEAN_PATH"
-            for module in PortalTables PortalChecker PortalFramePilot PortalSoundness RationalFrameModel RationalFrameChecker; do
+            for module in PortalTables PortalChecker PortalFramePilot PortalSoundness RationalFrameModel RationalFrameChecker RationalFrameWire; do
               lean -o "$module.olean" "$module.lean" 2>&1 | tee "../.data/live-portal/$module.log"
             done
           '
           git diff --exit-code -- lake-manifest.json lean-toolchain
+      - name: Exercise the generic source decoder and exact predicate
+        shell: bash
+        run: |
+          set -euo pipefail
+          node qa/general-frame/packets.mjs
+          cd proofs
+          lake env bash -c 'export LEAN_PATH="$PWD:$LEAN_PATH"; lean --run ../qa/general-frame/NativePackets.lean ../.data/general-frame-packets' | tee ../.data/live-portal/generic-packets.log
       - name: Audit every structural checker bridge theorem
         shell: bash
         run: |

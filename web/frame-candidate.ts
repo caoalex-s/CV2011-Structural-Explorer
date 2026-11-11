@@ -39,7 +39,18 @@ function within(value: number, maximum: number, name: string): void {
 
 /** Validate the advertised class without silently correcting the drawing. */
 export function validateFrame(input: unknown, query: EvidenceQuery): Model {
+    // Reject excessive source lists before the strict parser maps or searches them.
+    if (input && typeof input === 'object') {
+        const outer = input as Record<string, unknown>;
+        const raw = (outer.version === 2 ? outer.model : outer) as Record<string, unknown> | null;
+        if (raw && typeof raw === 'object') for (const field of ['nodes', 'members', 'supports', 'loads'] as const) {
+            if (Array.isArray(raw[field])) within(raw[field].length, frameLimits[field], field);
+        }
+    }
     const model = parseEvidenceModel(input);
+    for (const items of [model.nodes, model.members, model.supports, model.loads]) {
+        for (const item of items) within(item.id.length, 256, 'UTF-16 code units in an identifier');
+    }
     within(model.nodes.length, frameLimits.nodes, 'original nodes');
     within(model.members.length, frameLimits.members, 'members');
     within(model.supports.length, frameLimits.supports, 'supports');
