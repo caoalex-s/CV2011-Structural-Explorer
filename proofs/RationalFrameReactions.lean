@@ -15,7 +15,7 @@ theorem residual_coordinate (data : Compiled) (valid : PartitionValid data)
   rw [Equations.residual_entry]
   rw [residual_functional_apply _ _ _ _ (positive_segments data valid)]
   rw [Assembly.basis_motion, Work.residual_work]
-  simp [Fin.ext_iff]
+  simp [← Fin.ext_iff]
 
 theorem checked_grouped_reactions (data : Compiled) (valid : PartitionValid data)
     (query : Query) (certificate : Certificate)
