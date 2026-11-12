@@ -13,7 +13,7 @@ theorem residual_coordinate (data : Compiled) (valid : PartitionValid data)
         (motion data valid (fun j => (values[j.val]! : ℝ)))
         (coordinateBasis (model data valid) (coordinateEquiv data valid i)) := by
   rw [Equations.residual_entry]
-  change _ = residualWork _ _ _ _
+  rw [residual_functional_apply _ _ _ _ (positive_segments data valid)]
   rw [Assembly.basis_motion, Work.residual_work]
   simp [Fin.ext_iff]
 

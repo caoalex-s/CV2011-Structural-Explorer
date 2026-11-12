@@ -90,6 +90,7 @@ theorem checked_readouts (data : Compiled) (valid : PartitionValid data)
   intro i
   rw [solution.2.2.1]
   simp only [recover, selectedSegment, selected, Option.map_some]
+  change ((recoverSegment data.segments[segment.val]! query.t certificate.motion)[i.val]! : ℝ) = _
   rcases segments_valid data valid segment with
     ⟨_, _, _, _, _, _, _, length, axial, bending, _, _, cosine, sine, _⟩
   have lengthReal : (data.segments[segment.val]!.length : ℝ) ≠ 0 := by exact_mod_cast ne_of_gt length
