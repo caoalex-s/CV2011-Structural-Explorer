@@ -50,6 +50,8 @@ export async function runFrameCases({ page, context, output, origin, base, url, 
         if (type === 'member') {
             // A horizontal SVG path has a zero-height geometric box despite
             // its visible stroke. Click its screen midpoint with real input.
+            // Editing the inspector can scroll the canvas out of the viewport.
+            await page.locator('#canvas').scrollIntoViewIfNeeded();
             const midpoint = await object.locator('path').first().evaluate(path => {
                 const point = path.getPointAtLength(path.getTotalLength() / 2);
                 const screen = new DOMPoint(point.x, point.y).matrixTransform(path.getScreenCTM());
