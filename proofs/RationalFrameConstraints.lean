@@ -59,14 +59,14 @@ theorem blocked_exists (data : Compiled) (row : Nat) :
       blocksDirection data.source.supports[support.val]! (row % 3) = true := by
   simp only [blocked, Array.any_eq_true, Bool.and_eq_true, beq_iff_eq]
   constructor
-  · rintro ⟨support, hmember, hpoint, hdirection⟩
-    obtain ⟨index, hindex, heq⟩ := Array.mem_iff_getElem.mp hmember
+  · rintro ⟨index, hindex, hpoint, hdirection⟩
     refine ⟨⟨index, hindex⟩, ?_, ?_⟩
-    · simpa [getElem!_pos, heq] using hpoint
-    · simpa [getElem!_pos, heq] using hdirection
+    · simpa [getElem!_pos] using hpoint
+    · simpa [getElem!_pos] using hdirection
   · rintro ⟨index, hpoint, hdirection⟩
-    refine ⟨data.source.supports[index.val]!, ?_, hpoint, hdirection⟩
-    simp [getElem!_pos]
+    refine ⟨index.val, index.isLt, ?_, ?_⟩
+    · simpa [getElem!_pos] using hpoint
+    · simpa [getElem!_pos] using hdirection
 
 /-- The mask covers exactly the actual constraint kernel, not merely a
     subset of sufficient fixed coordinates. This also handles repeated rows. -/

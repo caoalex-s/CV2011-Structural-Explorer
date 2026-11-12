@@ -64,7 +64,7 @@ theorem localAt_eq (segment : Segment) (different : segment.a ≠ segment.b)
     fin_cases i <;> by_cases horizontal : segment.cosine = 0 <;>
       by_cases atStart : row / 3 = segment.a <;>
       by_cases atEnd : row / 3 = segment.b <;>
-      simp [localAt, globalIndex, horizontal, direction, atStart, atEnd] <;> omega
+      norm_num [localAt, globalIndex, horizontal, direction, atStart, atEnd] <;> try omega
 
 theorem mapping_at (segment : Segment) (different : segment.a ≠ segment.b)
     (row : Nat) (i : Fin 6) :
@@ -122,7 +122,9 @@ theorem segment_basis (data : Compiled) (valid : PartitionValid data)
       (FrameAssembly.coordinateBasis (model data valid) (coordinateEquiv data valid row)) segment i =
       (mapping data.segments[segment.val]! i row.val : ℝ) := by
   rw [basis_motion, segment_dofs data valid (fun j => if j = row.val then 1 else 0)]
-  simp [mapping, apply_ite]
+  by_cases incident : globalIndex data.segments[segment.val]! i = row.val
+  · simp [mapping, incident]
+  · simp [mapping, incident]
 
 theorem stiffness_coefficient (data : Compiled) (valid : PartitionValid data)
     (segment : Fin data.segments.size) (i j : Fin 6) :
