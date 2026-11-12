@@ -9,9 +9,38 @@ class WorkerFixture {
     constructor() { WorkerFixture.instances.push(this); }
     postMessage(data) { this.sent.push(data); }
     terminate() { this.terminated = true; }
-    ready(artifact = 'new-artifact') { this.onmessage({ data: { ready: true, isolated: true, artifact, bundle: 'bundle-v1' } }); }
+    ready(artifact = 'new-artifact', protocols = ['portal']) {
+        this.onmessage({ data: { ready: true, isolated: true, artifact, bundle: 'bundle-v1', protocols } });
+    }
 }
 globalThis.Worker = WorkerFixture;
+
+test('frame requests capture source and query bytes and require a generic bundle', async () => {
+    const legacy = new PortalRuntime(new URL('https://example.invalid/worker.mjs'));
+    const legacyWorker = WorkerFixture.instances.at(-1);
+    legacyWorker.ready(); await legacy.ready;
+    assert.equal((await legacy.checkFrame(new Uint8Array([1]))).state, 'unsupported-runtime');
+    assert.equal(legacyWorker.sent.length, 0);
+    legacy.dispose();
+
+    const runtime = new PortalRuntime(new URL('https://example.invalid/worker.mjs'));
+    const worker = WorkerFixture.instances.at(-1);
+    worker.ready('generic-artifact', ['portal', 'frame']); await runtime.ready;
+    const source = new TextEncoder().encode('{"model":{},"query":{"parameter":0.5}}');
+    const original = new Uint8Array(source);
+    const request = runtime.checkFrame(source);
+    source.fill(0);
+    await new Promise(resolve => setTimeout(resolve, 10));
+    const packet = worker.sent.at(-1);
+    assert.equal(packet.protocol, 'frame');
+    assert.deepEqual(packet.bytes, original);
+    const inputDigest = await sha256(original);
+    assert.equal(runtime.receive({ state: 'accepted', id: packet.id, artifact: runtime.artifact,
+        inputDigest: await sha256(source) }), false);
+    runtime.receive({ state: 'accepted', id: packet.id, artifact: runtime.artifact, inputDigest });
+    assert.equal((await request).state, 'accepted');
+    runtime.dispose();
+});
 
 test('current packet, artifact and revision bind acceptance; late packets cannot survive reversion', async () => {
     const runtime = new PortalRuntime(new URL('https://example.invalid/worker.mjs'));

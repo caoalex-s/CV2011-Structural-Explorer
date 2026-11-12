@@ -11,6 +11,7 @@ export class PortalRuntime {
     private stopped = false;
     artifact = '';
     bundle = '';
+    supportsFrames = false;
     onFailure: (reason: string) => void = () => {};
     readonly ready: Promise<void>;
 
@@ -35,7 +36,9 @@ export class PortalRuntime {
                     if (data.isolated !== true || typeof data.artifact !== 'string' || typeof data.bundle !== 'string') {
                         this.dispose(); reject(new Error('Checker isolation or identity missing')); return;
                     }
-                    this.artifact = data.artifact; this.bundle = data.bundle; resolve();
+                    this.artifact = data.artifact; this.bundle = data.bundle;
+                    this.supportsFrames = Array.isArray(data.protocols) && data.protocols.includes('frame');
+                    resolve();
                 } else this.receive(data);
             };
         });
@@ -50,6 +53,16 @@ export class PortalRuntime {
         clearTimeout(pending.timer); this.current = null; pending.resolve(result); return true;
     }
     async check(bytes: Uint8Array): Promise<CheckerResult> {
+        return this.submit(bytes, 'portal');
+    }
+    /** Source/query JSON is captured before hashing. Candidate construction
+     * and exact checking both run inside the same bounded worker request.
+     */
+    async checkFrame(bytes: Uint8Array): Promise<CheckerResult> {
+        if (!this.supportsFrames) { this.invalidate(); return { state: 'unsupported-runtime' }; }
+        return this.submit(bytes, 'frame');
+    }
+    private async submit(bytes: Uint8Array, protocol: 'portal' | 'frame'): Promise<CheckerResult> {
         this.invalidate();
         const id = this.sequence;
         if (this.stopped) return { state: 'reset-required' };
@@ -62,7 +75,7 @@ export class PortalRuntime {
                 this.onFailure('Checker timed out. Reset to continue.'); resolve({ state: 'timeout' });
             }, 1000);
             this.current = { id, inputDigest, resolve, timer };
-            this.worker.postMessage({ id, artifact: this.artifact, bytes: captured });
+            this.worker.postMessage({ id, artifact: this.artifact, bytes: captured, protocol });
         });
     }
     dispose(): void { this.invalidate(); this.stopped = true; this.worker.terminate(); }
