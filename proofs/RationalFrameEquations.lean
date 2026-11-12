@@ -28,7 +28,10 @@ theorem matrix_dot (data : Compiled) (q : Array Rat) (i : Fin data.dofs) :
     arrayDot (stiffnessMatrix data)[i.val]! q =
       ∑ j : Fin data.dofs, RationalFrame.stiffnessEntry data i.val j.val * q[j.val]! := by
   rw [arrayDot, matrix_row]
-  simp only [List.length_map, List.length_range, Array.size_toArray, Algebra.sumFin_eq_sum]
+  have rowSize :
+      ((List.range data.dofs).map (fun j => RationalFrame.stiffnessEntry data i.val j)).toArray.size =
+        data.dofs := by simp
+  rw [rowSize, Algebra.sumFin_eq_sum]
   apply Finset.sum_congr rfl
   intro j _
   simp [j.isLt]

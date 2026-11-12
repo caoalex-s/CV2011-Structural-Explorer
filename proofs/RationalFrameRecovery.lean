@@ -43,9 +43,10 @@ theorem recover_segment_cast (segment : Segment) (parameter : Rat) (motion : Arr
     ((segment.length * (parameter-segment.left) / (segment.right-segment.left) : Rat) : ℝ) length axial bending
   obtain ⟨normal, shear, moment, rotation, displacementX, displacementY⟩ := formulas
   have actions := end_action_cast segment motion length axial bending
+  push_cast at normal shear moment rotation displacementX displacementY actions
   fin_cases i <;>
-    simp [recoverSegment, fieldValues, ← Rat.cast_mul, normal, shear, moment, rotation,
-      displacementX, displacementY, ← actions, pow_succ] <;> push_cast <;> ring
+    simp [recoverSegment, fieldValues, normal, shear, moment, rotation,
+      displacementX, displacementY, ← actions] <;> ring
 
 theorem actual_local_motion (data : Compiled) (valid : PartitionValid data)
     (segment : Fin data.segments.size) (values : Array Rat) :
