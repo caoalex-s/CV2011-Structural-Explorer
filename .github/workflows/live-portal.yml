@@ -66,7 +66,7 @@ jobs:
           set -euo pipefail
           cd proofs
           failed=0
-          for module in RationalFrameAlgebra RationalFrameFields RationalFrameInterpretation RationalFrameGeometry RationalFrameContract RationalFrameAssembly RationalFrameRecovery RationalFrameConstraints RationalFrameWork RationalFrameEquations RationalFrameReactions RationalFrameFreeSpace RationalFrameStability; do
+          for module in RationalFrameAlgebra RationalFrameFields RationalFrameInterpretation RationalFrameGeometry RationalFrameContract RationalFrameAssembly RationalFrameRecovery RationalFrameConstraints RationalFrameWork RationalFrameEquations RationalFrameReactions RationalFrameFreeSpace RationalFrameStability RationalFrameSoundness; do
             if ! lake env bash -c 'export LEAN_PATH="$PWD:$LEAN_PATH"; lean -o "$1.olean" "$1.lean"' -- "$module" | tee "../.data/live-portal/$module.log"; then
               failed=1
             fi
@@ -81,6 +81,11 @@ jobs:
           lake env bash -c 'export LEAN_PATH="$PWD:$LEAN_PATH"; lean ../.data/live-portal/PortalAudit.lean' | tee ../.data/live-portal/axioms.log
           cd ..
           python3 qa/live-portal/audit.py --check .data/live-portal/axioms.log --output .data/live-portal/axiom-audit.json
+          python3 qa/live-portal/audit.py --frame --emit .data/live-portal/FrameAudit.lean
+          cd proofs
+          lake env bash -c 'export LEAN_PATH="$PWD:$LEAN_PATH"; lean ../.data/live-portal/FrameAudit.lean' | tee ../.data/live-portal/frame-axioms.log
+          cd ..
+          python3 qa/live-portal/audit.py --frame --check .data/live-portal/frame-axioms.log --output .data/live-portal/frame-axiom-audit.json
           python3 -m unittest discover -s qa/live-portal -p 'test_*.py' -v
       - name: Reject a corrupted stiffness table through the actual-model proof
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_wasm }}

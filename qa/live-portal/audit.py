@@ -14,11 +14,11 @@ spec = importlib.util.spec_from_file_location('strict_audit', Path(__file__).par
 strict_audit = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(strict_audit)
 
-def expected_theorems(source):
+def expected_theorems(source, namespace='PortalSoundness'):
     names = re.findall(r'^(?:@\[[^\]]+\]\s*)?theorem\s+(\w+)', source, re.MULTILINE)
     if not names or len(names) != len(set(names)):
         raise ValueError('Missing or repeated source theorem names')
-    return {'PortalSoundness.' + name for name in names}
+    return {namespace + '.' + name for name in names}
 
 def audit(source, log):
     strict_audit.EXPECTED_THEOREMS = expected_theorems(source)
@@ -29,15 +29,34 @@ def main():
     parser.add_argument('--emit', type=Path)
     parser.add_argument('--check', type=Path)
     parser.add_argument('--output', type=Path)
+    parser.add_argument('--frame', action='store_true', help='Audit all generic frame bridge theorems.')
     args = parser.parse_args()
-    source = Path('proofs/PortalSoundness.lean').read_text(encoding='utf-8')
+    if args.frame:
+        sources = sorted(Path('proofs').glob('RationalFrame*.lean'))
+        expected = set()
+        for path in sources:
+            source = path.read_text(encoding='utf-8')
+            if not re.search(r'^theorem\s+', source, re.MULTILINE):
+                continue
+            namespaces = re.findall(r'^namespace\s+(\S+)', source, re.MULTILINE)
+            if len(namespaces) != 1:
+                raise ValueError(f'Audit requires an explicit single namespace: {path}')
+            expected.update(expected_theorems(source, namespaces[0]))
+        imported = 'RationalFrameSoundness'
+    else:
+        sources = [Path('proofs/PortalSoundness.lean')]
+        expected = expected_theorems(sources[0].read_text(encoding='utf-8'))
+        imported = 'PortalSoundness'
     if args.emit:
-        args.emit.write_text('import PortalSoundness\n' + ''.join('#print axioms ' + name + '\n' for name in sorted(expected_theorems(source))), encoding='utf-8')
+        args.emit.write_text(f'import {imported}\n' + ''.join('#print axioms ' + name + '\n' for name in sorted(expected)), encoding='utf-8')
     if args.check:
-        reports = audit(source, args.check.read_text(encoding='utf-8'))
+        strict_audit.EXPECTED_THEOREMS = expected
+        reports = strict_audit.audit_reports(args.check.read_text(encoding='utf-8'))
         receipt = {'passed': True, 'theorems': reports,
-                   'source_sha256': hashlib.sha256(Path('proofs/PortalSoundness.lean').read_bytes()).hexdigest(),
+                   'sources': {str(path): hashlib.sha256(path.read_bytes()).hexdigest() for path in sources},
                    'log_sha256': hashlib.sha256(args.check.read_bytes()).hexdigest()}
+        if not args.frame:
+            receipt['source_sha256'] = receipt['sources'][str(sources[0])]
         args.output.write_text(json.dumps(receipt, indent=2) + '\n', encoding='utf-8')
 
 if __name__ == '__main__':
