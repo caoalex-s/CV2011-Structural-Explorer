@@ -223,6 +223,7 @@ theorem exact_contract (data : Compiled) (valid : PartitionValid data) :
   · intro segment
     rw [left_parameter, right_parameter]
     have length := (segments_valid data valid segment).2.2.2.2.2.2.1
+    dsimp only [model, segmentMember]
     exact_mod_cast length
   · intro side direction stiffness _ spring
     simp [rigid, directionLaw, rigidConnection] at spring

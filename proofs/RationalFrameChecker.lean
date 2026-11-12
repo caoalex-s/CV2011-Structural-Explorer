@@ -21,7 +21,7 @@ def arrayDot (a b : Array Rat) : Rat :=
   sumFin a.size (fun i => a[i.val]! * b[i.val]!)
 
 def residual (matrix : Array (Array Rat)) (force motion : Array Rat) : Array Rat :=
-  matrix.mapIdx fun i row => arrayDot row motion - force[i]!
+  ((List.range matrix.size).map fun i => arrayDot matrix[i]! motion - force[i]!).toArray
 
 /-- The finite decidable proposition is both the executable factor check and
     the theorem's arithmetic premise. There is no second specification checker. -/

@@ -28,14 +28,16 @@ theorem matrix_dot (data : Compiled) (q : Array Rat) (i : Fin data.dofs) :
     arrayDot (stiffnessMatrix data)[i.val]! q =
       ∑ j : Fin data.dofs, RationalFrame.stiffnessEntry data i.val j.val * q[j.val]! := by
   rw [arrayDot, matrix_row]
-  simp [Algebra.sumFin_eq_sum]
+  simp only [List.length_map, List.length_range, Array.size_toArray, Algebra.sumFin_eq_sum]
+  apply Finset.sum_congr rfl
+  intro j _
+  simp [j.isLt]
 
 theorem residual_entry (data : Compiled) (q : Array Rat) (i : Fin data.dofs) :
     (residual (stiffnessMatrix data) (forceVector data) q)[i.val]! =
       (∑ j : Fin data.dofs, RationalFrame.stiffnessEntry data i.val j.val * q[j.val]!) -
         RationalFrame.forceEntry data i.val := by
-  simp only [residual]
-  simp [matrix_size, i.isLt, matrix_dot, force_entry]
+  simp [RationalFrame.residual, matrix_size, i.isLt, matrix_dot, force_entry]
 
 theorem checked_equilibrium (data : Compiled) (valid : PartitionValid data)
     (query : Query) (certificate : Certificate)
