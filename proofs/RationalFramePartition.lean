@@ -73,6 +73,25 @@ def SupportValid (model : Compiled) (support : Support) : Prop :=
   support.kind ≤ 2 ∧
   (support.kind = 2 → support.angle = 0 ∨ support.angle = 90 ∨ support.angle = 180 ∨ support.angle = 270)
 
+def locationRepresented (model : Compiled) (member : Nat) (t : Rat) (point : Nat) : Bool :=
+  model.segments.any fun segment => segment.member == member &&
+    ((segment.left == t && segment.a == point) || (segment.right == t && segment.b == point))
+
+/-- Explicit finite postconditions keep the real contract independent of
+    implementation details of array filtering and cut insertion. They check
+    the derived subdivision, never a caller-supplied replacement graph. -/
+def BoundaryValid (model : Compiled) : Prop :=
+  (∀ i j : Fin model.segments.size, i ≠ j →
+    model.segments[i.val]!.member = model.segments[j.val]!.member →
+    model.segments[i.val]!.right ≤ model.segments[j.val]!.left ∨
+      model.segments[j.val]!.right ≤ model.segments[i.val]!.left) ∧
+  (∀ i : Fin model.source.supports.size,
+    let support := model.source.supports[i.val]!
+    locationRepresented model support.member support.t (locationIndex model support.member support.t) = true) ∧
+  (∀ i : Fin model.source.loads.size,
+    let load := model.source.loads[i.val]!
+    locationRepresented model load.member load.t (locationIndex model load.member load.t) = true)
+
 def PartitionValid (model : Compiled) : Prop :=
   0 < model.source.nodes.size ∧ 0 < model.source.members.size ∧
   model.source.nodes.size ≤ model.points.size ∧ model.points.size ≤ 16 ∧ model.segments.size ≤ 16 ∧
@@ -95,7 +114,8 @@ def PartitionValid (model : Compiled) : Prop :=
   (∀ i : Fin model.source.loads.size,
     let load := model.source.loads[i.val]!
     LocationValid model load.member load.t (locationIndex model load.member load.t) ∧
-    (load.kind = 2 → LocationValid model load.member load.ending (locationIndex model load.member load.ending)))
+    (load.kind = 2 → LocationValid model load.member load.ending (locationIndex model load.member load.ending))) ∧
+  BoundaryValid model
 
 instance (model : Compiled) (i : Fin model.points.size) : Decidable (PointValid model i) := by
   unfold PointValid
@@ -109,6 +129,9 @@ instance (model : Compiled) (segment : Segment) : Decidable (SegmentValid model 
   infer_instance
 instance (model : Compiled) (support : Support) : Decidable (SupportValid model support) := by
   unfold SupportValid
+  infer_instance
+instance (model : Compiled) : Decidable (BoundaryValid model) := by
+  unfold BoundaryValid
   infer_instance
 instance (model : Compiled) : Decidable (PartitionValid model) := by
   unfold PartitionValid

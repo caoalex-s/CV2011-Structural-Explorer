@@ -42,7 +42,11 @@ theorem loads_valid (data : Compiled) (valid : PartitionValid data)
     let load := data.source.loads[i.val]!
     LocationValid data load.member load.t (locationIndex data load.member load.t) := by
   rcases valid with ⟨_, _, _, _, _, _, _, _, _, _, _, _, loads⟩
-  exact (loads i).1
+  exact (loads.1 i).1
+
+theorem boundaries_valid (data : Compiled) (valid : PartitionValid data) : BoundaryValid data := by
+  rcases valid with ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, boundaries⟩
+  exact boundaries
 
 /-- Cut slots are the derived point indices, but the Location still carries
     its original member owner. Equal global coordinates never weld cuts. -/
