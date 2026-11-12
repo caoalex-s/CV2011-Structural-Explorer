@@ -46,7 +46,17 @@ export async function runFrameCases({ page, context, output, origin, base, url, 
         return accepted(kind);
     }
     async function editProperty(type, id, property, value) {
-        await page.locator(`[data-object="${type}"][data-id="${id}"]`).click();
+        const object = page.locator(`[data-object="${type}"][data-id="${id}"]`);
+        if (type === 'member') {
+            // A horizontal SVG path has a zero-height geometric box despite
+            // its visible stroke. Click its screen midpoint with real input.
+            const midpoint = await object.locator('path').first().evaluate(path => {
+                const point = path.getPointAtLength(path.getTotalLength() / 2);
+                const screen = new DOMPoint(point.x, point.y).matrixTransform(path.getScreenCTM());
+                return { x: screen.x, y: screen.y };
+            });
+            await page.mouse.click(midpoint.x, midpoint.y);
+        } else await object.click();
         const input = page.locator(`[data-property="${property}"]`);
         await input.fill(String(value));
         await input.dispatchEvent('change');
@@ -217,6 +227,7 @@ export async function runFrameCases({ page, context, output, origin, base, url, 
     assert.equal(number(latest.values.query.parameter), 0.5);
     assert.equal(latest.artifact, first.artifact);
     assert.deepEqual(result.offlineRequests, []);
+    result.offlineEditRequests = [...result.offlineRequests];
     const downloadPromise = page.waitForEvent('download');
     await page.locator('#frame-export').click();
     const exported = JSON.parse(await readFile(await (await downloadPromise).path(), 'utf8'));
@@ -239,6 +250,10 @@ export async function runFrameCases({ page, context, output, origin, base, url, 
         } finally { runtime.dispose(); URL.revokeObjectURL(workerURL); }
     });
     assert.deepEqual(watchdog, ['timeout', 'reset-required']);
+    // Creating the watchdog's local blob worker is recorded as a request by
+    // Playwright, but it is not an HTTP request or a model upload.
+    result.offlineNetworkRequests = result.offlineRequests.filter(url => /^https?:/.test(url));
+    assert.deepEqual(result.offlineNetworkRequests, []);
     result.cases.push('generic-browser-worker-watchdog-and-reset-required');
     await setOffline(false);
     await page.locator('#portal-reset').click(); await accepted();
