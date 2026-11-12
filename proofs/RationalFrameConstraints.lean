@@ -61,8 +61,8 @@ theorem blocked_exists (data : Compiled) (row : Nat) :
   constructor
   · rintro ⟨index, hindex, hpoint, hdirection⟩
     refine ⟨⟨index, hindex⟩, ?_, ?_⟩
-    · simpa [getElem!_pos] using hpoint
-    · simpa [getElem!_pos] using hdirection
+    · simpa [getElem!_pos, hindex] using hpoint
+    · simpa [getElem!_pos, hindex] using hdirection
   · rintro ⟨index, hpoint, hdirection⟩
     refine ⟨index.val, index.isLt, ?_, ?_⟩
     · simpa [getElem!_pos] using hpoint

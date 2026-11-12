@@ -64,7 +64,8 @@ theorem localAt_eq (segment : Segment) (different : segment.a ≠ segment.b)
     fin_cases i <;> by_cases horizontal : segment.cosine = 0 <;>
       by_cases atStart : row / 3 = segment.a <;>
       by_cases atEnd : row / 3 = segment.b <;>
-      norm_num [localAt, globalIndex, horizontal, direction, atStart, atEnd] <;> try omega
+      norm_num [localAt, globalIndex, horizontal, direction, atStart, atEnd] <;>
+      simp [different, Ne.symm different] <;> omega
 
 theorem mapping_at (segment : Segment) (different : segment.a ≠ segment.b)
     (row : Nat) (i : Fin 6) :
