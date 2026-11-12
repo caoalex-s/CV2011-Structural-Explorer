@@ -15,8 +15,9 @@ theorem member_segment (data : Compiled) (valid : PartitionValid data)
   have filtered := List.mem_filter.mp represented
   have owner : segment.member = member.val := by simpa using filtered.2
   obtain ⟨index, bound, value⟩ := List.mem_iff_getElem.mp filtered.1
-  have element : data.segments[index]! = segment := by simpa [getElem!_pos, bound] using value
-  refine ⟨⟨index, by simpa using bound⟩, ?_⟩
+  have arrayBound : index < data.segments.size := by simpa using bound
+  have element : data.segments[index]! = segment := by simpa [getElem!_pos, arrayBound] using value
+  refine ⟨⟨index, arrayBound⟩, ?_⟩
   apply Fin.ext
   simpa [segmentMember, element] using owner
 
@@ -66,7 +67,7 @@ theorem member_distance (data : Compiled) (valid : PartitionValid data) (member 
   rw [← realSquared, Real.sqrt_sq_eq_abs, abs_of_pos realPositive]
 
 theorem member_direction (data : Compiled) (valid : PartitionValid data) (member : Fin data.source.members.size) :
-    (model data valid).member member |>.orientation =
+    ((model data valid).member member).orientation =
       ExactGeometry.direction (nodePosition data (drawingStart data valid member))
         (nodePosition data (drawingEnd data valid member)) := by
   unfold ExactGeometry.direction
