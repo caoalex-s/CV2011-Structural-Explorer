@@ -59,6 +59,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
     let debounce: ReturnType<typeof setTimeout> | undefined;
     let member = 'BC', parameter = 0.5;
     let enabled = false;
+    let startingNow = false;
     let exportText = '';
     let acceptedGeneration: (() => void) | null = null;
     let generationRequested = false;
@@ -80,17 +81,18 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
     function stop() { clearTimeout(debounce); requests.invalidate(); runtime?.dispose(); runtime = null; enabled = false; }
     async function start() {
         stop(); clear('Starting local checker…');
+        startingNow = true;
         try { runtime = new PortalRuntime(); }
-        catch (error) { reset.hidden = false; clear(`Checking unavailable: ${String(error)}`); return; }
+        catch (error) { startingNow = false; reset.hidden = false; clear(`Checking unavailable: ${String(error)}`); return; }
         const starting = runtime;
         starting.onFailure = reason => {
             if (starting !== runtime) return;
-            requests.invalidate(); enabled = false; reset.hidden = false; clear(reason);
+            requests.invalidate(); enabled = false; startingNow = false; reset.hidden = false; clear(reason);
         };
         try {
             await starting.ready;
             if (starting !== runtime) return;
-            enabled = true; activate.hidden = true; deactivate.hidden = false; reset.hidden = false;
+            enabled = true; startingNow = false; activate.hidden = true; deactivate.hidden = false; reset.hidden = false;
             if (starting.supportsFrames) {
                 amplitude.closest('label')!.hidden = true;
                 host.querySelector<HTMLElement>('#frame-side-label')!.hidden = false;
@@ -102,7 +104,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
             // the same saved drawing. Subsequent edits revoke generation intent.
             if (sessionStorage.getItem(generationStorage) === JSON.stringify(modelAtPresent())) generationRequested = true;
             sessionStorage.removeItem(generationStorage);
-        } catch (error) { if (starting === runtime) clear(`Checking unavailable: ${String(error)}`); }
+        } catch (error) { if (starting === runtime) { startingNow = false; clear(`Checking unavailable: ${String(error)}`); } }
     }
     async function displayFrame(result: CheckerResult, envelope: Awaited<ReturnType<typeof createEvidenceEnvelope>>,
         token: { revision: number; request: number }, checker: PortalRuntime, sourceBytes: Uint8Array) {
@@ -214,7 +216,11 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
         if (acceptedGeneration) { acceptedGeneration(); return; }
         if (!enabled) {
             sessionStorage.setItem(generationStorage, JSON.stringify(modelAtPresent()));
-            if (runtime) { generationRequested = true; return; }
+            if (runtime) {
+                if (startingNow) generationRequested = true;
+                else void start();
+                return;
+            }
             activate.click(); return;
         }
         generationRequested = true;

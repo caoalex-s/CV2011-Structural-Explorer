@@ -315,6 +315,27 @@ export async function runFrameCases({ page, context, output, origin, base, url, 
     result.offlineNetworkRequests = result.offlineRequests.filter(url => /^https?:/.test(url));
     assert.deepEqual(result.offlineNetworkRequests, []);
     result.cases.push('generic-browser-worker-watchdog-and-reset-required');
+    // Drop one production request at the browser transport boundary. This
+    // exercises the actual worked controller's watchdog and recovery without
+    // adding a test command to the checker, worker or shipped application.
+    await page.evaluate(() => {
+        const send = Worker.prototype.postMessage;
+        Worker.prototype.postMessage = function (message, ...rest) {
+            if (message?.protocol === 'frame') { Worker.prototype.postMessage = send; return; }
+            return send.call(this, message, ...rest);
+        };
+    });
+    await page.locator('#frame-parameter').fill('0.4');
+    await page.locator('#frame-generate').click();
+    await page.waitForFunction(() => document.getElementById('portal-status').textContent.includes('timed out'));
+    assert.equal(await page.locator('#frame-worked-output').textContent(), '');
+    assert.equal(await page.locator('#portal-certificate').textContent(), '');
+    // Generate is an explicit request to recover and regenerate after failure.
+    await page.locator('#frame-generate').click();
+    const recovered = await accepted();
+    assert.equal(recovered.sourceRequest.query.parameter, 0.4);
+    assert.equal(recovered.workedSolution.binding.packetDigest, recovered.packetDigest);
+    result.cases.push('worked-production-timeout-clears-state-and-generate-recovers');
     await setOffline(false);
     await page.locator('#portal-reset').click(); await accepted();
     await page.locator('#portal-deactivate').click(); await page.waitForURL(origin + base);
