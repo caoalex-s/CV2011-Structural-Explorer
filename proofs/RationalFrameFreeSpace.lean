@@ -47,7 +47,7 @@ theorem sum_free (data : Compiled) (values : Fin data.dofs → ℝ)
     have notFree : blocked data i.val ≠ false := by
       intro free
       obtain ⟨j, same⟩ := (index_complete data i).mpr free
-      exact absent j same
+      exact absent ⟨j, same⟩
     cases h : blocked data i.val <;> simp_all
   · intro j
     rfl
