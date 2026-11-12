@@ -37,7 +37,7 @@ theorem stiffness_work (data : Compiled) (valid : PartitionValid data)
   apply Finset.sum_congr rfl
   intro j _
   rw [stiffness_operator_apply, stiffness_work_symmetric]
-  rw [Assembly.stiffness_entry]
+  rw [Assembly.stiffness_entry data valid i j]
   simp [FrameAssembly.stiffnessEntry, mul_comm]
 
 theorem external_work (data : Compiled) (valid : PartitionValid data) (variation : Fin data.dofs → ℝ) :
@@ -46,7 +46,7 @@ theorem external_work (data : Compiled) (valid : PartitionValid data) (variation
   rw [← external_functional_apply, functional_expansion]
   apply Finset.sum_congr rfl
   intro i _
-  rw [external_functional_apply, Assembly.force_entry]
+  rw [external_functional_apply, Assembly.force_entry data valid i]
   rfl
 
 theorem residual_work (data : Compiled) (valid : PartitionValid data)

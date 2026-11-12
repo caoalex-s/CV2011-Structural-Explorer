@@ -114,9 +114,11 @@ theorem correspondence (data : Compiled) (valid : PartitionValid data) :
     simpa [segmentMember, mul_comm] using castLength
   · intro segment
     rcases segments_valid data valid segment with ⟨_, _, _, _, _, _, _, _, _, _, EA, EI, _⟩
-    constructor
-    · exact_mod_cast EA
-    · exact_mod_cast EI
+    change (data.segments[segment.val]!.EA : ℝ) =
+      (data.source.members[data.segments[segment.val]!.member]!.EA : ℝ) ∧
+      (data.segments[segment.val]!.EI : ℝ) =
+      (data.source.members[data.segments[segment.val]!.member]!.EI : ℝ)
+    exact_mod_cast And.intro EA EI
 
 end
 end RationalFrame.Geometry
