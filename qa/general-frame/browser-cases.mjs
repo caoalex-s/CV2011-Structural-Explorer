@@ -30,7 +30,10 @@ export async function runFrameCases({ page, context, output, origin, base, url, 
         });
         assert.equal(await page.locator('#frame-worked-output .math-error').count(), 0);
         assert.equal(await page.locator('#worked-panel #frame-generate').count(), 1);
-        return JSON.parse(await page.locator('#portal-certificate').textContent());
+        const receipt = JSON.parse(await page.locator('#portal-certificate').textContent());
+        assert.match(await page.locator('#frame-overview-convention').textContent(), /Numerical overview:.*right-hand convention/);
+        assert.match(await page.locator('#portal-status').textContent(), new RegExp(`Checked section: ${receipt.values.query.cutSide} limit`));
+        return receipt;
     }
     async function select(member, parameter = 0.5, side = 'left') {
         await page.locator('#section-member').selectOption(member);

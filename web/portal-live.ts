@@ -41,6 +41,11 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
       <button id="frame-export" hidden>Export exact certificate</button>
       <p id="portal-scope">Diagram curves remain numerical. Acceptance uses a compiled Lean checker and relies on its compiler, runtime, decoder, and input binding. Each edit does not invoke the Lean kernel.</p><pre id="portal-certificate"></pre></details>`;
     document.getElementById('worked-panel')!.replaceChildren(host);
+    const overviewNote = document.createElement('p');
+    overviewNote.id = 'frame-overview-convention';
+    overviewNote.className = 'small frame-overview-note';
+    overviewNote.textContent = 'Numerical overview: interpolated values use the right-hand convention at interior jumps and the inward limit at member ends. The checked worked solution uses the section limit selected below.';
+    document.getElementById('section-results')!.before(overviewNote);
     const status = host.querySelector<HTMLElement>('#portal-status')!;
     const readouts = host.querySelector<HTMLElement>('#portal-readouts')!;
     const certificate = host.querySelector<HTMLElement>('#portal-certificate')!;
@@ -118,7 +123,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
         if (await sha256(packet) !== result.packetDigest) throw Error('Accepted packet identity changed.');
         if (!requests.isCurrent(token) || checker !== runtime) return;
         const frame = decodeAcceptedFramePacket(packet);
-        status.textContent = frameStatus(frame);
+        status.textContent = `${frameStatus(frame)} Checked section: ${frame.query.cutSide} limit.`;
         readouts.replaceChildren(...frameDescriptions(frame).map(text => {
             const line = document.createElement('p'); line.textContent = text; return line;
         }));

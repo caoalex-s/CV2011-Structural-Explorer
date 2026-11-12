@@ -1335,3 +1335,4 @@ dialog::backdrop {
 #frame-worked-output details { margin: .75rem 0; }
 #frame-worked-output summary { cursor: pointer; }
 #frame-worked-output small { color: var(--muted, #526072); }
+.frame-overview-note { margin: .5rem 1rem; color: var(--muted, #526072); }
