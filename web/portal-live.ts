@@ -9,6 +9,8 @@ import { validateFrame, frameQueryConvention } from './frame-candidate.js';
 import { decodeAcceptedFramePacket } from './frame-result.js';
 import { frameDescriptions, frameStatus } from './frame-display.js';
 import type { EvidenceQuery } from './model-evidence.js';
+import { createFrameWorked } from './frame-worked.js';
+import { renderFrameWorked } from './frame-worked-view.js';
 
 export const isPortalWorkspace = location.pathname.replace(/index\.html$/, '').endsWith('/portal-checker/');
 export const portalStorageKey = 'cv2011-checked-portal-model/v1';
@@ -24,17 +26,21 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
     if (!isPortalWorkspace) return { update(_member: string, _parameter: number) {} };
     const host = document.createElement('section');
     host.className = 'portal-certificate';
-    host.innerHTML = `<h2>Checked portal response</h2>
-      <p id="portal-introduction">Keep the original portal and vary its uniform BC load. Positive load acts upward.</p>
-      <label>Uniform load (kN/m) <input id="portal-amplitude" type="number" step="any" value="-5"></label>
+    host.innerHTML = `<h2>Worked solution</h2>
+      <p id="portal-introduction">Generate a solution for the current drawing and selected section. Local checking supports rigid frames with horizontal and vertical members.</p>
+      <button id="frame-generate">Generate worked solution</button>
+      <button id="frame-collapse" hidden aria-expanded="true">Collapse solution</button>
+      <label hidden>Uniform load (kN/m) <input id="portal-amplitude" type="number" step="any" value="-5"></label>
       <button id="portal-activate">Enable local checking</button><button id="portal-reset" hidden>Reset checker</button>
       <button id="portal-deactivate" hidden>Disable local checking</button>
       <label id="frame-side-label" hidden>Section limit <select id="frame-side"><option value="right">Right</option><option value="left">Left</option></select></label>
       <label id="frame-parameter-label" hidden>Member parameter t <input id="frame-parameter" type="number" min="0" max="1" step="any" value="0.5"></label>
-      <p id="portal-status" role="status">Local checking is off.</p><div id="portal-readouts"></div>
+      <p id="portal-status" role="status">Local checking is off. Generate enables checking and reloads this workspace once.</p>
+      <div id="frame-worked-output"></div>
+      <details><summary>Verification, scope, and exact certificate</summary><div id="portal-readouts"></div>
       <button id="frame-export" hidden>Export exact certificate</button>
-      <details><summary>Scope and exact certificate</summary><p id="portal-scope">The checked values cover joint displacements, both base reactions, and BC midpoint moment and vertical displacement. Diagram curves remain numerical. Acceptance uses a compiled Lean checker and relies on its compiler, runtime, decoder, and input binding. Each edit does not invoke the Lean kernel.</p><pre id="portal-certificate"></pre></details>`;
-    document.getElementById('workspace')!.prepend(host);
+      <p id="portal-scope">Diagram curves remain numerical. Acceptance uses a compiled Lean checker and relies on its compiler, runtime, decoder, and input binding. Each edit does not invoke the Lean kernel.</p><pre id="portal-certificate"></pre></details>`;
+    document.getElementById('worked-panel')!.replaceChildren(host);
     const status = host.querySelector<HTMLElement>('#portal-status')!;
     const readouts = host.querySelector<HTMLElement>('#portal-readouts')!;
     const certificate = host.querySelector<HTMLElement>('#portal-certificate')!;
@@ -45,12 +51,18 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
     const cutSide = host.querySelector<HTMLSelectElement>('#frame-side')!;
     const sectionParameter = host.querySelector<HTMLInputElement>('#frame-parameter')!;
     const exportButton = host.querySelector<HTMLButtonElement>('#frame-export')!;
+    const generate = host.querySelector<HTMLButtonElement>('#frame-generate')!;
+    const collapse = host.querySelector<HTMLButtonElement>('#frame-collapse')!;
+    const workedOutput = host.querySelector<HTMLElement>('#frame-worked-output')!;
     const requests = new EvidenceRequests();
     let runtime: PortalRuntime | null = null;
     let debounce: ReturnType<typeof setTimeout> | undefined;
     let member = 'BC', parameter = 0.5;
     let enabled = false;
     let exportText = '';
+    let acceptedGeneration: (() => void) | null = null;
+    let generationRequested = false;
+    const generationStorage = portalStorageKey + '/generate';
     const sideStorage = portalStorageKey + '/cut-side';
     try {
         const saved = JSON.parse(sessionStorage.getItem(sideStorage) || 'null');
@@ -62,6 +74,8 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
     function clear(message: string) {
         status.textContent = message; readouts.replaceChildren(); certificate.textContent = '';
         exportText = ''; exportButton.hidden = true;
+        acceptedGeneration = null; workedOutput.replaceChildren(); collapse.hidden = true;
+        workedOutput.hidden = false;
     }
     function stop() { clearTimeout(debounce); requests.invalidate(); runtime?.dispose(); runtime = null; enabled = false; }
     async function start() {
@@ -78,14 +92,16 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
             if (starting !== runtime) return;
             enabled = true; activate.hidden = true; deactivate.hidden = false; reset.hidden = false;
             if (starting.supportsFrames) {
-                host.querySelector('h2')!.textContent = 'Checked frame response';
-                host.querySelector('#portal-introduction')!.textContent = 'Draw or import a rigid frame with horizontal and vertical members. Select a member and section position to check its response.';
                 amplitude.closest('label')!.hidden = true;
                 host.querySelector<HTMLElement>('#frame-side-label')!.hidden = false;
                 host.querySelector<HTMLElement>('#frame-parameter-label')!.hidden = false;
                 host.querySelector('#portal-scope')!.textContent = 'The checker covers linear Euler–Bernoulli frames with positive EA and EI, fixed or pin supports, and rollers at 0, 90, 180, or 270 degrees. Point forces, couples, and uniform vertical loads may act over partial or overlapping member intervals. Up to 8 members, 16 nodes, 16 active points, 16 segments, 16 supports, and 16 loads are supported within the arithmetic and one-second limits. Inputs retain their exact parsed binary64 values. Source and certificate rationals allow 128 digits, with 256 digits for normalized candidate intermediates and 513 before reduction. The packet limit is 1 MiB. A limit or timeout is inconclusive. N is positive in tension, M is positive in sagging, dM/dx = V, global y is upward, and rotation is counterclockwise. Diagram curves remain numerical. Acceptance relies on the proved compiled checker, its compiler and runtime, and the decoder and input binding. Edits are checked locally without invoking the Lean kernel.';
             }
             update(member, parameter);
+            // A single explicit Generate survives only the activation reload of
+            // the same saved drawing. Subsequent edits revoke generation intent.
+            if (sessionStorage.getItem(generationStorage) === JSON.stringify(modelAtPresent())) generationRequested = true;
+            sessionStorage.removeItem(generationStorage);
         } catch (error) { if (starting === runtime) clear(`Checking unavailable: ${String(error)}`); }
     }
     async function displayFrame(result: CheckerResult, envelope: Awaited<ReturnType<typeof createEvidenceEnvelope>>,
@@ -96,6 +112,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
         }
         if (!(result.packet instanceof Uint8Array) || typeof result.packetDigest !== 'string') throw Error('Missing accepted packet.');
         const packet = new Uint8Array(result.packet);
+        const packetDigest = result.packetDigest;
         if (await sha256(packet) !== result.packetDigest) throw Error('Accepted packet identity changed.');
         if (!requests.isCurrent(token) || checker !== runtime) return;
         const frame = decodeAcceptedFramePacket(packet);
@@ -103,12 +120,29 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
         readouts.replaceChildren(...frameDescriptions(frame).map(text => {
             const line = document.createElement('p'); line.textContent = text; return line;
         }));
-        exportText = JSON.stringify({ protocol: 'CV2011_FRAME_1', ...token, bindings: envelope.bindings,
+        const receipt = { protocol: 'CV2011_FRAME_1', ...token, bindings: envelope.bindings,
             artifact: result.artifact, bundle: checker.bundle, inputDigest: result.inputDigest,
             packetDigest: result.packetDigest, theorem: 'RationalFrameSoundness.acceptance_actual_frame',
             sourceRequest: JSON.parse(new TextDecoder().decode(sourceBytes)), values: frame,
-            packet: new TextDecoder().decode(packet) }, null, 2);
+            packet: new TextDecoder().decode(packet) };
+        exportText = JSON.stringify(receipt, null, 2);
         certificate.textContent = exportText; exportButton.hidden = false;
+        acceptedGeneration = () => {
+            if (!requests.isCurrent(token) || checker !== runtime) return;
+            try {
+                const report = createFrameWorked(receipt.sourceRequest.model, receipt.sourceRequest.query, frame,
+                    { ...token, bindings: envelope.bindings, artifact: result.artifact, bundle: checker.bundle,
+                        inputDigest: result.inputDigest, packetDigest });
+                workedOutput.innerHTML = renderFrameWorked(report);
+                workedOutput.hidden = false; collapse.hidden = false;
+                collapse.textContent = 'Collapse solution'; collapse.setAttribute('aria-expanded', 'true');
+                exportText = JSON.stringify({ ...receipt, workedSolution: report }, null, 2);
+                certificate.textContent = exportText;
+            } catch (error) {
+                workedOutput.textContent = `The checked results remain available in Verification. The explanatory solution could not be generated: ${String(error)}`;
+            }
+        };
+        if (generationRequested) { generationRequested = false; acceptedGeneration(); }
     }
     function display(result: CheckerResult, envelope: Awaited<ReturnType<typeof createEvidenceEnvelope>>, token: { revision: number; request: number }) {
         if (result.state !== 'accepted' || !Array.isArray(result.checked) || result.checked.length !== 21) {
@@ -134,15 +168,16 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
     }
     function update(nextMember: string, nextParameter: number) {
         member = nextMember; parameter = nextParameter;
+        generationRequested = false;
         sectionParameter.value = String(parameter);
         clearTimeout(debounce); runtime?.invalidate(); requests.invalidate();
-        clear(enabled ? 'Checking…' : 'Enable local checking to check this portal.');
+        clear(enabled ? 'Checking current drawing…' : 'Generate enables local checking and reloads this workspace once.');
         let snapshot: Model;
         let query: EvidenceQuery;
         try {
             // Capture before any asynchronous work, including hashing and debounce.
             snapshot = structuredClone(modelAtPresent());
-            if (runtime?.supportsFrames) {
+            if (!runtime || runtime.supportsFrames) {
                 if (parameter === 0) cutSide.value = 'right';
                 if (parameter === 1) cutSide.value = 'left';
                 cutSide.options[0].disabled = parameter === 1;
@@ -175,6 +210,20 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
         }, 150);
     }
     cutSide.onchange = () => update(member, parameter);
+    generate.onclick = () => {
+        if (acceptedGeneration) { acceptedGeneration(); return; }
+        if (!enabled) {
+            sessionStorage.setItem(generationStorage, JSON.stringify(modelAtPresent()));
+            if (runtime) { generationRequested = true; return; }
+            activate.click(); return;
+        }
+        generationRequested = true;
+    };
+    collapse.onclick = () => {
+        workedOutput.hidden = !workedOutput.hidden;
+        collapse.textContent = workedOutput.hidden ? 'Expand solution' : 'Collapse solution';
+        collapse.setAttribute('aria-expanded', String(!workedOutput.hidden));
+    };
     sectionParameter.oninput = () => {
         const value = sectionParameter.valueAsNumber;
         if (!Number.isFinite(value) || value < 0 || value > 1) {

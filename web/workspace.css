@@ -1325,3 +1325,13 @@ dialog::backdrop {
 .portal-certificate label { display: inline-flex; gap: .5rem; align-items: center; margin-right: 1rem; }
 .portal-certificate input { width: 8rem; }
 .portal-certificate pre { max-height: 22rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.worked-panel > .portal-certificate { margin: 0; padding: 0; border: 0; }
+#frame-generate { font-weight: 700; }
+#frame-worked-output { max-width: 100%; }
+#frame-worked-output .worked-equation { display: block; margin: 1rem 0; padding: .75rem; }
+#frame-worked-output .katex-display { overflow-x: auto; overflow-y: hidden; text-align: left; }
+#frame-worked-output table { width: 100%; border-collapse: collapse; margin: .75rem 0; }
+#frame-worked-output th, #frame-worked-output td { padding: .4rem; text-align: left; border-bottom: 1px solid var(--line, #ccd3dc); overflow-wrap: anywhere; }
+#frame-worked-output details { margin: .75rem 0; }
+#frame-worked-output summary { cursor: pointer; }
+#frame-worked-output small { color: var(--muted, #526072); }

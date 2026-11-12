@@ -422,7 +422,7 @@ function render() {
     if (mode === 'practice')
         renderPractice();
     session.updateStatus();
-    renderWorked({ model, section: sectionT, practice: mode === 'practice', connected: session.connected,
+    if (!isPortalWorkspace) renderWorked({ model, section: sectionT, practice: mode === 'practice', connected: session.connected,
         request: payload => session.request('/api/worked-solution', payload),
         selectSection: section => {
             sectionT = section;
@@ -732,7 +732,10 @@ function renderPractice() {
         solutionRevealed = true;
         const attempt = await record('reveal', '', step.units);
         if (attempt.step !== solutionStep || attempt.section !== sectionT || JSON.stringify(attempt.model) !== JSON.stringify(model) || mode !== 'practice') return;
-        if (session.connected) {
+        if (isPortalWorkspace) {
+            document.getElementById('frame-generate')?.click();
+            document.getElementById('worked-panel')?.scrollIntoView({ behavior: 'smooth' });
+        } else if (session.connected) {
             showWorkedSolution(solutionStep === 'deflection' ? 'integration' : 'sections');
         } else {
             const expected = expectedValue(p);

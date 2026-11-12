@@ -1,7 +1,7 @@
 name: Live portal structural checker
 on:
   push:
-    branches: [codex/live-portal-checker, codex/general-frame-checker]
+    branches: [codex/live-portal-checker, codex/general-frame-checker, codex/frame-worked-solutions]
   workflow_dispatch:
     inputs:
       build_wasm:

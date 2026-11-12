@@ -23,6 +23,13 @@ export async function runFrameCases({ page, context, output, origin, base, url, 
             try { return JSON.parse(document.getElementById('portal-certificate').textContent).values.kind === expected; }
             catch { return false; }
         }, kind);
+        await page.locator('#frame-generate').click();
+        await page.waitForFunction(() => {
+            try { return !!JSON.parse(document.getElementById('portal-certificate').textContent).workedSolution; }
+            catch { return false; }
+        });
+        assert.equal(await page.locator('#frame-worked-output .math-error').count(), 0);
+        assert.equal(await page.locator('#worked-panel #frame-generate').count(), 1);
         return JSON.parse(await page.locator('#portal-certificate').textContent());
     }
     async function select(member, parameter = 0.5, side = 'left') {
@@ -30,6 +37,7 @@ export async function runFrameCases({ page, context, output, origin, base, url, 
         await page.locator('#section-position').evaluate((element, value) => { element.value = String(value * 1000); }, parameter);
         await page.locator('#section-position').dispatchEvent('input');
         await page.locator('#frame-side').selectOption(side);
+        assert.equal(await page.locator('#frame-worked-output').textContent(), '');
     }
     async function importModel(model) {
         await page.locator('#model-file').setInputFiles({ name: 'public-frame.json', mimeType: 'application/json',
@@ -86,12 +94,13 @@ export async function runFrameCases({ page, context, output, origin, base, url, 
     await page.locator('#section-position').evaluate(element => { element.value = '400'; });
     await page.locator('#section-position').dispatchEvent('input');
     assert.equal(await page.locator('#section-position').inputValue(), '400');
-    await Promise.all([page.waitForNavigation(), page.locator('#portal-activate').click()]);
+    await Promise.all([page.waitForNavigation(), page.locator('#frame-generate').click()]);
     assert.equal(await page.locator('#section-position').inputValue(), '400');
     const first = await accepted();
     assert.equal(await page.evaluate(() => crossOriginIsolated), true);
     assert.equal(first.values.query.member, 'BC');
     assert.equal(number(first.values.query.parameter), 0.4);
+    assert.equal(first.workedSolution.binding.packetDigest, first.packetDigest);
     const originalPortal = first.sourceRequest.model;
     await select('BC');
     const originalResponse = await accepted();
@@ -137,6 +146,14 @@ export async function runFrameCases({ page, context, output, origin, base, url, 
     assert.equal(single.artifact, first.artifact);
     assert.equal(number(single.values.readouts[2]), -10);
     assert.deepEqual(single.values.points.map(point => number(point.reaction[1])), [7.5, 7.5, 25]);
+    assert.equal(single.workedSolution.steps.find(step => step.id === 'M').result.value.numerator, '-10');
+    await page.locator('#frame-collapse').click();
+    assert.equal(await page.locator('#frame-worked-output').isVisible(), false);
+    // Normal canvas redraw must preserve the stable worked controller and state.
+    await page.locator('#section-position').dispatchEvent('input');
+    assert.equal(await page.locator('#frame-collapse').getAttribute('aria-expanded'), 'false');
+    await page.locator('#frame-collapse').click();
+    assert.equal(await page.locator('#frame-worked-output').isVisible(), true);
     const joined = {
         nodes: [beam.nodes[0], { id: 'middle', x: 4, y: 0 }, beam.nodes[1]],
         members: [{ ...beam.members[0], id: 'first', b: 'middle' }, { ...beam.members[0], id: 'second', a: 'middle' }],
@@ -179,7 +196,29 @@ export async function runFrameCases({ page, context, output, origin, base, url, 
     assert.ok(decimalRight.revision > decimalLeft.revision);
     assert.ok(Math.abs(number(decimalRight.values.readouts[2]) - number(decimalLeft.values.readouts[2]) + 3) < 1e-10);
     assert.equal(decimalRight.sourceRequest.model.supports[1].t, 0.4);
+    assert.notDeepEqual(decimalLeft.workedSolution.interval.from, decimalRight.workedSolution.interval.from);
+    assert.deepEqual(decimalRight.workedSolution.interval.values.q, { numerator: '-7', denominator: '1' });
     result.cases.push('offline-common-decimal-partial-overlap-support-and-couple-side');
+
+    const renamed = structuredClone(decimal);
+    renamed.loads[0].label = 'q_A';
+    renamed.members[0].id = '<img src=x>梁';
+    [...renamed.supports, ...renamed.loads].forEach(item => { item.member = renamed.members[0].id; });
+    const safe = await check(renamed, renamed.members[0].id, 0.6, 'right');
+    assert.deepEqual(safe.values.readouts, decimalRight.values.readouts);
+    assert.match(await page.locator('#frame-worked-output').textContent(), /q_A/);
+    assert.equal(await page.locator('#frame-worked-output img').count(), 0);
+    const tampering = await page.evaluate(async report => {
+        const { validateFrameWorked } = await import('./frame-worked.js');
+        const edits = [value => { value.steps[2].evidence = 'verified-result'; },
+            value => { value.steps[2].inputs.a1.numerator = '99'; },
+            value => { value.steps[2].predicate = 'invented'; },
+            value => { value.steps[2].exactSubstitution = '99'; }];
+        return edits.map(edit => { const changed = structuredClone(report); edit(changed);
+            try { validateFrameWorked(changed); return false; } catch { return true; } });
+    }, safe.workedSolution);
+    assert.deepEqual(tampering, [true, true, true, true]);
+    result.cases.push('worked-load-label-safe-identifier-and-explanatory-claim-integrity');
 
     const resized = structuredClone(originalPortal);
     resized.nodes[1].y = resized.nodes[2].y = 3.25;
@@ -216,6 +255,7 @@ export async function runFrameCases({ page, context, output, origin, base, url, 
         await importModel(unsupported); await select('beam');
         await page.waitForFunction(() => document.getElementById('portal-status').textContent.includes('Unsupported'));
         assert.equal(await page.locator('#portal-certificate').textContent(), '');
+        assert.equal(await page.locator('#frame-worked-output').textContent(), '');
         assert.equal(await page.locator('#frame-export').isVisible(), false);
     }
     const oversized = structuredClone(beam); oversized.members[0].EA = Number.MIN_VALUE;
@@ -225,7 +265,10 @@ export async function runFrameCases({ page, context, output, origin, base, url, 
     result.cases.push('unsupported-and-arithmetic-limit-clear-acceptance');
 
     await check(beam, 'beam');
-    for (const parameter of [0.25, 0.75, 0.5]) await select('beam', parameter);
+    for (const parameter of [0.25, 0.75, 0.5]) {
+        await select('beam', parameter);
+        await page.locator('#frame-generate').click();
+    }
     const reverted = await accepted();
     assert.equal(number(reverted.values.query.parameter), 0.5);
     await page.locator('#frame-parameter').fill('0.123456789');
@@ -240,11 +283,17 @@ export async function runFrameCases({ page, context, output, origin, base, url, 
     assert.deepEqual(result.offlineRequests, []);
     result.offlineEditRequests = [...result.offlineRequests];
     const downloadPromise = page.waitForEvent('download');
+    await page.locator('#frame-export').evaluate(element => { element.closest('details').open = true; });
     await page.locator('#frame-export').click();
     const exported = JSON.parse(await readFile(await (await downloadPromise).path(), 'utf8'));
     assert.equal(exported.packetDigest, latest.packetDigest);
     assert.equal(exported.inputDigest, latest.inputDigest);
     assert.equal(exported.packet, latest.packet);
+    assert.deepEqual(exported.workedSolution, latest.workedSolution);
+    assert.equal(exported.workedSolution.binding.revision, latest.revision);
+    assert.equal(exported.workedSolution.query.parameter, 0.5);
+    await page.locator('#frame-export').evaluate(element => { element.closest('details').open = false; });
+    result.cases.push('integrated-worked-generate-collapse-redraw-invalidation-and-bound-export');
     result.cases.push('offline-query-race-and-local-exact-certificate-export');
     await page.screenshot({ path: resolve(output, 'portal-accepted.png'), fullPage: true });
 
