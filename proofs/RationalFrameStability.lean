@@ -20,7 +20,7 @@ theorem no_mechanism (data : Compiled) (valid : PartitionValid data) (certificat
     intro zero
     apply nonzero
     rw [← represented, zero]
-    simp [motion]
+    rfl
   have fixed := (Constraints.admissible_finite data valid q)
   rw [represented] at fixed
   have positive := FreeSpace.physical_positive data valid certificate factor q
@@ -46,8 +46,9 @@ theorem checked_unique (data : Compiled) (valid : PartitionValid data)
     let q := motion data valid (fun i => (certificate.motion[i.val]! : ℝ))
     equilibrium (model data valid) (actions data valid) (supports data valid) q ∧
       ∀ other, equilibrium (model data valid) (actions data valid) (supports data valid) other → other = q := by
-  have exists := Equations.checked_equilibrium data valid query certificate restrained solution
-  exact ⟨exists, fun other checked => unique_equilibrium data valid certificate solution.1 other _ checked exists⟩
+  have checkedEquilibrium := Equations.checked_equilibrium data valid query certificate restrained solution
+  exact ⟨checkedEquilibrium,
+    fun other checked => unique_equilibrium data valid certificate solution.1 other _ checked checkedEquilibrium⟩
 
 /-- A checked full-K null vector is a nonzero admissible deformation-free
     motion of the original frame, including the zero-load case. -/
@@ -58,13 +59,16 @@ theorem checked_mechanism (data : Compiled) (valid : PartitionValid data) (certi
       deformationMap (model data valid) z = 0 := by
   let q : Fin data.dofs → ℝ := fun i => (certificate.motion[i.val]! : ℝ)
   have admissibleMotion := (Constraints.admissible_finite data valid q).mpr
-    (fun i hi => by exact_mod_cast restrained.2 i hi)
+    (fun i hi => by
+      change (certificate.motion[i.val]! : ℝ) = 0
+      exact_mod_cast restrained.2 i hi)
   refine ⟨admissibleMotion, ?_, ?_⟩
   · intro zero
     apply mechanism.1
     intro i
     have value := congrFun zero (coordinateEquiv data valid i)
     rw [motion_coordinate] at value
+    change (certificate.motion[i.val]! : ℝ) = 0 at value
     exact_mod_cast value
   · apply (stiffness_null_iff_deformation_zero _ _ _ _ _ _ _
       (Contract.exact_contract data valid) _).mp
