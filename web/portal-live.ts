@@ -19,7 +19,8 @@ function ownsRegistration(registration: ServiceWorkerRegistration): boolean {
         [registration.active, registration.waiting, registration.installing].some(worker => worker?.scriptURL === isolationScript);
 }
 
-export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad: (value: number) => void) {
+export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad: (value: number) => void,
+    changeSectionParameter: (value: number) => void) {
     if (!isPortalWorkspace) return { update(_member: string, _parameter: number) {} };
     const host = document.createElement('section');
     host.className = 'portal-certificate';
@@ -29,6 +30,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
       <button id="portal-activate">Enable local checking</button><button id="portal-reset" hidden>Reset checker</button>
       <button id="portal-deactivate" hidden>Disable local checking</button>
       <label id="frame-side-label" hidden>Section limit <select id="frame-side"><option value="right">Right</option><option value="left">Left</option></select></label>
+      <label id="frame-parameter-label" hidden>Member parameter t <input id="frame-parameter" type="number" min="0" max="1" step="any" value="0.5"></label>
       <p id="portal-status" role="status">Local checking is off.</p><div id="portal-readouts"></div>
       <button id="frame-export" hidden>Export exact certificate</button>
       <details><summary>Scope and exact certificate</summary><p id="portal-scope">The checked values cover joint displacements, both base reactions, and BC midpoint moment and vertical displacement. Diagram curves remain numerical. Acceptance uses a compiled Lean checker and relies on its compiler, runtime, decoder, and input binding. Each edit does not invoke the Lean kernel.</p><pre id="portal-certificate"></pre></details>`;
@@ -41,6 +43,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
     const deactivate = host.querySelector<HTMLButtonElement>('#portal-deactivate')!;
     const reset = host.querySelector<HTMLButtonElement>('#portal-reset')!;
     const cutSide = host.querySelector<HTMLSelectElement>('#frame-side')!;
+    const sectionParameter = host.querySelector<HTMLInputElement>('#frame-parameter')!;
     const exportButton = host.querySelector<HTMLButtonElement>('#frame-export')!;
     const requests = new EvidenceRequests();
     let runtime: PortalRuntime | null = null;
@@ -79,6 +82,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                 host.querySelector('#portal-introduction')!.textContent = 'Draw or import a rigid frame with horizontal and vertical members. Select a member and section position to check its response.';
                 amplitude.closest('label')!.hidden = true;
                 host.querySelector<HTMLElement>('#frame-side-label')!.hidden = false;
+                host.querySelector<HTMLElement>('#frame-parameter-label')!.hidden = false;
                 host.querySelector('#portal-scope')!.textContent = 'The checker covers linear Euler–Bernoulli frames with positive EA and EI, fixed or pin supports, and rollers at 0, 90, 180, or 270 degrees. Point forces, couples, and uniform vertical loads may act over partial or overlapping member intervals. Up to 8 members, 16 nodes, 16 active points, 16 segments, 16 supports, and 16 loads are supported within the arithmetic and one-second limits. Inputs retain their exact parsed binary64 values. Source and certificate rationals allow 128 digits, with 256 digits for normalized candidate intermediates and 513 before reduction. The packet limit is 1 MiB. A limit or timeout is inconclusive. N is positive in tension, M is positive in sagging, dM/dx = V, global y is upward, and rotation is counterclockwise. Diagram curves remain numerical. Acceptance relies on the proved compiled checker, its compiler and runtime, and the decoder and input binding. Edits are checked locally without invoking the Lean kernel.';
             }
             update(member, parameter);
@@ -130,6 +134,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
     }
     function update(nextMember: string, nextParameter: number) {
         member = nextMember; parameter = nextParameter;
+        sectionParameter.value = String(parameter);
         clearTimeout(debounce); runtime?.invalidate(); requests.invalidate();
         clear(enabled ? 'Checking…' : 'Enable local checking to check this portal.');
         let snapshot: Model;
@@ -170,6 +175,14 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
         }, 150);
     }
     cutSide.onchange = () => update(member, parameter);
+    sectionParameter.oninput = () => {
+        const value = sectionParameter.valueAsNumber;
+        if (!Number.isFinite(value) || value < 0 || value > 1) {
+            requests.invalidate(); runtime?.invalidate(); clear('Enter a member parameter from 0 to 1.'); return;
+        }
+        changeSectionParameter(value);
+        update(member, value);
+    };
     exportButton.onclick = () => {
         if (!exportText) return;
         const url = URL.createObjectURL(new Blob([exportText], { type: 'application/json' }));

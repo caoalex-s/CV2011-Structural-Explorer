@@ -29,6 +29,11 @@ self.onmessage = async ({ data }) => {
     if (artifact !== manifest.files['checker.wasm']) { postMessage({ id, artifact, inputDigest, state: 'artifact-mismatch' }); return; }
     if (bytes.length > capacity) { postMessage({ id, artifact, inputDigest, state: 'limit' }); return; }
     try {
+        if (data.protocol !== 'frame' && data.protocol !== 'portal') throw Error('Malformed checker protocol.');
+        // The legacy decoder must never interpret an accepted generic packet
+        // as the old fixed 21-value result, even when both share one ABI.
+        if (data.protocol === 'portal' && (bytes[0] === undefined ||
+            (bytes[0] !== 45 && (bytes[0] < 48 || bytes[0] > 57)))) throw Error('Malformed portal packet.');
         let packet = bytes;
         if (data.protocol === 'frame') {
             if (!generic) throw Error('Unsupported: this installed bundle does not check general frames.');

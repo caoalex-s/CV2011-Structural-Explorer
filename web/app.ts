@@ -772,7 +772,7 @@ const controls = createWorkspaceControls({
 const session = createLearningSession({ notify: toast, onConnectionChange: render });
 portalPanel = createPortalPanel(() => model, value => commit(() => {
     if (model.loads.length === 1) { model.loads[0].fy = value; model.loads[0].qEnd = value; }
-}));
+}), value => { sectionT = value; updateEvidenceBinding(); render(); });
 if (!restoredPortalView) fit();
 controls.showLayer(layer);
 setMode(restoredPortalView ? mode : location.hash.slice(1) || 'sandbox');

@@ -175,6 +175,14 @@ export async function runFrameCases({ page, context, output, origin, base, url, 
 
     await check(beam, 'beam');
     for (const parameter of [0.25, 0.75, 0.5]) await select('beam', parameter);
+    const reverted = await accepted();
+    assert.equal(number(reverted.values.query.parameter), 0.5);
+    await page.locator('#frame-parameter').fill('0.123456789');
+    const precise = await accepted();
+    assert.equal(number(precise.values.query.parameter), 0.123456789);
+    await page.locator('#frame-parameter').fill('');
+    assert.equal(await page.locator('#portal-certificate').textContent(), '');
+    await page.locator('#frame-parameter').fill('0.5');
     const latest = await accepted();
     assert.equal(number(latest.values.query.parameter), 0.5);
     assert.equal(latest.artifact, first.artifact);
