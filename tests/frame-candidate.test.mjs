@@ -8,6 +8,7 @@ registerHooks({ resolve(specifier, context, next) {
 const { compileFrame, FrameCandidates, frameQueryConvention } = await import('../web/frame-candidate.ts');
 const { encoded, dot, zero, equal, mul, div, sub, integer, binary64, fraction } = await import('../web/frame-rational.ts');
 const { framePacket } = await import('../web/frame-packet.ts');
+const { decodeAcceptedFramePacket } = await import('../web/frame-result.ts');
 const { portalCandidate } = await import('../web/portal-candidate.ts');
 const { example } = await import('../web/engine.ts');
 const query = (member, parameter = 0.5, cutSide = 'left') => ({ member, parameter, cutSide, ...frameQueryConvention });
@@ -43,6 +44,38 @@ test('one- and two-member continuous beams recover the independent textbook base
         assert.deepEqual(encoded(candidate.readouts[2]), { numerator: '-10', denominator: '1' });
         assert.ok(equal(candidate.readouts[5], zero));
     }
+});
+
+test('display decoding preserves checked source identities and point order', () => {
+    const model = twoSpans(true);
+    model.members[0].id = '梁😀';
+    model.supports.forEach(support => { support.member = '梁😀'; });
+    model.loads.forEach(load => { load.member = '梁😀'; });
+    const selected = query('梁😀'), { candidate } = solve(model, selected);
+    const packet = framePacket(model, selected, candidate);
+    const decoded = decodeAcceptedFramePacket(packet);
+    assert.equal(decoded.kind, 'solution');
+    assert.deepEqual(decoded.points.map(point => [point.owner, point.id]),
+        [['node', 'left'], ['node', 'right'], ['member', '梁😀']]);
+    assert.deepEqual(decoded.points.flatMap(point => point.motion), candidate.motion.map(encoded));
+    assert.deepEqual(decoded.points.flatMap(point => point.reaction), candidate.reactions.map(encoded));
+    assert.deepEqual(decoded.readouts, candidate.readouts.map(encoded));
+    assert.equal(decoded.query.member, '梁😀');
+    assert.deepEqual(decoded.query.parameter, { numerator: '1', denominator: '2' });
+    assert.throws(() => decodeAcceptedFramePacket(packet.slice(0, -2)), /Truncated|Invalid/);
+    const extra = new TextEncoder().encode(new TextDecoder().decode(packet) + '\n0');
+    assert.throws(() => decodeAcceptedFramePacket(extra), /trailing/);
+});
+
+test('display decoding retains mechanism semantics and omits solution reactions', () => {
+    const model = twoSpans(true); model.supports = []; model.loads = [];
+    const selected = query('beam'), frame = compileFrame(model, selected);
+    const certificate = new FrameCandidates().produce(frame);
+    const decoded = decodeAcceptedFramePacket(framePacket(model, selected, certificate));
+    assert.equal(decoded.kind, 'mechanism');
+    assert.ok(decoded.points.every(point => point.reaction === undefined));
+    assert.deepEqual(decoded.readouts, []);
+    assert.deepEqual(decoded.loadWork, { numerator: '0', denominator: '1' });
 });
 
 test('the original portal is a regression of the generic source-driven algorithm', () => {
