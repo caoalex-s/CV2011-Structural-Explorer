@@ -77,5 +77,31 @@ theorem restricted_nonzero (data : Compiled) (q : Fin data.dofs → ℝ)
     obtain ⟨j, rfl⟩ := (index_complete data i).mpr free
     exact congrFun vanishes j
 
+/-- Positive reduced factors control every nonzero mask-admissible motion.
+    The matrix entries here are exactly those computed by the public checker. -/
+theorem factor_positive (data : Compiled) (certificate : Certificate)
+    (factor : FactorValid (stiffnessMatrix data) (freeIndices data) certificate)
+    (q : Fin data.dofs → ℝ)
+    (zeroBlocked : ∀ i, blocked data i.val = true → q i = 0) (nonzero : q ≠ 0) :
+    0 < ∑ i : Fin data.dofs, q i *
+      (∑ j : Fin data.dofs, (RationalFrame.stiffnessEntry data i.val j.val : ℝ) * q j) := by
+  rw [quadratic_reduction data q zeroBlocked]
+  let reduced : Fin (freeIndices data).size → ℝ := fun i => q (index data i)
+  have positive := Algebra.checked_factor_positive (stiffnessMatrix data) (freeIndices data) certificate factor
+  have value := positive.2 reduced (restricted_nonzero data q zeroBlocked nonzero)
+  have entry (i j : Fin (freeIndices data).size) :
+      (((stiffnessMatrix data)[(freeIndices data)[i.val]!]!)[(freeIndices data)[j.val]!]! : ℝ) =
+        (RationalFrame.stiffnessEntry data (index data i).val (index data j).val : ℝ) :=
+    congrArg (fun value : Rat => (value : ℝ)) (Equations.matrix_entry data (index data i) (index data j))
+  simpa only [dotProduct, Matrix.mulVec, entry, star_trivial, reduced] using value
+
+theorem physical_positive (data : Compiled) (valid : PartitionValid data) (certificate : Certificate)
+    (factor : FactorValid (stiffnessMatrix data) (freeIndices data) certificate)
+    (q : Fin data.dofs → ℝ)
+    (zeroBlocked : ∀ i, blocked data i.val = true → q i = 0) (nonzero : q ≠ 0) :
+    0 < FrameAssembly.stiffnessWork (model data valid) (motion data valid q) (motion data valid q) := by
+  rw [Work.stiffness_work]
+  exact factor_positive data certificate factor q zeroBlocked nonzero
+
 end
 end RationalFrame.FreeSpace
