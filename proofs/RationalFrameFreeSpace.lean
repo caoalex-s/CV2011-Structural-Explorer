@@ -32,9 +32,10 @@ theorem index_complete (data : Compiled) (i : Fin data.dofs) :
   · intro unblocked
     have member := (Algebra.freeIndices_complete data i.val).mpr ⟨i.isLt, unblocked⟩
     obtain ⟨j, hj, same⟩ := List.mem_iff_getElem.mp member
-    refine ⟨⟨j, by simpa using hj⟩, ?_⟩
+    have inBounds : j < (freeIndices data).size := by simpa using hj
+    refine ⟨⟨j, inBounds⟩, ?_⟩
     apply Fin.ext
-    simpa [index, getElem!_pos] using same
+    simpa [index, getElem!_pos, inBounds] using same
 
 theorem sum_free (data : Compiled) (values : Fin data.dofs → ℝ)
     (zeroBlocked : ∀ i, blocked data i.val = true → values i = 0) :
@@ -45,8 +46,9 @@ theorem sum_free (data : Compiled) (values : Fin data.dofs → ℝ)
     apply zeroBlocked i
     have notFree : blocked data i.val ≠ false := by
       intro free
-      exact absent ((index_complete data i).mpr free)
-    cases blocked data i.val <;> simp_all
+      obtain ⟨j, same⟩ := (index_complete data i).mpr free
+      exact absent j same
+    cases h : blocked data i.val <;> simp_all
   · intro j
     rfl
 
