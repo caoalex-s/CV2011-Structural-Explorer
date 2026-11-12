@@ -288,22 +288,35 @@ def blocked (model : Compiled) (i : Nat) : Bool :=
 def freeIndices (model : Compiled) : Array Nat :=
   ((List.range model.dofs).filter (fun i => !blocked model i)).toArray
 
+def SideContains (segment : Segment) (query : Query) : Prop :=
+  segment.member = query.member ∧
+    if query.right then segment.left ≤ query.t ∧ query.t < segment.right
+    else segment.left < query.t ∧ query.t ≤ segment.right
+
+instance (segment : Segment) (query : Query) : Decidable (SideContains segment query) := by
+  unfold SideContains
+  infer_instance
+
+/-- Strictness on the outward endpoint selects the requested one-sided
+    field directly, independently of the storage order of other members. -/
+def selectedIndex (model : Compiled) (query : Query) : Option (Fin model.segments.size) :=
+  (List.finRange model.segments.size).find? fun i => decide (SideContains model.segments[i.val]! query)
+
 def selectedSegment (model : Compiled) (query : Query) : Option Segment :=
-  let matching := model.segments.toList.filter fun segment =>
-    segment.member == query.member && segment.left ≤ query.t && query.t ≤ segment.right
-  if query.right then matching.getLast? else matching.head?
+  (selectedIndex model query).map (fun i => model.segments[i.val]!)
 
 def queryValid (model : Compiled) (query : Query) : Bool :=
   query.member < model.source.members.size && inUnit query.t && query.convention == 1 &&
     (query.t != 0 || query.right) && (query.t != 1 || !query.right) &&
-    (selectedSegment model query).isSome
+    (match selectedIndex model query with
+      | none => false
+      | some i => decide (SideContains model.segments[i.val]! query))
 
 /-- Loaded field values, ordered N,V,M,rotation,ux,uy with original member axes. -/
-def recover (model : Compiled) (query : Query) (motion : Array Rat) : Array Rat := Id.run do
-  let some s := selectedSegment model query | return #[]
+def recoverSegment (s : Segment) (parameter : Rat) (motion : Array Rat) : Array Rat :=
   let d := fun i : Fin 6 => coordinateSign s i * motion[globalIndex s i]!
   let action := fun i : Fin 6 => sumFin 6 (fun j => localStiffness s i j * d j) - localForce s i
-  let x := s.length * (query.t - s.left) / (s.right - s.left)
+  let x := s.length * (parameter - s.left) / (s.right - s.left)
   let p := s.sine * s.vertical
   let q := s.cosine * s.vertical
   let x2 := x*x
@@ -315,7 +328,12 @@ def recover (model : Compiled) (query : Query) (motion : Array Rat) : Array Rat 
   let axial := d 0 + (-action 0*x - p*x2/2)/s.EA
   let transverse := d 1 + d 2*x + (-action 2*x2/2 + action 1*x3/6 + q*x4/24)/s.EI
   let rotation := d 2 + (-action 2*x + action 1*x2/2 + q*x3/6)/s.EI
-  return #[normal, shear, moment, rotation,
+  #[normal, shear, moment, rotation,
     s.cosine*axial - s.sine*transverse, s.sine*axial + s.cosine*transverse]
+
+def recover (model : Compiled) (query : Query) (motion : Array Rat) : Array Rat :=
+  match selectedSegment model query with
+  | none => #[]
+  | some segment => recoverSegment segment query.t motion
 
 end RationalFrame
