@@ -53,8 +53,12 @@ export async function runFrameCases({ page, context, output, origin, base, url, 
     await page.evaluate(async scope => navigator.serviceWorker.register(scope + 'sentinel-sw.js', { scope }), sentinelScope);
     await page.locator('a[href="portal-checker/"]').click();
     assert.equal(await page.evaluate(() => crossOriginIsolated), false);
+    // The slider exists in the static HTML before app.ts binds its input
+    // handler. The generated panel appears only after those bindings exist.
+    await page.locator('#portal-activate').waitFor({ state: 'visible' });
     await page.locator('#section-position').evaluate(element => { element.value = '400'; });
     await page.locator('#section-position').dispatchEvent('input');
+    assert.equal(await page.locator('#section-position').inputValue(), '400');
     await Promise.all([page.waitForNavigation(), page.locator('#portal-activate').click()]);
     assert.equal(await page.locator('#section-position').inputValue(), '400');
     const first = await accepted();
