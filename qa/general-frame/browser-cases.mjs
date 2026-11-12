@@ -45,6 +45,12 @@ export async function runFrameCases({ page, context, output, origin, base, url, 
         await select(member, parameter, side);
         return accepted(kind);
     }
+    async function editProperty(type, id, property, value) {
+        await page.locator(`[data-object="${type}"][data-id="${id}"]`).click();
+        const input = page.locator(`[data-property="${property}"]`);
+        await input.fill(String(value));
+        await input.dispatchEvent('change');
+    }
 
     const rootResponse = await page.goto(origin + base);
     assert.equal(rootResponse.status(), 200);
@@ -120,6 +126,26 @@ export async function runFrameCases({ page, context, output, origin, base, url, 
     assert.deepEqual(two.values.points.map(point => number(point.reaction[1])), [7.5, 25, 7.5]);
     assert.equal(number(two.values.readouts[2]), -10);
     result.cases.push('offline-one-and-two-original-member-continuous-beams');
+
+    // Exercise the ordinary inspector as well as file import. Every edit
+    // must reach a fresh certificate from the same installed artifact.
+    await editProperty('node', 'right', 'x', 10);
+    assert.equal((await accepted()).sourceRequest.model.nodes[2].x, 10);
+    await editProperty('member', 'second', 'EI', 30000);
+    assert.equal((await accepted()).sourceRequest.model.members[1].EI, 30000);
+    await editProperty('support', 'b', 't', 0.75);
+    assert.equal((await accepted()).sourceRequest.model.supports[1].t, 0.75);
+    await editProperty('load', 'w2', 't', 0.25);
+    assert.equal((await accepted()).sourceRequest.model.loads[1].t, 0.25);
+    result.cases.push('offline-inspector-dimension-material-support-and-load-edits');
+
+    const shortBeam = structuredClone(beam);
+    shortBeam.nodes[1].x = 1 / 128;
+    const shortResponse = await check(shortBeam, 'beam');
+    assert.equal(shortResponse.sourceRequest.model.nodes[1].x, 1 / 128);
+    assert.match(await page.locator('#status').textContent(), /at least 0\.02 m/);
+    assert.match(await page.locator('#section-results').textContent(), /—/);
+    result.cases.push('exact-short-member-with-honest-numerical-panel-decline');
 
     const decimal = structuredClone(beam);
     decimal.nodes[1].x = 10; decimal.supports[1].t = 0.4;
