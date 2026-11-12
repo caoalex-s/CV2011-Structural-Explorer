@@ -3,7 +3,12 @@ import { EvidenceRequests, createEvidenceEnvelope } from './model-evidence.js';
 import { portalAmplitude, portalCandidate, encodeCandidate, portalQuery, outputIds, roundedDecimal, profileId } from './portal-candidate.js';
 import type { Model } from './engine.js';
 import { PortalRuntime } from './portal-runtime.js';
+import { sha256 } from './portal-runtime.js';
 import type { CheckerResult } from './portal-runtime.js';
+import { validateFrame, frameQueryConvention } from './frame-candidate.js';
+import { decodeAcceptedFramePacket } from './frame-result.js';
+import { frameDescriptions, frameStatus } from './frame-display.js';
+import type { EvidenceQuery } from './model-evidence.js';
 
 export const isPortalWorkspace = location.pathname.replace(/index\.html$/, '').endsWith('/portal-checker/');
 export const portalStorageKey = 'cv2011-checked-portal-model/v1';
@@ -19,12 +24,14 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
     const host = document.createElement('section');
     host.className = 'portal-certificate';
     host.innerHTML = `<h2>Checked portal response</h2>
-      <p>Keep the original portal and vary its uniform BC load. Positive load acts upward.</p>
+      <p id="portal-introduction">Keep the original portal and vary its uniform BC load. Positive load acts upward.</p>
       <label>Uniform load (kN/m) <input id="portal-amplitude" type="number" step="any" value="-5"></label>
       <button id="portal-activate">Enable local checking</button><button id="portal-reset" hidden>Reset checker</button>
       <button id="portal-deactivate" hidden>Disable local checking</button>
+      <label id="frame-side-label" hidden>Section limit <select id="frame-side"><option value="right">Right</option><option value="left">Left</option></select></label>
       <p id="portal-status" role="status">Local checking is off.</p><div id="portal-readouts"></div>
-      <details><summary>Scope and exact certificate</summary><p>The checked values cover joint displacements, both base reactions, and BC midpoint moment and vertical displacement. Diagram curves remain numerical. Acceptance uses a compiled Lean checker and relies on its compiler, runtime, decoder, and input binding. Each edit does not invoke the Lean kernel.</p><pre id="portal-certificate"></pre></details>`;
+      <button id="frame-export" hidden>Export exact certificate</button>
+      <details><summary>Scope and exact certificate</summary><p id="portal-scope">The checked values cover joint displacements, both base reactions, and BC midpoint moment and vertical displacement. Diagram curves remain numerical. Acceptance uses a compiled Lean checker and relies on its compiler, runtime, decoder, and input binding. Each edit does not invoke the Lean kernel.</p><pre id="portal-certificate"></pre></details>`;
     document.getElementById('workspace')!.prepend(host);
     const status = host.querySelector<HTMLElement>('#portal-status')!;
     const readouts = host.querySelector<HTMLElement>('#portal-readouts')!;
@@ -33,13 +40,26 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
     const activate = host.querySelector<HTMLButtonElement>('#portal-activate')!;
     const deactivate = host.querySelector<HTMLButtonElement>('#portal-deactivate')!;
     const reset = host.querySelector<HTMLButtonElement>('#portal-reset')!;
+    const cutSide = host.querySelector<HTMLSelectElement>('#frame-side')!;
+    const exportButton = host.querySelector<HTMLButtonElement>('#frame-export')!;
     const requests = new EvidenceRequests();
     let runtime: PortalRuntime | null = null;
     let debounce: ReturnType<typeof setTimeout> | undefined;
     let member = 'BC', parameter = 0.5;
     let enabled = false;
+    let exportText = '';
+    const sideStorage = portalStorageKey + '/cut-side';
+    try {
+        const saved = JSON.parse(sessionStorage.getItem(sideStorage) || 'null');
+        if (saved?.model === JSON.stringify(modelAtPresent()) && ['left', 'right'].includes(saved.side)) cutSide.value = saved.side;
+    } catch { /* A fresh query is checked even when view restoration fails. */ }
+    window.addEventListener('beforeunload', () => sessionStorage.setItem(sideStorage,
+        JSON.stringify({ model: JSON.stringify(modelAtPresent()), side: cutSide.value })));
 
-    function clear(message: string) { status.textContent = message; readouts.replaceChildren(); certificate.textContent = ''; }
+    function clear(message: string) {
+        status.textContent = message; readouts.replaceChildren(); certificate.textContent = '';
+        exportText = ''; exportButton.hidden = true;
+    }
     function stop() { clearTimeout(debounce); requests.invalidate(); runtime?.dispose(); runtime = null; enabled = false; }
     async function start() {
         stop(); clear('Starting local checker…');
@@ -54,8 +74,37 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
             await starting.ready;
             if (starting !== runtime) return;
             enabled = true; activate.hidden = true; deactivate.hidden = false; reset.hidden = false;
+            if (starting.supportsFrames) {
+                host.querySelector('h2')!.textContent = 'Checked frame response';
+                host.querySelector('#portal-introduction')!.textContent = 'Draw or import a rigid frame with horizontal and vertical members. Select a member and section position to check its response.';
+                amplitude.closest('label')!.hidden = true;
+                host.querySelector<HTMLElement>('#frame-side-label')!.hidden = false;
+                host.querySelector('#portal-scope')!.textContent = 'The checker covers linear Euler–Bernoulli frames with positive EA and EI, fixed or pin supports, and rollers at 0, 90, 180, or 270 degrees. Point forces, couples, and uniform vertical loads may act over partial or overlapping member intervals. Up to 8 members, 16 nodes, 16 active points, 16 segments, 16 supports, and 16 loads are supported within the arithmetic and one-second limits. Inputs retain their exact parsed binary64 values. Source and certificate rationals allow 128 digits, with 256 digits for normalized candidate intermediates and 513 before reduction. The packet limit is 1 MiB. A limit or timeout is inconclusive. N is positive in tension, M is positive in sagging, dM/dx = V, global y is upward, and rotation is counterclockwise. Diagram curves remain numerical. Acceptance relies on the proved compiled checker, its compiler and runtime, and the decoder and input binding. Edits are checked locally without invoking the Lean kernel.';
+            }
             update(member, parameter);
         } catch (error) { if (starting === runtime) clear(`Checking unavailable: ${String(error)}`); }
+    }
+    async function displayFrame(result: CheckerResult, envelope: Awaited<ReturnType<typeof createEvidenceEnvelope>>,
+        token: { revision: number; request: number }, checker: PortalRuntime, sourceBytes: Uint8Array) {
+        if (result.state !== 'accepted') {
+            const detail = typeof result.message === 'string' ? ` ${result.message}` : '';
+            clear(`Check ${result.state}.${detail}`); return;
+        }
+        if (!(result.packet instanceof Uint8Array) || typeof result.packetDigest !== 'string') throw Error('Missing accepted packet.');
+        const packet = new Uint8Array(result.packet);
+        if (await sha256(packet) !== result.packetDigest) throw Error('Accepted packet identity changed.');
+        if (!requests.isCurrent(token) || checker !== runtime) return;
+        const frame = decodeAcceptedFramePacket(packet);
+        status.textContent = frameStatus(frame);
+        readouts.replaceChildren(...frameDescriptions(frame).map(text => {
+            const line = document.createElement('p'); line.textContent = text; return line;
+        }));
+        exportText = JSON.stringify({ protocol: 'CV2011_FRAME_1', ...token, bindings: envelope.bindings,
+            artifact: result.artifact, bundle: checker.bundle, inputDigest: result.inputDigest,
+            packetDigest: result.packetDigest, theorem: 'RationalFrameSoundness.acceptance_actual_frame',
+            sourceRequest: JSON.parse(new TextDecoder().decode(sourceBytes)), values: frame,
+            packet: new TextDecoder().decode(packet) }, null, 2);
+        certificate.textContent = exportText; exportButton.hidden = false;
     }
     function display(result: CheckerResult, envelope: Awaited<ReturnType<typeof createEvidenceEnvelope>>, token: { revision: number; request: number }) {
         if (result.state !== 'accepted' || !Array.isArray(result.checked) || result.checked.length !== 21) {
@@ -84,27 +133,49 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
         clearTimeout(debounce); runtime?.invalidate(); requests.invalidate();
         clear(enabled ? 'Checking…' : 'Enable local checking to check this portal.');
         let snapshot: Model;
+        let query: EvidenceQuery;
         try {
             // Capture before any asynchronous work, including hashing and debounce.
             snapshot = structuredClone(modelAtPresent());
-            const value = portalAmplitude(snapshot);
-            amplitude.value = String(value);
-            if (member !== 'BC' || parameter !== 0.5) throw new Error('Unsupported query: select BC at its midpoint.');
-            requests.update(snapshot, portalQuery);
+            if (runtime?.supportsFrames) {
+                if (parameter === 0) cutSide.value = 'right';
+                if (parameter === 1) cutSide.value = 'left';
+                cutSide.options[0].disabled = parameter === 1;
+                cutSide.options[1].disabled = parameter === 0;
+                query = { member, parameter, cutSide: cutSide.value as 'left' | 'right', ...frameQueryConvention };
+                validateFrame(snapshot, query);
+            } else {
+                const value = portalAmplitude(snapshot);
+                amplitude.value = String(value);
+                if (member !== 'BC' || parameter !== 0.5) throw new Error('Unsupported query: select BC at its midpoint.');
+                query = portalQuery;
+            }
+            requests.update(snapshot, query);
         } catch (error) { clear(String(error)); return; }
         if (!enabled || !runtime) return;
         const checker = runtime, token = requests.begin();
         debounce = setTimeout(async () => {
             try {
-                const bytes = encodeCandidate(portalCandidate(portalAmplitude(snapshot)));
-                const envelope = await createEvidenceEnvelope(snapshot, portalQuery);
+                const bytes = checker.supportsFrames
+                    ? new TextEncoder().encode(JSON.stringify({ model: snapshot, query }))
+                    : encodeCandidate(portalCandidate(portalAmplitude(snapshot)));
+                const envelope = await createEvidenceEnvelope(snapshot, query);
                 if (!requests.isCurrent(token) || checker !== runtime) return;
-                const result = await checker.check(bytes);
+                const result = checker.supportsFrames ? await checker.checkFrame(bytes) : await checker.check(bytes);
                 if (!requests.isCurrent(token) || checker !== runtime) return;
-                display(requests.accept(token, result), envelope, token);
+                const current = requests.accept(token, result);
+                if (checker.supportsFrames) await displayFrame(current, envelope, token, checker, bytes);
+                else display(current, envelope, token);
             } catch (error) { if (requests.isCurrent(token)) clear(String(error)); }
         }, 150);
     }
+    cutSide.onchange = () => update(member, parameter);
+    exportButton.onclick = () => {
+        if (!exportText) return;
+        const url = URL.createObjectURL(new Blob([exportText], { type: 'application/json' }));
+        const link = document.createElement('a'); link.href = url; link.download = 'checked-frame.json'; link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 0);
+    };
     amplitude.oninput = () => {
         const value = amplitude.valueAsNumber;
         if (!Number.isFinite(value)) { requests.invalidate(); runtime?.invalidate(); clear('Enter a finite uniform load.'); return; }

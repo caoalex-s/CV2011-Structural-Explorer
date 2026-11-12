@@ -9,6 +9,7 @@ const { compileFrame, FrameCandidates, frameQueryConvention } = await import('..
 const { encoded, dot, zero, equal, mul, div, sub, integer, binary64, fraction } = await import('../web/frame-rational.ts');
 const { framePacket } = await import('../web/frame-packet.ts');
 const { decodeAcceptedFramePacket } = await import('../web/frame-result.ts');
+const { frameDescriptions, frameStatus } = await import('../web/frame-display.ts');
 const { portalCandidate } = await import('../web/portal-candidate.ts');
 const { example } = await import('../web/engine.ts');
 const query = (member, parameter = 0.5, cutSide = 'left') => ({ member, parameter, cutSide, ...frameQueryConvention });
@@ -76,6 +77,21 @@ test('display decoding retains mechanism semantics and omits solution reactions'
     assert.ok(decoded.points.every(point => point.reaction === undefined));
     assert.deepEqual(decoded.readouts, []);
     assert.deepEqual(decoded.loadWork, { numerator: '0', denominator: '1' });
+});
+
+test('display names section units, original point owners and grouped reactions', () => {
+    const model = twoSpans(true), selected = query('beam');
+    const { candidate } = solve(model, selected);
+    const frame = decodeAcceptedFramePacket(framePacket(model, selected, candidate));
+    const text = frameDescriptions(frame).join('\n');
+    assert.match(text, /Member beam, t = 1\/2, left limit/);
+    assert.match(text, /Bending moment M: -10.000 kN m/);
+    assert.match(text, /Member beam at t = 1\/2, grouped reaction: Fx 0.000 kN, Fy 25.000 kN/);
+    assert.match(frameStatus(frame), /unique linear equilibrium/);
+    const mechanism = { ...frame, kind: 'mechanism', readouts: [], loadWork: { numerator: '0', denominator: '1' } };
+    assert.match(frameStatus(mechanism), /does not determine load compatibility/);
+    assert.doesNotMatch(frameDescriptions(mechanism).join('\n'), /grouped reaction| mm| kN/);
+    assert.match(frameStatus({ ...mechanism, loadWork: { numerator: '1', denominator: '2' } }), /incompatible with equilibrium/);
 });
 
 test('the original portal is a regression of the generic source-driven algorithm', () => {
