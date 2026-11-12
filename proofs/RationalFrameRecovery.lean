@@ -65,5 +65,43 @@ theorem checked_selection (data : Compiled) (query : Query) (checked : queryVali
     simp only [queryValid, selected, Bool.and_eq_true, decide_eq_true_eq] at checked
     exact checked.2
 
+/-- Six quantities from the actual member-side motion and loaded fields.
+    The coordinate x is measured from the selected segment's original-left
+    boundary, in metres along the original member orientation. -/
+def actualValues (data : Compiled) (valid : PartitionValid data)
+    (values : Array Rat) (segment : Fin data.segments.size) (parameter : Rat) : Fin 6 → ℝ :=
+  let frame := model data valid
+  let orientation := (frame.member (frame.segmentMember segment)).orientation
+  fieldValues (segmentDofs frame (motion data valid (fun i => (values[i.val]! : ℝ))) segment)
+    (frame.segmentLength segment) (frame.segmentEA segment) (frame.segmentEI segment)
+    orientation.cosine orientation.sine (frame.segmentVerticalStart segment)
+    (frame.segmentLength segment * ((parameter : ℝ) - (data.segments[segment.val]!.left : ℝ)) /
+      ((data.segments[segment.val]!.right : ℝ) - (data.segments[segment.val]!.left : ℝ)))
+
+theorem checked_readouts (data : Compiled) (valid : PartitionValid data)
+    (query : Query) (certificate : Certificate)
+    (queryChecked : queryValid data query = true) (solution : SolutionValid data query certificate) :
+    ∃ segment : Fin data.segments.size,
+      selectedIndex data query = some segment ∧ SideContains data.segments[segment.val]! query ∧
+      ∀ i : Fin 6, (certificate.readouts[i.val]! : ℝ) =
+        actualValues data valid certificate.motion segment query.t i := by
+  obtain ⟨segment, selected, contains⟩ := checked_selection data query queryChecked
+  refine ⟨segment, selected, contains, ?_⟩
+  intro i
+  rw [solution.2.2.1]
+  simp only [recover, selectedSegment, selected, Option.map_some]
+  rcases segments_valid data valid segment with
+    ⟨_, _, _, _, _, _, _, length, axial, bending, _, _, cosine, sine, _⟩
+  have lengthReal : (data.segments[segment.val]!.length : ℝ) ≠ 0 := by exact_mod_cast ne_of_gt length
+  have axialReal : (data.segments[segment.val]!.EA : ℝ) ≠ 0 := by exact_mod_cast ne_of_gt axial
+  have bendingReal : (data.segments[segment.val]!.EI : ℝ) ≠ 0 := by exact_mod_cast ne_of_gt bending
+  rw [recover_segment_cast _ _ _ lengthReal axialReal bendingReal, actual_local_motion]
+  change fieldValues _ _ _ _ _ _ _ _ i = fieldValues _ _ _ _
+    (memberCosine data.source data.segments[segment.val]!.member : ℝ)
+    (memberSine data.source data.segments[segment.val]!.member : ℝ) _ _ i
+  rw [← cosine, ← sine]
+  push_cast
+  rfl
+
 end
 end RationalFrame.Recovery

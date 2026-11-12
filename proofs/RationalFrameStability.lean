@@ -80,5 +80,19 @@ theorem checked_mechanism (data : Compiled) (valid : PartitionValid data) (certi
     push_cast at castRow
     rw [castRow, mul_zero]
 
+/- A nonzero work value excludes every equilibrium. A zero value for one
+   witness is deliberately not promoted to a claim of load compatibility. -/
+theorem checked_incompatible (data : Compiled) (valid : PartitionValid data) (certificate : Certificate)
+    (restrained : Admissible data certificate.motion) (mechanism : MechanismValid data certificate)
+    (nonzeroWork : certificate.loadWork ≠ 0) :
+    ¬ ∃ q, equilibrium (model data valid) (actions data valid) (supports data valid) q := by
+  intro existsEquilibrium
+  have compatible := (equilibrium_exists_iff_load_compatible _ _ _ _ _ _ _
+    (Contract.exact_contract data valid)).mp existsEquilibrium
+  have witness := checked_mechanism data valid certificate restrained mechanism
+  have zeroWork := compatible _ witness.1 witness.2.2
+  rw [← Equations.load_work, ← mechanism.2.2.1] at zeroWork
+  exact nonzeroWork (by exact_mod_cast zeroWork)
+
 end
 end RationalFrame.Stability

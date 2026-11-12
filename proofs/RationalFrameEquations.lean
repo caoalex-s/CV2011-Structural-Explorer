@@ -42,6 +42,26 @@ theorem residual_entry (data : Compiled) (q : Array Rat) (i : Fin data.dofs) :
         RationalFrame.forceEntry data i.val := by
   simp [RationalFrame.residual, matrix_size, i.isLt, matrix_dot, force_entry]
 
+theorem force_dot (data : Compiled) (q : Array Rat) :
+    arrayDot (forceVector data) q =
+      ∑ i : Fin data.dofs, RationalFrame.forceEntry data i.val * q[i.val]! := by
+  have size : (forceVector data).size = data.dofs := by simp [forceVector]
+  unfold arrayDot
+  rw [size, Algebra.sumFin_eq_sum]
+  apply Finset.sum_congr rfl
+  intro i _
+  rw [force_entry]
+
+theorem load_work (data : Compiled) (valid : PartitionValid data) (q : Array Rat) :
+    (arrayDot (forceVector data) q : ℝ) =
+      externalWork (model data valid) (actions data valid)
+        (motion data valid (fun i => (q[i.val]! : ℝ))) := by
+  rw [force_dot, Work.external_work]
+  push_cast
+  apply Finset.sum_congr rfl
+  intro i _
+  ring
+
 theorem checked_equilibrium (data : Compiled) (valid : PartitionValid data)
     (query : Query) (certificate : Certificate)
     (restrained : Admissible data certificate.motion)
