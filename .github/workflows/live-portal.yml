@@ -66,7 +66,7 @@ jobs:
           set -euo pipefail
           cd proofs
           failed=0
-          for module in RationalFrameAlgebra RationalFrameFields RationalFrameInterpretation RationalFrameGeometry RationalFrameContract RationalFrameAssembly RationalFrameConstraints RationalFrameWork RationalFrameEquations RationalFrameFreeSpace RationalFrameStability; do
+          for module in RationalFrameAlgebra RationalFrameFields RationalFrameInterpretation RationalFrameGeometry RationalFrameContract RationalFrameAssembly RationalFrameRecovery RationalFrameConstraints RationalFrameWork RationalFrameEquations RationalFrameFreeSpace RationalFrameStability; do
             if ! lake env bash -c 'export LEAN_PATH="$PWD:$LEAN_PATH"; lean -o "$1.olean" "$1.lean"' -- "$module" | tee "../.data/live-portal/$module.log"; then
               failed=1
             fi

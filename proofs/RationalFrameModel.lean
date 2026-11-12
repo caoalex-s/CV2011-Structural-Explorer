@@ -312,10 +312,16 @@ def queryValid (model : Compiled) (query : Query) : Bool :=
       | none => false
       | some i => decide (SideContains model.segments[i.val]! query))
 
+def localMotion (s : Segment) (motion : Array Rat) (i : Fin 6) : Rat :=
+  coordinateSign s i * motion[globalIndex s i]!
+
+def endAction (s : Segment) (motion : Array Rat) (i : Fin 6) : Rat :=
+  sumFin 6 (fun j => localStiffness s i j * localMotion s motion j) - localForce s i
+
 /-- Loaded field values, ordered N,V,M,rotation,ux,uy with original member axes. -/
 def recoverSegment (s : Segment) (parameter : Rat) (motion : Array Rat) : Array Rat :=
-  let d := fun i : Fin 6 => coordinateSign s i * motion[globalIndex s i]!
-  let action := fun i : Fin 6 => sumFin 6 (fun j => localStiffness s i j * d j) - localForce s i
+  let d := localMotion s motion
+  let action := endAction s motion
   let x := s.length * (parameter - s.left) / (s.right - s.left)
   let p := s.sine * s.vertical
   let q := s.cosine * s.vertical
