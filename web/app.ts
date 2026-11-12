@@ -35,7 +35,12 @@ try {
     const saved = localStorage.getItem(modelStorageKey);
     if (saved) {
         const candidate = JSON.parse(saved);
-        if (analyse(candidate).status !== 'invalid')
+        if (isPortalWorkspace) {
+            // The numerical diagram engine has its own length/tolerance
+            // limits. Exact checker inputs use the strict source schema.
+            parseEvidenceModel(candidate);
+            model = candidate;
+        } else if (analyse(candidate).status !== 'invalid')
             model = candidate;
     }
 }
@@ -663,8 +668,10 @@ $<HTMLInputElement>('model-file').onchange = async () => { try {
     const parsed = JSON.parse(source), candidate = parsed.model || parsed;
     if (parsed.version && parsed.version > 2) throw Error('This model uses a newer file format. Update Structural Explorer before opening it.');
     const checked = analyse(candidate);
-    if (checked.status === 'invalid')
-        throw Error(checked.message);
+    if (checked.status === 'invalid') {
+        if (!isPortalWorkspace) throw Error(checked.message);
+        parseEvidenceModel(candidate);
+    }
     commit(() => { model = candidate; selected = null; fit(); });
     // Keep original text only while its parsed snapshot still matches the drawing.
     try {

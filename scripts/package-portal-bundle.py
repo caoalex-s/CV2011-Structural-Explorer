@@ -24,9 +24,13 @@ prefix = '.data/live-portal-build/'
 with zipfile.ZipFile(args.archive) as archive:
     receipt_bytes = archive.read(prefix + 'receipt.json')
     receipt = json.loads(receipt_bytes)
+    generic = receipt.get('mode') == 'frame'
+    abi_path = Path('qa/general-frame/abi.c' if generic else 'qa/live-portal/abi.c')
     assert receipt['commit'] == args.source_commit
     assert receipt['repeatability'] and receipt['comparison']['equal']
     assert receipt['cleanup']['removed']
+    if generic:
+        assert receipt['runtime_gate_passed'] and receipt['browser']['passed']
     manifests = [json.loads(archive.read(prefix + f'pass-{number}/manifest.json')) for number in (1, 2)]
     assert manifests[0] == manifests[1]
     checked_files = 0
@@ -41,20 +45,25 @@ with zipfile.ZipFile(args.archive) as archive:
 
     # All current formal sources and ABI/worker inputs must remain the same as
     # the source commit actually used by the compiler, including bridge imports.
-    subprocess.run(['git', 'diff', '--exit-code', args.source_commit, '--', 'proofs',
-                    'qa/live-portal/abi.c', 'qa/live-portal/worker.mjs'], check=True)
-    for name in ['abi.c', 'worker.mjs']:
-        path = Path('qa/live-portal') / name
+    source_paths = ['proofs', str(abi_path), 'qa/live-portal/worker.mjs']
+    if generic:
+        source_paths.extend(receipt['frame_sources'])
+    subprocess.run(['git', 'diff', '--exit-code', args.source_commit, '--', *source_paths], check=True)
+    for path in [abi_path, Path('qa/live-portal/worker.mjs')]:
         assert digest(path.read_bytes()) == receipt['files'][path.as_posix()]
-    assert digest(archive.read(prefix + 'PortalChecker.c')) == receipt['generated_modules_1']['PortalChecker']['c_sha256']
-    audit = archive.read(prefix + 'axiom-audit.json')
+    checker_module = 'RationalFrameWire' if generic else 'PortalChecker'
+    assert digest(archive.read(prefix + checker_module + '.c')) == receipt['generated_modules_1'][checker_module]['c_sha256']
+    audit = archive.read(prefix + ('frame-axiom-audit.json' if generic else 'axiom-audit.json'))
     assert json.loads(audit)['passed'] is True
-    assert digest(audit) == receipt['proof_audit_sha256']
+    assert digest(audit) == receipt['frame_proof_audit_sha256' if generic else 'proof_audit_sha256']
 
     bundle = Path('public/portal-checker/bundle')
     bundle.mkdir(parents=True, exist_ok=True)
     files = {}
-    for name in ['checker.wasm', 'checker.mjs', 'checker.worker.js', 'checker.mjs.symbols']:
+    asset_names = ['checker.wasm', 'checker.mjs', 'checker.worker.js', 'checker.mjs.symbols']
+    if generic:
+        asset_names.extend(['frame-rational.js', 'model-evidence.js', 'frame-candidate.js', 'frame-packet.js', 'frame-result.js'])
+    for name in asset_names:
         relative = '.data/wasm-build/canonical/assets/' + name
         data = archive.read(prefix + 'pass-2/files/' + relative)
         files[name] = digest(data)
@@ -65,20 +74,22 @@ with zipfile.ZipFile(args.archive) as archive:
     # Use the committed text bytes used by Linux CI. Windows generators may
     # leave CRLF in a worktree even when Git's declared storage format is LF.
     proof_files = {}
-    for name in ['PortalChecker.lean', 'PortalTables.lean', 'PortalSoundness.lean',
-                 'PortalFramePilot.lean', 'lean-toolchain', 'lake-manifest.json']:
+    proof_names = sorted(path.name for path in Path('proofs').glob('*.lean')) if generic else [
+        'PortalChecker.lean', 'PortalTables.lean', 'PortalSoundness.lean', 'PortalFramePilot.lean']
+    proof_names.extend(['lean-toolchain', 'lake-manifest.json'])
+    for name in proof_names:
         committed = subprocess.run(['git', 'show', args.source_commit + ':proofs/' + name],
                                    capture_output=True, check=True).stdout
         assert (Path('proofs') / name).read_bytes().replace(b'\r\n', b'\n') == committed
         proof_files[name] = digest(committed)
     manifest = {
-        'status': 'proved-compiled', 'theorem': 'PortalSoundness.acceptance_actual_portal',
+        'status': 'proved-compiled', 'theorem': 'RationalFrameSoundness.acceptance_actual_frame' if generic else 'PortalSoundness.acceptance_actual_portal',
         'sourceCommit': receipt['commit'], 'pins': receipt['pins'],
         'buildManifests': [receipt['manifest_1_sha256'], receipt['manifest_2_sha256']],
-        'stabilityWitness': 'PortalSoundness.fixed_inverse',
-        'groupedReactions': 'PortalSoundness.accepted_grouped_reactions',
+        'stabilityWitness': 'RationalFrame.Stability.checked_unique' if generic else 'PortalSoundness.fixed_inverse',
+        'groupedReactions': 'RationalFrame.Reactions.checked_grouped_reactions' if generic else 'PortalSoundness.accepted_grouped_reactions',
         'files': files, 'proofFiles': proof_files, 'workerSha256': digest(worker),
-        'abiSha256': digest(Path('qa/live-portal/abi.c').read_bytes()),
+        'abiSha256': digest(abi_path.read_bytes()),
         'axiomAuditSha256': digest(audit),
         'buildArchiveSha256': args.archive_sha256, 'buildReceiptSha256': digest(receipt_bytes),
         'trust': 'Pinned Lean 4.19/C/Emscripten compilation, runtime, decoder and input binding. No kernel invocation per edit.',

@@ -112,15 +112,16 @@ jobs:
           pnpm check
           pnpm test
           mkdir -p .data/live-portal-build
-          cp .data/live-portal/axiom-audit.json .data/live-portal-build/
+          cp .data/live-portal/axiom-audit.json .data/live-portal/frame-axiom-audit.json .data/live-portal-build/
           cd proofs
           lake env bash -c 'export LEAN_PATH="$PWD:$LEAN_PATH"; lean -c ../.data/live-portal-build/PortalChecker.c PortalChecker.lean'
+          lake env bash -c 'export LEAN_PATH="$PWD:$LEAN_PATH"; lean -c ../.data/live-portal-build/RationalFrameWire.c RationalFrameWire.lean'
       - name: Reproduce the structural WASM and test the live portal workspace
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_wasm }}
         shell: bash
         run: |
           set -euo pipefail
-          python3 qa/wasm-feasibility/gate.py --portal 2>&1 | tee .data/live-portal-build/build.log
+          python3 qa/wasm-feasibility/gate.py --frame 2>&1 | tee .data/live-portal-build/build.log
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.build_wasm }}
         with:

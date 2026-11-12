@@ -2,8 +2,9 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
-import { readFile, writeFile, mkdir, copyFile } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, copyFile, readdir } from 'node:fs/promises';
 import { resolve, extname, dirname } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { chromium } from 'playwright';
 
@@ -13,18 +14,28 @@ const [assets, source, installedOutput] = process.argv.slice(2);
 const root = process.cwd();
 const output = installedOutput ? resolve(installedOutput) : dirname(assets);
 const bundle = resolve('public/portal-checker/bundle');
+const installedManifest = installedOutput ? JSON.parse(await readFile(resolve(bundle, 'manifest.json'), 'utf8')) : null;
+const generic = installedManifest ? installedManifest.theorem === 'RationalFrameSoundness.acceptance_actual_frame'
+    : process.env.CV2011_FRAME_GATE === '1';
+const theorem = generic ? 'RationalFrameSoundness.acceptance_actual_frame' : 'PortalSoundness.acceptance_actual_portal';
+const abiPath = generic ? resolve('qa/general-frame/abi.c') : resolve(source, 'abi.c');
+const auditName = generic ? 'frame-axiom-audit.json' : 'axiom-audit.json';
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 await mkdir(bundle, { recursive: true });
 await mkdir(output, { recursive: true });
 const files = {};
-for (const name of ['checker.wasm', 'checker.mjs', 'checker.worker.js', 'checker.mjs.symbols']) {
+const runtimeFiles = ['checker.wasm', 'checker.mjs', 'checker.worker.js', 'checker.mjs.symbols'];
+if (generic) runtimeFiles.push('frame-rational.js', 'model-evidence.js', 'frame-candidate.js', 'frame-packet.js', 'frame-result.js');
+for (const name of runtimeFiles) {
     const bytes = await readFile(resolve(assets, name));
     files[name] = digest(bytes);
     if (!installedOutput) await writeFile(resolve(bundle, name), bytes);
 }
 if (!installedOutput) await copyFile(resolve(source, 'worker.mjs'), resolve(bundle, 'worker.mjs'));
 const proofFiles = {};
-for (const name of ['PortalChecker.lean', 'PortalTables.lean', 'PortalSoundness.lean', 'PortalFramePilot.lean', 'lean-toolchain', 'lake-manifest.json']) {
+const proofNames = generic ? [...(await readdir('proofs')).filter(name => name.endsWith('.lean')), 'lean-toolchain', 'lake-manifest.json'].sort()
+    : ['PortalChecker.lean', 'PortalTables.lean', 'PortalSoundness.lean', 'PortalFramePilot.lean', 'lean-toolchain', 'lake-manifest.json'];
+for (const name of proofNames) {
     proofFiles[name] = digest(await readFile(resolve('proofs', name)));
 }
 if (installedOutput) {
@@ -32,24 +43,24 @@ if (installedOutput) {
     // fresh kernel audit must agree before testing the final workspace build.
     const manifest = JSON.parse(await readFile(resolve(bundle, 'manifest.json'), 'utf8'));
     assert.equal(manifest.status, 'proved-compiled');
-    assert.equal(manifest.theorem, 'PortalSoundness.acceptance_actual_portal');
+    assert.equal(manifest.theorem, theorem);
     assert.deepEqual(manifest.files, files);
     assert.deepEqual(manifest.proofFiles, proofFiles);
     assert.equal(manifest.workerSha256, digest(await readFile(resolve(bundle, 'worker.mjs'))));
     assert.equal(manifest.workerSha256, digest(await readFile(resolve(source, 'worker.mjs'))));
-    assert.equal(manifest.abiSha256, digest(await readFile(resolve(source, 'abi.c'))));
-    assert.equal(manifest.axiomAuditSha256, digest(await readFile('.data/live-portal/axiom-audit.json')));
+    assert.equal(manifest.abiSha256, digest(await readFile(abiPath)));
+    assert.equal(manifest.axiomAuditSha256, digest(await readFile('.data/live-portal/' + auditName)));
 } else {
     const buildReceipt = JSON.parse(await readFile('.data/live-portal-build/receipt.json', 'utf8'));
     assert.equal(buildReceipt.repeatability, true);
-    const manifest = { status: 'proved-compiled', theorem: 'PortalSoundness.acceptance_actual_portal',
+    const manifest = { status: 'proved-compiled', theorem,
         sourceCommit: buildReceipt.commit, pins: buildReceipt.pins,
         buildManifests: [buildReceipt.manifest_1_sha256, buildReceipt.manifest_2_sha256],
-        stabilityWitness: 'PortalSoundness.fixed_inverse',
-        groupedReactions: 'PortalSoundness.accepted_grouped_reactions',
+        stabilityWitness: generic ? 'RationalFrame.Stability.checked_unique' : 'PortalSoundness.fixed_inverse',
+        groupedReactions: generic ? 'RationalFrame.Reactions.checked_grouped_reactions' : 'PortalSoundness.accepted_grouped_reactions',
         files, proofFiles, workerSha256: digest(await readFile(resolve(bundle, 'worker.mjs'))),
-        abiSha256: digest(await readFile(resolve(source, 'abi.c'))),
-        axiomAuditSha256: digest(await readFile('.data/live-portal-build/axiom-audit.json')),
+        abiSha256: digest(await readFile(abiPath)),
+        axiomAuditSha256: digest(await readFile('.data/live-portal-build/' + auditName)),
         trust: 'Pinned Lean 4.19/C/Emscripten compilation, runtime, decoder and input binding. No kernel invocation per edit.' };
     await writeFile(resolve(bundle, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
 }
@@ -94,6 +105,11 @@ async function importModel(model) {
     await page.locator('#model-file').setInputFiles({ name: 'public-portal.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ version: 2, model })) });
 }
 try {
+    if (generic) {
+        const { runFrameCases } = await import(pathToFileURL(resolve('qa/general-frame/browser-cases.mjs')).href);
+        await runFrameCases({ page, context, output, origin, base, url, result,
+            setOffline: async value => { offline = value; await context.setOffline(value); } });
+    } else {
     const rootResponse = await page.goto(origin + base);
     assert.equal(rootResponse.status(), 200);
     assert.equal(await page.evaluate(() => navigator.serviceWorker.controller), null);
@@ -253,6 +269,7 @@ try {
     result.cases.push('reset-exact-scope-cleanup-root-neighbor');
     assert.deepEqual(result.errors, []);
     result.passed = true;
+    }
 } catch (error) { result.failure = String(error.stack ?? error); throw error; }
 finally {
     await context.setOffline(false);

@@ -16,14 +16,18 @@ import time
 from canonical_evidence import collect_manifest, archive_pass, clean_archived_build, compare_passes
 
 ROOT = Path.cwd()
-PORTAL = sys.argv[1:] == ["--portal"]
-assert not sys.argv[1:] or PORTAL, "Use no arguments for historical smoke, or --portal."
-CHECKER_MODULE = "PortalChecker" if PORTAL else "SmokeChecker"
+FRAME = sys.argv[1:] == ["--frame"]
+PORTAL = FRAME or sys.argv[1:] == ["--portal"]
+assert not sys.argv[1:] or PORTAL, "Use no arguments for smoke, --portal, or --frame."
+CHECKER_MODULE = "RationalFrameWire" if FRAME else "PortalChecker" if PORTAL else "SmokeChecker"
 CHECKER_MODULES = {"PortalChecker", "PortalTables"} if PORTAL else {"SmokeChecker"}
+if FRAME:
+    CHECKER_MODULES.update({"RationalFrameModel", "RationalFramePartition", "RationalFrameChecker", "RationalFrameWire"})
 OUTPUT = ROOT / (".data/live-portal-build" if PORTAL else ".data/wasm-gate")
 WORK = ROOT / ".data/wasm-build"
 CANONICAL = WORK / "canonical"
 SOURCES = ROOT / ("qa/live-portal" if PORTAL else "qa/wasm-feasibility")
+ABI = ROOT / "qa/general-frame/abi.c" if FRAME else SOURCES / "abi.c"
 PINS = {
     "lean": "6caaee842e9495688c1567e78c0e68dbb96942aa",
     "emsdk": "a896e3d066448b3530dbcaa48869fafefd738f57",
@@ -33,6 +37,7 @@ PINS = {
     "playwright": "1.51.1",
 }
 receipt = {"pins": PINS, "stage": "setup", "passed": False,
+           "mode": "frame" if FRAME else "portal" if PORTAL else "smoke",
            "proof": "see separate axioms.log and axiom-audit.json", "browser": "not reached",
            "repeatability": False, "runtime_gate_passed": False,
            "overall_gate_passed": False, "hosting_gate": "pending"}
@@ -65,6 +70,10 @@ def save_receipt():
         for path in sorted(SOURCES.glob("*")) if path.is_file()
     }
     receipt["dependency_lock_sha256"] = digest(ROOT / "proofs/lake-manifest.json")
+    if FRAME:
+        receipt["files"]["qa/general-frame/abi.c"] = digest(ABI)
+        receipt["frame_sources"] = {f"web/{name}.ts": digest(ROOT / f"web/{name}.ts")
+                                    for name in ["frame-rational", "model-evidence", "frame-candidate", "frame-packet", "frame-result"]}
     (OUTPUT / "receipt.json").write_text(json.dumps(receipt, indent=2) + "\n")
 
 
@@ -80,7 +89,7 @@ def generate_c(environment, native_lean, index):
     generated.mkdir()
     prefix = Path(run([native_lean, "--print-prefix"], env=environment, capture=True))
     roots = [ROOT / "proofs", ROOT / "proofs/.lake/packages/batteries", prefix / "src/lean"]
-    pending = [CHECKER_MODULE]
+    pending = [CHECKER_MODULE, "PortalChecker"] if FRAME else [CHECKER_MODULE]
     modules = {}
     while pending:
         module = pending.pop()
@@ -145,7 +154,7 @@ def build_artifact(index, environment, generated):
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
         compiled = list(pool.map(compile_c, sorted(generated.glob("*.c"))))
-    wrapper = compile_c(SOURCES / "abi.c")
+    wrapper = compile_c(ABI)
     archive = build / "checker-core.a"
     run(["emar", "rcs", archive, *compiled], env=environment)
     assets = build / "assets"
@@ -159,6 +168,10 @@ def build_artifact(index, environment, generated):
          "-sPTHREAD_POOL_SIZE=0", "-sERROR_ON_UNDEFINED_SYMBOLS=1",
          "-sEXPORTED_FUNCTIONS=['_checker_init','_checker_check','_input_ptr','_input_capacity']",
          "--emit-symbol-map", "-o", assets / "checker.mjs"], env=environment)
+    if FRAME:
+        # Use the same Node type-stripping operation as the workspace build.
+        # Include these modules in both clean manifests before comparison.
+        run(["node", ROOT / "qa/general-frame/build-worker-modules.mjs", assets])
     return assets
 
 
@@ -203,6 +216,8 @@ def main():
     receipt["source_date_epoch"] = environment["SOURCE_DATE_EPOCH"]
     receipt["toolchain_cache_policy"] = "Pinned installed SDK and its system-library cache are shared; every Lean/libuv/checker generated file, header, object, archive and final output is freshly built. No project object cache is reused."
     receipt["proof_audit_sha256"] = digest(OUTPUT / "axiom-audit.json")
+    if FRAME:
+        receipt["frame_proof_audit_sha256"] = digest(OUTPUT / "frame-axiom-audit.json")
     manifests = []
     for index in (1, 2):
         if index == 2:
@@ -238,7 +253,8 @@ def main():
     run(["node", browser / "node_modules/playwright/cli.js", "install", "--with-deps", "chromium"])
     shutil.copy(SOURCES / "browser-test.mjs", browser / "browser-test.mjs")
     # Playwright uses the recorded CI host Node, not Emsdk's bundled Node 16.
-    run(["node", browser / "browser-test.mjs", assets, SOURCES])
+    run(["node", browser / "browser-test.mjs", assets, SOURCES],
+        env={**os.environ, "CV2011_FRAME_GATE": "1" if FRAME else "0"})
     shutil.copyfile(CANONICAL / "browser-results.json", OUTPUT / "browser-results.json")
     receipt["browser"] = json.loads((OUTPUT / "browser-results.json").read_text())
     receipt["browser_package_lock_sha256"] = digest(browser / "package-lock.json")
