@@ -150,6 +150,8 @@ export async function runFrameCases({ page, context, output, origin, base, url, 
     assert.equal(number(single.values.readouts[2]), -10);
     assert.deepEqual(single.values.points.map(point => number(point.reaction[1])), [7.5, 7.5, 25]);
     assert.equal(single.workedSolution.steps.find(step => step.id === 'M').result.value.numerator, '-10');
+    assert.equal(number(single.values.readouts[1]), -12.5);
+    assert.equal((await page.locator('#section-results .metric').nth(1).locator('strong').textContent()).trim(), '12.5 kN');
     await page.locator('#frame-collapse').click();
     assert.equal(await page.locator('#frame-worked-output').isVisible(), false);
     // Normal canvas redraw must preserve the stable worked controller and state.
@@ -157,6 +159,12 @@ export async function runFrameCases({ page, context, output, origin, base, url, 
     assert.equal(await page.locator('#frame-collapse').getAttribute('aria-expanded'), 'false');
     await page.locator('#frame-collapse').click();
     assert.equal(await page.locator('#frame-worked-output').isVisible(), true);
+    await select('beam', 0.5, 'right');
+    const rightSupport = await accepted();
+    assert.equal(number(rightSupport.values.readouts[1]), 12.5);
+    assert.equal((await page.locator('#section-results .metric').nth(1).locator('strong').textContent()).trim(), '12.5 kN');
+    assert.match(await page.locator('#frame-worked-output').textContent(), /using the right limit/);
+    result.cases.push('paired-support-jump-left-right-checked-values-and-numerical-convention-label');
     const joined = {
         nodes: [beam.nodes[0], { id: 'middle', x: 4, y: 0 }, beam.nodes[1]],
         members: [{ ...beam.members[0], id: 'first', b: 'middle' }, { ...beam.members[0], id: 'second', a: 'middle' }],
