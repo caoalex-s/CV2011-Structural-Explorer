@@ -97,5 +97,16 @@ theorem admissible_iff_mask (data : Compiled) (valid : PartitionValid data) (val
     · have hmod : i.val % 3 = direction.val := by dsimp [i]; omega
       simpa only [hmod] using hdirection
 
+theorem admissible_finite (data : Compiled) (valid : PartitionValid data) (q : Fin data.dofs → ℝ) :
+    FrameAssembly.admissible (model data valid) (supports data valid) (motion data valid q) ↔
+      ∀ i : Fin data.dofs, blocked data i.val = true → q i = 0 := by
+  have complete := admissible_iff_mask data valid
+    (fun i => if h : i < data.dofs then q ⟨i, h⟩ else 0)
+  have extend : (fun i : Fin data.dofs => if h : i.val < data.dofs then q ⟨i.val, h⟩ else 0) = q := by
+    funext i
+    simp [i.isLt]
+  rw [extend] at complete
+  simpa using complete
+
 end
 end RationalFrame.Constraints
