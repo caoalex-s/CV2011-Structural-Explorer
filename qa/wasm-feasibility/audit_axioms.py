@@ -1,7 +1,7 @@
 """Require both smoke-theorem reports under the existing real-field axiom policy.
 
 The allowlist matches scripts/audit_real_axioms.py and the portal pilot audit.
-This isolated gate also rejects unknown, repeated or malformed report lines.
+This isolated gate also rejects unknown, repeated or malformed reports.
 Run with an axiom log and optional --output receipt; no Lean execution occurs.
 """
 import argparse
@@ -12,21 +12,38 @@ import re
 
 ALLOWED_AXIOMS = frozenset({"propext", "Classical.choice", "Quot.sound"})
 EXPECTED_THEOREMS = frozenset({"WasmSmoke.accepts_sound", "WasmSmoke.accepts_complete"})
-REPORT = re.compile(r"'([A-Za-z0-9_.]+)' (.+)")
+REPORT = re.compile(
+    r"'([A-Za-z0-9_.]+)' "
+    r"(does not depend on any axioms|depends on axioms:\s*\[[^\[\]]*\])"
+)
+WHITESPACE = re.compile(r"\s*")
 AXIOM_LIST = re.compile(r"depends on axioms:\s*\[([^\]]*)\]")
 AXIOM_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_.]*")
+
+
+def complete_reports(log):
+    """Read whole reports, permitting Lean's line breaks inside axiom lists.
+
+    Every non-whitespace character must belong to a recognized report. Never
+    skip malformed text or join fragments by discarding unrecognized lines.
+    """
+    position = 0
+    while position < len(log):
+        position = WHITESPACE.match(log, position).end()
+        if position == len(log):
+            break
+        match = REPORT.match(log, position)
+        if match is None or (match.end() < len(log) and not log[match.end()].isspace()):
+            raise ValueError("Unrecognized or incomplete axiom report: " + log[position:position + 200])
+        yield match.groups()
+        position = match.end()
 
 
 def audit_reports(log):
     """Return theorem-to-axiom lists, or reject any incomplete/unapproved log."""
     reports = {}
-    for line in log.splitlines():
-        if not line.strip():
-            continue
-        match = REPORT.fullmatch(line.strip())
-        if match is None:
-            raise ValueError("Unrecognized axiom report: " + line)
-        name, detail = match.groups()
+    for name, detail in complete_reports(log):
+        line = f"'{name}' {detail}"
         if name not in EXPECTED_THEOREMS:
             raise ValueError("Unexpected theorem report: " + name)
         if name in reports:

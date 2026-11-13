@@ -15,7 +15,7 @@ class AxiomAuditTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 audit(source, log)
 
-    def test_emitted_audits_keep_complete_reports_on_one_line(self):
+    def test_emitted_audits_preserve_original_print_commands(self):
         repository = Path(__file__).resolve().parents[2]
         for arguments, imported, required in [
             ([], 'PortalSoundness', 'PortalSoundness.acceptance_actual_portal'),
@@ -27,10 +27,10 @@ class AxiomAuditTests(unittest.TestCase):
                 subprocess.run([sys.executable, str(Path(__file__).with_name('audit.py')),
                                 *arguments, '--emit', str(output)], cwd=repository, check=True)
                 lines = output.read_text(encoding='utf-8').splitlines()
-                self.assertEqual(lines[:2], [f'import {imported}', 'set_option pp.width 1000'])
-                self.assertIn('#print axioms ' + required, lines[2:])
-                self.assertTrue(all(line.startswith('#print axioms ') for line in lines[2:]))
-                self.assertEqual(len(lines[2:]), len(set(lines[2:])))
+                self.assertEqual(lines[0], f'import {imported}')
+                self.assertIn('#print axioms ' + required, lines[1:])
+                self.assertTrue(all(line.startswith('#print axioms ') for line in lines[1:]))
+                self.assertEqual(len(lines[1:]), len(set(lines[1:])))
 
     def test_long_theorem_report_preserves_strict_dependency_validation(self):
         name = 'segment_load_from_piecewise_source'
@@ -38,8 +38,8 @@ class AxiomAuditTests(unittest.TestCase):
         report = f"'PortalSoundness.{name}' depends on axioms: [propext, Classical.choice, Quot.sound]"
         self.assertEqual(audit(source, report)['PortalSoundness.' + name],
                          ['Classical.choice', 'Quot.sound', 'propext'])
-        for invalid in [report.replace('Quot.sound', 'sorryAx'), report[:-1],
-                        report.replace(', Classical.choice', ',\n Classical.choice')]:
+        self.assertEqual(audit(source, report), audit(source, report.replace(', ', ',\n ')))
+        for invalid in [report.replace('Quot.sound', 'sorryAx'), report[:-1]]:
             with self.assertRaises(ValueError):
                 audit(source, invalid)
 
