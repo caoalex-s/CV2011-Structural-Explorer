@@ -97,7 +97,11 @@ if (isCheckedWorkspace) {
                     target.push(...snapshots);
                 }
             }
-            if (state.selected && ['node', 'member', 'load', 'support'].includes(state.selected.kind)) selected = state.selected;
+            const selectionCollections: Record<string, { id: string }[]> = {
+                node: model.nodes, member: model.members, load: model.loads, support: model.supports,
+            };
+            if (state.selected && selectionCollections[state.selected.type]?.some(item => item.id === state.selected.id))
+                selected = { type: state.selected.type, id: state.selected.id };
             if ([...document.querySelectorAll<HTMLElement>('[data-tool]')].some(button => button.dataset.tool === state.tool)) tool = state.tool;
             restoreCheckerControls = () => {
                 if (state.solutionStep in stepDefinitions) solutionStep = state.solutionStep;

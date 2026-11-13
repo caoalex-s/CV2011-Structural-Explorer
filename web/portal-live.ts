@@ -38,8 +38,8 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
       <label hidden>Uniform load (kN/m) <input id="portal-amplitude" type="number" step="any" value="-5"></label>
       <button id="portal-activate">Enable local checking</button><button id="portal-reset" hidden>Reset checker</button>
       <button id="portal-deactivate" hidden>Disable local checking</button>
-      <label id="frame-side-label" hidden>Section limit <select id="frame-side"><option value="right">Right</option><option value="left">Left</option></select></label>
-      <label id="frame-parameter-label" hidden>Member parameter t <input id="frame-parameter" type="number" min="0" max="1" step="any" value="0.5"></label>
+      <label id="frame-side-label">Section limit <select id="frame-side"><option value="right">Right</option><option value="left">Left</option></select></label>
+      <label id="frame-parameter-label">Member parameter t <input id="frame-parameter" type="number" min="0" max="1" step="any" value="0.5"></label>
       <p id="portal-status" role="status">Local checking is off. Generate enables checking and reloads this workspace once.</p>
       <div id="frame-worked-output"></div>
       <details><summary>Verification, scope, and exact certificate</summary><div id="portal-readouts"></div>

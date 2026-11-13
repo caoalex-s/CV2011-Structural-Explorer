@@ -76,7 +76,7 @@ const server = createServer(async (request, response) => {
         const url = new URL(request.url, 'http://localhost');
         if (!url.pathname.startsWith(base)) { response.writeHead(404).end(); return; }
         const relative = decodeURIComponent(url.pathname.slice(base.length));
-        if (relative === 'neighbor/sentinel-sw.js') {
+        if (['neighbor/sentinel-sw.js', 'foreign-checker-fixture.js'].includes(relative)) {
             response.writeHead(200, { 'Content-Type': 'text/javascript' });
             response.end("self.addEventListener('install', () => self.skipWaiting());");
             return;
@@ -111,6 +111,12 @@ try {
         const { runFrameCases } = await import(pathToFileURL(resolve('qa/general-frame/browser-cases.mjs')).href);
         await runFrameCases({ page, context, output, origin, base, url, result,
             setOffline: async value => { offline = value; await context.setOffline(value); } });
+        result.passed = false;
+        const { runMainCases } = await import(pathToFileURL(resolve('qa/general-frame/main-browser-cases.mjs')).href);
+        await runMainCases({ page, context, output, origin, base, result,
+            setOffline: async value => { offline = value; await context.setOffline(value); } });
+        assert.deepEqual(result.errors, []);
+        result.passed = true;
     } else {
     const rootResponse = await page.goto(origin + base);
     assert.equal(rootResponse.status(), 200);
@@ -275,7 +281,16 @@ try {
 } catch (error) { result.failure = String(error.stack ?? error); throw error; }
 finally {
     await context.setOffline(false);
-    await page.evaluate(async scope => { for (const registration of await navigator.serviceWorker.getRegistrations()) if (registration.scope === scope) await registration.unregister(); }, url).catch(error => { result.cleanupError = String(error); });
+    await page.evaluate(async ({ main, portal }) => {
+        const owned = new Map([[main, main + 'main-checker-sw.js'], [portal, portal + 'isolation-sw.js'],
+            [main + 'neighbor/', main + 'neighbor/sentinel-sw.js']]);
+        for (const registration of await navigator.serviceWorker.getRegistrations()) {
+            const script = registration.active?.scriptURL;
+            if (owned.get(registration.scope) === script ||
+                (registration.scope === main && script === main + 'foreign-checker-fixture.js')) await registration.unregister();
+        }
+        await caches.delete('main-affine-unrelated-fixture');
+    }, { main: origin + base, portal: url }).catch(error => { result.cleanupError = String(error); });
     await context.tracing.stop({ path: resolve(output, 'browser-trace.zip') });
     await writeFile(resolve(output, 'browser-results.json'), JSON.stringify(result, null, 2) + '\n');
     await browser.close(); server.close();

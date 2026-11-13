@@ -44,6 +44,20 @@ def restrictedVertical (source : Source) (segment : Segment) (parameter : Rat) :
     if load.member == segment.member && load.kind == 2 && load.t ≤ segment.left && segment.right ≤ load.ending
     then loadIntensity load parameter else 0)
 
+/-- No affine source endpoint may lie strictly within a derived segment.
+    This finite check prevents whole-interval load filtering from omitting a
+    load that covers only part of a purported segment. -/
+def LoadPartitioned (source : Source) (segment : Segment) : Prop :=
+  ∀ i : Fin source.loads.size,
+    let load := source.loads[i.val]!
+    load.member = segment.member → load.kind = 2 →
+      (load.t ≤ segment.left ∨ segment.right ≤ load.t) ∧
+      (load.ending ≤ segment.left ∨ segment.right ≤ load.ending)
+
+instance (source : Source) (segment : Segment) : Decidable (LoadPartitioned source segment) := by
+  unfold LoadPartitioned
+  infer_instance
+
 def SegmentValid (model : Compiled) (segment : Segment) : Prop :=
   segment.member < model.source.members.size ∧
   LocationValid model segment.member segment.left segment.a ∧
@@ -58,7 +72,8 @@ def SegmentValid (model : Compiled) (segment : Segment) : Prop :=
   segment.cosine * segment.cosine + segment.sine * segment.sine = 1 ∧
   (segment.cosine = 0 ∨ segment.sine = 0) ∧
   segment.vertical = restrictedVertical model.source segment segment.left ∧
-  segment.verticalEnd = restrictedVertical model.source segment segment.right ∧ segment.a ≠ segment.b
+  segment.verticalEnd = restrictedVertical model.source segment segment.right ∧ segment.a ≠ segment.b ∧
+  LoadPartitioned model.source segment
 
 /-- Every member's filtered segment list is a positive chain ending at 1. -/
 def chainFrom (start : Rat) : List Segment → Bool

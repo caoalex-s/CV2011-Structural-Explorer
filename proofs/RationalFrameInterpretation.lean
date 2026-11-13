@@ -408,7 +408,11 @@ def sourceSegmentIntensity (source : Source) (segment : Segment) (t : ℝ) : ℝ
 
 theorem restricted_vertical_cast (source : Source) (segment : Segment) (t : Rat) :
     (restrictedVertical source segment t : ℝ) = sourceSegmentIntensity source segment (t : ℝ) := by
-  simp [restrictedVertical, Algebra.sumFin_eq_sum, sourceSegmentIntensity, loadIntensity, sourceIntensity]
+  simp only [restrictedVertical, Algebra.sumFin_eq_sum, Rat.cast_sum, sourceSegmentIntensity]
+  apply Finset.sum_congr rfl
+  intro i _
+  dsimp only
+  split_ifs <;> simp [loadIntensity, sourceIntensity]
 
 /-- Interpolating restricted endpoints recovers every original affine load
     throughout the interval, including overlaps and sign changes. -/
@@ -422,8 +426,8 @@ theorem source_affine_restriction (source : Source) (segment : Segment) (t : ℝ
   have nonzero : (segment.right : ℝ)-(segment.left : ℝ) ≠ 0 := by
     have order : (segment.left : ℝ) < (segment.right : ℝ) := by exact_mod_cast positive
     exact ne_of_gt (sub_pos.mpr order)
-  simp only [sourceSegmentIntensity, Finset.sum_sub_distrib, Finset.sum_mul,
-    Finset.sum_div, ← Finset.sum_add_distrib]
+  simp only [sourceSegmentIntensity, ← Finset.sum_sub_distrib, ← Finset.sum_mul,
+    ← Finset.sum_div, ← Finset.sum_add_distrib]
   apply Finset.sum_congr rfl
   intro i _
   dsimp only
@@ -445,6 +449,74 @@ theorem segment_load_from_source (data : Compiled) (valid : PartitionValid data)
   dsimp only [model]
   rw [startLoad, endLoad, restricted_vertical_cast, restricted_vertical_cast]
   exact source_affine_restriction data.source data.segments[i.val]! t positive
+
+/-- Original piecewise source loading. Endpoint values are represented by
+    the selected segment's one-sided affine extension, not by double counting. -/
+def sourceMemberIntensity (source : Source) (member : Nat) (t : ℝ) : ℝ :=
+  ∑ i : Fin source.loads.size,
+    let load := source.loads[i.val]!
+    if load.member = member ∧ load.kind = 2 ∧ (load.t : ℝ) < t ∧ t < (load.ending : ℝ)
+    then sourceIntensity load t else 0
+
+/-- The finite endpoint exclusion closes the connection to the actual
+    piecewise source, rather than only the whole-segment-filtered sum. -/
+theorem source_piecewise_agreement (data : Compiled) (valid : PartitionValid data)
+    (segmentIndex : Fin data.segments.size) (t : ℝ)
+    (left : (data.segments[segmentIndex.val]!.left : ℝ) < t)
+    (right : t < (data.segments[segmentIndex.val]!.right : ℝ)) :
+    sourceSegmentIntensity data.source data.segments[segmentIndex.val]! t =
+      sourceMemberIntensity data.source data.segments[segmentIndex.val]!.member t := by
+  rcases segments_valid data valid segmentIndex with
+    ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, partitioned⟩
+  unfold sourceSegmentIntensity sourceMemberIntensity
+  apply Finset.sum_congr rfl
+  intro i _
+  dsimp only
+  by_cases owner : data.source.loads[i.val]!.member = data.segments[segmentIndex.val]!.member
+  · by_cases kind : data.source.loads[i.val]!.kind = 2
+    · have excluded := partitioned i owner kind
+      have exclusion :
+          ((data.source.loads[i.val]!.t : ℝ) ≤ (data.segments[segmentIndex.val]!.left : ℝ) ∨
+            (data.segments[segmentIndex.val]!.right : ℝ) ≤ (data.source.loads[i.val]!.t : ℝ)) ∧
+          ((data.source.loads[i.val]!.ending : ℝ) ≤ (data.segments[segmentIndex.val]!.left : ℝ) ∨
+            (data.segments[segmentIndex.val]!.right : ℝ) ≤ (data.source.loads[i.val]!.ending : ℝ)) := by
+        exact_mod_cast excluded
+      have coverage :
+          (data.source.loads[i.val]!.t ≤ data.segments[segmentIndex.val]!.left ∧
+            data.segments[segmentIndex.val]!.right ≤ data.source.loads[i.val]!.ending) ↔
+          ((data.source.loads[i.val]!.t : ℝ) < t ∧ t < (data.source.loads[i.val]!.ending : ℝ)) := by
+        constructor
+        · intro covered
+          have bounds : (data.source.loads[i.val]!.t : ℝ) ≤ (data.segments[segmentIndex.val]!.left : ℝ) ∧
+              (data.segments[segmentIndex.val]!.right : ℝ) ≤ (data.source.loads[i.val]!.ending : ℝ) := by
+            exact_mod_cast covered
+          exact ⟨lt_of_le_of_lt bounds.1 left, lt_of_lt_of_le right bounds.2⟩
+        · intro covered
+          have bounds : (data.source.loads[i.val]!.t : ℝ) ≤ (data.segments[segmentIndex.val]!.left : ℝ) ∧
+              (data.segments[segmentIndex.val]!.right : ℝ) ≤ (data.source.loads[i.val]!.ending : ℝ) := by
+            constructor
+            · rcases exclusion.1 with h | h
+              · exact h
+              · linarith [covered.1]
+            · rcases exclusion.2 with h | h
+              · linarith [covered.2]
+              · exact h
+          exact_mod_cast bounds
+      simp [owner, kind, coverage]
+    · simp [kind]
+  · simp [owner]
+
+theorem segment_load_from_piecewise_source (data : Compiled) (valid : PartitionValid data)
+    (i : Fin data.segments.size) (t : ℝ)
+    (left : (data.segments[i.val]!.left : ℝ) < t)
+    (right : t < (data.segments[i.val]!.right : ℝ)) :
+    let segment := data.segments[i.val]!
+    (model data valid).segmentVerticalStart i +
+      ((model data valid).segmentVerticalEnd i - (model data valid).segmentVerticalStart i) *
+      (t-(segment.left : ℝ)) / ((segment.right : ℝ)-(segment.left : ℝ)) =
+      sourceMemberIntensity data.source segment.member t := by
+  rw [segment_load_from_source]
+  exact source_piecewise_agreement data valid i t left right
 
 end
 end RationalFrame.Interpretation
