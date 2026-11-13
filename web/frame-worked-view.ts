@@ -65,7 +65,7 @@ export function renderFrameWorked(report: FrameWorkedSolution): string {
       <h3>3. Support reactions</h3>
       <p>The residual gives the grouped support force and moment at each restrained point:</p>${math('\\mathbf R=K\\mathbf d-\\mathbf F.', true)}
       <table><thead><tr><th>Point</th><th>Rx (kN)</th><th>Ry (kN)</th><th>Mz (kN m)</th></tr></thead><tbody>${reactionRows}</tbody></table>
-      <p>These returned reactions are checked. Coincident restraints share a grouped reaction without assigning a unique force to each individual restraint.</p>
+      <p>These returned reactions are checked. Positive Ry acts upward and positive Mz acts counterclockwise. Canvas reaction labels show magnitudes, with direction indicated by the arrows. Coincident restraints share a grouped reaction without assigning a unique force to each individual restraint.</p>
       <h3>4. Section forces and displacements</h3>
       <p>The selected interval on ${escape(memberName(query.member))} extends from t ≈ ${escape(String(Number(interval.from.numerator) / Number(interval.from.denominator)))} to t ≈ ${escape(String(Number(interval.to.numerator) / Number(interval.to.denominator)))}. Coordinate x is measured from its start. Local displacement components are u and v, with start values u₀, v₀, and θ₀.</p>
       <p>Direction cosines c and s transform global motion into local motion. The local axial and transverse load intensities are ${math('p(x)=p_0+k_p x')} and ${math('q(x)=q_0+k_q x')}. Their start values and slopes include every distributed load acting on this interval. The start axial force a₁, transverse force a₂, and moment a₃ follow from the element stiffness and consistent load vector:</p>

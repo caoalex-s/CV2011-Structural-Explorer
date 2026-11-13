@@ -28,9 +28,11 @@ export async function runMainCases({ page, context, output, origin, base, result
         assert.deepEqual(receipt.workedSolution.query, receipt.sourceRequest.query);
         for (const key of ['revision', 'request', 'inputDigest', 'packetDigest', 'artifact', 'bundle'])
             assert.equal(receipt.workedSolution.binding[key], receipt[key]);
+        assert.deepEqual(receipt.workedSolution.binding.bindings, receipt.bindings);
         assert.deepEqual(receipt.workedSolution.values, receipt.values);
         assert.ok(receipt.workedSolution.steps.every(step => step.evidence === 'explanatory-rule'));
         assert.deepEqual(receipt.workedSolution.steps.filter(step => step.result).map(step => step.result.value), receipt.values.readouts);
+        assert.ok(receipt.workedSolution.steps.filter(step => step.result).every(step => step.result.evidence === 'verified-result'));
         assert.equal(await page.locator('#frame-worked-output .math-error').count(), 0);
         return receipt;
     }
@@ -90,13 +92,14 @@ export async function runMainCases({ page, context, output, origin, base, result
         window.mainActivationIdentity = 'before-activation';
         return performance.timeOrigin;
     });
+    const activationUrl = page.url();
     let navigations = 0;
     const navigation = frame => { if (frame === page.mainFrame()) navigations++; };
     page.on('framenavigated', navigation);
     await Promise.all([page.waitForNavigation(), page.locator('#frame-generate').click()]);
     // Automatic post-activation Generate must succeed without a second click.
     const first = await currentReport();
-    assert.equal(page.url(), main);
+    assert.equal(page.url(), activationUrl);
     assert.equal(navigations, 1);
     assert.equal(await page.evaluate(() => window.mainActivationIdentity), undefined);
     assert.notEqual(await page.evaluate(() => performance.timeOrigin), beforeDocument);
@@ -143,6 +146,26 @@ export async function runMainCases({ page, context, output, origin, base, result
 
     await setOffline(true);
     const offlineStart = result.offlineRequests.length;
+    await page.locator('#focus-workspace').click();
+    await page.locator('#close-inspector').click();
+    await page.locator('[data-object="load"][data-id="q1"] path.hit').first().click();
+    const editEndpoint = async value => {
+        await page.locator('[data-property="qEnd"]').fill(value);
+        await page.locator('[data-property="qEnd"]').dispatchEvent('change');
+        assert.equal(await page.locator('#frame-worked-output').textContent(), '');
+        return generate();
+    };
+    const editedLoad = await editEndpoint('-6');
+    assert.equal(editedLoad.sourceRequest.model.loads[0].qEnd, 6);
+    assert.notEqual(editedLoad.inputDigest, first.inputDigest);
+    const restoredLoad = await editEndpoint('-5');
+    assert.equal(restoredLoad.sourceRequest.model.loads[0].qEnd, 5);
+    assert.ok(restoredLoad.request > editedLoad.request);
+    await page.locator('#undo').click();
+    assert.equal((await generate()).sourceRequest.model.loads[0].qEnd, 6);
+    await page.locator('#redo').click();
+    assert.equal((await generate()).sourceRequest.model.loads[0].qEnd, 5);
+    result.cases.push('main-affine-endpoint-inspector-edit-revert-undo-redo-current-binding');
     for (const parameter of ['0.5', '0.75', '0.25']) {
         await page.locator('#frame-parameter').fill(parameter);
         assert.equal(await page.locator('#frame-worked-output').textContent(), '');
@@ -173,13 +196,13 @@ export async function runMainCases({ page, context, output, origin, base, result
     await scoped.waitForFunction(() => document.getElementById('portal-certificate').textContent.includes('workedSolution'));
     assert.equal(await scoped.evaluate(() => navigator.serviceWorker.controller.scriptURL), portal + 'isolation-sw.js');
     await scoped.locator('#portal-deactivate').click();
-    await scoped.waitForURL(main);
+    await scoped.waitForURL(url => url.origin + url.pathname === main);
     await scoped.close();
     assert.ok((await inventory()).some(item => item.script === ownScript));
     result.cases.push('root-and-scoped-checker-independent-activation-and-cleanup');
 
     await Promise.all([page.waitForNavigation(), page.locator('#portal-deactivate').click()]);
-    assert.equal(page.url(), main);
+    assert.equal(page.url(), activationUrl);
     assert.equal(await page.evaluate(() => crossOriginIsolated), false);
     assert.equal(await page.evaluate(() => navigator.serviceWorker.controller), null);
     assert.deepEqual(await inventory(), beforeInventory);

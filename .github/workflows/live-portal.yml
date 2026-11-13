@@ -136,6 +136,7 @@ jobs:
             .data/live-portal-build
             .data/wasm-build/canonical/browser-trace.zip
             .data/wasm-build/canonical/portal-accepted.png
+            .data/wasm-build/canonical/main-affine-accepted.png
             .data/wasm-build/canonical/browser-results.json
             public/portal-checker/bundle
             !.data/live-portal-build/browser/node_modules
@@ -147,6 +148,7 @@ jobs:
             .data/live-portal-browser/browser-results.json
             .data/live-portal-browser/browser-trace.zip
             .data/live-portal-browser/portal-accepted.png
+            .data/live-portal-browser/main-affine-accepted.png
             .data/live-portal-browser/package-lock.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()

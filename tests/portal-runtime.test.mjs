@@ -9,11 +9,23 @@ class WorkerFixture {
     constructor() { WorkerFixture.instances.push(this); }
     postMessage(data) { this.sent.push(data); }
     terminate() { this.terminated = true; }
-    ready(artifact = 'new-artifact', protocols = ['portal']) {
-        this.onmessage({ data: { ready: true, isolated: true, artifact, bundle: 'bundle-v1', protocols } });
+    ready(artifact = 'new-artifact', protocols = ['portal'], capabilities = []) {
+        this.onmessage({ data: { ready: true, isolated: true, artifact, bundle: 'bundle-v1', protocols, capabilities } });
     }
 }
 globalThis.Worker = WorkerFixture;
+
+test('affine capability is explicit and absent from older generic runtime greetings', async () => {
+    for (const supported of [false, true]) {
+        const runtime = new PortalRuntime(new URL('https://example.invalid/worker.mjs'));
+        const worker = WorkerFixture.instances.at(-1);
+        worker.ready('frame-artifact', ['frame'], supported ? ['affine-vertical-v1'] : []);
+        await runtime.ready;
+        assert.equal(runtime.supportsFrames, true);
+        assert.equal(runtime.supportsAffineFrames, supported);
+        runtime.dispose();
+    }
+});
 
 test('frame requests capture source and query bytes and require a generic bundle', async () => {
     const legacy = new PortalRuntime(new URL('https://example.invalid/worker.mjs'));
