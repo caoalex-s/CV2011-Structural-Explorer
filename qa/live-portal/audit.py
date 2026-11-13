@@ -48,7 +48,10 @@ def main():
         expected = expected_theorems(sources[0].read_text(encoding='utf-8'))
         imported = 'PortalSoundness'
     if args.emit:
-        args.emit.write_text(f'import {imported}\n' + ''.join('#print axioms ' + name + '\n' for name in sorted(expected)), encoding='utf-8')
+        # Keep each complete dependency list on one line for the strict parser.
+        # This changes pretty-print layout only; no dependency is suppressed.
+        args.emit.write_text(f'import {imported}\nset_option pp.width 1000\n' +
+                            ''.join('#print axioms ' + name + '\n' for name in sorted(expected)), encoding='utf-8')
     if args.check:
         strict_audit.EXPECTED_THEOREMS = expected
         reports = strict_audit.audit_reports(args.check.read_text(encoding='utf-8'))
