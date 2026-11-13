@@ -426,15 +426,35 @@ theorem source_affine_restriction (source : Source) (segment : Segment) (t : ℝ
   have nonzero : (segment.right : ℝ)-(segment.left : ℝ) ≠ 0 := by
     have order : (segment.left : ℝ) < (segment.right : ℝ) := by exact_mod_cast positive
     exact ne_of_gt (sub_pos.mpr order)
-  simp only [sourceSegmentIntensity, ← Finset.sum_sub_distrib, ← Finset.sum_mul,
-    ← Finset.sum_div, ← Finset.sum_add_distrib]
+  have interpolate (offset slope : ℝ) :
+      (offset + slope * (segment.left : ℝ)) +
+        ((offset + slope * (segment.right : ℝ)) - (offset + slope * (segment.left : ℝ))) *
+        (t-(segment.left : ℝ)) / ((segment.right : ℝ)-(segment.left : ℝ)) =
+      offset + slope * t := by
+    field_simp [nonzero]
+    <;> ring
+  unfold sourceSegmentIntensity
+  -- First combine endpoint differences, then distribute the scalar factors.
+  -- The multiplication/division lemmas run in the opposite direction to
+  -- the addition/subtraction lemmas when collecting one sum per source load.
+  rw [← Finset.sum_sub_distrib, Finset.sum_mul, Finset.sum_div,
+    ← Finset.sum_add_distrib]
   apply Finset.sum_congr rfl
   intro i _
   dsimp only
   split_ifs
-  · dsimp [sourceIntensity]
-    field_simp [nonzero]
-    <;> ring
+  · let load := source.loads[i.val]!
+    let slope : ℝ := ((load.qEnd : ℝ)-(load.fy : ℝ)) / ((load.ending : ℝ)-(load.t : ℝ))
+    -- Treat the source slope as a coefficient. Only the positive segment
+    -- width is cancelled, so this algebra needs no extra source hypothesis.
+    have affine (x : ℝ) : sourceIntensity load x =
+        ((load.fy : ℝ) - slope * (load.t : ℝ)) + slope * x := by
+      dsimp [sourceIntensity, slope]
+      ring
+    change sourceIntensity load _ + (sourceIntensity load _ - sourceIntensity load _) * _ / _ =
+      sourceIntensity load t
+    simp only [affine]
+    exact interpolate _ _
   · ring
 
 theorem segment_load_from_source (data : Compiled) (valid : PartitionValid data)
@@ -515,8 +535,8 @@ theorem segment_load_from_piecewise_source (data : Compiled) (valid : PartitionV
       ((model data valid).segmentVerticalEnd i - (model data valid).segmentVerticalStart i) *
       (t-(segment.left : ℝ)) / ((segment.right : ℝ)-(segment.left : ℝ)) =
       sourceMemberIntensity data.source segment.member t := by
-  rw [segment_load_from_source]
-  exact source_piecewise_agreement data valid i t left right
+  exact (segment_load_from_source data valid i t).trans
+    (source_piecewise_agreement data valid i t left right)
 
 end
 end RationalFrame.Interpretation
