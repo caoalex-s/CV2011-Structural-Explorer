@@ -162,7 +162,7 @@ test('fully restrained loaded members retain the load particular displacement', 
 
 test('unsupported geometry and restraint semantics are never rounded into the class', () => {
     for (const edit of [m => { m.nodes[1].x += 0.001; }, m => { m.supports[0].kind = 'roller'; m.supports[0].angle = 89.999999999; },
-        m => { m.nodes[1].joint = 'pinned'; }, m => { m.loads[0].qEnd = -6; }]) {
+        m => { m.nodes[1].joint = 'pinned'; }]) {
         const model = example('frame'); edit(model);
         assert.throws(() => compileFrame(model, query('BC')), /Unsupported/);
     }

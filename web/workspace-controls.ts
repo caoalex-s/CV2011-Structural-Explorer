@@ -47,7 +47,7 @@ export function createWorkspaceControls(actions: ControlActions) {
             `<svg class="tool-icon load-tool-icon" viewBox="0 0 40 40" aria-hidden="true">${shape}</svg>`;
     }
 
-    bindChoiceGroup(tools, 'tool', tool => {
+    const showTool = bindChoiceGroup(tools, 'tool', tool => {
         const hints: Record<string, string> = {
             select: 'Select an object to edit. Drag to move.',
             member: 'Click the start and end points. Snap to a member to create a rigid joint.',
@@ -64,6 +64,7 @@ export function createWorkspaceControls(actions: ControlActions) {
     return {
         showMode,
         showLayer,
+        showTool,
         setHistory(canUndo: boolean, canRedo: boolean): void {
             element<HTMLButtonElement>('undo').disabled = !canUndo;
             element<HTMLButtonElement>('redo').disabled = !canRedo;

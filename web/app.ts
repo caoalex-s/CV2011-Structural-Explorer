@@ -20,7 +20,7 @@ import { createLearningSession } from './learning-session.js';
 import { createEvidenceEnvelope, EvidenceRequests, parseEvidenceModel } from './model-evidence.js';
 import type { Attempt } from './learning-session.js';
 import { lessonContext } from './lesson-beam.js';
-import { createPortalPanel, isPortalWorkspace, portalStorageKey } from './portal-live.js';
+import { createPortalPanel, isPortalWorkspace, isCheckedWorkspace, portalStorageKey } from './portal-live.js';
 const clone = <T>(value: T): T => structuredClone(value);
 const id = (prefix: string) => `${prefix}${crypto.randomUUID().slice(0, 6)}`;
 renderCourseConventions();
@@ -63,10 +63,20 @@ let drag: {
 const history: Model[] = [], future: Model[] = [];
 let currentMember = isPortalWorkspace ? 'BC' : model.members[0]?.id || '', sectionT = 0.5;
 let restoredPortalView = false;
-if (isPortalWorkspace) {
+let restoreCheckerControls: (() => void) | undefined;
+function preserveCheckerView() {
+    sessionStorage.setItem(modelStorageKey + '/view', JSON.stringify({ model: JSON.stringify(model),
+        member: currentMember, parameter: sectionT, layer, mode, side, view, selected, tool,
+        history, future, solutionStep, solutionRevealed, hintUsed, practiceResultsVisible,
+        gridSpacing: $<HTMLInputElement>('grid-spacing').value,
+        focused: document.querySelector('.work-grid')!.classList.contains('is-focused'),
+        checkboxes: Object.fromEntries([...document.querySelectorAll<HTMLInputElement>('input[type=checkbox][id]')]
+            .map(input => [input.id, input.checked])) }));
+}
+if (isCheckedWorkspace) {
     // Activation reloads this page once. Restore its view/query only for the
     // identical saved model; a certificate is always checked afresh.
-    const stateKey = portalStorageKey + '/view';
+    const stateKey = modelStorageKey + '/view';
     try {
         const saved = sessionStorage.getItem(stateKey);
         sessionStorage.removeItem(stateKey);
@@ -80,13 +90,33 @@ if (isPortalWorkspace) {
             && Number.isFinite(state.view?.cx) && Number.isFinite(state.view?.cy)) {
             currentMember = state.member; sectionT = state.parameter;
             layer = state.layer; mode = state.mode; side = state.side; view = state.view;
+            // History contains drawings only; accepted reports are never restored.
+            for (const [target, snapshots] of [[history, state.history], [future, state.future]] as const) {
+                if (Array.isArray(snapshots) && snapshots.length <= 60) {
+                    snapshots.forEach(snapshot => parseEvidenceModel(snapshot));
+                    target.push(...snapshots);
+                }
+            }
+            if (state.selected && ['node', 'member', 'load', 'support'].includes(state.selected.kind)) selected = state.selected;
+            if ([...document.querySelectorAll<HTMLElement>('[data-tool]')].some(button => button.dataset.tool === state.tool)) tool = state.tool;
+            restoreCheckerControls = () => {
+                if (state.solutionStep in stepDefinitions) solutionStep = state.solutionStep;
+                solutionRevealed = state.solutionRevealed === true;
+                hintUsed = state.hintUsed === true;
+                practiceResultsVisible = state.practiceResultsVisible === true;
+                if (Number(state.gridSpacing) > 0) $<HTMLInputElement>('grid-spacing').value = state.gridSpacing;
+                $<HTMLSelectElement>('moment-side').value = side;
+                controls.setFocus(state.focused === true);
+                controls.showTool(tool);
+            };
+            for (const [id, checked] of Object.entries(state.checkboxes || {})) {
+                const input = document.getElementById(id);
+                if (input instanceof HTMLInputElement && input.type === 'checkbox' && typeof checked === 'boolean') input.checked = checked;
+            }
             restoredPortalView = true;
         }
     } catch { /* Ignore stale view state; the model has its own recovery above. */ }
-    window.addEventListener('beforeunload', () => {
-        sessionStorage.setItem(stateKey, JSON.stringify({ model: JSON.stringify(model),
-            member: currentMember, parameter: sectionT, layer, mode, side, view }));
-    });
+    window.addEventListener('beforeunload', preserveCheckerView);
 }
 let portalPanel: ReturnType<typeof createPortalPanel> | undefined;
 let portalSignature = '';
@@ -94,7 +124,7 @@ const evidenceRequests = new EvidenceRequests();
 let evidenceRawSource: string | undefined;
 const evidenceQuery = () => ({ member: currentMember, parameter: sectionT, cutSide: 'unspecified' as const, quantity: 'section-response', units: 'kN, kN m, m, rad', signConvention: 'global y upward; rotation counterclockwise; tension N positive; sagging M positive; dM/dx = V' });
 function updateEvidenceBinding() {
-    if (isPortalWorkspace) $<HTMLInputElement>('section-position').value = String(sectionT * 1000);
+    if (isCheckedWorkspace) $<HTMLInputElement>('section-position').value = String(sectionT * 1000);
     try { evidenceRequests.update(model, evidenceQuery()); }
     catch { evidenceRequests.invalidate(); }
     // Render-only changes do not repeatedly launch checks. Mechanical/query
@@ -422,7 +452,7 @@ function render() {
     if (mode === 'practice')
         renderPractice();
     session.updateStatus();
-    if (!isPortalWorkspace) renderWorked({ model, section: sectionT, practice: mode === 'practice', connected: session.connected,
+    if (!isCheckedWorkspace) renderWorked({ model, section: sectionT, practice: mode === 'practice', connected: session.connected,
         request: payload => session.request('/api/worked-solution', payload),
         selectSection: section => {
             sectionT = section;
@@ -732,7 +762,7 @@ function renderPractice() {
         solutionRevealed = true;
         const attempt = await record('reveal', '', step.units);
         if (attempt.step !== solutionStep || attempt.section !== sectionT || JSON.stringify(attempt.model) !== JSON.stringify(model) || mode !== 'practice') return;
-        if (isPortalWorkspace) {
+        if (isCheckedWorkspace) {
             document.getElementById('frame-generate')?.click();
             document.getElementById('worked-panel')?.scrollIntoView({ behavior: 'smooth' });
         } else if (session.connected) {
@@ -773,9 +803,10 @@ const controls = createWorkspaceControls({
     selectMode: setMode,
 });
 const session = createLearningSession({ notify: toast, onConnectionChange: render });
+restoreCheckerControls?.();
 portalPanel = createPortalPanel(() => model, value => commit(() => {
     if (model.loads.length === 1) { model.loads[0].fy = value; model.loads[0].qEnd = value; }
-}), value => { sectionT = value; updateEvidenceBinding(); render(); });
+}), value => { sectionT = value; updateEvidenceBinding(); render(); }, modelStorageKey, preserveCheckerView);
 if (!restoredPortalView) fit();
 controls.showLayer(layer);
 setMode(restoredPortalView ? mode : location.hash.slice(1) || 'sandbox');

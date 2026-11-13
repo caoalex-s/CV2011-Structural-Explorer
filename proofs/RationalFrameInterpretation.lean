@@ -93,7 +93,7 @@ def model (data : Compiled) (valid : PartitionValid data) :
   segmentEA := fun i => (data.segments[i.val]!.EA : ℝ)
   segmentEI := fun i => (data.segments[i.val]!.EI : ℝ)
   segmentVerticalStart := fun i => (data.segments[i.val]!.vertical : ℝ)
-  segmentVerticalEnd := fun i => (data.segments[i.val]!.vertical : ℝ)
+  segmentVerticalEnd := fun i => (data.segments[i.val]!.verticalEnd : ℝ)
 
 def cutParameter (data : Compiled) (_member : Fin data.source.members.size) (point : Fin data.points.size) : ℝ :=
   (data.points[point.val]!.t : ℝ)
@@ -392,6 +392,59 @@ theorem member_coverage (data : Compiled) (valid : PartitionValid data)
   obtain ⟨segment, hsegment, heq⟩ := List.mem_map.mp hpiece
   cases heq
   exact ⟨segment, hsegment, hl, hr⟩
+
+/-- Original source load evaluated at a real member parameter. -/
+def sourceIntensity (load : Load) (t : ℝ) : ℝ :=
+  (load.fy : ℝ) + ((load.qEnd : ℝ)-(load.fy : ℝ)) *
+    (t-(load.t : ℝ)) / ((load.ending : ℝ)-(load.t : ℝ))
+
+/-- Sum the original affine loads covering the selected source interval.
+    No centroid or division by the total resultant is used. -/
+def sourceSegmentIntensity (source : Source) (segment : Segment) (t : ℝ) : ℝ :=
+  ∑ i : Fin source.loads.size,
+    let load := source.loads[i.val]!
+    if load.member == segment.member && load.kind == 2 && load.t ≤ segment.left && segment.right ≤ load.ending
+    then sourceIntensity load t else 0
+
+theorem restricted_vertical_cast (source : Source) (segment : Segment) (t : Rat) :
+    (restrictedVertical source segment t : ℝ) = sourceSegmentIntensity source segment (t : ℝ) := by
+  simp [restrictedVertical, Algebra.sumFin_eq_sum, sourceSegmentIntensity, loadIntensity, sourceIntensity]
+
+/-- Interpolating restricted endpoints recovers every original affine load
+    throughout the interval, including overlaps and sign changes. -/
+theorem source_affine_restriction (source : Source) (segment : Segment) (t : ℝ)
+    (positive : segment.left < segment.right) :
+    sourceSegmentIntensity source segment (segment.left : ℝ) +
+      (sourceSegmentIntensity source segment (segment.right : ℝ) -
+        sourceSegmentIntensity source segment (segment.left : ℝ)) *
+      (t-(segment.left : ℝ)) / ((segment.right : ℝ)-(segment.left : ℝ)) =
+    sourceSegmentIntensity source segment t := by
+  have nonzero : (segment.right : ℝ)-(segment.left : ℝ) ≠ 0 := by
+    have order : (segment.left : ℝ) < (segment.right : ℝ) := by exact_mod_cast positive
+    exact ne_of_gt (sub_pos.mpr order)
+  simp only [sourceSegmentIntensity, Finset.sum_sub_distrib, Finset.sum_mul,
+    Finset.sum_div, ← Finset.sum_add_distrib]
+  apply Finset.sum_congr rfl
+  intro i _
+  dsimp only
+  split_ifs
+  · dsimp [sourceIntensity]
+    field_simp [nonzero]
+    <;> ring
+  · ring
+
+theorem segment_load_from_source (data : Compiled) (valid : PartitionValid data)
+    (i : Fin data.segments.size) (t : ℝ) :
+    let segment := data.segments[i.val]!
+    (model data valid).segmentVerticalStart i +
+      ((model data valid).segmentVerticalEnd i - (model data valid).segmentVerticalStart i) *
+      (t-(segment.left : ℝ)) / ((segment.right : ℝ)-(segment.left : ℝ)) =
+      sourceSegmentIntensity data.source segment t := by
+  rcases segments_valid data valid i with
+    ⟨_, _, _, _, positive, _, _, _, _, _, _, _, _, _, _, _, startLoad, endLoad, _⟩
+  dsimp only [model]
+  rw [startLoad, endLoad, restricted_vertical_cast, restricted_vertical_cast]
+  exact source_affine_restriction data.source data.segments[i.val]! t positive
 
 end
 end RationalFrame.Interpretation

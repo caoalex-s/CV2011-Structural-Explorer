@@ -4,6 +4,11 @@ on:
     branches: [codex/live-portal-checker, codex/general-frame-checker, codex/frame-worked-solutions]
   workflow_dispatch:
     inputs:
+      proof_only:
+        description: Check current source and exact packets without running an installed bundle
+        type: boolean
+        required: false
+        default: false
       build_wasm:
         description: Deliberately build the proved portal checker twice and test the actual browser artifact
         type: boolean
@@ -95,7 +100,7 @@ jobs:
         with:
           version: '11.25.0'
       - name: Test the installed structural bundle in the final workspace
-        if: ${{ hashFiles('public/portal-checker/bundle/manifest.json') != '' && !(github.event_name == 'workflow_dispatch' && inputs.build_wasm) }}
+        if: ${{ !inputs.proof_only && hashFiles('public/portal-checker/bundle/manifest.json') != '' && !(github.event_name == 'workflow_dispatch' && inputs.build_wasm) }}
         shell: bash
         run: |
           set -euo pipefail

@@ -1,7 +1,7 @@
 import RationalFrameModel
 import LocalFrameFields
 
-/-! Exact rational element coefficients and the uniform loaded recovery
+/-! Exact rational element coefficients and the affine loaded recovery
     formulas used by the executable checker, connected to the existing
     Euler–Bernoulli polynomial fields. This is a local bridge, not the global
     source/coordinate/constraint acceptance theorem. -/
@@ -17,23 +17,25 @@ theorem stiffness_cast (segment : Segment) (i j : Fin 6) :
 
 theorem force_cast (segment : Segment) (i : Fin 6) :
     (localForce segment i : ℝ) = LocalFrameFields.consistentLoad (segment.length : ℝ)
-      ((segment.sine * segment.vertical : Rat) : ℝ) ((segment.sine * segment.vertical : Rat) : ℝ)
-      ((segment.cosine * segment.vertical : Rat) : ℝ) ((segment.cosine * segment.vertical : Rat) : ℝ) i := by
+      ((segment.sine * segment.vertical : Rat) : ℝ) ((segment.sine * segment.verticalEnd : Rat) : ℝ)
+      ((segment.cosine * segment.vertical : Rat) : ℝ) ((segment.cosine * segment.verticalEnd : Rat) : ℝ) i := by
   fin_cases i <;> norm_num [localForce, LocalFrameFields.consistentLoad, pow_two] <;> ring
 
 set_option maxHeartbeats 4000000 in
 /-- All six loaded readouts follow from the actual field-derived end actions.
     The particular terms remain even when every nodal motion is restrained. -/
-theorem uniform_recovery (d : FrameInterfaces.LocalDofs) (L EA EI p q x : ℝ)
+theorem affine_recovery (d : FrameInterfaces.LocalDofs) (L EA EI p pEnd q qEnd x : ℝ)
     (hL : L ≠ 0) (hEA : EA ≠ 0) (hEI : EI ≠ 0) :
-    let action := LocalFrameFields.endActions d L EA EI p p q q
-    (LocalFrameFields.normal d L EA p p).eval x = -action 0 - p*x ∧
-    (LocalFrameFields.shear d L EI q q).eval x = action 1 + q*x ∧
-    (LocalFrameFields.moment d L EI q q).eval x = -action 2 + action 1*x + q*x^2/2 ∧
-    (LocalFrameFields.rotation d L EI q q).eval x = d 2 + (-action 2*x + action 1*x^2/2 + q*x^3/6)/EI ∧
-    (LocalFrameFields.axialDisplacement d L EA p p).eval x = d 0 + (-action 0*x - p*x^2/2)/EA ∧
-    (LocalFrameFields.transverseDisplacement d L EI q q).eval x =
-      d 1 + d 2*x + (-action 2*x^2/2 + action 1*x^3/6 + q*x^4/24)/EI := by
+    let action := LocalFrameFields.endActions d L EA EI p pEnd q qEnd
+    let dp := (pEnd-p)/L
+    let dq := (qEnd-q)/L
+    (LocalFrameFields.normal d L EA p pEnd).eval x = -action 0 - p*x - dp*x^2/2 ∧
+    (LocalFrameFields.shear d L EI q qEnd).eval x = action 1 + q*x + dq*x^2/2 ∧
+    (LocalFrameFields.moment d L EI q qEnd).eval x = -action 2 + action 1*x + q*x^2/2 + dq*x^3/6 ∧
+    (LocalFrameFields.rotation d L EI q qEnd).eval x = d 2 + (-action 2*x + action 1*x^2/2 + q*x^3/6 + dq*x^4/24)/EI ∧
+    (LocalFrameFields.axialDisplacement d L EA p pEnd).eval x = d 0 + (-action 0*x - p*x^2/2 - dp*x^3/6)/EA ∧
+    (LocalFrameFields.transverseDisplacement d L EI q qEnd).eval x =
+      d 1 + d 2*x + (-action 2*x^2/2 + action 1*x^3/6 + q*x^4/24 + dq*x^5/120)/EI := by
   dsimp only
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
   all_goals

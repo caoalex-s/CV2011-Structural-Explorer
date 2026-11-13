@@ -12,6 +12,7 @@ export class PortalRuntime {
     artifact = '';
     bundle = '';
     supportsFrames = false;
+    supportsAffineFrames = false;
     onFailure: (reason: string) => void = () => {};
     readonly ready: Promise<void>;
 
@@ -38,6 +39,7 @@ export class PortalRuntime {
                     }
                     this.artifact = data.artifact; this.bundle = data.bundle;
                     this.supportsFrames = Array.isArray(data.protocols) && data.protocols.includes('frame');
+                    this.supportsAffineFrames = Array.isArray(data.capabilities) && data.capabilities.includes('affine-vertical-v1');
                     resolve();
                 } else this.receive(data);
             };

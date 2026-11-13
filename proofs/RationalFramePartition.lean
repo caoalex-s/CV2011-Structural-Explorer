@@ -38,10 +38,11 @@ def LocationValid (model : Compiled) (member : Nat) (t : Rat) (index : Nat) : Pr
     else if t = 1 then index = model.source.members[member]!.b
     else model.points[index]!.owner = some member ∧ model.points[index]!.t = t
 
-def restrictedVertical (source : Source) (segment : Segment) : Rat :=
-  source.loads.foldl (fun total load =>
+def restrictedVertical (source : Source) (segment : Segment) (parameter : Rat) : Rat :=
+  sumFin source.loads.size (fun i =>
+    let load := source.loads[i.val]!
     if load.member == segment.member && load.kind == 2 && load.t ≤ segment.left && segment.right ≤ load.ending
-    then total + load.fy else total) 0
+    then loadIntensity load parameter else 0)
 
 def SegmentValid (model : Compiled) (segment : Segment) : Prop :=
   segment.member < model.source.members.size ∧
@@ -56,7 +57,8 @@ def SegmentValid (model : Compiled) (segment : Segment) : Prop :=
   segment.sine = memberSine model.source segment.member ∧
   segment.cosine * segment.cosine + segment.sine * segment.sine = 1 ∧
   (segment.cosine = 0 ∨ segment.sine = 0) ∧
-  segment.vertical = restrictedVertical model.source segment ∧ segment.a ≠ segment.b
+  segment.vertical = restrictedVertical model.source segment segment.left ∧
+  segment.verticalEnd = restrictedVertical model.source segment segment.right ∧ segment.a ≠ segment.b
 
 /-- Every member's filtered segment list is a positive chain ending at 1. -/
 def chainFrom (start : Rat) : List Segment → Bool

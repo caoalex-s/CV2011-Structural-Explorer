@@ -10,6 +10,12 @@ open RationalFrame RationalFrame.Interpretation FrameAssemblyModel FrameAssembly
 noncomputable section
 
 structure ActualModel (data : Compiled) (valid : PartitionValid data) : Prop where
+  distributedLoads : ∀ (i : Fin data.segments.size) (t : ℝ),
+    let segment := data.segments[i.val]!
+    (model data valid).segmentVerticalStart i +
+      ((model data valid).segmentVerticalEnd i - (model data valid).segmentVerticalStart i) *
+      (t-(segment.left : ℝ)) / ((segment.right : ℝ)-(segment.left : ℝ)) =
+      sourceSegmentIntensity data.source segment t
   geometry : ExactGeometry.GeometryCorrespondence (model data valid) (Geometry.nodePosition data)
     (Geometry.drawingStart data valid) (Geometry.drawingEnd data valid) (cutParameter data)
     (fun member => (data.source.members[member.val]!.EA : ℝ))
@@ -64,7 +70,7 @@ theorem acceptance_actual_frame (source : Source) (query : Query) (certificate :
   obtain ⟨sourceChecked, data, compiled, sameSource, valid, samePoints, queryChecked, restrained, result⟩ :=
     acceptance_source source query certificate accepted
   refine ⟨sourceChecked, data, valid, compiled, sameSource, samePoints, queryChecked, ?_, ?_⟩
-  · exact ⟨Geometry.correspondence data valid, Contract.exact_contract data valid,
+  · exact ⟨segment_load_from_source data valid, Geometry.correspondence data valid, Contract.exact_contract data valid,
       Assembly.stiffness_entry data valid, Assembly.force_entry data valid,
       Constraints.admissible_finite data valid⟩
   · cases branch : certificate.mechanism with

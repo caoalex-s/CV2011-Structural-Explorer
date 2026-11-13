@@ -36,7 +36,7 @@ structure Support where
 structure Load where
   id : String
   member : Nat
-  /-- 0 global point force, 1 point couple, 2 vertical uniform intensity. -/
+  /-- 0 global point force, 1 point couple, 2 affine vertical intensity. -/
   kind : Nat
   t : Rat
   ending : Rat
@@ -83,6 +83,7 @@ structure Segment where
   EA : Rat
   EI : Rat
   vertical : Rat
+  verticalEnd : Rat
   deriving Inhabited, Repr
 
 structure Compiled where
@@ -120,7 +121,7 @@ def sourceValid (source : Source) : Bool := Id.run do
     if support.kind == 2 && !(support.angle == 0 || support.angle == 90 || support.angle == 180 || support.angle == 270) then return false
   for load in source.loads do
     if load.member ≥ source.members.size || !inUnit load.t || !inUnit load.ending || load.kind > 2 then return false
-    if load.kind == 2 && (load.t ≥ load.ending || load.fy != load.qEnd) then return false
+    if load.kind == 2 && load.t ≥ load.ending then return false
   return true
 
 /-- Complete sorted unique source boundaries for one original member. -/
@@ -136,6 +137,11 @@ def locationIndex (model : Compiled) (member : Nat) (t : Rat) : Nat :=
   else if t = 1 then model.source.members[member]!.b
   else ((List.range model.points.size).find? (fun i =>
     model.points[i]!.owner == some member && model.points[i]!.t == t)).getD model.points.size
+
+/-- Physical global-y intensity at an original-member parameter. The UI's
+    downward-positive label is not the stored force convention. -/
+def loadIntensity (load : Load) (parameter : Rat) : Rat :=
+  load.fy + (load.qEnd - load.fy) * (parameter - load.t) / (load.ending - load.t)
 
 /-- The checker derives its own subdivision and load restriction from source. -/
 def compileModel (source : Source) : Option Compiled := Id.run do
@@ -169,11 +175,14 @@ def compileModel (source : Source) : Option Compiled := Id.run do
       let right := cuts[i + 1]!
       let vertical := source.loads.foldl (fun total load =>
         if load.member == m && load.kind == 2 && load.t ≤ left && right ≤ load.ending
-        then total + load.fy else total) 0
+        then total + loadIntensity load left else total) 0
+      let verticalEnd := source.loads.foldl (fun total load =>
+        if load.member == m && load.kind == 2 && load.t ≤ left && right ≤ load.ending
+        then total + loadIntensity load right else total) 0
       segments := segments.push {
         member := m, a := indices[i]!, b := indices[i + 1]!,
         left := left, right := right, length := length * (right - left), cosine := cosine, sine := sine,
-        EA := member.EA, EI := member.EI, vertical := vertical }
+        EA := member.EA, EI := member.EI, vertical := vertical, verticalEnd := verticalEnd }
   return some { source := source, points := points, segments := segments }
 
 def Compiled.dofs (model : Compiled) : Nat := 3 * model.points.size
@@ -203,14 +212,18 @@ def localStiffness (s : Segment) (i j : Fin 6) : Rat :=
   | _, _ => 0
 
 def localForce (s : Segment) (i : Fin 6) : Rat :=
-  let axial := s.sine * s.vertical * s.length / 2
-  let transverse := s.cosine * s.vertical * s.length / 2
-  let moment := s.cosine * s.vertical * (s.length * s.length) / 12
+  let p₀ := s.sine * s.vertical
+  let p₁ := s.sine * s.verticalEnd
+  let q₀ := s.cosine * s.vertical
+  let q₁ := s.cosine * s.verticalEnd
+  let L := s.length
   match i.val with
-  | 0 | 3 => axial
-  | 1 | 4 => transverse
-  | 2 => moment
-  | 5 => -moment
+  | 0 => L * (2*p₀+p₁) / 6
+  | 1 => L * (7*q₀+3*q₁) / 20
+  | 2 => L*L * (3*q₀+2*q₁) / 60
+  | 3 => L * (p₀+2*p₁) / 6
+  | 4 => L * (3*q₀+7*q₁) / 20
+  | 5 => -(L*L * (2*q₀+3*q₁) / 60)
   | _ => 0
 
 /-- For the supported axes each local coordinate is one signed global coordinate. -/
@@ -325,15 +338,18 @@ def recoverSegment (s : Segment) (parameter : Rat) (motion : Array Rat) : Array 
   let x := s.length * (parameter - s.left) / (s.right - s.left)
   let p := s.sine * s.vertical
   let q := s.cosine * s.vertical
+  let dp := s.sine * (s.verticalEnd - s.vertical) / s.length
+  let dq := s.cosine * (s.verticalEnd - s.vertical) / s.length
   let x2 := x*x
   let x3 := x2*x
   let x4 := x2*x2
-  let normal := -action 0 - p*x
-  let shear := action 1 + q*x
-  let moment := -action 2 + action 1*x + q*x2/2
-  let axial := d 0 + (-action 0*x - p*x2/2)/s.EA
-  let transverse := d 1 + d 2*x + (-action 2*x2/2 + action 1*x3/6 + q*x4/24)/s.EI
-  let rotation := d 2 + (-action 2*x + action 1*x2/2 + q*x3/6)/s.EI
+  let x5 := x4*x
+  let normal := -action 0 - p*x - dp*x2/2
+  let shear := action 1 + q*x + dq*x2/2
+  let moment := -action 2 + action 1*x + q*x2/2 + dq*x3/6
+  let axial := d 0 + (-action 0*x - p*x2/2 - dp*x3/6)/s.EA
+  let transverse := d 1 + d 2*x + (-action 2*x2/2 + action 1*x3/6 + q*x4/24 + dq*x5/120)/s.EI
+  let rotation := d 2 + (-action 2*x + action 1*x2/2 + q*x3/6 + dq*x4/24)/s.EI
   #[normal, shear, moment, rotation,
     s.cosine*axial - s.sine*transverse, s.sine*axial + s.cosine*transverse]
 

@@ -13,17 +13,22 @@ import { createFrameWorked } from './frame-worked.js';
 import { renderFrameWorked } from './frame-worked-view.js';
 
 export const isPortalWorkspace = location.pathname.replace(/index\.html$/, '').endsWith('/portal-checker/');
+// The same controller serves the main workspace and the compatible scoped URL.
+export const isCheckedWorkspace = location.pathname.replace(/index\.html$/, '') === new URL('./', import.meta.url).pathname;
 export const portalStorageKey = 'cv2011-checked-portal-model/v1';
 const scope = new URL('./', location.href);
-const isolationScript = new URL('isolation-sw.js', scope).href;
+const isolationScript = new URL(isPortalWorkspace ? 'isolation-sw.js' : 'main-checker-sw.js', scope).href;
+const runtimeUrl = new URL(isPortalWorkspace ? './bundle/worker.mjs' : './portal-checker/bundle/worker.mjs', scope);
 function ownsRegistration(registration: ServiceWorkerRegistration): boolean {
     return registration.scope === scope.href &&
-        [registration.active, registration.waiting, registration.installing].some(worker => worker?.scriptURL === isolationScript);
+        [registration.active, registration.waiting, registration.installing].filter(worker => worker !== null)
+            .every(worker => worker!.scriptURL === isolationScript) &&
+        Boolean(registration.active || registration.waiting || registration.installing);
 }
 
 export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad: (value: number) => void,
-    changeSectionParameter: (value: number) => void) {
-    if (!isPortalWorkspace) return { update(_member: string, _parameter: number) {} };
+    changeSectionParameter: (value: number) => void, storageKey = portalStorageKey, prepareReload: () => void = () => {}) {
+    if (!isCheckedWorkspace) return { update(_member: string, _parameter: number) {} };
     const host = document.createElement('section');
     host.className = 'portal-certificate';
     host.innerHTML = `<h2>Worked solution</h2>
@@ -68,8 +73,9 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
     let exportText = '';
     let acceptedGeneration: (() => void) | null = null;
     let generationRequested = false;
-    const generationStorage = portalStorageKey + '/generate';
-    const sideStorage = portalStorageKey + '/cut-side';
+    const generationStorage = storageKey + '/generate';
+    const sideStorage = storageKey + '/cut-side';
+    const generationKey = () => JSON.stringify({ model: modelAtPresent(), member, parameter, side: cutSide.value });
     try {
         const saved = JSON.parse(sessionStorage.getItem(sideStorage) || 'null');
         if (saved?.model === JSON.stringify(modelAtPresent()) && ['left', 'right'].includes(saved.side)) cutSide.value = saved.side;
@@ -87,7 +93,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
     async function start() {
         stop(); clear('Starting local checker…');
         startingNow = true;
-        try { runtime = new PortalRuntime(); }
+        try { runtime = new PortalRuntime(runtimeUrl); }
         catch (error) { startingNow = false; reset.hidden = false; clear(`Checking unavailable: ${String(error)}`); return; }
         const starting = runtime;
         starting.onFailure = reason => {
@@ -97,19 +103,20 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
         try {
             await starting.ready;
             if (starting !== runtime) return;
+            if (!starting.supportsAffineFrames) throw Error('This checker bundle predates affine-load support. Refresh after the updated checker is published.');
             enabled = true; startingNow = false; activate.hidden = true; deactivate.hidden = false; reset.hidden = false;
             if (starting.supportsFrames) {
                 amplitude.closest('label')!.hidden = true;
                 host.querySelector<HTMLElement>('#frame-side-label')!.hidden = false;
                 host.querySelector<HTMLElement>('#frame-parameter-label')!.hidden = false;
-                host.querySelector('#portal-scope')!.textContent = 'The checker covers linear Euler–Bernoulli frames with positive EA and EI, fixed or pin supports, and rollers at 0, 90, 180, or 270 degrees. Point forces, couples, and uniform vertical loads may act over partial or overlapping member intervals. Up to 8 members, 16 nodes, 16 active points, 16 segments, 16 supports, and 16 loads are supported within the arithmetic and one-second limits. Inputs retain their exact parsed binary64 values. Source and certificate rationals allow 128 digits, with 256 digits for normalized candidate intermediates and 513 before reduction. The packet limit is 1 MiB. A limit or timeout is inconclusive. N is positive in tension, M is positive in sagging, dM/dx = V, global y is upward, and rotation is counterclockwise. Diagram curves remain numerical. Acceptance relies on the proved compiled checker, its compiler and runtime, and the decoder and input binding. Edits are checked locally without invoking the Lean kernel.';
+                host.querySelector('#portal-scope')!.textContent = 'The checker covers linear Euler–Bernoulli frames with positive EA and EI, fixed or pin supports, and rollers at 0, 90, 180, or 270 degrees. Point forces, couples, and linearly varying vertical loads may act over partial or overlapping member intervals. Distributed loads may change sign. Drawing labels are downward positive; the stored global-y forces are upward positive. Up to 8 members, 16 nodes, 16 active points, 16 segments, 16 supports, and 16 loads are supported within the arithmetic and one-second limits. Inputs retain their exact parsed binary64 values. Source and certificate rationals allow 128 digits, with 256 digits for normalized candidate intermediates and 513 before reduction. The packet limit is 1 MiB. A limit or timeout is inconclusive. N is positive in tension, M is positive in sagging, dM/dx = V, global y is upward, and rotation is counterclockwise. Diagram curves remain numerical. Acceptance relies on the proved compiled checker, its compiler and runtime, and the decoder and input binding. Edits are checked locally without invoking the Lean kernel.';
             }
             update(member, parameter);
             // A single explicit Generate survives only the activation reload of
             // the same saved drawing. Subsequent edits revoke generation intent.
-            if (sessionStorage.getItem(generationStorage) === JSON.stringify(modelAtPresent())) generationRequested = true;
+            if (sessionStorage.getItem(generationStorage) === generationKey()) generationRequested = true;
             sessionStorage.removeItem(generationStorage);
-        } catch (error) { if (starting === runtime) { startingNow = false; clear(`Checking unavailable: ${String(error)}`); } }
+        } catch (error) { if (starting === runtime) { stop(); startingNow = false; reset.hidden = false; clear(`Checking unavailable: ${String(error)}`); } }
     }
     async function displayFrame(result: CheckerResult, envelope: Awaited<ReturnType<typeof createEvidenceEnvelope>>,
         token: { revision: number; request: number }, checker: PortalRuntime, sourceBytes: Uint8Array) {
@@ -220,7 +227,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
     generate.onclick = () => {
         if (acceptedGeneration) { acceptedGeneration(); return; }
         if (!enabled) {
-            sessionStorage.setItem(generationStorage, JSON.stringify(modelAtPresent()));
+            sessionStorage.setItem(generationStorage, generationKey());
             if (runtime) {
                 if (startingNow) generationRequested = true;
                 else void start();
@@ -260,29 +267,44 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
     activate.onclick = async () => {
         stop(); clear('Enabling local checking…');
         try {
-            localStorage.setItem(portalStorageKey, JSON.stringify(modelAtPresent()));
+            localStorage.setItem(storageKey, JSON.stringify(modelAtPresent()));
+            prepareReload();
             const existing = await navigator.serviceWorker.getRegistrations();
-            if (existing.some(registration => scope.href.startsWith(registration.scope) && registration.scope !== scope.href)) throw new Error('Another service worker controls this workspace.');
+            const ancestor = existing.find(registration => scope.href.startsWith(registration.scope) && registration.scope !== scope.href);
+            const knownMain = new URL('../main-checker-sw.js', scope).href;
+            if (ancestor && !(isPortalWorkspace && [ancestor.active, ancestor.waiting, ancestor.installing]
+                .filter(worker => worker !== null).every(worker => worker!.scriptURL === knownMain)))
+                throw new Error('Another service worker controls this workspace.');
             if (existing.some(registration => registration.scope === scope.href && !ownsRegistration(registration))) throw new Error('Another service worker owns this scope.');
             const registration = await navigator.serviceWorker.register(isolationScript, { scope: scope.href });
             if (registration.scope !== scope.href) throw new Error('Unexpected checker scope');
             // An activation error must still leave an exact-scope cleanup path.
             deactivate.hidden = false;
-            await navigator.serviceWorker.ready;
-            if (!navigator.serviceWorker.controller) await new Promise<void>((resolve, reject) => {
-                const timer = setTimeout(() => reject(new Error('Activation timeout')), 10000);
-                navigator.serviceWorker.addEventListener('controllerchange', () => { clearTimeout(timer); resolve(); }, { once: true });
+            await new Promise<void>((resolve, reject) => {
+                const changed = () => {
+                    if (navigator.serviceWorker.controller?.scriptURL !== isolationScript) return;
+                    clearTimeout(timer); navigator.serviceWorker.removeEventListener('controllerchange', changed); resolve();
+                };
+                const timer = setTimeout(() => {
+                    navigator.serviceWorker.removeEventListener('controllerchange', changed);
+                    reject(new Error('Activation timeout'));
+                }, 10000);
+                navigator.serviceWorker.addEventListener('controllerchange', changed);
+                changed();
             });
             location.reload();
         } catch (error) { clear(String(error)); }
     };
     deactivate.onclick = async () => {
         stop(); clear('Disabling local checking…');
-        localStorage.setItem(portalStorageKey, JSON.stringify(modelAtPresent()));
+        localStorage.setItem(storageKey, JSON.stringify(modelAtPresent()));
+        prepareReload();
+        sessionStorage.removeItem(generationStorage);
         for (const registration of await navigator.serviceWorker.getRegistrations()) {
             if (ownsRegistration(registration)) await registration.unregister();
         }
-        location.href = new URL('../', scope).href;
+        if (isPortalWorkspace) location.href = new URL('../', scope).href;
+        else location.reload();
     };
     reset.onclick = () => void start();
     if (navigator.serviceWorker.controller?.scriptURL === isolationScript) {

@@ -13,7 +13,7 @@ theorem segment_axes (data : Compiled) (valid : PartitionValid data) (i : Fin da
     segment.sine = memberSine data.source segment.member ∧
     (segment.cosine = 0 ∨ segment.sine = 0) ∧ segment.a ≠ segment.b := by
   rcases segments_valid data valid i with
-    ⟨_, _, _, _, _, _, _, _, _, _, _, _, hc, hs, _, haxis, _, hends⟩
+    ⟨_, _, _, _, _, _, _, _, _, _, _, _, hc, hs, _, haxis, _, _, hends⟩
   exact ⟨hc, hs, haxis, hends⟩
 
 /-- The six local degrees of freedom are not an independent supplied map:

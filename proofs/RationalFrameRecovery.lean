@@ -6,15 +6,17 @@ namespace RationalFrame.Recovery
 open FrameInterfaces FrameAssemblyModel Interpretation
 noncomputable section
 
-def fieldValues (d : LocalDofs) (L EA EI c s intensity x : ℝ) : Fin 6 → ℝ :=
+def fieldValues (d : LocalDofs) (L EA EI c s intensity intensityEnd x : ℝ) : Fin 6 → ℝ :=
   let p := s * intensity
   let q := c * intensity
-  let axial := (LocalFrameFields.axialDisplacement d L EA p p).eval x
-  let transverse := (LocalFrameFields.transverseDisplacement d L EI q q).eval x
-  ![(LocalFrameFields.normal d L EA p p).eval x,
-    (LocalFrameFields.shear d L EI q q).eval x,
-    (LocalFrameFields.moment d L EI q q).eval x,
-    (LocalFrameFields.rotation d L EI q q).eval x,
+  let pEnd := s * intensityEnd
+  let qEnd := c * intensityEnd
+  let axial := (LocalFrameFields.axialDisplacement d L EA p pEnd).eval x
+  let transverse := (LocalFrameFields.transverseDisplacement d L EI q qEnd).eval x
+  ![(LocalFrameFields.normal d L EA p pEnd).eval x,
+    (LocalFrameFields.shear d L EI q qEnd).eval x,
+    (LocalFrameFields.moment d L EI q qEnd).eval x,
+    (LocalFrameFields.rotation d L EI q qEnd).eval x,
     c*axial - s*transverse, s*axial + c*transverse]
 
 theorem end_action_cast (segment : Segment) (motion : Array Rat)
@@ -22,8 +24,8 @@ theorem end_action_cast (segment : Segment) (motion : Array Rat)
     (i : Fin 6) :
     (endAction segment motion i : ℝ) = LocalFrameFields.endActions
       (fun j => (localMotion segment motion j : ℝ)) (segment.length : ℝ) (segment.EA : ℝ) (segment.EI : ℝ)
-      ((segment.sine * segment.vertical : Rat) : ℝ) ((segment.sine * segment.vertical : Rat) : ℝ)
-      ((segment.cosine * segment.vertical : Rat) : ℝ) ((segment.cosine * segment.vertical : Rat) : ℝ) i := by
+      ((segment.sine * segment.vertical : Rat) : ℝ) ((segment.sine * segment.verticalEnd : Rat) : ℝ)
+      ((segment.cosine * segment.vertical : Rat) : ℝ) ((segment.cosine * segment.verticalEnd : Rat) : ℝ) i := by
   rw [LocalFrameFields.end_actions_from_fields _ _ _ _ _ _ _ _ length axial bending]
   simp only [endAction, Algebra.sumFin_eq_sum, Rat.cast_sub, Rat.cast_sum, Rat.cast_mul,
     Fields.stiffness_cast, Fields.force_cast]
@@ -36,10 +38,12 @@ theorem recover_segment_cast (segment : Segment) (parameter : Rat) (motion : Arr
       fieldValues (fun j => (localMotion segment motion j : ℝ))
         (segment.length : ℝ) (segment.EA : ℝ) (segment.EI : ℝ)
         (segment.cosine : ℝ) (segment.sine : ℝ) (segment.vertical : ℝ)
+        (segment.verticalEnd : ℝ)
         ((segment.length * (parameter-segment.left) / (segment.right-segment.left) : Rat) : ℝ) i := by
-  have formulas := Fields.uniform_recovery (fun j => (localMotion segment motion j : ℝ))
+  have formulas := Fields.affine_recovery (fun j => (localMotion segment motion j : ℝ))
     (segment.length : ℝ) (segment.EA : ℝ) (segment.EI : ℝ)
-    ((segment.sine * segment.vertical : Rat) : ℝ) ((segment.cosine * segment.vertical : Rat) : ℝ)
+    ((segment.sine * segment.vertical : Rat) : ℝ) ((segment.sine * segment.verticalEnd : Rat) : ℝ)
+    ((segment.cosine * segment.vertical : Rat) : ℝ) ((segment.cosine * segment.verticalEnd : Rat) : ℝ)
     ((segment.length * (parameter-segment.left) / (segment.right-segment.left) : Rat) : ℝ) length axial bending
   obtain ⟨normal, shear, moment, rotation, displacementX, displacementY⟩ := formulas
   have actions := end_action_cast segment motion length axial bending
@@ -74,7 +78,7 @@ def actualValues (data : Compiled) (valid : PartitionValid data)
   let orientation := (frame.member (frame.segmentMember segment)).orientation
   fieldValues (segmentDofs frame (motion data valid (fun i => (values[i.val]! : ℝ))) segment)
     (frame.segmentLength segment) (frame.segmentEA segment) (frame.segmentEI segment)
-    orientation.cosine orientation.sine (frame.segmentVerticalStart segment)
+    orientation.cosine orientation.sine (frame.segmentVerticalStart segment) (frame.segmentVerticalEnd segment)
     (frame.segmentLength segment * ((parameter : ℝ) - (data.segments[segment.val]!.left : ℝ)) /
       ((data.segments[segment.val]!.right : ℝ) - (data.segments[segment.val]!.left : ℝ)))
 
@@ -97,9 +101,9 @@ theorem checked_readouts (data : Compiled) (valid : PartitionValid data)
   have axialReal : (data.segments[segment.val]!.EA : ℝ) ≠ 0 := by exact_mod_cast ne_of_gt axial
   have bendingReal : (data.segments[segment.val]!.EI : ℝ) ≠ 0 := by exact_mod_cast ne_of_gt bending
   rw [recover_segment_cast _ _ _ lengthReal axialReal bendingReal, actual_local_motion]
-  change fieldValues _ _ _ _ _ _ _ _ i = fieldValues _ _ _ _
+  change fieldValues _ _ _ _ _ _ _ _ _ i = fieldValues _ _ _ _
     (memberCosine data.source data.segments[segment.val]!.member : ℝ)
-    (memberSine data.source data.segments[segment.val]!.member : ℝ) _ _ i
+    (memberSine data.source data.segments[segment.val]!.member : ℝ) _ _ _ i
   rw [← cosine, ← sine]
   push_cast
   rfl

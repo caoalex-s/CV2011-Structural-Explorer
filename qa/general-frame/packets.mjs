@@ -65,6 +65,39 @@ disconnected.supports = ['first', 'second'].flatMap(member => [
 disconnected.loads = [disconnected.loads[0]];
 await save('1_coincident_disconnected_members', disconnected, selected('first'));
 await save('1_original_portal', example('frame'), selected('BC'));
+// Public synthetic affine drawings; screenshot geometry was not supplied.
+const affinePortal = example('frame');
+affinePortal.loads[0].fy = -5; affinePortal.loads[0].qEnd = 5;
+await save('1_affine_portal', affinePortal, selected('BC', 0.25));
+await save('1_affine_zero_crossing_left', affinePortal, selected('BC', 0.5, 'left'));
+await save('1_affine_zero_crossing_right', affinePortal, selected('BC', 0.5, 'right'));
+const affineBeam = copy(beam);
+affineBeam.nodes[1].x = 6;
+affineBeam.supports.splice(1, 1);
+affineBeam.loads[0].qEnd = 5;
+await save('1_affine_zero_resultant', affineBeam, selected('beam'));
+const affineReversed = copy(affineBeam);
+[affineReversed.members[0].a, affineReversed.members[0].b] = [affineReversed.members[0].b, affineReversed.members[0].a];
+affineReversed.supports.forEach(support => { support.t = 1 - support.t; });
+[affineReversed.loads[0].fy, affineReversed.loads[0].qEnd] = [affineReversed.loads[0].qEnd, affineReversed.loads[0].fy];
+await save('1_affine_reversed', affineReversed, selected('beam', 0.75, 'right'));
+const affineOverlap = copy(affineBeam);
+affineOverlap.loads[0].t = 0.25; affineOverlap.loads[0].end = 0.75;
+affineOverlap.loads.push({ ...affineOverlap.loads[0], id: 'overlap-affine', t: 0.5, end: 1, fy: 2, qEnd: -2 });
+affineOverlap.supports.push({ ...beam.supports[1], id: 'middle-affine' });
+await save('1_affine_overlap_left', affineOverlap, selected('beam', 0.5, 'left'));
+await save('1_affine_overlap_right', affineOverlap, selected('beam', 0.5, 'right'));
+for (const vertical of [false, true]) {
+    const fixedAffine = copy(affineBeam);
+    fixedAffine.supports.forEach(support => { support.kind = 'fixed'; });
+    if (vertical) { fixedAffine.nodes[1].x = 0; fixedAffine.nodes[1].y = 6; }
+    await save('1_affine_fixed_' + (vertical ? 'axial' : 'bending'), fixedAffine, selected('beam', 0.25));
+}
+const staleAffine = make(affineBeam, selected('beam'));
+affineBeam.loads[0].qEnd = 6;
+await save('0_affine_changed_endpoint', affineBeam, selected('beam'), staleAffine);
+affineBeam.loads[0].qEnd = 5; affineBeam.loads[0].t = 0.25;
+await save('0_affine_changed_interval', affineBeam, selected('beam'), staleAffine);
 const permuted = example('frame');
 for (const field of ['nodes', 'members', 'supports', 'loads']) permuted[field].reverse();
 await save('1_permuted_portal_records', permuted, selected('BC'));

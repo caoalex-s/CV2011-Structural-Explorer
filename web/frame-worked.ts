@@ -10,7 +10,7 @@ import { compileFrame, recoverFrame } from './frame-candidate.js';
 import { type Fraction, binary64, fraction, encoded, mul, sub, div, dot, compare, equal } from './frame-rational.js';
 import { symbols, expression } from './frame-worked-rules.js';
 
-export const workedRuleVersion = 'frame-worked/1';
+export const workedRuleVersion = 'frame-worked/2';
 export interface WorkedBinding {
     revision: number; request: number; bindings: unknown; artifact: unknown;
     bundle: unknown; inputDigest: unknown; packetDigest: string;
@@ -32,7 +32,7 @@ const decode = (value: Rational): Fraction => fraction(BigInt(value.numerator), 
 const named = (values: Record<string, Fraction>): Record<string, Rational> =>
     Object.fromEntries(Object.entries(values).map(([key, value]) => [key, encoded(value)]));
 const inputUnits: Record<string, string> = { x: 'm', L: 'm', c: '1', s: '1', EA: 'kN', EI: 'kN m²',
-    p: 'kN/m', q: 'kN/m', a1: 'kN', a2: 'kN', a3: 'kN m', u0: 'm', v0: 'm', theta0: 'rad' };
+    p: 'kN/m', q: 'kN/m', dp: 'kN/m²', dq: 'kN/m²', a1: 'kN', a2: 'kN', a3: 'kN m', u0: 'm', v0: 'm', theta0: 'rad' };
 function freeze<T>(value: T): T {
     if (value && typeof value === 'object') {
         Object.values(value).forEach(freeze);
@@ -84,6 +84,8 @@ export function createFrameWorked(model: Model, query: EvidenceQuery, values: Ch
     const x = mul(segment.length, div(sub(t, segment.from), sub(segment.to, segment.from)));
     const inputs = named({ x, L: segment.length, c: segment.c, s: segment.s, EA: segment.EA, EI: segment.EI,
         p: mul(segment.s, segment.vertical), q: mul(segment.c, segment.vertical),
+        dp: mul(segment.s, div(sub(segment.verticalEnd, segment.vertical), segment.length)),
+        dq: mul(segment.c, div(sub(segment.verticalEnd, segment.vertical), segment.length)),
         a1: actions[0], a2: actions[1], a3: actions[2], u0: local[0], v0: local[1], theta0: local[2] });
     report.interval = { from: encoded(segment.from), to: encoded(segment.to), member: query.member, values: inputs };
     const step = (id: string, rule: string, predicate: string, dependencies: string[], data = inputs): WorkedStep =>

@@ -44,6 +44,7 @@ if (installedOutput) {
     const manifest = JSON.parse(await readFile(resolve(bundle, 'manifest.json'), 'utf8'));
     assert.equal(manifest.status, 'proved-compiled');
     assert.equal(manifest.theorem, theorem);
+    if (generic) assert.equal(manifest.frameSemantics, 'affine-vertical-v1');
     assert.deepEqual(manifest.files, files);
     assert.deepEqual(manifest.proofFiles, proofFiles);
     assert.equal(manifest.workerSha256, digest(await readFile(resolve(bundle, 'worker.mjs'))));
@@ -54,6 +55,7 @@ if (installedOutput) {
     const buildReceipt = JSON.parse(await readFile('.data/live-portal-build/receipt.json', 'utf8'));
     assert.equal(buildReceipt.repeatability, true);
     const manifest = { status: 'proved-compiled', theorem,
+        frameSemantics: generic ? 'affine-vertical-v1' : null,
         sourceCommit: buildReceipt.commit, pins: buildReceipt.pins,
         buildManifests: [buildReceipt.manifest_1_sha256, buildReceipt.manifest_2_sha256],
         stabilityWitness: generic ? 'RationalFrame.Stability.checked_unique' : 'PortalSoundness.fixed_inverse',

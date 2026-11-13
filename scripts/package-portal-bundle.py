@@ -87,6 +87,7 @@ with zipfile.ZipFile(args.archive) as archive:
     manifest = {
         'status': 'proved-compiled', 'theorem': 'RationalFrameSoundness.acceptance_actual_frame' if generic else 'PortalSoundness.acceptance_actual_portal',
         'sourceCommit': receipt['commit'], 'pins': receipt['pins'],
+        'frameSemantics': 'affine-vertical-v1' if generic else None,
         'buildManifests': [receipt['manifest_1_sha256'], receipt['manifest_2_sha256']],
         'stabilityWitness': 'RationalFrame.Stability.checked_unique' if generic else 'PortalSoundness.fixed_inverse',
         'groupedReactions': 'RationalFrame.Reactions.checked_grouped_reactions' if generic else 'PortalSoundness.accepted_grouped_reactions',
