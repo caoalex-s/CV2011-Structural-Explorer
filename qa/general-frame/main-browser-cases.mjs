@@ -148,7 +148,12 @@ export async function runMainCases({ page, context, output, origin, base, result
     const offlineStart = result.offlineRequests.length;
     await page.locator('#focus-workspace').click();
     await page.locator('#close-inspector').click();
-    await page.locator('[data-object="load"][data-id="q1"] path.hit').first().click();
+    // Click the visible envelope, which shares the load's normal selection
+    // handler. Its painted stroke sits above the wider transparent hit path.
+    const loadEnvelope = page.locator('[data-object="load"][data-id="q1"] > path[stroke][fill="none"]');
+    assert.equal(await loadEnvelope.count(), 1);
+    await loadEnvelope.click();
+    assert.equal(await page.locator('[data-property="qEnd"]').inputValue(), '-5');
     const editEndpoint = async value => {
         await page.locator('[data-property="qEnd"]').fill(value);
         await page.locator('[data-property="qEnd"]').dispatchEvent('change');
