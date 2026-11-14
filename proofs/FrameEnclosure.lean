@@ -50,7 +50,7 @@ theorem outward_post {bits : Nat} {lower upper : Rat} {out : Bounds}
       have outputEquality : candidate = out := Option.some.inj h
       subst out
       exact ⟨endpoints.2.1, endpoints.2.2⟩
-    next rejected => simp only [Option.none_eq_some] at h
+    next rejected => cases h
 
 theorem widen {a b : Bounds} {x : ℝ} (hx : Contains a x)
     (hl : (b.lower : ℝ) ≤ a.lower) (hu : (a.upper : ℝ) ≤ b.upper) :

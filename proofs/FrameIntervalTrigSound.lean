@@ -48,7 +48,7 @@ theorem smallAngle_contains {bits : Nat} {angle outSine outCosine : Bounds} {x :
     have hxsmall : |x| ≤ 1 := le_trans hmag (by exact_mod_cast hlimit)
     have hfourth := fourth_power_bound hmag
     have herrors := small_angle_error hxsmall
-    simp only [bind_eq_bind, Option.bind_eq_some, Option.some.injEq] at h
+    simp only [Option.bind_eq_bind, Option.bind_eq_some, Option.some.injEq] at h
     obtain ⟨squared, hsquared, cubed, hcubed, six, hsix, two, htwo, one, hone,
       remainder, hremainder, cubicTerm, hcubicTerm, sinePolynomial, hsinePolynomial,
       sine, hsine, squareTerm, hsquareTerm, cosinePolynomial, hcosinePolynomial,
@@ -81,7 +81,7 @@ theorem smallAngle_contains {bits : Nat} {angle outSine outCosine : Bounds} {x :
 theorem doubleAngle_contains {bits : Nat} {axes out : Axes} {angle : ℝ}
     (h : doubleAngle bits axes = some out) (haxes : ContainsAxes axes angle) :
     ContainsAxes out (2*angle) := by
-  simp only [doubleAngle, bind_eq_bind, Option.bind_eq_some, Option.some.injEq] at h
+  simp only [doubleAngle, Option.bind_eq_bind, Option.bind_eq_some, Option.some.injEq] at h
   obtain ⟨two, htwo, product, hproduct, sine, hsine, cosineSquared, hcosineSquared,
     sineSquared, hsineSquared, cosine, hcosine, hout⟩ := h
   subst out
@@ -120,7 +120,7 @@ theorem degreeAxesGeneral_contains {bits : Nat} {source reduced : Rat} {turns : 
     have halias : source = reduced + 360 * (turns : Rat) := by
       by_contra hn
       simp [hn] at checks
-    simp only [bind_eq_bind, Option.bind_eq_some] at h
+    simp only [Option.bind_eq_bind, Option.bind_eq_some] at h
     obtain ⟨pi, hpi, degrees, hdegrees, radians, hradians, scale, hscale,
       small, hsmall, axes, haxes, hdouble⟩ := h
     have hpiContains : Contains pi Real.pi := by
