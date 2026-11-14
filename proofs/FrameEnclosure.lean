@@ -15,12 +15,16 @@ theorem power_eq_pow (value : Rat) (exponent : Nat) : FrameIntervalOps.power val
   | succ exponent ih => simp [FrameIntervalOps.power, pow_succ, ih]
 
 theorem lowerOf_eq_min (a b : Rat) : FrameIntervalOps.lowerOf a b = min a b := by
-  unfold FrameIntervalOps.lowerOf
-  split <;> simp_all [min_def]
+  by_cases h : a ≤ b
+  · simp only [FrameIntervalOps.lowerOf, if_pos h, min_eq_left h]
+  · have hba : b ≤ a := le_of_lt (lt_of_not_ge h)
+    simp only [FrameIntervalOps.lowerOf, if_neg h, min_eq_right hba]
 
 theorem upperOf_eq_max (a b : Rat) : FrameIntervalOps.upperOf a b = max a b := by
-  unfold FrameIntervalOps.upperOf
-  split <;> simp_all [max_def]
+  by_cases h : a ≤ b
+  · simp only [FrameIntervalOps.upperOf, if_pos h, max_eq_right h]
+  · have hba : b ≤ a := le_of_lt (lt_of_not_ge h)
+    simp only [FrameIntervalOps.upperOf, if_neg h, max_eq_left hba]
 
 def Contains (bounds : Bounds) (value : ℝ) : Prop :=
   (bounds.lower : ℝ) ≤ value ∧ value ≤ (bounds.upper : ℝ)
@@ -31,7 +35,8 @@ theorem outward_post {bits : Nat} {lower upper : Rat} {out : Bounds}
   unfold FrameIntervalOps.outward at h
   split at h
   · simp at h
-  · split at h <;> simp_all [Bool.and_eq_true]
+  · dsimp only at h
+    split at h <;> simp_all [Bool.and_eq_true]
 
 theorem widen {a b : Bounds} {x : ℝ} (hx : Contains a x)
     (hl : (b.lower : ℝ) ≤ a.lower) (hu : (a.upper : ℝ) ≤ b.upper) :
@@ -233,8 +238,8 @@ theorem reciprocal_contains {a out : Bounds} {x : ℝ}
       have hfirst := reciprocal_positive_order (neg_pos.mpr hnegative) (neg_le_neg hx.2)
       have hsecond := reciprocal_positive_order (neg_pos.mpr hxnegative) (neg_le_neg hx.1)
       constructor
-      · simpa only [one_div_neg, neg_le_neg_iff] using hfirst
-      · simpa only [one_div_neg, neg_le_neg_iff] using hsecond
+      · simpa only [div_neg, neg_le_neg_iff] using hfirst
+      · simpa only [div_neg, neg_le_neg_iff] using hsecond
   exact ⟨le_trans hl hinner.1, le_trans hinner.2 hu⟩
 
 theorem executable_reciprocal_contains {bits : Nat} {a out : Bounds} {x : ℝ}

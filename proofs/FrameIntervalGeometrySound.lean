@@ -13,6 +13,7 @@ theorem member_contains {bits : Nat} {dx dy : Rat} {root : Bounds} {out : Member
     Contains out.cosine ((dx : ℝ) / Real.sqrt ((dx : ℝ)^2 + (dy : ℝ)^2)) ∧
     Contains out.sine ((dy : ℝ) / Real.sqrt ((dx : ℝ)^2 + (dy : ℝ)^2)) := by
   unfold member at h
+  dsimp only at h
   split at h
   · simp at h
   · obtain ⟨squaredBounds, hsquared, hremaining⟩ := Option.bind_eq_some.mp h
