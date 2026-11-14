@@ -36,7 +36,21 @@ theorem outward_post {bits : Nat} {lower upper : Rat} {out : Bounds}
   split at h
   · simp at h
   · dsimp only at h
-    split at h <;> simp_all [Bool.and_eq_true]
+    let scale := FrameIntervalOps.power 2 bits
+    let candidate : Bounds := ⟨(Rat.floor (lower*scale) : Rat)/scale,
+      (Rat.ceil (upper*scale) : Rat)/scale⟩
+    change (if FrameIntervalOps.valid candidate && candidate.lower ≤ lower && upper ≤ candidate.upper
+      then some candidate else none) = some out at h
+    split at h
+    next checks =>
+      -- Preserve the checked inequalities before identifying the returned bounds.
+      have endpoints : FrameIntervalOps.valid candidate = true ∧
+          candidate.lower ≤ lower ∧ upper ≤ candidate.upper := by
+        simpa only [Bool.and_eq_true, decide_eq_true_eq, and_assoc] using checks
+      have outputEquality : candidate = out := Option.some.inj h
+      subst out
+      exact ⟨endpoints.2.1, endpoints.2.2⟩
+    next rejected => simp only [Option.none_eq_some] at h
 
 theorem widen {a b : Bounds} {x : ℝ} (hx : Contains a x)
     (hl : (b.lower : ℝ) ≤ a.lower) (hu : (a.upper : ℝ) ≤ b.upper) :
