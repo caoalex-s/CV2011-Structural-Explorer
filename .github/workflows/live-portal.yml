@@ -51,6 +51,28 @@ jobs:
           '
           git diff --exit-code -- lake-manifest.json lean-toolchain
           lake env bash -c 'cc -fsyntax-only -I"$(lean --print-prefix)/include" ../qa/general-frame/abi.c'
+      - name: Compile the frozen inclined foundation (no frame acceptance claim)
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test tests/frame-interval.test.mjs tests/inclined-reference.test.mjs
+          cd proofs
+          failed=0
+          for module in FrameIntervalOps FrameEnclosure FrameIntervalGeometry FrameIntervalGeometrySound FrameIntervalTrig FrameIntervalTrigSound FrameAdmissiblePoint FrameReducedStability; do
+            if ! lake env bash -c 'export LEAN_PATH="$PWD:$LEAN_PATH"; lean -o "$1.olean" "$1.lean"' -- "$module" 2>&1 | tee "../.data/live-portal/$module.log"; then
+              failed=1
+            fi
+          done
+          exit "$failed"
+      - name: Audit the frozen inclined foundation claims
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 qa/live-portal/audit.py --inclined-foundation --emit .data/live-portal/InclinedFoundationAudit.lean
+          cd proofs
+          lake env bash -c 'export LEAN_PATH="$PWD:$LEAN_PATH"; lean ../.data/live-portal/InclinedFoundationAudit.lean' 2>&1 | tee ../.data/live-portal/inclined-foundation-axioms.log
+          cd ..
+          python3 qa/live-portal/audit.py --inclined-foundation --check .data/live-portal/inclined-foundation-axioms.log --output .data/live-portal/inclined-foundation-axiom-audit.json
       - name: Exercise the generic source decoder and exact predicate
         shell: bash
         run: |
@@ -96,7 +118,7 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_wasm }}
         run: cd proofs && lake env python3 ../qa/live-portal/negative-table.py
       - uses: pnpm/action-setup@v4
-        if: ${{ (github.event_name == 'workflow_dispatch' && inputs.build_wasm) || hashFiles('public/portal-checker/bundle/manifest.json') != '' }}
+        if: ${{ !inputs.proof_only && ((github.event_name == 'workflow_dispatch' && inputs.build_wasm) || hashFiles('public/portal-checker/bundle/manifest.json') != '') }}
         with:
           version: '11.25.0'
       - name: Test the installed structural bundle in the final workspace
@@ -141,7 +163,7 @@ jobs:
             public/portal-checker/bundle
             !.data/live-portal-build/browser/node_modules
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        if: ${{ always() && hashFiles('public/portal-checker/bundle/manifest.json') != '' && !(github.event_name == 'workflow_dispatch' && inputs.build_wasm) }}
+        if: ${{ always() && !inputs.proof_only && hashFiles('public/portal-checker/bundle/manifest.json') != '' && !(github.event_name == 'workflow_dispatch' && inputs.build_wasm) }}
         with:
           name: live-portal-browser
           path: |
