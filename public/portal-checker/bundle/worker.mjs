@@ -5,6 +5,7 @@ const manifestBytes = await (await fetch(new URL('./manifest.json', import.meta.
 const manifest = JSON.parse(new TextDecoder().decode(manifestBytes));
 const generic = manifest.theorem === 'RationalFrameSoundness.acceptance_actual_frame';
 if ((!generic && manifest.theorem !== 'PortalSoundness.acceptance_actual_portal') || manifest.status !== 'proved-compiled') throw Error('Unproved checker bundle');
+if (generic && manifest.frameSemantics !== 'affine-vertical-v1') throw Error('Checker bundle predates affine-load support');
 const assets = {};
 const codeAssets = ['checker.wasm', 'checker.mjs', 'checker.worker.js', 'checker.mjs.symbols'];
 if (generic) codeAssets.push('frame-rational.js', 'model-evidence.js', 'frame-candidate.js', 'frame-packet.js', 'frame-result.js');
@@ -68,4 +69,5 @@ self.onmessage = async ({ data }) => {
     }
 };
 postMessage({ ready: true, isolated: crossOriginIsolated, artifact: manifest.files['checker.wasm'],
-    bundle: await hash(manifestBytes), capacity, protocols: generic ? ['portal', 'frame'] : ['portal'] });
+    bundle: await hash(manifestBytes), capacity, protocols: generic ? ['portal', 'frame'] : ['portal'],
+    capabilities: generic ? ['affine-vertical-v1'] : [] });

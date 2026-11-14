@@ -16,7 +16,7 @@ export const frameQueryConvention = Object.freeze({ quantity: 'N,V,M,rotation,ux
                                                                                                               
                                
                                                                              
-                                                                                               
+                                                                                                                      
                                                                                      
  
                                 
@@ -70,9 +70,6 @@ export function validateFrame(input         , query               )        {
     for (const support of model.supports) {
         if (!['pin', 'fixed', 'roller'].includes(support.kind)) unsupported('use fixed, pin or axis-aligned roller supports.');
         if (support.kind === 'roller' && ![0, 90, 180, 270].includes(support.angle)) unsupported('roller angles must be exactly 0, 90, 180 or 270 degrees.');
-    }
-    for (const load of model.loads) {
-        if (load.kind === 'distributed' && load.fy !== load.qEnd) unsupported('distributed loads must be uniform.');
     }
     if (!model.members.some(member => member.id === query.member) || !Number.isFinite(query.parameter) || query.parameter < 0 || query.parameter > 1)
         throw Error('Malformed query: select an existing member and a parameter in [0,1].');
@@ -132,23 +129,40 @@ export function compileFrame(input         , query               )              
             within(segments.length + 1, frameLimits.segments, 'segments');
             const from = ordered[interval], to = ordered[interval + 1], L = mul(length, sub(to, from));
             const a = pointAt.get(token(from)) , b = pointAt.get(token(to)) ;
-            let vertical = zero;
+            let vertical = zero, verticalEnd = zero;
             for (const load of model.loads) {
                 if (load.member === member.id && load.kind === 'distributed' &&
-                    compare(binary64(load.t), from) <= 0 && compare(to, binary64(load.end)) <= 0) vertical = add(vertical, binary64(load.fy));
+                    compare(binary64(load.t), from) <= 0 && compare(to, binary64(load.end)) <= 0) {
+                    // Restrict each affine source load to this interval before
+                    // summing overlaps. Stored fy is physical upward-positive.
+                    const start = binary64(load.t), extent = sub(binary64(load.end), start);
+                    const intensity = (t          ) => add(binary64(load.fy),
+                        mul(sub(binary64(load.qEnd), binary64(load.fy)), div(sub(t, start), extent)));
+                    vertical = add(vertical, intensity(from));
+                    verticalEnd = add(verticalEnd, intensity(to));
+                }
             }
-            const p = mul(s, vertical), q = mul(c, vertical);
-            const axial = div(mul(p, L), integer(2)), transverse = div(mul(q, L), integer(2));
-            const moment = div(mul(q, square(L)), integer(12));
+            const p0 = mul(s, vertical), p1 = mul(s, verticalEnd);
+            const q0 = mul(c, vertical), q1 = mul(c, verticalEnd);
+            const weighted = (a          , b          , left        , right        ) =>
+                add(mul(integer(left), a), mul(integer(right), b));
+            const force = [
+                div(mul(L, weighted(p0, p1, 2, 1)), integer(6)),
+                div(mul(L, weighted(q0, q1, 7, 3)), integer(20)),
+                div(mul(square(L), weighted(q0, q1, 3, 2)), integer(60)),
+                div(mul(L, weighted(p0, p1, 1, 2)), integer(6)),
+                div(mul(L, weighted(q0, q1, 3, 7)), integer(20)),
+                neg(div(mul(square(L), weighted(q0, q1, 2, 3)), integer(60))),
+            ];
             const horizontal = c.n !== 0n;
             const indices = [3 * a + (horizontal ? 0 : 1), 3 * a + (horizontal ? 1 : 0), 3 * a + 2,
                 3 * b + (horizontal ? 0 : 1), 3 * b + (horizontal ? 1 : 0), 3 * b + 2];
             const signs = [horizontal ? c : s, horizontal ? c : neg(s), one,
                 horizontal ? c : s, horizontal ? c : neg(s), one];
             segments.push({ member: memberIndex, start: a, end: b, from, to, length: L, c, s,
-                EA: binary64(member.EA), EI: binary64(member.EI), vertical, indices, signs,
+                EA: binary64(member.EA), EI: binary64(member.EI), vertical, verticalEnd, indices, signs,
                 stiffness: elementStiffness(L, binary64(member.EA), binary64(member.EI)),
-                force: [axial, transverse, moment, axial, transverse, neg(moment)] });
+                force });
         }
     }
     const count = 3 * points.length;
@@ -223,7 +237,7 @@ function nullVector(input              )             {
     return vector;
 }
 
-/** Actual uniform-load fields, in local N,V,M,rotation then global ux,uy order. */
+/** Affine loaded fields, in local N,V,M,rotation then global ux,uy order. */
 export function recoverFrame(frame               , motion            )             {
     const member = frame.model.members.findIndex(item => item.id === frame.query.member), t = binary64(frame.query.parameter);
     const candidates = frame.segments.filter(segment => segment.member === member && compare(segment.from, t) <= 0 && compare(t, segment.to) <= 0);
@@ -234,12 +248,17 @@ export function recoverFrame(frame               , motion            )          
     const x = mul(segment.length, div(sub(t, segment.from), sub(segment.to, segment.from)));
     const x2 = square(x), x3 = mul(x2, x), x4 = square(x2);
     const p = mul(segment.s, segment.vertical), q = mul(segment.c, segment.vertical);
-    const N = sub(neg(actions[0]), mul(p, x));
-    const V = add(actions[1], mul(q, x));
-    const M = add(add(neg(actions[2]), mul(actions[1], x)), div(mul(q, x2), integer(2)));
-    const u = add(local[0], div(sub(mul(neg(actions[0]), x), div(mul(p, x2), integer(2))), segment.EA));
-    const v = add(add(local[1], mul(local[2], x)), div(add(add(div(mul(neg(actions[2]), x2), integer(2)), div(mul(actions[1], x3), integer(6))), div(mul(q, x4), integer(24))), segment.EI));
-    const rotation = add(local[2], div(add(add(mul(neg(actions[2]), x), div(mul(actions[1], x2), integer(2))), div(mul(q, x3), integer(6))), segment.EI));
+    const slope = div(sub(segment.verticalEnd, segment.vertical), segment.length);
+    const dp = mul(segment.s, slope), dq = mul(segment.c, slope);
+    const term = (coefficient          , power          , denominator        ) => div(mul(coefficient, power), integer(denominator));
+    const N = sub(sub(neg(actions[0]), mul(p, x)), term(dp, x2, 2));
+    const V = sum([actions[1], mul(q, x), term(dq, x2, 2)]);
+    const M = sum([neg(actions[2]), mul(actions[1], x), term(q, x2, 2), term(dq, x3, 6)]);
+    const u = add(local[0], div(sum([mul(neg(actions[0]), x), neg(term(p, x2, 2)), neg(term(dp, x3, 6))]), segment.EA));
+    const v = sum([local[1], mul(local[2], x), div(sum([term(neg(actions[2]), x2, 2),
+        term(actions[1], x3, 6), term(q, x4, 24), term(dq, mul(x4, x), 120)]), segment.EI)]);
+    const rotation = add(local[2], div(sum([mul(neg(actions[2]), x), term(actions[1], x2, 2),
+        term(q, x3, 6), term(dq, x4, 24)]), segment.EI));
     return [N, V, M, rotation, sub(mul(segment.c, u), mul(segment.s, v)), add(mul(segment.s, u), mul(segment.c, v))];
 }
 
