@@ -20,6 +20,8 @@ export async function runMainCases({ page, context, output, origin, base, result
         });
         const receipt = JSON.parse(await page.locator('#portal-certificate').textContent());
         assert.equal(receipt.theorem, 'RationalFrameSoundness.acceptance_actual_frame');
+        assert.equal(receipt.artifact, result.artifact);
+        assert.equal(receipt.bundle, result.bundle);
         const normalized = await page.evaluate(async source => {
             const { parseEvidenceModel } = await import('./model-evidence.js');
             return parseEvidenceModel(source);

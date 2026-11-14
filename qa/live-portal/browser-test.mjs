@@ -95,7 +95,14 @@ const browser = await chromium.launch({ headless: true });
 const context = await browser.newContext({ acceptDownloads: true });
 await context.tracing.start({ screenshots: true, snapshots: true, sources: false });
 const page = await context.newPage();
-const result = { passed: false, browser: browser.version(), cases: [], errors: [], offlineRequests: [] };
+const manifestBytes = await readFile(resolve(bundle, 'manifest.json'));
+const checkedManifest = JSON.parse(manifestBytes.toString('utf8'));
+const workspaceCommit = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' });
+assert.equal(workspaceCommit.status, 0);
+assert.equal(workspaceCommit.stdout.trim(), process.env.GITHUB_SHA);
+const result = { passed: false, browser: browser.version(), cases: [], errors: [], offlineRequests: [],
+    workspaceCommit: workspaceCommit.stdout.trim(), compiledSourceCommit: checkedManifest.sourceCommit,
+    artifact: files['checker.wasm'], bundle: digest(manifestBytes), installedBundle: !!installedOutput };
 let offline = false;
 page.on('pageerror', error => result.errors.push(String(error)));
 context.on('request', request => { if (offline) result.offlineRequests.push(request.url()); });
