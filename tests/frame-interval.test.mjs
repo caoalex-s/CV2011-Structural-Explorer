@@ -310,3 +310,61 @@ test('37-degree trig enclosures contain an independent exact alternating-series 
         }
     }
 });
+
+test('two inclined members share their rigid joint and enclose independent energy derivatives', () => {
+    const positions = [[0, 0], [1, 2], [3, 1]];
+    const forceX = 3, forceY = -7;
+    const EA = 2000000, EI = 20000;
+    const exact = value => fraction(BigInt(value));
+    // Both physical member lengths are sqrt(5). Differentiate their exact
+    // axial/bending strain energies with respect to the tip force components.
+    // The product integral is for two affine functions on t in [0,1].
+    const productIntegral = (a0, a1, b0, b1) => fraction(BigInt(2*a0*b0 + a0*b1 + a1*b0 + 2*a1*b1), 6n);
+    let coefficientX = exact(0), coefficientY = exact(0), coefficientRotation = exact(0);
+    for (let segment = 0; segment < 2; segment++) {
+        const [ax, ay] = positions[segment], [bx, by] = positions[segment+1];
+        const dx = bx-ax, dy = by-ay;
+        const rx0 = 3-ax, ry0 = 1-ay, rx1 = 3-bx, ry1 = 1-by;
+        const m0 = rx0*forceY-ry0*forceX, m1 = rx1*forceY-ry1*forceX;
+        const axialProjection = forceX*dx+forceY*dy;
+        coefficientX = add(coefficientX, add(fraction(BigInt(axialProjection*dx), BigInt(5*EA)),
+            div(productIntegral(m0, m1, -ry0, -ry1), exact(EI))));
+        coefficientY = add(coefficientY, add(fraction(BigInt(axialProjection*dy), BigInt(5*EA)),
+            div(productIntegral(m0, m1, rx0, rx1), exact(EI))));
+        coefficientRotation = add(coefficientRotation, fraction(BigInt(m0+m1), BigInt(2*EI)));
+    }
+    const reference = new IntervalArithmetic(128);
+    const root = reference.squareRoot(reference.bounds(exact(5)));
+    const expected = [coefficientX, coefficientY, coefficientRotation].map(value =>
+        reference.multiply(reference.bounds(value), root));
+    for (const reversed of [false, true]) {
+        const source = {
+            nodes: positions.map(([x, y], index) => ({ id: ['A', 'B', 'C'][index], x, y })),
+            members: [{ id: 'AB', a: 'A', b: 'B', EA, EI },
+                { id: 'BC', a: reversed ? 'C' : 'B', b: reversed ? 'B' : 'C', EA, EI }],
+            supports: [{ id: 'S', member: 'AB', kind: 'fixed', t: 0, angle: 90 }],
+            loads: [{ id: 'P', member: 'BC', kind: 'force', t: reversed ? 0 : 1,
+                end: reversed ? 0 : 1, fx: forceX, fy: forceY, mz: 0, qEnd: 0 }],
+        };
+        const arithmetic = new IntervalArithmetic(96);
+        const frame = compileIntervalFrame(arithmetic, source, { member: 'BC', parameter: reversed ? 0 : 1,
+            cutSide: reversed ? 'right' : 'left', ...frameQueryConvention });
+        assert.equal(frame.points.length, 3);
+        assert.equal(frame.coordinates.length, 6);
+        const proposal = proposeIntervalSolution(arithmetic, frame.reduced, frame.reducedForce);
+        const motion = frame.basis.map(row => intervalDot(arithmetic, row, proposal.enclosure));
+        expected.forEach((bounds, i) => {
+            contains(motion[6+i], bounds.lower);
+            contains(motion[6+i], bounds.upper);
+            assert.equal(enclosureAccuracy(['ux', 'uy', 'rotation'][i], motion[6+i]).meetsTarget, true);
+        });
+        const reactions = frame.stiffness.map((row, i) => arithmetic.subtract(intervalDot(arithmetic, row, motion), frame.force[i]));
+        reactions.forEach((bounds, i) => contains(bounds, exact(i < 3 ? [-3, 7, 24][i] : 0)));
+        const readouts = recoverIntervalFields(arithmetic, frame, motion);
+        contains(readouts[2], exact(0));
+        [expected[2], expected[0], expected[1]].forEach((bounds, i) => {
+            contains(readouts[3+i], bounds.lower);
+            contains(readouts[3+i], bounds.upper);
+        });
+    }
+});
