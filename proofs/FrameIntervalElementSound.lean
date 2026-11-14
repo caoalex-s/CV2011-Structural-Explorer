@@ -16,7 +16,7 @@ theorem coefficients_contains {bits : Nat} {length : Bounds} {EA EI : Rat}
     {out : Coefficients} {L : ℝ}
     (h : coefficients bits length EA EI = some out) (hL : Contains length L) :
     ContainsCoefficients out L EA EI := by
-  simp only [coefficients, bind_eq_bind, Option.bind_eq_some, Option.some.injEq] at h
+  simp only [coefficients, Option.bind_eq_bind, Option.bind_eq_some, Option.some.injEq] at h
   obtain ⟨axialRigidity, hEA, bendingRigidity, hEI, twelve, h12, six, h6, four, h4, two, h2,
     squared, hsquared, cubed, hcubed, bendingNumerator, hbendingNumerator,
     couplingNumerator, hcouplingNumerator, rotationNumerator, hrotationNumerator,

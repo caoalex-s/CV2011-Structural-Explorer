@@ -18,7 +18,7 @@ theorem dot_contains {bits n : Nat} {left right : Fin n → Bounds} {out : Bound
     simpa using hp
   | succ n ih =>
     obtain ⟨head, hhead, tail, htail, hadd⟩ := by
-      simpa only [dot, bind_eq_bind, Option.bind_eq_some] using h
+      simpa only [dot, Option.bind_eq_bind, Option.bind_eq_some] using h
     have hheadContains := executable_multiply_contains hhead (hx 0) (hy 0)
     have htailContains := ih htail (fun i => hx i.succ) (fun i => hy i.succ)
     have hsum := executable_add_contains hadd hheadContains htailContains
