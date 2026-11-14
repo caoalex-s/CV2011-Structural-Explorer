@@ -15,40 +15,19 @@ theorem member_contains {bits : Nat} {dx dy : Rat} {root : Bounds} {out : Member
   unfold member at h
   split at h
   · simp at h
-  · cases hsquared : point bits (dx*dx+dy*dy) with
-    | none => simp [hsquared] at h
-    | some squaredBounds =>
-      simp only [hsquared, Option.bind] at h
-      cases hroot : squareRoot squaredBounds root with
-      | none => simp [hroot] at h
-      | some length =>
-        simp only [hroot, Option.bind] at h
-        split at h
-        · simp at h
-        · cases hx : point bits dx with
-          | none => simp [hx] at h
-          | some horizontal =>
-            simp only [hx, Option.bind] at h
-            cases hy : point bits dy with
-            | none => simp [hy] at h
-            | some vertical =>
-              simp only [hy, Option.bind] at h
-              cases hc : divide bits horizontal length with
-              | none => simp [hc] at h
-              | some cosine =>
-                simp only [hc, Option.bind] at h
-                cases hs : divide bits vertical length with
-                | none => simp [hs] at h
-                | some sine =>
-                  have heq : (⟨length, cosine, sine⟩ : MemberBounds) = out := by
-                    simpa [hs] using h
-                  subst out
-                  have hsquaredContains : Contains squaredBounds ((dx : ℝ)^2 + (dy : ℝ)^2) := by
-                    have hp := executable_point_contains hsquared
-                    simpa [Rat.cast_add, Rat.cast_mul, pow_two] using hp
-                  have hl := executable_sqrt_contains hroot hsquaredContains
-                  exact ⟨hl, executable_divide_contains hc (executable_point_contains hx) hl,
-                    executable_divide_contains hs (executable_point_contains hy) hl⟩
+  · obtain ⟨squaredBounds, hsquared, hremaining⟩ := Option.bind_eq_some.mp h
+    obtain ⟨length, hroot, hpositive⟩ := Option.bind_eq_some.mp hremaining
+    split at hpositive
+    · simp at hpositive
+    · simp only [bind_eq_bind, Option.bind_eq_some, Option.some.injEq] at hpositive
+      obtain ⟨horizontal, hx, vertical, hy, cosine, hc, sine, hs, hout⟩ := hpositive
+      subst out
+      have hsquaredContains : Contains squaredBounds ((dx : ℝ)^2 + (dy : ℝ)^2) := by
+        have hp := executable_point_contains hsquared
+        simpa [Rat.cast_add, Rat.cast_mul, pow_two] using hp
+      have hl := executable_sqrt_contains hroot hsquaredContains
+      exact ⟨hl, executable_divide_contains hc (executable_point_contains hx) hl,
+        executable_divide_contains hs (executable_point_contains hy) hl⟩
 
 /-- The enclosed quantities refer to the actual endpoints, including irrational
     lengths. No rounded orientation is substituted into ExactGeometry. -/

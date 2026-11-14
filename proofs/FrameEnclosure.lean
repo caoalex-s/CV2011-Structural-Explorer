@@ -9,6 +9,23 @@ noncomputable section
 
 abbrev Bounds := FrameIntervalOps.Bounds
 
+theorem power_eq_pow (value : Rat) (exponent : Nat) : FrameIntervalOps.power value exponent = value^exponent := by
+  induction exponent with
+  | zero => rfl
+  | succ exponent ih => simp [FrameIntervalOps.power, pow_succ, ih]
+
+theorem lowerOf_eq_min (a b : Rat) : FrameIntervalOps.lowerOf a b = min a b := by
+  by_cases h : a ≤ b
+  · simp only [FrameIntervalOps.lowerOf, if_pos h, min_eq_left h]
+  · have hba : b ≤ a := le_of_lt (lt_of_not_ge h)
+    simp only [FrameIntervalOps.lowerOf, if_neg h, min_eq_right hba]
+
+theorem upperOf_eq_max (a b : Rat) : FrameIntervalOps.upperOf a b = max a b := by
+  by_cases h : a ≤ b
+  · simp only [FrameIntervalOps.upperOf, if_pos h, max_eq_right h]
+  · have hba : b ≤ a := le_of_lt (lt_of_not_ge h)
+    simp only [FrameIntervalOps.upperOf, if_neg h, max_eq_left hba]
+
 def Contains (bounds : Bounds) (value : ℝ) : Prop :=
   (bounds.lower : ℝ) ≤ value ∧ value ≤ (bounds.upper : ℝ)
 
@@ -18,7 +35,8 @@ theorem outward_post {bits : Nat} {lower upper : Rat} {out : Bounds}
   unfold FrameIntervalOps.outward at h
   split at h
   · simp at h
-  · split at h <;> simp_all [Bool.and_eq_true]
+  · dsimp only at h
+    split at h <;> simp_all [Bool.and_eq_true]
 
 theorem widen {a b : Bounds} {x : ℝ} (hx : Contains a x)
     (hl : (b.lower : ℝ) ≤ a.lower) (hu : (a.upper : ℝ) ≤ b.upper) :
@@ -82,10 +100,8 @@ theorem pi_contains : Contains
     ⟨314159265358979323846 / 100000000000000000000,
       314159265358979323847 / 100000000000000000000⟩ Real.pi := by
   constructor
-  · norm_num [Contains] at *
-    exact le_of_lt Real.pi_gt_d20
-  · norm_num [Contains] at *
-    exact le_of_lt Real.pi_lt_d20
+  · convert (le_of_lt Real.pi_gt_d20) using 1 <;> norm_num
+  · convert (le_of_lt Real.pi_lt_d20) using 1 <;> norm_num
 
 /-- The same fourth-order remainder applies to both small-angle polynomials.
     Repeated exact double-angle identities then cover the reduced degree angle. -/
@@ -156,6 +172,7 @@ theorem executable_multiply_contains {bits : Nat} {a b out : Bounds} {x y : ℝ}
   unfold FrameIntervalOps.multiply at h
   split at h
   · have hp := outward_post h
+    simp only [lowerOf_eq_min, upperOf_eq_max] at hp
     have hll := le_trans hp.1 (le_trans (min_le_left _ _) (min_le_left _ _))
     have hlu := le_trans hp.1 (le_trans (min_le_left _ _) (min_le_right _ _))
     have hul := le_trans hp.1 (le_trans (min_le_right _ _) (min_le_left _ _))
@@ -191,8 +208,8 @@ theorem executable_sqrt_contains {a witness out : Bounds} {x : ℝ}
     subst out
     have hordered : witness.lower ≤ witness.upper := by
       have hv := hc.2.1
-      simp only [FrameIntervalOps.valid, Bool.and_eq_true, decide_eq_true_eq] at hv
-      exact hv.1.1
+      simp only [FrameIntervalOps.valid, Bool.and_eq_true, decide_eq_true_eq, and_assoc] at hv
+      exact hv.1
     apply sqrt_contains hx
     · exact_mod_cast hc.2.2.1
     · exact_mod_cast hc.2.2.2.1
@@ -221,8 +238,8 @@ theorem reciprocal_contains {a out : Bounds} {x : ℝ}
       have hfirst := reciprocal_positive_order (neg_pos.mpr hnegative) (neg_le_neg hx.2)
       have hsecond := reciprocal_positive_order (neg_pos.mpr hxnegative) (neg_le_neg hx.1)
       constructor
-      · simpa only [one_div_neg, neg_le_neg_iff] using hfirst
-      · simpa only [one_div_neg, neg_le_neg_iff] using hsecond
+      · simpa only [div_neg, neg_le_neg_iff] using hfirst
+      · simpa only [div_neg, neg_le_neg_iff] using hsecond
   exact ⟨le_trans hl hinner.1, le_trans hinner.2 hu⟩
 
 theorem executable_reciprocal_contains {bits : Nat} {a out : Bounds} {x : ℝ}

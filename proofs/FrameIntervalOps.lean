@@ -5,6 +5,16 @@ import Batteries.Data.Rat.Basic
     not trust the floor implementation. No real arithmetic enters this module. -/
 namespace FrameIntervalOps
 
+/-- Batteries supplies rational arithmetic and comparison, but not Mathlib's
+    power/min/max instances. Keep the executable operations explicit. Callers
+    restrict the exponent to the fixed precision or fourth-order remainder. -/
+def power (value : Rat) : Nat → Rat
+  | 0 => 1
+  | exponent+1 => power value exponent * value
+
+def lowerOf (a b : Rat) : Rat := if a ≤ b then a else b
+def upperOf (a b : Rat) : Rat := if a ≤ b then b else a
+
 structure Bounds where
   lower : Rat
   upper : Rat
@@ -20,7 +30,7 @@ def precisionValid (bits : Nat) : Bool := bits == 32 || bits == 64 || bits == 96
 /-- The postcheck explicitly establishes the inequality used by every caller. -/
 def outward (bits : Nat) (lower upper : Rat) : Option Bounds := do
   if !precisionValid bits || lower > upper then none else
-    let scale : Rat := 2^bits
+    let scale := power 2 bits
     let out : Bounds := ⟨(Rat.floor (lower*scale) : Rat)/scale,
       (Rat.ceil (upper*scale) : Rat)/scale⟩
     if valid out && out.lower ≤ lower && upper ≤ out.upper then some out else none
@@ -42,7 +52,7 @@ def multiply (bits : Nat) (a b : Bounds) : Option Bounds :=
     let lu := a.lower*b.upper
     let ul := a.upper*b.lower
     let uu := a.upper*b.upper
-    outward bits (min (min ll lu) (min ul uu)) (max (max ll lu) (max ul uu))
+    outward bits (lowerOf (lowerOf ll lu) (lowerOf ul uu)) (upperOf (upperOf ll lu) (upperOf ul uu))
   else none
 
 def reciprocal (bits : Nat) (a : Bounds) : Option Bounds :=

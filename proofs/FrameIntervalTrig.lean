@@ -11,14 +11,14 @@ structure Axes where
   deriving Inhabited, Repr, DecidableEq
 
 def smallAngle (bits : Nat) (angle : Bounds) : Option Axes := do
-  let magnitude := max (-angle.lower) angle.upper
+  let magnitude := upperOf (-angle.lower) angle.upper
   if !valid angle || magnitude > 1 then none else
     let squared ← multiply bits angle angle
     let cubed ← multiply bits squared angle
     let six ← point bits 6
     let two ← point bits 2
     let one ← point bits 1
-    let error := 5*magnitude^4/96
+    let error := 5*power magnitude 4/96
     let remainder ← outward bits (-error) error
     let cubicTerm ← divide bits cubed six
     let sinePolynomial ← subtract bits angle cubicTerm
@@ -55,7 +55,7 @@ def degreeAxesGeneral (bits : Nat) (source reduced : Rat) (turns : Int) : Option
       (314159265358979323847 / 100000000000000000000)
     let degrees ← point bits (reduced/180)
     let radians ← multiply bits degrees pi
-    let scale ← point bits (2^halvings)
+    let scale ← point bits (power 2 halvings)
     let small ← divide bits radians scale
     let axes ← smallAngle bits small
     doubleAngles bits halvings axes
