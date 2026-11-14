@@ -30,6 +30,7 @@ theorem smallAngle_contains {bits : Nat} {angle outSine outCosine : Bounds} {x :
     (h : smallAngle bits angle = some ⟨outSine, outCosine⟩)
     (hx : Contains angle x) : ContainsAxes ⟨outSine, outCosine⟩ x := by
   unfold smallAngle at h
+  simp only [upperOf_eq_max, power_eq_pow] at h
   split at h
   · simp at h
   next checks =>
@@ -112,6 +113,7 @@ theorem degreeAxesGeneral_contains {bits : Nat} {source reduced : Rat} {turns : 
     (h : degreeAxesGeneral bits source reduced turns = some out) :
     ContainsAxes out ((source : ℝ) * (Real.pi/180)) := by
   unfold degreeAxesGeneral at h
+  simp only [power_eq_pow] at h
   split at h
   · simp at h
   next checks =>

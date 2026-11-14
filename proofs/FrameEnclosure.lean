@@ -9,6 +9,19 @@ noncomputable section
 
 abbrev Bounds := FrameIntervalOps.Bounds
 
+theorem power_eq_pow (value : Rat) (exponent : Nat) : FrameIntervalOps.power value exponent = value^exponent := by
+  induction exponent with
+  | zero => rfl
+  | succ exponent ih => simp [FrameIntervalOps.power, pow_succ, ih]
+
+theorem lowerOf_eq_min (a b : Rat) : FrameIntervalOps.lowerOf a b = min a b := by
+  unfold FrameIntervalOps.lowerOf
+  split <;> simp_all [min_def]
+
+theorem upperOf_eq_max (a b : Rat) : FrameIntervalOps.upperOf a b = max a b := by
+  unfold FrameIntervalOps.upperOf
+  split <;> simp_all [max_def]
+
 def Contains (bounds : Bounds) (value : ℝ) : Prop :=
   (bounds.lower : ℝ) ≤ value ∧ value ≤ (bounds.upper : ℝ)
 
@@ -82,10 +95,8 @@ theorem pi_contains : Contains
     ⟨314159265358979323846 / 100000000000000000000,
       314159265358979323847 / 100000000000000000000⟩ Real.pi := by
   constructor
-  · norm_num [Contains] at *
-    exact le_of_lt Real.pi_gt_d20
-  · norm_num [Contains] at *
-    exact le_of_lt Real.pi_lt_d20
+  · convert (le_of_lt Real.pi_gt_d20) using 1 <;> norm_num
+  · convert (le_of_lt Real.pi_lt_d20) using 1 <;> norm_num
 
 /-- The same fourth-order remainder applies to both small-angle polynomials.
     Repeated exact double-angle identities then cover the reduced degree angle. -/
@@ -156,6 +167,7 @@ theorem executable_multiply_contains {bits : Nat} {a b out : Bounds} {x y : ℝ}
   unfold FrameIntervalOps.multiply at h
   split at h
   · have hp := outward_post h
+    simp only [lowerOf_eq_min, upperOf_eq_max] at hp
     have hll := le_trans hp.1 (le_trans (min_le_left _ _) (min_le_left _ _))
     have hlu := le_trans hp.1 (le_trans (min_le_left _ _) (min_le_right _ _))
     have hul := le_trans hp.1 (le_trans (min_le_right _ _) (min_le_left _ _))
@@ -191,8 +203,8 @@ theorem executable_sqrt_contains {a witness out : Bounds} {x : ℝ}
     subst out
     have hordered : witness.lower ≤ witness.upper := by
       have hv := hc.2.1
-      simp only [FrameIntervalOps.valid, Bool.and_eq_true, decide_eq_true_eq] at hv
-      exact hv.1.1
+      simp only [FrameIntervalOps.valid, Bool.and_eq_true, decide_eq_true_eq, and_assoc] at hv
+      exact hv.1
     apply sqrt_contains hx
     · exact_mod_cast hc.2.2.1
     · exact_mod_cast hc.2.2.2.1
