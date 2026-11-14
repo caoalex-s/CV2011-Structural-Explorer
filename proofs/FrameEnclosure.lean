@@ -36,7 +36,15 @@ theorem outward_post {bits : Nat} {lower upper : Rat} {out : Bounds}
   split at h
   · simp at h
   · dsimp only at h
-    split at h <;> simp_all [Bool.and_eq_true]
+    split at h
+    next checks =>
+      -- Preserve the checked inequalities before identifying the returned bounds.
+      have endpoints := checks
+      simp only [Bool.and_eq_true, decide_eq_true_eq] at endpoints
+      have outputEquality := Option.some.inj h
+      subst out
+      exact ⟨endpoints.1.2, endpoints.2⟩
+    next rejected => simp only [Option.none_eq_some] at h
 
 theorem widen {a b : Bounds} {x : ℝ} (hx : Contains a x)
     (hl : (b.lower : ℝ) ≤ a.lower) (hu : (a.upper : ℝ) ≤ b.upper) :
