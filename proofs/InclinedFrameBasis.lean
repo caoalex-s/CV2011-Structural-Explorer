@@ -90,4 +90,59 @@ theorem checkedBasis_valid {data : Partition} {point : Nat} {basis : PointBasis}
     simpa [heq] using accepted
   · simp at h
 
+/-- Column kinds are x translation, y translation, tangent translation and
+    rotation, respectively. Point ownership is retained in every column. -/
+structure Column where
+  point : Nat
+  kind : Nat
+  deriving Inhabited, Repr, DecidableEq
+
+def columnKinds (basis : PointBasis) : List Nat :=
+  let translations := match basis.translation with
+    | 0 => [0, 1]
+    | 1 => [2]
+    | _ => []
+  translations ++ if basis.rotationFree then [3] else []
+
+/-- Enumerate points in source-partition order, then their permitted local
+    coordinates. No candidate-provided permutation or omitted point is used. -/
+def allocatedColumns (points : Array PointBasis) : Array Column :=
+  ((List.finRange points.size).flatMap fun point =>
+    (columnKinds points[point.val]!).map fun kind => ⟨point.val, kind⟩).toArray
+
+structure GlobalBasis where
+  points : Array PointBasis
+  columns : Array Column
+  deriving Inhabited, Repr, DecidableEq
+
+def rawGlobalBasis (data : Partition) : GlobalBasis :=
+  let points := Array.ofFn fun point : Fin data.points.size => rawBasis data point.val
+  ⟨points, allocatedColumns points⟩
+
+/-- Check all source-owned local classifications before accepting their global
+    allocation. The 48-coordinate cap matches the bounded reduced solver.
+    Real range equality and column independence are separate proof obligations. -/
+def GlobalBasisValid (data : Partition) (basis : GlobalBasis) : Prop :=
+  basis.points.size = data.points.size ∧
+  (∀ point : Fin data.points.size, BasisValid data point.val basis.points[point.val]!) ∧
+  basis.columns = allocatedColumns basis.points ∧ basis.columns.size ≤ 48
+
+instance (data : Partition) (basis : GlobalBasis) : Decidable (GlobalBasisValid data basis) := by
+  unfold GlobalBasisValid
+  infer_instance
+
+def checkedGlobalBasis (data : Partition) : Option GlobalBasis :=
+  let basis := rawGlobalBasis data
+  if GlobalBasisValid data basis then some basis else none
+
+theorem checkedGlobalBasis_valid {data : Partition} {basis : GlobalBasis}
+    (h : checkedGlobalBasis data = some basis) : GlobalBasisValid data basis := by
+  unfold checkedGlobalBasis at h
+  dsimp only at h
+  split at h
+  next accepted =>
+    have outputEquality : rawGlobalBasis data = basis := Option.some.inj h
+    simpa only [outputEquality] using accepted
+  · cases h
+
 end InclinedFrameBasis

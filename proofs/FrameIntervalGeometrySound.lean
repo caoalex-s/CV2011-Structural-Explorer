@@ -20,7 +20,7 @@ theorem member_contains {bits : Nat} {dx dy : Rat} {root : Bounds} {out : Member
     obtain ⟨length, hroot, hpositive⟩ := Option.bind_eq_some.mp hremaining
     split at hpositive
     · simp at hpositive
-    · simp only [bind_eq_bind, Option.bind_eq_some, Option.some.injEq] at hpositive
+    · simp only [Option.bind_eq_bind, Option.bind_eq_some, Option.some.injEq] at hpositive
       obtain ⟨horizontal, hx, vertical, hy, cosine, hc, sine, hs, hout⟩ := hpositive
       subst out
       have hsquaredContains : Contains squaredBounds ((dx : ℝ)^2 + (dy : ℝ)^2) := by
