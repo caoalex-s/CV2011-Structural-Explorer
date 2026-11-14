@@ -7,7 +7,7 @@ namespace FrameIntervalGeometrySound
 open FrameIntervalOps FrameIntervalGeometry FrameEnclosure
 noncomputable section
 
-theorem member_contains {bits : Nat} {dx dy : Rat} {root : Bounds} {out : MemberBounds}
+theorem member_contains {bits : Nat} {dx dy : Rat} {root : FrameIntervalOps.Bounds} {out : MemberBounds}
     (h : member bits dx dy root = some out) :
     Contains out.length (Real.sqrt ((dx : ℝ)^2 + (dy : ℝ)^2)) ∧
     Contains out.cosine ((dx : ℝ) / Real.sqrt ((dx : ℝ)^2 + (dy : ℝ)^2)) ∧
@@ -32,11 +32,12 @@ theorem member_contains {bits : Nat} {dx dy : Rat} {root : Bounds} {out : Member
 
 /-- The enclosed quantities refer to the actual endpoints, including irrational
     lengths. No rounded orientation is substituted into ExactGeometry. -/
-theorem original_endpoints {bits : Nat} {ax ay bx by : Rat} {root : Bounds} {out : MemberBounds}
-    (h : member bits (bx-ax) (by-ay) root = some out) :
-    Contains out.length (ExactGeometry.distance (ax, ay) (bx, by)) ∧
-    Contains out.cosine (ExactGeometry.direction (ax, ay) (bx, by)).cosine ∧
-    Contains out.sine (ExactGeometry.direction (ax, ay) (bx, by)).sine := by
+theorem original_endpoints {bits : Nat} {startX startY endX endY : Rat}
+    {root : FrameIntervalOps.Bounds} {out : MemberBounds}
+    (h : member bits (endX-startX) (endY-startY) root = some out) :
+    Contains out.length (ExactGeometry.distance (startX, startY) (endX, endY)) ∧
+    Contains out.cosine (ExactGeometry.direction (startX, startY) (endX, endY)).cosine ∧
+    Contains out.sine (ExactGeometry.direction (startX, startY) (endX, endY)).sine := by
   simpa [ExactGeometry.distance, ExactGeometry.direction, ExactGeometry.dx,
     ExactGeometry.dy, Rat.cast_sub] using member_contains h
 

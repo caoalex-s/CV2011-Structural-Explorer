@@ -12,7 +12,7 @@ def ContainsCoefficients (values : Coefficients) (L EA EI : ℝ) : Prop :=
   Contains values.coupling (6*EI/L^2) ∧ Contains values.rotation (4*EI/L) ∧
   Contains values.crossRotation (2*EI/L)
 
-theorem coefficients_contains {bits : Nat} {length : Bounds} {EA EI : Rat}
+theorem coefficients_contains {bits : Nat} {length : FrameIntervalOps.Bounds} {EA EI : Rat}
     {out : Coefficients} {L : ℝ}
     (h : coefficients bits length EA EI = some out) (hL : Contains length L) :
     ContainsCoefficients out L EA EI := by
@@ -44,7 +44,7 @@ theorem coefficients_contains {bits : Nat} {length : Bounds} {EA EI : Rat}
   exact ⟨ha, by simpa [pow_succ, pow_two] using hb,
     by simpa [pow_two] using hc, hd, he⟩
 
-theorem negative_contains {a : Bounds} {x : ℝ} (h : Contains a x) : Contains (negative a) (-x) := by
+theorem negative_contains {a : FrameIntervalOps.Bounds} {x : ℝ} (h : Contains a x) : Contains (negative a) (-x) := by
   constructor <;> dsimp [Contains, negative] at * <;> push_cast <;> linarith
 
 theorem entry_contains {values : Coefficients} {L EA EI : ℝ}

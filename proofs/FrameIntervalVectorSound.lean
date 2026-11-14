@@ -8,7 +8,8 @@ namespace FrameIntervalVectorSound
 open FrameIntervalOps FrameIntervalVector FrameEnclosure
 noncomputable section
 
-theorem dot_contains {bits n : Nat} {left right : Fin n → Bounds} {out : Bounds}
+theorem dot_contains {bits n : Nat} {left right : Fin n → FrameIntervalOps.Bounds}
+    {out : FrameIntervalOps.Bounds}
     {x y : Fin n → ℝ} (h : dot bits left right = some out)
     (hx : ∀ i, Contains (left i) (x i)) (hy : ∀ i, Contains (right i) (y i)) :
     Contains out (∑ i, x i * y i) := by
@@ -24,7 +25,7 @@ theorem dot_contains {bits n : Nat} {left right : Fin n → Bounds} {out : Bound
     have hsum := executable_add_contains hadd hheadContains htailContains
     simpa [Fin.sum_univ_succ] using hsum
 
-theorem magnitude_bound {bounds : Bounds} {x : ℝ} (hx : Contains bounds x) :
+theorem magnitude_bound {bounds : FrameIntervalOps.Bounds} {x : ℝ} (hx : Contains bounds x) :
     |x| ≤ (magnitude bounds : ℝ) := by
   apply abs_le.mpr
   have hl : -(bounds.lower : ℝ) ≤ (magnitude bounds : ℝ) := by
@@ -35,7 +36,7 @@ theorem magnitude_bound {bounds : Bounds} {x : ℝ} (hx : Contains bounds x) :
     exact_mod_cast (le_max_right (-bounds.lower) bounds.upper)
   constructor <;> dsimp [Contains] at * <;> linarith
 
-theorem magnitudeSum_bound {n : Nat} {bounds : Fin n → Bounds} {x : Fin n → ℝ}
+theorem magnitudeSum_bound {n : Nat} {bounds : Fin n → FrameIntervalOps.Bounds} {x : Fin n → ℝ}
     (hx : ∀ i, Contains (bounds i) (x i)) :
     (∑ i, |x i|) ≤ (magnitudeSum bounds : ℝ) := by
   induction n with
@@ -49,7 +50,7 @@ theorem magnitudeSum_bound {n : Nat} {bounds : Fin n → Bounds} {x : Fin n → 
 /-- Rational row checks are sufficient for the actual real defect matrix.
     The source bridge must establish containment of every defect entry. -/
 theorem checked_defect_rows {n : Nat} {matrix inverse : Fin n → Fin n → ℝ}
-    {bounds : Fin n → Fin n → Bounds} {q : Rat}
+    {bounds : Fin n → Fin n → FrameIntervalOps.Bounds} {q : Rat}
     (hcontains : ∀ i j, Contains (bounds i j) (FrameMatrixResidual.defect matrix inverse i j))
     (hcheck : ∀ i, magnitudeSum (bounds i) ≤ q) :
     ∀ i, (∑ j, |FrameMatrixResidual.defect matrix inverse i j|) ≤ (q : ℝ) := by
