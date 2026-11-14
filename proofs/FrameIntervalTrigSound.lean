@@ -18,7 +18,7 @@ private theorem fourth_power_bound {x magnitude : ℝ}
     (add_nonneg (sq_nonneg magnitude) (sq_nonneg |x|))
   nlinarith
 
-private theorem remainder_contains {bits : Nat} {magnitude : Rat} {out : Bounds} {error : ℝ}
+private theorem remainder_contains {bits : Nat} {magnitude : Rat} {out : FrameIntervalOps.Bounds} {error : ℝ}
     (h : outward bits (-(5*magnitude^4/96)) (5*magnitude^4/96) = some out)
     (he : |error| ≤ 5*(magnitude : ℝ)^4/96) : Contains out error := by
   have hp := outward_post h
@@ -26,7 +26,7 @@ private theorem remainder_contains {bits : Nat} {magnitude : Rat} {out : Bounds}
   have hu : 5*(magnitude : ℝ)^4/96 ≤ (out.upper : ℝ) := by exact_mod_cast hp.2
   exact ⟨le_trans hl (abs_le.mp he).1, le_trans (abs_le.mp he).2 hu⟩
 
-theorem smallAngle_contains {bits : Nat} {angle outSine outCosine : Bounds} {x : ℝ}
+theorem smallAngle_contains {bits : Nat} {angle outSine outCosine : FrameIntervalOps.Bounds} {x : ℝ}
     (h : smallAngle bits angle = some ⟨outSine, outCosine⟩)
     (hx : Contains angle x) : ContainsAxes ⟨outSine, outCosine⟩ x := by
   unfold smallAngle at h
