@@ -156,9 +156,20 @@ export async function runMainCases({ page, context, output, origin, base, result
     assert.equal(await loadEnvelope.count(), 1);
     await loadEnvelope.click();
     assert.equal(await page.locator('[data-property="qEnd"]').inputValue(), '-5');
+    await page.evaluate(() => {
+        window.mainEndpointChanges = [];
+        document.addEventListener('change', event => {
+            if (event.target.matches('[data-property="qEnd"]'))
+                window.mainEndpointChanges.push({ value: event.target.value, trusted: event.isTrusted });
+        }, true);
+    });
+    const storedEndpoint = () => page.evaluate(() => JSON.parse(localStorage.getItem('cv2011-model')).loads[0].qEnd);
     const editEndpoint = async value => {
         await page.locator('[data-property="qEnd"]').fill(value);
-        await page.locator('[data-property="qEnd"]').dispatchEvent('change');
+        // Let the browser commit the focused field once, as a user does. A
+        // synthetic change leaves the field's native edit lifecycle unfinished.
+        await page.locator('[data-property="qEnd"]').press('Tab');
+        assert.equal(await storedEndpoint(), -Number(value));
         assert.equal(await page.locator('#frame-worked-output').textContent(), '');
         return generate();
     };
@@ -168,10 +179,25 @@ export async function runMainCases({ page, context, output, origin, base, result
     const restoredLoad = await editEndpoint('-5');
     assert.equal(restoredLoad.sourceRequest.model.loads[0].qEnd, 5);
     assert.ok(restoredLoad.request > editedLoad.request);
+    // Re-entering the current value must not add a drawing to undo history.
+    await page.locator('[data-property="qEnd"]').fill('-5');
+    await page.locator('[data-property="qEnd"]').press('Tab');
+    result.mainEndpointChanges = await page.evaluate(() => window.mainEndpointChanges);
+    assert.deepEqual(result.mainEndpointChanges, [{ value: '-6', trusted: true }, { value: '-5', trusted: true }]);
     await page.locator('#undo').click();
+    assert.equal(await storedEndpoint(), 6);
+    assert.equal(await page.locator('#frame-worked-output').textContent(), '');
+    assert.equal((await generate()).sourceRequest.model.loads[0].qEnd, 6);
+    await page.locator('#undo').click();
+    assert.equal(await storedEndpoint(), 5);
+    assert.equal((await generate()).sourceRequest.model.loads[0].qEnd, 5);
+    await page.locator('#redo').click();
+    assert.equal(await storedEndpoint(), 6);
     assert.equal((await generate()).sourceRequest.model.loads[0].qEnd, 6);
     await page.locator('#redo').click();
+    assert.equal(await storedEndpoint(), 5);
     assert.equal((await generate()).sourceRequest.model.loads[0].qEnd, 5);
+    assert.equal(await page.locator('#redo').isEnabled(), false);
     result.cases.push('main-affine-endpoint-inspector-edit-revert-undo-redo-current-binding');
     for (const parameter of ['0.5', '0.75', '0.25']) {
         await page.locator('#frame-parameter').fill(parameter);
