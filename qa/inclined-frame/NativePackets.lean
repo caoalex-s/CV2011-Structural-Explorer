@@ -12,6 +12,8 @@ def main (arguments : List String) : IO UInt32 := do
   let directory := arguments.headD "../.data/inclined-frame-packets"
   let cases : List (String × Bool) := [
     ("irrational-cantilever", true), ("affine-zero-resultant", true),
+    ("reversed-cantilever", true), ("shared-rigid-joint", true),
+    ("roller-interior-left", true), ("roller-interior-right", true),
     ("invalid-root", false), ("noncontracting-inverse", false),
     ("wrong-header", false), ("trailing-field", false),
     ("invalid-precision", false), ("zero-denominator", false),

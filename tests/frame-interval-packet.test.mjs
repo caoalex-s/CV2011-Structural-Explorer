@@ -62,3 +62,36 @@ test('precision and source/query mutations are rejected or preserved in distinct
     oversized.loads[0].id = 'x'.repeat(257);
     assert.throws(() => proposeInclinedPacket(oversized, query, 96), /256/);
 });
+
+test('decimal binary64, UTF-16 identifiers and version-two reference ownership remain exact', () => {
+    const changed = structuredClone(source);
+    changed.nodes[0] = { id: 'A😀', x: 0.1, y: 0, referenceMember: '梁' };
+    changed.nodes[1].id = '\ud800B';
+    changed.members[0] = { ...changed.members[0], id: '梁', a: 'A😀', b: '\ud800B' };
+    changed.supports[0].member = '梁';
+    changed.loads[0].member = '梁';
+    const selected = { ...query, member: '梁' };
+    const direct = proposeInclinedPacket(changed, selected, 96).packet;
+    const wrapped = proposeInclinedPacket({ version: 2, model: changed }, selected, 96).packet;
+    assert.deepEqual(wrapped, direct);
+    const tokens = new TextDecoder().decode(wrapped).split('\n');
+    assert.equal(tokens[5], '0041d83dde00');
+    // Independent IEEE-754 oracle for 0.1, not the serializer's converter.
+    assert.deepEqual(tokens.slice(6, 8), ['3602879701896397', '36028797018963968']);
+    assert.equal(tokens[11], '1', 'Reference member zero is encoded as one.');
+    assert.equal(tokens[14], 'd8000042', 'An unpaired UTF-16 code unit must survive unchanged.');
+    assert.equal(tokens[23], '6881');
+});
+
+test('one-sided interior queries differ in exactly their source query side field', () => {
+    const changed = structuredClone(source);
+    changed.loads[0].t = changed.loads[0].end = 0.5;
+    const left = proposeInclinedPacket(changed, { ...query, parameter: 0.5, cutSide: 'left' }, 96);
+    const right = proposeInclinedPacket(changed, { ...query, parameter: 0.5, cutSide: 'right' }, 96);
+    const leftTokens = new TextDecoder().decode(left.packet).split('\n');
+    const rightTokens = new TextDecoder().decode(right.packet).split('\n');
+    const rootStart = leftTokens.length - 2 * (left.coordinates ** 2 + left.coordinates) - 4;
+    assert.deepEqual(leftTokens.flatMap((value, index) => value === rightTokens[index] ? [] : [index]), [rootStart - 3]);
+    assert.equal(leftTokens[rootStart - 3], '0');
+    assert.equal(rightTokens[rootStart - 3], '1');
+});
