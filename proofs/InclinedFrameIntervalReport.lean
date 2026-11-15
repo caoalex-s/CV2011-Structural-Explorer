@@ -20,7 +20,6 @@ def pointFields (result : Result) (index : Fin result.data.points.size) : List S
     | none => result.data.source.nodes[point.index]!.id
     | some member => result.data.source.members[member]!.id
   [owner, toString point.index, identity] ++ rationalFields point.t ++
-    rationalFields point.x ++ rationalFields point.y ++
     (List.finRange 3).flatMap (fun direction => intervalFields (result.outputs.reactions index direction))
 
 /-- Point indices and UTF-16 hexadecimal identifiers are read from the checked
