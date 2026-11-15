@@ -84,6 +84,7 @@ def checkedBasis (data : Partition) (point : Nat) : Option PointBasis :=
 theorem checkedBasis_valid {data : Partition} {point : Nat} {basis : PointBasis}
     (h : checkedBasis data point = some basis) : BasisValid data point basis := by
   unfold checkedBasis at h
+  dsimp only at h
   split at h
   next accepted =>
     have heq : rawBasis data point = basis := Option.some.inj h
