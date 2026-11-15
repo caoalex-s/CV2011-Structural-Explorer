@@ -1,4 +1,5 @@
 import FrameIntervalExpression
+import Mathlib.Data.Fin.VecNotation
 
 /-! Fixed source-authored recovery expressions. Input order is left endpoint
     actions (0..2), left local motion (3..5), p, dp, q, dq, x, EA, EI, cosine,

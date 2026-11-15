@@ -16,12 +16,26 @@ theorem coefficients_contains {bits : Nat} {length : FrameIntervalOps.Bounds} {E
     {out : Coefficients} {L : ℝ}
     (h : coefficients bits length EA EI = some out) (hL : Contains length L) :
     ContainsCoefficients out L EA EI := by
-  simp only [coefficients, Option.bind_eq_bind, Option.bind_eq_some, Option.some.injEq] at h
-  obtain ⟨axialRigidity, hEA, bendingRigidity, hEI, twelve, h12, six, h6, four, h4, two, h2,
-    squared, hsquared, cubed, hcubed, bendingNumerator, hbendingNumerator,
-    couplingNumerator, hcouplingNumerator, rotationNumerator, hrotationNumerator,
-    axial, haxial, bending, hbending, coupling, hcoupling, rotation, hrotation,
-    crossRotation, hcrossRotation, hout⟩ := h
+  -- Expose each checked arithmetic step once, avoiding repeated simplification
+  -- of the entire long bind chain and its dependent intermediate expressions.
+  unfold coefficients at h
+  obtain ⟨axialRigidity, hEA, h⟩ := Option.bind_eq_some.mp h
+  obtain ⟨bendingRigidity, hEI, h⟩ := Option.bind_eq_some.mp h
+  obtain ⟨twelve, h12, h⟩ := Option.bind_eq_some.mp h
+  obtain ⟨six, h6, h⟩ := Option.bind_eq_some.mp h
+  obtain ⟨four, h4, h⟩ := Option.bind_eq_some.mp h
+  obtain ⟨two, h2, h⟩ := Option.bind_eq_some.mp h
+  obtain ⟨squared, hsquared, h⟩ := Option.bind_eq_some.mp h
+  obtain ⟨cubed, hcubed, h⟩ := Option.bind_eq_some.mp h
+  obtain ⟨bendingNumerator, hbendingNumerator, h⟩ := Option.bind_eq_some.mp h
+  obtain ⟨couplingNumerator, hcouplingNumerator, h⟩ := Option.bind_eq_some.mp h
+  obtain ⟨rotationNumerator, hrotationNumerator, h⟩ := Option.bind_eq_some.mp h
+  obtain ⟨axial, haxial, h⟩ := Option.bind_eq_some.mp h
+  obtain ⟨bending, hbending, h⟩ := Option.bind_eq_some.mp h
+  obtain ⟨coupling, hcoupling, h⟩ := Option.bind_eq_some.mp h
+  obtain ⟨rotation, hrotation, h⟩ := Option.bind_eq_some.mp h
+  obtain ⟨crossRotation, hcrossRotation, h⟩ := Option.bind_eq_some.mp h
+  have hout := Option.some.inj h
   subst out
   have hEAContains := executable_point_contains hEA
   have hEIContains := executable_point_contains hEI
@@ -55,7 +69,7 @@ theorem entry_contains {values : Coefficients} {L EA EI : ℝ}
   have hnb := negative_contains hb
   have hnc := negative_contains hc
   fin_cases i <;> fin_cases j <;>
-    simp [entry, LocalFrameFields.stiffness, Contains, zero] at * <;> assumption
+    simp [entry, LocalFrameFields.stiffness, Contains, zero, neg_div] at * <;> assumption
 
 end
 end FrameIntervalElementSound

@@ -1,5 +1,6 @@
 import InclinedFrameBasis
 import FrameIntervalTrig
+import Mathlib.Data.Fin.VecNotation
 
 /-! Enclose source-owned admissible unit columns. Rational amplitudes are
     Kronecker coordinates; only a roller tangent requires real trigonometry. -/
