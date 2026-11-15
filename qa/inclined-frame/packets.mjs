@@ -10,7 +10,7 @@ registerHooks({ resolve(specifier, context, next) {
 } });
 const { proposeInclinedPacket } = await import('../../web/frame-interval-packet.ts');
 const { frameQueryConvention } = await import('../../web/frame-candidate.ts');
-const directory = resolve('.data/inclined-frame-packets');
+const directory = resolve(process.argv[2] ?? '.data/inclined-frame-packets');
 mkdirSync(directory, { recursive: true });
 const manifest = [];
 function save(name, packet, expected) {
