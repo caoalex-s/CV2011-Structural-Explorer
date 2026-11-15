@@ -113,5 +113,111 @@ theorem endAction_contains {bits : Nat} {data : Partition} {basis : GlobalBasis}
     (hgeometry index) (hload.1 index) component
   exact executable_subtract_contains hout helasticContains hloadContains
 
+def sourceInputs (data : Partition) (basis : GlobalBasis) (hbasis : GlobalBasisValid data basis)
+    (values : Fin basis.columns.size → ℝ) (index : Fin data.pieces.size) (parameter : Rat) : Fin 15 → ℝ :=
+  let segment := data.pieces[index.val]!
+  let member := data.source.members[segment.member]!
+  let direction := InclinedFrameReal.memberDirection data segment.member
+  let length := InclinedFrameReal.pieceLength data segment
+  FrameIntervalRecoverySound.inputs
+    (InclinedFrameReal.pieceMotion data segment (embed data basis (liftCoordinates hbasis values)))
+    length member.EA member.EI
+    (direction.sine*segment.vertical) (direction.sine*segment.verticalEnd)
+    (direction.cosine*segment.vertical) (direction.cosine*segment.verticalEnd)
+    (length*((parameter : ℝ)-segment.left)/((segment.right : ℝ)-segment.left))
+    direction.cosine direction.sine
+
+theorem fieldInputs_contains {bits : Nat} {data : Partition} {basis : GlobalBasis}
+    (hpartition : PartitionValid data) (hbasis : GlobalBasisValid data basis)
+    {certificate : Certificate data basis} (hgeometry : GeometryChecks bits certificate)
+    (hprojection : ProjectionChecks bits certificate) (hload : LoadChecks bits certificate)
+    {values : Fin basis.columns.size → ℝ}
+    (hvalues : ∀ column, Contains (certificate.solve.solution column) (values column))
+    {index : Fin data.pieces.size} {parameter : Rat} {out : Fin 15 → FrameIntervalOps.Bounds}
+    (h : InclinedFrameIntervalRecovery.fieldInputs bits certificate index parameter = some out) :
+    ∀ i, Contains (out i) (sourceInputs data basis hbasis values index parameter i) := by
+  unfold InclinedFrameIntervalRecovery.fieldInputs at h
+  dsimp only at h
+  obtain ⟨motion, hmotion, h⟩ := Option.bind_eq_some.mp h
+  obtain ⟨actionX, hactionX, h⟩ := Option.bind_eq_some.mp h
+  obtain ⟨actionY, hactionY, h⟩ := Option.bind_eq_some.mp h
+  obtain ⟨actionMoment, hactionMoment, h⟩ := Option.bind_eq_some.mp h
+  obtain ⟨left, hleft, h⟩ := Option.bind_eq_some.mp h
+  obtain ⟨right, hright, h⟩ := Option.bind_eq_some.mp h
+  obtain ⟨p, hp, h⟩ := Option.bind_eq_some.mp h
+  obtain ⟨pEnd, hpEnd, h⟩ := Option.bind_eq_some.mp h
+  obtain ⟨q, hq, h⟩ := Option.bind_eq_some.mp h
+  obtain ⟨qEnd, hqEnd, h⟩ := Option.bind_eq_some.mp h
+  obtain ⟨pChange, hpChange, h⟩ := Option.bind_eq_some.mp h
+  obtain ⟨qChange, hqChange, h⟩ := Option.bind_eq_some.mp h
+  obtain ⟨dp, hdp, h⟩ := Option.bind_eq_some.mp h
+  obtain ⟨dq, hdq, h⟩ := Option.bind_eq_some.mp h
+  obtain ⟨offset, hoffset, h⟩ := Option.bind_eq_some.mp h
+  obtain ⟨x, hx, h⟩ := Option.bind_eq_some.mp h
+  obtain ⟨EA, hEA, h⟩ := Option.bind_eq_some.mp h
+  obtain ⟨EI, hEI, h⟩ := Option.bind_eq_some.mp h
+  have hout := Option.some.inj h
+  subst out
+  obtain ⟨hL, hc, hs, _⟩ := InclinedFrameIntervalGeometrySound.piece_contains (hgeometry index)
+  have hd := localMotion_contains hbasis hgeometry hprojection hvalues hmotion
+  have hax := endAction_contains hpartition hbasis hgeometry hload hd hactionX
+  have hay := endAction_contains hpartition hbasis hgeometry hload hd hactionY
+  have ham := endAction_contains hpartition hbasis hgeometry hload hd hactionMoment
+  have hl := executable_point_contains hleft
+  have hr := executable_point_contains hright
+  have hp0 := executable_multiply_contains hp hs hl
+  have hp1 := executable_multiply_contains hpEnd hs hr
+  have hq0 := executable_multiply_contains hq hc hl
+  have hq1 := executable_multiply_contains hqEnd hc hr
+  have hdpContains := executable_divide_contains hdp (executable_subtract_contains hpChange hp1 hp0) hL
+  have hdqContains := executable_divide_contains hdq (executable_subtract_contains hqChange hq1 hq0) hL
+  have hxContains := executable_multiply_contains hx hL (executable_point_contains hoffset)
+  have hEAContains := executable_point_contains hEA
+  have hEIContains := executable_point_contains hEI
+  intro i
+  fin_cases i
+  · simpa [sourceInputs, FrameIntervalRecoverySound.inputs] using hax
+  · simpa [sourceInputs, FrameIntervalRecoverySound.inputs] using hay
+  · simpa [sourceInputs, FrameIntervalRecoverySound.inputs] using ham
+  · simpa [sourceInputs, FrameIntervalRecoverySound.inputs] using hd 0
+  · simpa [sourceInputs, FrameIntervalRecoverySound.inputs] using hd 1
+  · simpa [sourceInputs, FrameIntervalRecoverySound.inputs] using hd 2
+  · simpa [sourceInputs, FrameIntervalRecoverySound.inputs] using hp0
+  · simpa [sourceInputs, FrameIntervalRecoverySound.inputs] using hdpContains
+  · simpa [sourceInputs, FrameIntervalRecoverySound.inputs] using hq0
+  · simpa [sourceInputs, FrameIntervalRecoverySound.inputs] using hdqContains
+  · simpa [sourceInputs, FrameIntervalRecoverySound.inputs, Rat.cast_div, Rat.cast_sub, mul_div_assoc] using hxContains
+  · simpa [sourceInputs, FrameIntervalRecoverySound.inputs] using hEAContains
+  · simpa [sourceInputs, FrameIntervalRecoverySound.inputs] using hEIContains
+  · simpa [sourceInputs, FrameIntervalRecoverySound.inputs] using hc
+  · simpa [sourceInputs, FrameIntervalRecoverySound.inputs] using hs
+
+theorem field_contains {bits : Nat} {data : Partition} {basis : GlobalBasis}
+    (hpartition : PartitionValid data) (hbasis : GlobalBasisValid data basis)
+    {certificate : Certificate data basis} (hgeometry : GeometryChecks bits certificate)
+    (hprojection : ProjectionChecks bits certificate) (hload : LoadChecks bits certificate)
+    {values : Fin basis.columns.size → ℝ}
+    (hvalues : ∀ column, Contains (certificate.solve.solution column) (values column))
+    {query : RationalFrame.Query} {component : Fin 6} {out : FrameIntervalOps.Bounds}
+    (h : InclinedFrameIntervalRecovery.field bits certificate query component = some out) :
+    ∃ index : Fin data.pieces.size,
+      InclinedFrameIntervalRecovery.selectedPiece data query = some index ∧
+      InclinedFrameIntervalRecovery.SideContains data.pieces[index.val]! query ∧
+      Contains out (InclinedFrameReal.fieldValues data data.pieces[index.val]!
+        (embed data basis (liftCoordinates hbasis values)) query.t component) := by
+  by_cases hquery : InclinedFrameIntervalRecovery.queryValid data query = true
+  · obtain ⟨index, hselected, hside⟩ := checked_selection data query hquery
+    have hbody : (InclinedFrameIntervalRecovery.fieldInputs bits certificate index query.t >>= fun inputs =>
+        FrameIntervalRecovery.field bits inputs component) = some out := by
+      simpa [InclinedFrameIntervalRecovery.field, hquery, hselected] using h
+    obtain ⟨inputs, hinputs, hfield⟩ := Option.bind_eq_some.mp hbody
+    have hi := fieldInputs_contains hpartition hbasis hgeometry hprojection hload hvalues hinputs
+    have hp := InclinedFrameReal.piece_properties data hpartition index
+    have hresult := FrameIntervalRecoverySound.field_contains
+      (ne_of_gt hp.1) (ne_of_gt hp.2.1) (ne_of_gt hp.2.2) hi hfield
+    refine ⟨index, hselected, hside, ?_⟩
+    simpa only [FrameIntervalRecoverySound.actualFields, InclinedFrameReal.fieldValues] using hresult
+  · simp [InclinedFrameIntervalRecovery.field, hquery] at h
+
 end
 end InclinedFrameIntervalRecoverySound
