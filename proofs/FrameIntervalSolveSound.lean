@@ -59,8 +59,9 @@ theorem check_sound {size bits : Nat}
     {certificate : Certificate size} (hcheck : check bits matrix force certificate = true)
     (hmatrix : ∀ i j, Contains (matrix i j) (actual i j))
     (hforce : ∀ i, Contains (force i) (actualForce i)) :
-    ∃! solution, FrameMatrixResidual.action actual solution = actualForce ∧
-      ∀ i, Contains (certificate.solution i) (solution i) := by
+    ∃ solution, FrameMatrixResidual.action actual solution = actualForce ∧
+      (∀ i, Contains (certificate.solution i) (solution i)) ∧
+      ∀ other, FrameMatrixResidual.action actual other = actualForce → other = solution := by
   have hchecks : Checks bits matrix force certificate := of_decide_eq_true hcheck
   rcases hchecks with ⟨hscalar, _, harithmetic, hnorm, houtput⟩
   have hdefect : ∀ i j, Contains (certificate.defect i j)
@@ -88,7 +89,7 @@ theorem check_sound {size bits : Nat}
     (fun row column => (certificate.inverse row column : ℝ)) actualForce
     (fun i => (certificate.estimate i : ℝ)) certificate.contraction certificate.residualBound
     hqzero hqone hetazero hrows hresidualBound
-  refine ⟨solution, ⟨hsolution.1, ?_⟩, ?_⟩
+  refine ⟨solution, hsolution.1, ?_, ?_⟩
   · intro i
     have hlower : ((certificate.solution i).lower : ℝ) ≤
         (certificate.estimate i : ℝ) - certificate.residualBound/(1-(certificate.contraction : ℝ)) := by
@@ -102,7 +103,7 @@ theorem check_sound {size bits : Nat}
       (FrameMatrixResidual.action (fun row column => (certificate.inverse row column : ℝ)))
       (certificate.contraction : ℝ) hqone
       (FrameMatrixResidual.defect_norm_bound actual _ _ hqzero hrows)
-    exact hinjective (hother.1.trans hsolution.1.symm)
+    exact hinjective (hother.trans hsolution.1.symm)
 
 end
 end FrameIntervalSolveSound
