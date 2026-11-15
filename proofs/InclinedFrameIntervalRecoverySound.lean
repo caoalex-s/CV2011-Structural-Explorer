@@ -26,8 +26,12 @@ theorem source_point_expansion {data : Partition} {basis : GlobalBasis}
     _ = ∑ index, liftCoordinates h values index * functional (InclinedFrameReduced.unit data basis index) :=
       InclinedFrameReduced.linear_expansion data basis functional (liftCoordinates h values)
     _ = ∑ column, values column * functional (InclinedFrameReduced.unit data basis (columnIndex h column)) := by
-      simpa only [lift_at_column] using ((columnEquivalence h).sum_comp
+      have reindexed := ((columnEquivalence h).sum_comp
         (fun index => liftCoordinates h values index * functional (InclinedFrameReduced.unit data basis index))).symm
+      change (∑ index, liftCoordinates h values index * functional (InclinedFrameReduced.unit data basis index)) =
+        ∑ column, liftCoordinates h values (columnIndex h column) *
+          functional (InclinedFrameReduced.unit data basis (columnIndex h column)) at reindexed
+      simpa only [lift_at_column] using reindexed
     _ = _ := by
       apply Finset.sum_congr rfl
       intro column _

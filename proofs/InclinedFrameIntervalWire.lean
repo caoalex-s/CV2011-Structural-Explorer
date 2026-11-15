@@ -126,7 +126,7 @@ def checkPacket (value : Packet) : Option Result := do
       !(value.inverse.all (fun row => row.size == basis.columns.size)) then none else
     let proposal : InclinedFrameIntervalBuild.Proposal data basis := {
       roots := fun index => value.roots[index.val]!,
-      inverse := fun row column => value.inverse[row.val]![column.val]!,
+      inverse := fun row column => (value.inverse[row.val]!)[column.val]!,
       estimate := fun row => value.estimate[row.val]! }
     let outputs ← InclinedFrameIntervalBuild.checked value.bits proposal value.query
     return ⟨data, outputs⟩
