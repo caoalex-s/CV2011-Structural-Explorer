@@ -6,6 +6,25 @@ import InclinedFrameSource
 namespace InclinedFrameBasis
 open RationalFrame InclinedFrameSource
 
+/-- Search the finite index range constructively. The returned decision carries
+    a witness or a proof that every index fails, including the empty range. -/
+private def finiteExistsDecision : (size : Nat) → (predicate : Fin size → Prop) →
+    [DecidablePred predicate] → Decidable (∃ index, predicate index)
+  | 0, _, _ => isFalse (fun ⟨index, _⟩ => Fin.elim0 index)
+  | size + 1, predicate, _ =>
+    match (inferInstance : Decidable (predicate 0)) with
+    | isTrue accepted => isTrue ⟨0, accepted⟩
+    | isFalse rejected =>
+      match finiteExistsDecision size (fun index => predicate index.succ) with
+      | isTrue accepted => isTrue (by
+          obtain ⟨index, proof⟩ := accepted
+          exact ⟨index.succ, proof⟩)
+      | isFalse rejectedTail => isFalse (fun ⟨index, accepted⟩ =>
+          Fin.cases rejected (fun tail => fun proof => rejectedTail ⟨tail, proof⟩) index accepted)
+
+local instance {size : Nat} (predicate : Fin size → Prop) [DecidablePred predicate] :
+    Decidable (∃ index, predicate index) := finiteExistsDecision size predicate
+
 structure AngleClass where
   angle : Rat
   turns : Int
