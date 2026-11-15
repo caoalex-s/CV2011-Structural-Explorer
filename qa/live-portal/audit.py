@@ -28,6 +28,22 @@ INCLINED_INTEGRATION_MODULES = INCLINED_FOUNDATION_MODULES + (
     'InclinedFrameGlobalBasis', 'InclinedFrameReduced',
 )
 
+# Source-derived assembly and enclosed equilibrium; packet/recovery/UI remain separate.
+INCLINED_ASSEMBLY_MODULES = INCLINED_INTEGRATION_MODULES + (
+    'FrameIntervalVector', 'FrameIntervalVectorSound',
+    'FrameIntervalElement', 'FrameIntervalElementSound',
+    'FrameIntervalSolve', 'FrameIntervalSolveSound',
+    'FrameIntervalAssembly', 'FrameIntervalAssemblySound',
+    'FrameIntervalLoad', 'FrameIntervalLoadSound',
+    'FrameIntervalTransform', 'FrameIntervalTransformSound',
+    'InclinedFrameAssemblySound',
+    'InclinedFrameIntervalGeometry', 'InclinedFrameIntervalGeometrySound',
+    'InclinedFrameIntervalLoad', 'InclinedFrameIntervalLoadSound',
+    'InclinedFrameIntervalBasis', 'InclinedFrameIntervalBasisSound',
+    'InclinedFrameIntervalAssembly', 'InclinedFrameIntervalAssemblySound',
+    'InclinedFrameIntervalEquilibrium',
+)
+
 def expected_theorems(source, namespace='PortalSoundness'):
     names = re.findall(r'^(?:@\[[^\]]+\]\s*)?theorem\s+(\w+)', source, re.MULTILINE)
     if not names or len(names) != len(set(names)):
@@ -46,10 +62,12 @@ def main():
     parser.add_argument('--frame', action='store_true', help='Audit all generic frame bridge theorems.')
     parser.add_argument('--inclined-foundation', action='store_true', help='Audit only the frozen inclined foundation modules.')
     parser.add_argument('--inclined-integration', action='store_true', help='Audit the source-owned reduced-equilibrium milestone.')
+    parser.add_argument('--inclined-assembly', action='store_true', help='Audit source-derived interval assembly and enclosed physical equilibrium.')
     args = parser.parse_args()
-    if sum((args.frame, args.inclined_foundation, args.inclined_integration)) > 1:
+    if sum((args.frame, args.inclined_foundation, args.inclined_integration, args.inclined_assembly)) > 1:
         parser.error('Choose one audit scope.')
-    scoped_modules = (INCLINED_INTEGRATION_MODULES if args.inclined_integration else
+    scoped_modules = (INCLINED_ASSEMBLY_MODULES if args.inclined_assembly else
+                      INCLINED_INTEGRATION_MODULES if args.inclined_integration else
                       INCLINED_FOUNDATION_MODULES if args.inclined_foundation else None)
     if args.frame or scoped_modules:
         sources = ([Path('proofs') / (name + '.lean') for name in scoped_modules]
