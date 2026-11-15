@@ -1,6 +1,5 @@
 import InclinedFrameBasis
 import FrameIntervalTrig
-import Mathlib.Data.Fin.VecNotation
 
 /-! Enclose source-owned admissible unit columns. Rational amplitudes are
     Kronecker coordinates; only a roller tangent requires real trigonometry. -/
@@ -20,17 +19,20 @@ def synthesize (bits : Nat) (basis : PointBasis) (amplitudes : Fin 3 → Rat) :
   let first ← point bits (amplitudes 0)
   let second ← point bits (amplitudes 1)
   let rotation ← point bits (amplitudes 2)
-  if basis.translation = 0 then some ![first, second, rotation]
+  if basis.translation = 0 then some (fun component => match component.val with
+    | 0 => first | 1 => second | _ => rotation)
   else if basis.translation = 1 then
     let axes ← FrameIntervalTrig.degreeAxesGeneral bits basis.normal basis.normal 0
     let zero ← point bits 0
     let negativeSine ← subtract bits zero axes.sine
     let horizontal ← multiply bits negativeSine first
     let vertical ← multiply bits axes.cosine first
-    some ![horizontal, vertical, rotation]
+    some (fun component => match component.val with
+      | 0 => horizontal | 1 => vertical | _ => rotation)
   else
     let zero ← point bits 0
-    some ![zero, zero, rotation]
+    some (fun component => match component.val with
+      | 0 => zero | 1 => zero | _ => rotation)
 
 def pointColumn (bits : Nat) (data : Partition) (basis : GlobalBasis)
     (column : Fin basis.columns.size) (point : Nat) : Option (Fin 3 → Bounds) :=

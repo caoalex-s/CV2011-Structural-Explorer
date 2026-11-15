@@ -24,7 +24,9 @@ def pieceWork {data : Partition} {basis : GlobalBasis} (bits : Nat) (certificate
   let momentEnd ← InclinedFrameIntervalRecovery.endAction bits certificate index motion 5
   let variation ← FrameIntervalTransform.localPiece bits geometry.cosine geometry.sine
     (virtualPoint point direction segment.a) (virtualPoint point direction segment.b)
-  FrameIntervalVector.dot bits variation ![axialStart, shearStart, momentStart, axialEnd, shearEnd, momentEnd]
+  FrameIntervalVector.dot bits variation (fun component => match component.val with
+    | 0 => axialStart | 1 => shearStart | 2 => momentStart
+    | 3 => axialEnd | 4 => shearEnd | _ => momentEnd)
 
 def appliedAction {data : Partition} {basis : GlobalBasis} (certificate : Certificate data basis)
     (point : Fin data.points.size) (direction : Fin 3) (index : Fin data.source.loads.size) : Bounds :=
