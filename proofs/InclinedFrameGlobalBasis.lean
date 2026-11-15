@@ -57,7 +57,8 @@ theorem project_synthesize (basis : PointBasis) (values : LocalCoordinates basis
       omega
     rcases hmode with hfree | htangent
     · simp [project, synthesize, amplitude, Active, hfree]
-    · simp [project, synthesize, amplitude, Active, htangent, recover_tangent]
+    · simpa [project, synthesize, amplitude, Active, htangent] using
+        recover_tangent basis (values ⟨0, active⟩)
   · have hfree : basis.translation = 0 := by simpa [Active] using active
     simp [project, synthesize, amplitude, Active, hfree]
   · have hrotation : basis.rotationFree = true := by simpa [Active] using active
@@ -72,7 +73,13 @@ private theorem valid_modes {data : Partition} {point : Nat} {basis : PointBasis
     (h : BasisValid data point basis) :
     basis.translation = 0 ∨ basis.translation = 1 ∨ basis.translation = 2 := by
   have classification := h.2.2.2
-  split at classification <;> omega
+  match hmode : basis.translation with
+  | 0 => exact Or.inl hmode
+  | 1 => exact Or.inr (Or.inl hmode)
+  | 2 => exact Or.inr (Or.inr hmode)
+  | remaining + 3 =>
+    have impossible : False := by simpa only [hmode] using classification
+    exact impossible.elim
 
 def PointAllows (data : Partition) (point : Nat) (motion : FrameTransform.Triple) : Prop :=
   TranslationAllows data point (motion 0) (motion 1) ∧ RotationAllows data point (motion 2)
