@@ -74,31 +74,32 @@ theorem form_nonnegative (h : PartitionValid data) (values : Coordinates data ba
 
 /-- Equilibrium is tested against every source-admissible virtual motion. -/
 def Equilibrium (motion : Motion data) : Prop :=
-  Allows data motion ∧ ∀ variation, Allows data variation →
+  SourceAllows data motion ∧ ∀ variation, SourceAllows data variation →
     stiffnessWork data motion variation = externalWork data variation
 
-theorem reduced_equilibrium (h : GlobalBasisValid data basis) (values : Coordinates data basis) :
+theorem reduced_equilibrium (hpartition : PartitionValid data)
+    (h : GlobalBasisValid data basis) (values : Coordinates data basis) :
     FrameMatrixResidual.action (matrix data basis) values = force data basis ↔
       Equilibrium data (embed data basis values) := by
   constructor
   · intro hsolution
     constructor
-    · exact (range_equals_source_kernel h _).mpr ⟨values, rfl⟩
+    · exact (range_equals_source_kernel hpartition h _).mpr ⟨values, rfl⟩
     · intro variation hadmissible
-      obtain ⟨coordinates, rfl⟩ := (range_equals_source_kernel h variation).mp hadmissible
+      obtain ⟨coordinates, rfl⟩ := (range_equals_source_kernel hpartition h variation).mp hadmissible
       change form data basis values coordinates = load data basis coordinates
       rw [matrix_representation, force_representation, hsolution]
   · intro hequilibrium
     funext row
-    have hadmissible : Allows data (embed data basis (unit data basis row)) :=
-      (range_equals_source_kernel h _).mpr ⟨unit data basis row, rfl⟩
+    have hadmissible : SourceAllows data (embed data basis (unit data basis row)) :=
+      (range_equals_source_kernel hpartition h _).mpr ⟨unit data basis row, rfl⟩
     have hwork := hequilibrium.2 _ hadmissible
     change form data basis values (unit data basis row) = force data basis row at hwork
     simpa only [matrix_row] using hwork
 
 /-- Verified contraction of the actual reduced operator gives unique physical
     equilibrium. An inverse proposal or floating rank estimate is insufficient. -/
-theorem unique_equilibrium (h : GlobalBasisValid data basis)
+theorem unique_equilibrium (hpartition : PartitionValid data) (h : GlobalBasisValid data basis)
     (inverse : Index data basis → Index data basis → ℝ) (q : ℝ)
     (hqzero : 0 ≤ q) (hqone : q < 1)
     (hrows : ∀ row, (∑ column,
@@ -108,18 +109,18 @@ theorem unique_equilibrium (h : GlobalBasisValid data basis)
   obtain ⟨values, hsolution, hunique⟩ := FrameResidualBound.exists_unique_solution
     (FrameMatrixResidual.action (matrix data basis)) (FrameMatrixResidual.action inverse)
     q hqone hdefect (force data basis)
-  refine ⟨embed data basis values, (reduced_equilibrium data basis h values).mp hsolution, ?_⟩
+  refine ⟨embed data basis values, (reduced_equilibrium data basis hpartition h values).mp hsolution, ?_⟩
   intro other hequilibrium
-  obtain ⟨coordinates, hcoordinates⟩ := (range_equals_source_kernel h other).mp hequilibrium.1
+  obtain ⟨coordinates, hcoordinates⟩ := (range_equals_source_kernel hpartition h other).mp hequilibrium.1
   have hother : Equilibrium data (embed data basis coordinates) := by
     simpa only [hcoordinates] using hequilibrium
-  have hequal := hunique coordinates ((reduced_equilibrium data basis h coordinates).mpr hother)
+  have hequal := hunique coordinates ((reduced_equilibrium data basis hpartition h coordinates).mpr hother)
   rw [← hcoordinates, hequal]
 
 /-- The residual enclosure bounds the same source coordinates that generate
     physical equilibrium. Requested-field and reaction bounds must subsequently
     be obtained by enclosing their source-defined recovery expressions. -/
-theorem enclosed_equilibrium (h : GlobalBasisValid data basis)
+theorem enclosed_equilibrium (hpartition : PartitionValid data) (h : GlobalBasisValid data basis)
     (inverse : Index data basis → Index data basis → ℝ)
     (estimate : Coordinates data basis) (q eta : ℝ)
     (hqzero : 0 ≤ q) (hqone : q < 1) (hetazero : 0 ≤ eta)
@@ -132,7 +133,7 @@ theorem enclosed_equilibrium (h : GlobalBasisValid data basis)
         values index ≤ estimate index + eta/(1-q) := by
   obtain ⟨values, hvalues, _⟩ := FrameMatrixResidual.enclosed_solution
     (matrix data basis) inverse (force data basis) estimate q eta hqzero hqone hetazero hrows hresidual
-  exact ⟨values, (reduced_equilibrium data basis h values).mp hvalues.1, hvalues.2⟩
+  exact ⟨values, (reduced_equilibrium data basis hpartition h values).mp hvalues.1, hvalues.2⟩
 
 /-- Physical PSD and symmetry are indispensable here. They are derived from
     the source member properties, not inferred from the inverse certificate. -/
@@ -142,13 +143,13 @@ theorem positive_physical_stiffness (hpartition : PartitionValid data)
     (hqzero : 0 ≤ q) (hqone : q < 1)
     (hrows : ∀ row, (∑ column,
       |FrameMatrixResidual.defect (matrix data basis) inverse row column|) ≤ q)
-    (motion : Motion data) (hadmissible : Allows data motion) (hnonzero : motion ≠ 0) :
+    (motion : Motion data) (hadmissible : SourceAllows data motion) (hnonzero : motion ≠ 0) :
     0 < stiffnessWork data motion motion := by
   have hpositive := FrameMatrixResidual.positive_stiffness_of_defect
     (matrix data basis) inverse (form data basis) q hqzero hqone hrows
     (matrix_representation data basis) (form_symmetric data basis)
     (form_nonnegative data basis hpartition)
-  obtain ⟨values, hvalues⟩ := (range_equals_source_kernel hbasis motion).mp hadmissible
+  obtain ⟨values, hvalues⟩ := (range_equals_source_kernel hpartition hbasis motion).mp hadmissible
   have hvaluesNonzero : values ≠ 0 := by
     intro hzero
     apply hnonzero
@@ -157,6 +158,20 @@ theorem positive_physical_stiffness (hpartition : PartitionValid data)
   have hresult := hpositive values hvaluesNonzero
   change 0 < stiffnessWork data (embed data basis values) (embed data basis values) at hresult
   simpa only [hvalues] using hresult
+
+/-- The physical conclusion is tied to the source accepted by the partition
+    compiler, and to the basis accepted for that same partition. -/
+theorem checked_source_equilibrium (source : RationalFrame.Source)
+    (hcompile : checkedPartition source = some data)
+    (hbasis : checkedGlobalBasis data = some basis)
+    (inverse : Index data basis → Index data basis → ℝ) (q : ℝ)
+    (hqzero : 0 ≤ q) (hqone : q < 1)
+    (hrows : ∀ row, (∑ column,
+      |FrameMatrixResidual.defect (matrix data basis) inverse row column|) ≤ q) :
+    data.source = source ∧ ∃! motion, Equilibrium data motion := by
+  have hpartition := checkedPartition_source hcompile
+  exact ⟨hpartition.1, unique_equilibrium data basis hpartition.2
+    (checkedGlobalBasis_valid hbasis) inverse q hqzero hqone hrows⟩
 
 end
 end InclinedFrameReduced

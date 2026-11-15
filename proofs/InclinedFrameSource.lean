@@ -193,4 +193,53 @@ theorem checkedPartition_source {source : Source} {data : Partition}
     simpa [heq] using accepted
   · simp at hcheck
 
+/-- Every original support is represented at a valid partition location. -/
+theorem support_location {data : Partition} (h : PartitionValid data)
+    (index : Fin data.source.supports.size) :
+    let support := data.source.supports[index.val]!
+    LocationValid data support.member support.t (locate data support.member support.t) ∧
+      represented data support.member support.t (locate data support.member support.t) = true := by
+  rcases h with ⟨_, _, _, _, _, _, _, _, _, _, hsupports, _⟩
+  exact hsupports index
+
+/-- Point actions and both endpoints of every affine-load interval retain
+    their original source ownership and an actual represented cut location. -/
+theorem load_location {data : Partition} (h : PartitionValid data)
+    (index : Fin data.source.loads.size) :
+    let load := data.source.loads[index.val]!
+    LocationValid data load.member load.t (locate data load.member load.t) ∧
+    represented data load.member load.t (locate data load.member load.t) = true ∧
+    (load.kind = 2 → LocationValid data load.member load.ending (locate data load.member load.ending) ∧
+      represented data load.member load.ending (locate data load.member load.ending) = true) := by
+  rcases h with ⟨_, _, _, _, _, _, _, _, _, _, _, hloads⟩
+  exact hloads index
+
+/-- Valid locations cannot silently choose among duplicate owned cut points. -/
+theorem location_unique {data : Partition} (h : PartitionValid data)
+    {member : Nat} {parameter : Rat} {first second : Nat}
+    (hfirst : LocationValid data member parameter first)
+    (hsecond : LocationValid data member parameter second) : first = second := by
+  have hfirstBound := hfirst.2.1
+  have hsecondBound := hsecond.2.1
+  by_cases hstart : parameter = 0
+  · have hf : first = data.source.members[member]!.a := by simpa [hstart] using hfirst.2.2
+    have hs : second = data.source.members[member]!.a := by simpa [hstart] using hsecond.2.2
+    exact hf.trans hs.symm
+  by_cases hend : parameter = 1
+  · have hf : first = data.source.members[member]!.b := by simpa [hstart, hend] using hfirst.2.2
+    have hs : second = data.source.members[member]!.b := by simpa [hstart, hend] using hsecond.2.2
+    exact hf.trans hs.symm
+  have hf : data.points[first]!.owner = some member ∧ data.points[first]!.t = parameter := by
+    simpa [hstart, hend] using hfirst.2.2
+  have hs : data.points[second]!.owner = some member ∧ data.points[second]!.t = parameter := by
+    simpa [hstart, hend] using hsecond.2.2
+  rcases h with ⟨_, _, _, _, hpoints, hunique, _⟩
+  have hfp := hpoints ⟨first, hfirstBound⟩
+  have hsp := hpoints ⟨second, hsecondBound⟩
+  simp only [PointValid, hf.1] at hfp
+  simp only [PointValid, hs.1] at hsp
+  have hequal := hunique ⟨first, hfirstBound⟩ ⟨second, hsecondBound⟩
+    (hf.1.trans hs.1.symm) (hfp.2.2.1.trans hsp.2.2.1.symm) (hf.2.trans hs.2.symm)
+  exact congrArg Fin.val hequal
+
 end InclinedFrameSource

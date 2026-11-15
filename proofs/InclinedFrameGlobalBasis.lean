@@ -148,6 +148,55 @@ def extract (data : Partition) (basis : GlobalBasis) (motion : InclinedFrameReal
 def Allows (data : Partition) (motion : InclinedFrameReal.Motion data) : Prop :=
   ∀ point : Fin data.points.size, PointAllows data point.val (motion point)
 
+/-- Original support rows, before grouping by point or reducing degree aliases.
+    Every source index occurs, including repeated and nearly parallel rollers. -/
+def SourceAllows (data : Partition) (motion : InclinedFrameReal.Motion data) : Prop :=
+  ∀ index : Fin data.source.supports.size,
+    let support := data.source.supports[index.val]!
+    let displacement := InclinedFrameReal.pointMotion data motion (locate data support.member support.t)
+    (if support.kind = 2 then sourceNormalWork support.angle (displacement 0) (displacement 1) = 0
+      else displacement 0 = 0 ∧ displacement 1 = 0) ∧
+    (support.kind = 1 → displacement 2 = 0)
+
+theorem allows_iff_source {data : Partition} (hpartition : PartitionValid data)
+    (motion : InclinedFrameReal.Motion data) : Allows data motion ↔ SourceAllows data motion := by
+  constructor
+  · intro hallows index
+    have hlocation := support_location hpartition index
+    let support := data.source.supports[index.val]!
+    let location := locate data support.member support.t
+    have hbound : location < data.points.size := hlocation.1.2.1
+    have hpoint := hallows ⟨location, hbound⟩
+    have howned : owned data location index := rfl
+    have htranslation := hpoint.1 index howned
+    have hrotation := hpoint.2 index howned
+    constructor
+    · simpa [InclinedFrameReal.pointMotion, support, location, hbound] using htranslation
+    · simpa [InclinedFrameReal.pointMotion, support, location, hbound] using hrotation
+  · intro hsource point
+    constructor
+    · intro index howned
+      have hrow := (hsource index).1
+      have hlocation : locate data data.source.supports[index.val]!.member
+          data.source.supports[index.val]!.t = point.val := howned
+      simpa [InclinedFrameReal.pointMotion, hlocation, point.isLt] using hrow
+    · intro index howned hfixed
+      have hrow := (hsource index).2 hfixed
+      have hlocation : locate data data.source.supports[index.val]!.member
+          data.source.supports[index.val]!.t = point.val := howned
+      simpa [InclinedFrameReal.pointMotion, hlocation, point.isLt] using hrow
+
+/-- Combine source-row equivalence with represented, unique source locations;
+    the latter rules out vacuous ownership from a malformed partition. -/
+theorem original_support_location {data : Partition} (hpartition : PartitionValid data)
+    (index : Fin data.source.supports.size) :
+    let support := data.source.supports[index.val]!
+    represented data support.member support.t (locate data support.member support.t) = true ∧
+      ∀ other, LocationValid data support.member support.t other →
+        other = locate data support.member support.t := by
+  have hlocation := support_location hpartition index
+  exact ⟨hlocation.2, fun _ hother => location_unique hpartition hother hlocation.1⟩
+
 theorem extract_embed (data : Partition) (basis : GlobalBasis) (values : Coordinates data basis) :
     extract data basis (embed data basis values) = values := by
   funext coordinate
@@ -161,7 +210,7 @@ theorem embed_injective (data : Partition) (basis : GlobalBasis) :
   have equalCoordinates := congrArg (extract data basis) equalMotion
   simpa only [extract_embed] using equalCoordinates
 
-theorem range_equals_source_kernel {data : Partition} {basis : GlobalBasis}
+theorem range_equals_point_kernel {data : Partition} {basis : GlobalBasis}
     (h : GlobalBasisValid data basis) (motion : InclinedFrameReal.Motion data) :
     Allows data motion ↔ ∃ values, embed data basis values = motion := by
   constructor
@@ -172,6 +221,12 @@ theorem range_equals_source_kernel {data : Partition} {basis : GlobalBasis}
   · rintro ⟨values, rfl⟩ point
     exact synthesize_allows (h.2.1 point)
       (fun localIndex => values ⟨(point, localIndex.val), localIndex.property⟩)
+
+theorem range_equals_source_kernel {data : Partition} {basis : GlobalBasis}
+    (hpartition : PartitionValid data) (hbasis : GlobalBasisValid data basis)
+    (motion : InclinedFrameReal.Motion data) :
+    SourceAllows data motion ↔ ∃ values, embed data basis values = motion :=
+  (allows_iff_source hpartition motion).symm.trans (range_equals_point_kernel hbasis motion)
 
 theorem amplitude_add (basis : PointBasis) (first second : LocalCoordinates basis) (slot : Fin 3) :
     amplitude basis (first+second) slot = amplitude basis first slot + amplitude basis second slot := by
