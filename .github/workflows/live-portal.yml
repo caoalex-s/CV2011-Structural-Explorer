@@ -185,6 +185,7 @@ jobs:
         run: |
           set -euo pipefail
           test ! -e .data/live-portal/inclined-native
+          python3 qa/inclined-frame/check-runtime-imports.py > .data/live-portal/inclined-runtime-imports.json
           node qa/inclined-frame/packets.mjs .data/live-portal/inclined-native
           cd proofs
           timeout --kill-after=10s 180s lake env bash -c 'export LEAN_PATH="$PWD:$LEAN_PATH"; lean --run ../qa/inclined-frame/NativePackets.lean ../.data/live-portal/inclined-native' 2>&1 | tee ../.data/live-portal/inclined-native.log

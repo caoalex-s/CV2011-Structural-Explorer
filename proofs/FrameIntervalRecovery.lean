@@ -1,5 +1,4 @@
 import FrameIntervalExpression
-import Mathlib.Data.Fin.VecNotation
 
 /-! Fixed source-authored recovery expressions. Input order is left endpoint
     actions (0..2), left local motion (3..5), p, dp, q, dq, x, EA, EI, cosine,
@@ -34,7 +33,13 @@ def expressions : Fin 6 → Expression 15 :=
   let axial := axialStart + (-actionX*x - p*x2/2 - dp*x3/6)/EA
   let transverse := transverseStart + rotationStart*x +
     (-actionMoment*x2/2 + actionY*x3/6 + q*x4/24 + dq*x5/120)/EI
-  ![normal, shear, moment, rotation, cosine*axial-sine*transverse, sine*axial+cosine*transverse]
+  fun component => match component.val with
+    | 0 => normal
+    | 1 => shear
+    | 2 => moment
+    | 3 => rotation
+    | 4 => cosine*axial-sine*transverse
+    | _ => sine*axial+cosine*transverse
 
 def field (bits : Nat) (inputs : Fin 15 → FrameIntervalOps.Bounds) (component : Fin 6) :
     Option FrameIntervalOps.Bounds := enclose bits inputs (expressions component)

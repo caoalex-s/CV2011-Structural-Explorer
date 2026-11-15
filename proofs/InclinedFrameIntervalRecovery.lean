@@ -33,7 +33,8 @@ def nodalMotion {data : Partition} {basis : GlobalBasis} (bits : Nat) (certifica
     (fun column => pointColumnAt certificate point column 1) certificate.solve.solution
   let rotation ← FrameIntervalVector.dot bits
     (fun column => pointColumnAt certificate point column 2) certificate.solve.solution
-  some ![horizontal, vertical, rotation]
+  some (fun component => match component.val with
+    | 0 => horizontal | 1 => vertical | _ => rotation)
 
 def localMotion {data : Partition} {basis : GlobalBasis} (bits : Nat) (certificate : Certificate data basis)
     (index : Fin data.pieces.size) : Option (Fin 6 → Bounds) := do
@@ -52,8 +53,11 @@ def endAction {data : Partition} {basis : GlobalBasis} (bits : Nat) (certificate
     Component order is exactly the source-authored recovery expression order. -/
 @[noinline] def inputVector (actionX actionY actionMoment : Bounds) (motion : Fin 6 → Bounds)
     (p dp q dq x EA EI cosine sine : Bounds) : Fin 15 → Bounds :=
-  ![actionX, actionY, actionMoment, motion 0, motion 1, motion 2,
-    p, dp, q, dq, x, EA, EI, cosine, sine]
+  fun component => match component.val with
+    | 0 => actionX | 1 => actionY | 2 => actionMoment
+    | 3 => motion 0 | 4 => motion 1 | 5 => motion 2
+    | 6 => p | 7 => dp | 8 => q | 9 => dq | 10 => x
+    | 11 => EA | 12 => EI | 13 => cosine | _ => sine
 
 structure LoadComponents where
   p : Bounds

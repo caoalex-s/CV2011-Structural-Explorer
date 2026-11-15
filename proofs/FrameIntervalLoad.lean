@@ -1,5 +1,4 @@
 import FrameIntervalOps
-import Mathlib.Data.Fin.VecNotation
 
 /-! Affine consistent nodal actions in local u/v/rotation endpoint order.
     Each action is evaluated with outward interval operations; cancellation
@@ -28,6 +27,8 @@ def consistentLoad (bits : Nat) (length axialLeft axialRight transverseLeft tran
   let axialEnd ← scaledPair bits length axialLeft axialRight 1 2 6
   let shearEnd ← scaledPair bits length transverseLeft transverseRight 3 7 20
   let momentEnd ← scaledPair bits squared transverseLeft transverseRight (-2) (-3) 60
-  some ![axialStart, shearStart, momentStart, axialEnd, shearEnd, momentEnd]
+  some (fun component => match component.val with
+    | 0 => axialStart | 1 => shearStart | 2 => momentStart
+    | 3 => axialEnd | 4 => shearEnd | _ => momentEnd)
 
 end FrameIntervalLoad
