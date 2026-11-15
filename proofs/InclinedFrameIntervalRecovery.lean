@@ -48,6 +48,13 @@ def endAction {data : Partition} {basis : GlobalBasis} (bits : Nat) (certificate
   let elastic ← FrameIntervalVector.dot bits (localStiffness certificate index component) motion
   subtract bits elastic (certificate.distributed index component)
 
+/-- Keep the fixed input layout separate from the monadic arithmetic sequence.
+    Component order is exactly the source-authored recovery expression order. -/
+@[noinline] def inputVector (actionX actionY actionMoment : Bounds) (motion : Fin 6 → Bounds)
+    (p dp q dq x EA EI cosine sine : Bounds) : Fin 15 → Bounds :=
+  ![actionX, actionY, actionMoment, motion 0, motion 1, motion 2,
+    p, dp, q, dq, x, EA, EI, cosine, sine]
+
 /-- Build the fixed fifteen field inputs from the same source piece and
     enclosed solved motion, including affine slopes and actual physical x. -/
 def fieldInputs {data : Partition} {basis : GlobalBasis} (bits : Nat) (certificate : Certificate data basis)
@@ -73,8 +80,8 @@ def fieldInputs {data : Partition} {basis : GlobalBasis} (bits : Nat) (certifica
   let x ← multiply bits geometry.length offset
   let EA ← point bits member.EA
   let EI ← point bits member.EI
-  some ![actionX, actionY, actionMoment, motion 0, motion 1, motion 2,
-    p, dp, q, dq, x, EA, EI, geometry.cosine, geometry.sine]
+  some (inputVector actionX actionY actionMoment motion
+    p dp q dq x EA EI geometry.cosine geometry.sine)
 
 def field {data : Partition} {basis : GlobalBasis} (bits : Nat) (certificate : Certificate data basis)
     (query : RationalFrame.Query) (component : Fin 6) : Option Bounds := do
