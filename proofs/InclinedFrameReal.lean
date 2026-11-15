@@ -133,21 +133,36 @@ theorem stiffness_smul_right (data : Partition) (scalar : ℝ) (x y : Motion dat
     stiffnessWork data x (scalar • y) = scalar * stiffnessWork data x y := by
   simp [stiffnessWork, pieceMotion_smul, Finset.mul_sum, mul_assoc, mul_left_comm]
 
+/-- Hold the physical motion fixed while varying the virtual displacement.
+    Naming this map keeps the outer linearity proof from expanding its record. -/
+def stiffnessVariation (data : Partition) (x : Motion data) : Motion data →ₗ[ℝ] ℝ where
+  toFun := stiffnessWork data x
+  map_add' := stiffness_add_right data x
+  map_smul' := by
+    intro scalar y
+    change stiffnessWork data x (scalar • y) = scalar * stiffnessWork data x y
+    exact stiffness_smul_right data scalar x y
+
+theorem stiffnessVariation_add (data : Partition) (x y : Motion data) :
+    stiffnessVariation data (x+y) = stiffnessVariation data x + stiffnessVariation data y := by
+  apply LinearMap.ext
+  intro z
+  change stiffnessWork data (x+y) z = stiffnessWork data x z + stiffnessWork data y z
+  exact stiffness_add_left data x y z
+
+theorem stiffnessVariation_smul (data : Partition) (scalar : ℝ) (x : Motion data) :
+    stiffnessVariation data (scalar • x) = scalar • stiffnessVariation data x := by
+  apply LinearMap.ext
+  intro y
+  change stiffnessWork data (scalar • x) y = scalar * stiffnessWork data x y
+  exact stiffness_smul_left data scalar x y
+
 /-- The source stiffness form in the linear-map interface used by the stability
     argument. Linearity follows from the actual transforms and local stiffness. -/
 def stiffnessForm (data : Partition) : Motion data →ₗ[ℝ] Motion data →ₗ[ℝ] ℝ where
-  toFun x := {
-    toFun := stiffnessWork data x
-    map_add' := stiffness_add_right data x
-    map_smul' := by intro scalar y; simpa using stiffness_smul_right data scalar x y }
-  map_add' := by
-    intro x y
-    ext z
-    exact stiffness_add_left data x y z
-  map_smul' := by
-    intro scalar x
-    ext y
-    simpa using stiffness_smul_left data scalar x y
+  toFun := stiffnessVariation data
+  map_add' := stiffnessVariation_add data
+  map_smul' := stiffnessVariation_smul data
 
 def pieceLoad (data : Partition) (piece : Piece) : LocalActions :=
   let direction := memberDirection data piece.member
