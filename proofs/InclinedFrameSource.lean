@@ -85,15 +85,23 @@ def compilePartition (source : Source) : Option Partition := Id.run do
       else
         if points.size ≥ 16 then return none
         indices := indices.push points.size
-        points := points.push { owner := some memberIndex, index := memberIndex, t := t,
-          x := a.x + t*(b.x-a.x), y := a.y + t*(b.y-a.y) }
+        points := points.push {
+          owner := some memberIndex
+          index := memberIndex
+          t := t
+          x := a.x + t*(b.x-a.x)
+          y := a.y + t*(b.y-a.y) }
     for i in [:cuts.size-1] do
       if pieces.size ≥ 16 then return none
       let left := cuts[i]!
       let right := cuts[i+1]!
-      pieces := pieces.push { member := memberIndex, a := indices[i]!, b := indices[i+1]!,
-        left := left, right := right,
-        vertical := restricted source memberIndex left right left,
+      pieces := pieces.push {
+        member := memberIndex
+        a := indices[i]!
+        b := indices[i+1]!
+        left := left
+        right := right
+        vertical := restricted source memberIndex left right left
         verticalEnd := restricted source memberIndex left right right }
   return some { source := source, points := points, pieces := pieces }
 
