@@ -44,15 +44,19 @@ def roller_normal():
     return cosine, sine
 
 
-def cantilever(scale=1):
+def cantilever(scale=1, parameter=D(1), reversed_member=False):
     """Tip force resolved in member axes; integrated axial and bending strains."""
     length = scale * LENGTH
+    position = parameter * length
     axial_force = -11 / LENGTH
     transverse_force = -13 / LENGTH
-    axial = axial_force * length / EA
-    transverse = transverse_force * length ** 3 / (3 * EI)
-    rotation = transverse_force * length ** 2 / (2 * EI)
-    fields = [axial_force, -transverse_force, ZERO, rotation,
+    axial = axial_force * position / EA
+    transverse = transverse_force * (length * position ** 2 / 2 - position ** 3 / 6) / EI
+    rotation = transverse_force * (length * position - position ** 2 / 2) / EI
+    moment = transverse_force * (length - position)
+    if reversed_member:
+        moment = -moment
+    fields = [axial_force, -transverse_force, moment, rotation,
               COSINE * axial - SINE * transverse, SINE * axial + COSINE * transverse]
     reactions = [D(-3), D(7), D(13 * scale)] + [ZERO] * (3 * scale)
     return fields, reactions
@@ -111,6 +115,8 @@ references = {
     'irrational-cantilever': cantilever(), 'reversed-cantilever': cantilever(),
     'shared-rigid-joint': cantilever(2), 'affine-zero-resultant': affine(),
     'roller-interior-left': roller(False), 'roller-interior-right': roller(True),
+    'cantilever-interior': cantilever(parameter=D('0.5')),
+    'reversed-interior': cantilever(parameter=D('0.5'), reversed_member=True),
 }
 observed = {}
 current = None

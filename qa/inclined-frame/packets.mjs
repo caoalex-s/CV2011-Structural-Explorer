@@ -43,6 +43,10 @@ reversed.supports[0].t = 1;
 reversed.loads[0].t = reversed.loads[0].end = 0;
 save('reversed-cantilever', proposeInclinedPacket(reversed,
     { ...query, parameter: 0, cutSide: 'right' }, 96).packet, 'accept');
+save('cantilever-interior', proposeInclinedPacket(source,
+    { ...query, parameter: 0.5 }, 96).packet, 'accept');
+save('reversed-interior', proposeInclinedPacket(reversed,
+    { ...query, parameter: 0.5 }, 96).packet, 'accept');
 
 // A shared rigid point splits the same physical cantilever into two members.
 const shared = structuredClone(source);
