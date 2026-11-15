@@ -74,9 +74,9 @@ private theorem valid_modes {data : Partition} {point : Nat} {basis : PointBasis
     basis.translation = 0 ∨ basis.translation = 1 ∨ basis.translation = 2 := by
   have classification := h.2.2.2
   match hmode : basis.translation with
-  | 0 => exact Or.inl hmode
-  | 1 => exact Or.inr (Or.inl hmode)
-  | 2 => exact Or.inr (Or.inr hmode)
+  | 0 => exact Or.inl rfl
+  | 1 => exact Or.inr (Or.inl rfl)
+  | 2 => exact Or.inr (Or.inr rfl)
   | remaining + 3 =>
     have impossible : False := by simpa only [hmode] using classification
     exact impossible.elim
