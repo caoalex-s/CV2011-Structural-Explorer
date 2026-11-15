@@ -154,9 +154,8 @@ theorem reaction_contains {bits : Nat} {data : Partition} {basis : GlobalBasis}
     exact appliedAction_contains hpartition hload point direction index
   have hresult := executable_subtract_contains hout he hx
   rw [total_piece_work hpartition] at hresult
-  convert hresult using 1 <;>
-    simp only [InclinedFrameReal.groupedReaction, InclinedFrameReal.residualWork,
-      InclinedFrameReal.externalWork, virtualMotion] <;> ring
+  rw [sub_sub] at hresult
+  exact hresult
 
 end
 end InclinedFrameIntervalReactionsSound
