@@ -18,6 +18,7 @@ theorem virtualPoint_contains {data : Partition} (point : Fin data.points.size) 
       (InclinedFrameReal.pointMotion data (virtualMotion point direction) endpoint component) := by
   by_cases hin : endpoint < data.points.size
   · simp [virtualPoint, virtualMotion, InclinedFrameReal.pointMotion, hin, Fin.ext_iff, Contains]
+    split_ifs <;> norm_num
   · have hne : endpoint ≠ point.val := by
       intro equal
       apply hin
@@ -153,10 +154,9 @@ theorem reaction_contains {bits : Nat} {data : Partition} {basis : GlobalBasis}
     exact appliedAction_contains hpartition hload point direction index
   have hresult := executable_subtract_contains hout he hx
   rw [total_piece_work hpartition] at hresult
-  convert hresult using 1
-  simp only [InclinedFrameReal.groupedReaction, InclinedFrameReal.residualWork,
-    InclinedFrameReal.externalWork, virtualMotion]
-  ring
+  convert hresult using 1 <;>
+    simp only [InclinedFrameReal.groupedReaction, InclinedFrameReal.residualWork,
+      InclinedFrameReal.externalWork, virtualMotion] <;> ring
 
 end
 end InclinedFrameIntervalReactionsSound

@@ -34,6 +34,7 @@ def encode (value : Packet) (result : Result) : String :=
 
 /-- A result over the output byte budget is inconclusive, just like any other
     failed check. The ABI must also cap its destination buffer before copying. -/
+@[export inclined_report]
 def checkReport (input : String) : Option String := do
   let value ← decode input
   let result ← checkPacket value
