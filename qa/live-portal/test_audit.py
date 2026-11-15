@@ -4,9 +4,26 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
-from audit import audit, INCLINED_FOUNDATION_MODULES, INCLINED_INTEGRATION_MODULES, INCLINED_ASSEMBLY_MODULES, INCLINED_OUTPUT_MODULES
+from audit import audit, INCLINED_FOUNDATION_MODULES, INCLINED_INTEGRATION_MODULES, INCLINED_ASSEMBLY_MODULES, INCLINED_OUTPUT_MODULES, INCLINED_PACKET_MODULES
 
 class AxiomAuditTests(unittest.TestCase):
+    def test_packet_audit_binds_successful_returns_to_source_and_query(self):
+        repository = Path(__file__).resolve().parents[2]
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder) / 'Audit.lean'
+            subprocess.run([sys.executable, str(Path(__file__).with_name('audit.py')),
+                            '--inclined-packet', '--emit', str(output)], cwd=repository, check=True)
+            lines = output.read_text(encoding='utf-8').splitlines()
+            imports = [line for line in lines if line.startswith('import ')]
+            claims = [line for line in lines if line.startswith('#print axioms ')]
+            self.assertEqual(imports, ['import ' + name for name in INCLINED_PACKET_MODULES])
+            self.assertEqual(len(imports), 54)
+            self.assertEqual(len(claims), len(set(claims)))
+            for name in ['InclinedFrameIntervalBuildSound.checked_source_sound',
+                         'InclinedFrameIntervalWireSound.checkPacket_sound',
+                         'InclinedFrameIntervalWireSound.decodeAndCheck_sound']:
+                self.assertIn('#print axioms ' + name, claims)
+
     def test_output_audit_includes_stability_recovery_and_accuracy(self):
         repository = Path(__file__).resolve().parents[2]
         with tempfile.TemporaryDirectory() as folder:
