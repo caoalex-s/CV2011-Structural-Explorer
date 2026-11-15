@@ -14,6 +14,20 @@ spec = importlib.util.spec_from_file_location('strict_audit', Path(__file__).par
 strict_audit = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(strict_audit)
 
+# Frozen foundation diagnostic scope; these are not an executable frame checker.
+INCLINED_FOUNDATION_MODULES = (
+    'FrameIntervalOps', 'FrameEnclosure', 'FrameIntervalGeometry',
+    'FrameIntervalGeometrySound', 'FrameIntervalTrig', 'FrameIntervalTrigSound',
+    'FrameAdmissiblePoint', 'FrameReducedStability',
+)
+
+# Source-owned constrained equilibrium, excluding the unfinished interval packet path.
+INCLINED_INTEGRATION_MODULES = INCLINED_FOUNDATION_MODULES + (
+    'FrameResidualBound', 'FrameMatrixResidual', 'InclinedFrameSource',
+    'InclinedFrameBasis', 'InclinedFrameBasisSound', 'InclinedFrameReal',
+    'InclinedFrameGlobalBasis', 'InclinedFrameReduced',
+)
+
 def expected_theorems(source, namespace='PortalSoundness'):
     names = re.findall(r'^(?:@\[[^\]]+\]\s*)?theorem\s+(\w+)', source, re.MULTILINE)
     if not names or len(names) != len(set(names)):
@@ -30,9 +44,16 @@ def main():
     parser.add_argument('--check', type=Path)
     parser.add_argument('--output', type=Path)
     parser.add_argument('--frame', action='store_true', help='Audit all generic frame bridge theorems.')
+    parser.add_argument('--inclined-foundation', action='store_true', help='Audit only the frozen inclined foundation modules.')
+    parser.add_argument('--inclined-integration', action='store_true', help='Audit the source-owned reduced-equilibrium milestone.')
     args = parser.parse_args()
-    if args.frame:
-        sources = sorted(Path('proofs').glob('RationalFrame*.lean'))
+    if sum((args.frame, args.inclined_foundation, args.inclined_integration)) > 1:
+        parser.error('Choose one audit scope.')
+    scoped_modules = (INCLINED_INTEGRATION_MODULES if args.inclined_integration else
+                      INCLINED_FOUNDATION_MODULES if args.inclined_foundation else None)
+    if args.frame or scoped_modules:
+        sources = ([Path('proofs') / (name + '.lean') for name in scoped_modules]
+                   if scoped_modules else sorted(Path('proofs').glob('RationalFrame*.lean')))
         expected = set()
         for path in sources:
             source = path.read_text(encoding='utf-8')
@@ -42,20 +63,21 @@ def main():
             if len(namespaces) != 1:
                 raise ValueError(f'Audit requires an explicit single namespace: {path}')
             expected.update(expected_theorems(source, namespaces[0]))
-        imported = 'RationalFrameSoundness'
+        imports = list(scoped_modules) if scoped_modules else ['RationalFrameSoundness']
     else:
         sources = [Path('proofs/PortalSoundness.lean')]
         expected = expected_theorems(sources[0].read_text(encoding='utf-8'))
-        imported = 'PortalSoundness'
+        imports = ['PortalSoundness']
     if args.emit:
-        args.emit.write_text(f'import {imported}\n' + ''.join('#print axioms ' + name + '\n' for name in sorted(expected)), encoding='utf-8')
+        args.emit.write_text(''.join(f'import {name}\n' for name in imports) +
+                            ''.join('#print axioms ' + name + '\n' for name in sorted(expected)), encoding='utf-8')
     if args.check:
         strict_audit.EXPECTED_THEOREMS = expected
         reports = strict_audit.audit_reports(args.check.read_text(encoding='utf-8'))
         receipt = {'passed': True, 'theorems': reports,
                    'sources': {str(path): hashlib.sha256(path.read_bytes()).hexdigest() for path in sources},
                    'log_sha256': hashlib.sha256(args.check.read_bytes()).hexdigest()}
-        if not args.frame:
+        if not args.frame and not scoped_modules:
             receipt['source_sha256'] = receipt['sources'][str(sources[0])]
         args.output.write_text(json.dumps(receipt, indent=2) + '\n', encoding='utf-8')
 
