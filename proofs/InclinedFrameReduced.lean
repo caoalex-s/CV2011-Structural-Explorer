@@ -14,11 +14,20 @@ variable (data : Partition) (basis : GlobalBasis)
 def form : Coordinates data basis →ₗ[ℝ] Coordinates data basis →ₗ[ℝ] ℝ where
   toFun values := (stiffnessForm data (embedding data basis values)).comp (embedding data basis)
   map_add' first second := by
-    ext variation
-    simp [map_add]
+    apply LinearMap.ext
+    intro variation
+    change stiffnessForm data (embedding data basis (first+second)) (embedding data basis variation) =
+      stiffnessForm data (embedding data basis first) (embedding data basis variation) +
+        stiffnessForm data (embedding data basis second) (embedding data basis variation)
+    rw [map_add, map_add]
+    rfl
   map_smul' scalar values := by
-    ext variation
-    simp [map_smul]
+    apply LinearMap.ext
+    intro variation
+    change stiffnessForm data (embedding data basis (scalar • values)) (embedding data basis variation) =
+      scalar * stiffnessForm data (embedding data basis values) (embedding data basis variation)
+    rw [map_smul, map_smul]
+    rfl
 
 def load : Coordinates data basis →ₗ[ℝ] ℝ := (loadForm data).comp (embedding data basis)
 
