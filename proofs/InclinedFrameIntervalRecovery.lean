@@ -55,6 +55,48 @@ def endAction {data : Partition} {basis : GlobalBasis} (bits : Nat) (certificate
   ![actionX, actionY, actionMoment, motion 0, motion 1, motion 2,
     p, dp, q, dq, x, EA, EI, cosine, sine]
 
+structure LoadComponents where
+  p : Bounds
+  pEnd : Bounds
+  q : Bounds
+  qEnd : Bounds
+
+/-- Project both affine load endpoints before forming either slope. -/
+@[noinline] def loadComponents (bits : Nat) (segment : Piece)
+    (geometry : InclinedFrameIntervalGeometry.PieceBounds) : Option LoadComponents := do
+  let left ← point bits segment.vertical
+  let right ← point bits segment.verticalEnd
+  let p ← multiply bits geometry.sine left
+  let pEnd ← multiply bits geometry.sine right
+  let q ← multiply bits geometry.cosine left
+  let qEnd ← multiply bits geometry.cosine right
+  some ⟨p, pEnd, q, qEnd⟩
+
+structure LoadSlopes where
+  dp : Bounds
+  dq : Bounds
+
+@[noinline] def loadSlopes (bits : Nat) (loads : LoadComponents)
+    (length : Bounds) : Option LoadSlopes := do
+  let pChange ← subtract bits loads.pEnd loads.p
+  let qChange ← subtract bits loads.qEnd loads.q
+  let dp ← divide bits pChange length
+  let dq ← divide bits qChange length
+  some ⟨dp, dq⟩
+
+structure PositionMaterial where
+  x : Bounds
+  EA : Bounds
+  EI : Bounds
+
+@[noinline] def positionMaterial (bits : Nat) (segment : Piece)
+    (parameter : Rat) (length : Bounds) (axial flexural : Rat) : Option PositionMaterial := do
+  let offset ← point bits ((parameter-segment.left)/(segment.right-segment.left))
+  let x ← multiply bits length offset
+  let EA ← point bits axial
+  let EI ← point bits flexural
+  some ⟨x, EA, EI⟩
+
 /-- Build the fixed fifteen field inputs from the same source piece and
     enclosed solved motion, including affine slopes and actual physical x. -/
 def fieldInputs {data : Partition} {basis : GlobalBasis} (bits : Nat) (certificate : Certificate data basis)
@@ -66,22 +108,11 @@ def fieldInputs {data : Partition} {basis : GlobalBasis} (bits : Nat) (certifica
   let actionX ← endAction bits certificate index motion 0
   let actionY ← endAction bits certificate index motion 1
   let actionMoment ← endAction bits certificate index motion 2
-  let left ← point bits segment.vertical
-  let right ← point bits segment.verticalEnd
-  let p ← multiply bits geometry.sine left
-  let pEnd ← multiply bits geometry.sine right
-  let q ← multiply bits geometry.cosine left
-  let qEnd ← multiply bits geometry.cosine right
-  let pChange ← subtract bits pEnd p
-  let qChange ← subtract bits qEnd q
-  let dp ← divide bits pChange geometry.length
-  let dq ← divide bits qChange geometry.length
-  let offset ← point bits ((parameter-segment.left)/(segment.right-segment.left))
-  let x ← multiply bits geometry.length offset
-  let EA ← point bits member.EA
-  let EI ← point bits member.EI
+  let loads ← loadComponents bits segment geometry
+  let slopes ← loadSlopes bits loads geometry.length
+  let properties ← positionMaterial bits segment parameter geometry.length member.EA member.EI
   some (inputVector actionX actionY actionMoment motion
-    p dp q dq x EA EI geometry.cosine geometry.sine)
+    loads.p slopes.dp loads.q slopes.dq properties.x properties.EA properties.EI geometry.cosine geometry.sine)
 
 def field {data : Partition} {basis : GlobalBasis} (bits : Nat) (certificate : Certificate data basis)
     (query : RationalFrame.Query) (component : Fin 6) : Option Bounds := do
