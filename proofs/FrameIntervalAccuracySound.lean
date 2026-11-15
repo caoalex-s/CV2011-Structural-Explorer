@@ -21,7 +21,7 @@ theorem check_error {quantity : Fin 9} {bounds : FrameIntervalOps.Bounds} {actua
       (relativeTolerance : ℝ) * max 0 (|(midpoint bounds : ℝ)| - (radius bounds : ℝ)) := by
     exact_mod_cast hgate
   have herror : |actual - (midpoint bounds : ℝ)| ≤ (radius bounds : ℝ) := by
-    simpa [midpoint, radius] using midpoint_error hcontains
+    simpa [FrameIntervalAccuracy.midpoint, radius] using midpoint_error hcontains
   exact accuracy_gate herror (by norm_num [relativeTolerance]) hgateReal
 
 end
