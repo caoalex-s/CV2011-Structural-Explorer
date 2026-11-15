@@ -33,7 +33,10 @@ jobs:
       - uses: leanprover/lean-action@ba3fdfe5c4476c925da13bf11a005ddb47e47aee
         with:
           lake-package-directory: proofs
-          build: 'false'
+          # Build prerequisites before lean-action saves its Lake cache.
+          # The explicit build and every source/audit check below still run.
+          build: 'true'
+          build-args: 'ExactGeometry FrameReuse'
           test: 'false'
           use-mathlib-cache: 'true'
       - name: Compile the exact structural checker and actual-model bridge

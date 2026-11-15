@@ -176,21 +176,21 @@ theorem fieldInputs_contains {bits : Nat} {data : Partition} {basis : GlobalBasi
   have hEIContains := executable_point_contains hEI
   intro i
   fin_cases i
-  · simpa [sourceInputs, FrameIntervalRecoverySound.inputs] using hax
-  · simpa [sourceInputs, FrameIntervalRecoverySound.inputs] using hay
-  · simpa [sourceInputs, FrameIntervalRecoverySound.inputs] using ham
-  · simpa [sourceInputs, FrameIntervalRecoverySound.inputs] using hd 0
-  · simpa [sourceInputs, FrameIntervalRecoverySound.inputs] using hd 1
-  · simpa [sourceInputs, FrameIntervalRecoverySound.inputs] using hd 2
-  · simpa [sourceInputs, FrameIntervalRecoverySound.inputs] using hp0
-  · simpa [sourceInputs, FrameIntervalRecoverySound.inputs] using hdpContains
-  · simpa [sourceInputs, FrameIntervalRecoverySound.inputs] using hq0
-  · simpa [sourceInputs, FrameIntervalRecoverySound.inputs] using hdqContains
-  · simpa [sourceInputs, FrameIntervalRecoverySound.inputs, Rat.cast_div, Rat.cast_sub, mul_div_assoc] using hxContains
-  · simpa [sourceInputs, FrameIntervalRecoverySound.inputs] using hEAContains
-  · simpa [sourceInputs, FrameIntervalRecoverySound.inputs] using hEIContains
-  · simpa [sourceInputs, FrameIntervalRecoverySound.inputs] using hc
-  · simpa [sourceInputs, FrameIntervalRecoverySound.inputs] using hs
+  · simpa [InclinedFrameIntervalRecovery.inputVector, sourceInputs, FrameIntervalRecoverySound.inputs] using hax
+  · simpa [InclinedFrameIntervalRecovery.inputVector, sourceInputs, FrameIntervalRecoverySound.inputs] using hay
+  · simpa [InclinedFrameIntervalRecovery.inputVector, sourceInputs, FrameIntervalRecoverySound.inputs] using ham
+  · simpa [InclinedFrameIntervalRecovery.inputVector, sourceInputs, FrameIntervalRecoverySound.inputs] using hd 0
+  · simpa [InclinedFrameIntervalRecovery.inputVector, sourceInputs, FrameIntervalRecoverySound.inputs] using hd 1
+  · simpa [InclinedFrameIntervalRecovery.inputVector, sourceInputs, FrameIntervalRecoverySound.inputs] using hd 2
+  · simpa [InclinedFrameIntervalRecovery.inputVector, sourceInputs, FrameIntervalRecoverySound.inputs] using hp0
+  · simpa [InclinedFrameIntervalRecovery.inputVector, sourceInputs, FrameIntervalRecoverySound.inputs] using hdpContains
+  · simpa [InclinedFrameIntervalRecovery.inputVector, sourceInputs, FrameIntervalRecoverySound.inputs] using hq0
+  · simpa [InclinedFrameIntervalRecovery.inputVector, sourceInputs, FrameIntervalRecoverySound.inputs] using hdqContains
+  · simpa [InclinedFrameIntervalRecovery.inputVector, sourceInputs, FrameIntervalRecoverySound.inputs, Rat.cast_div, Rat.cast_sub, mul_div_assoc] using hxContains
+  · simpa [InclinedFrameIntervalRecovery.inputVector, sourceInputs, FrameIntervalRecoverySound.inputs] using hEAContains
+  · simpa [InclinedFrameIntervalRecovery.inputVector, sourceInputs, FrameIntervalRecoverySound.inputs] using hEIContains
+  · simpa [InclinedFrameIntervalRecovery.inputVector, sourceInputs, FrameIntervalRecoverySound.inputs] using hc
+  · simpa [InclinedFrameIntervalRecovery.inputVector, sourceInputs, FrameIntervalRecoverySound.inputs] using hs
 
 theorem field_contains {bits : Nat} {data : Partition} {basis : GlobalBasis}
     (hpartition : PartitionValid data) (hbasis : GlobalBasisValid data basis)
