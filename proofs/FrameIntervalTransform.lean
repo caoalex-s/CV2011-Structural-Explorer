@@ -1,4 +1,5 @@
 import FrameIntervalOps
+import Mathlib.Data.Fin.VecNotation
 
 /-! Apply one source member orientation to both endpoint displacement triples.
     The minus sign is attached to sine in transverse local displacement. -/

@@ -44,7 +44,7 @@ theorem source_point_work (data : Partition) (basis : GlobalBasis) (h : GlobalBa
     pointLoadWork data index (embed data basis (InclinedFrameReduced.unit data basis (columnIndex h row))) =
       ∑ component, sourceActionProjection data basis h index component row * sourceAction data index component := by
   unfold pointLoadWork sourceActionProjection sourceAction
-  split_ifs <;> simp [Fin.sum_univ_succ] <;> ring
+  split_ifs <;> simp_all [Fin.sum_univ_succ] <;> ring
 
 theorem source_force_assembly (data : Partition) (basis : GlobalBasis) (h : GlobalBasisValid data basis)
     (row : Fin basis.columns.size) :

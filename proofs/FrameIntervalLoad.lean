@@ -1,4 +1,5 @@
 import FrameIntervalOps
+import Mathlib.Data.Fin.VecNotation
 
 /-! Affine consistent nodal actions in local u/v/rotation endpoint order.
     Each action is evaluated with outward interval operations; cancellation
