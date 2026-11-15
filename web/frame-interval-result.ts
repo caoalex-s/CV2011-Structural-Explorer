@@ -25,8 +25,10 @@ export interface IntervalValues {
 
 export function decodeAcceptedIntervalReport(bytes: Uint8Array): IntervalValues {
     if (bytes.length > 262144) throw Error('Interval report exceeds its byte budget.');
+    // Check original bytes: TextDecoder otherwise silently strips a UTF-8 BOM.
+    for (const byte of bytes)
+        if (byte !== 10 && (byte < 32 || byte > 126)) throw Error('Invalid interval report characters.');
     const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-    if (!/^[\x20-\x7e\n]*$/.test(text)) throw Error('Invalid interval report characters.');
     let lines = 1;
     for (const character of text) if (character === '\n') lines++;
     if (lines > 1024) throw Error('Too many interval report fields.');

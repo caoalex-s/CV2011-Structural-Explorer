@@ -38,6 +38,9 @@ test('high precision readouts are preserved as rationals without binary64 conver
 });
 
 test('report corruption and preallocation limits fail closed', () => {
+    const validBytes = bytes(representationFixture());
+    const withBom = new Uint8Array([0xef, 0xbb, 0xbf, ...validBytes]);
+    assert.throws(() => decodeAcceptedIntervalReport(withBom), /characters/);
     const wrongMidpoint = representationFixture();
     wrongMidpoint[11] = '3';
     assert.throws(() => decodeAcceptedIntervalReport(bytes(wrongMidpoint)), /midpoint/);
