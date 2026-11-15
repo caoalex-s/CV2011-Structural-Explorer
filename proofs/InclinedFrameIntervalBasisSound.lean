@@ -75,6 +75,7 @@ theorem pointAmplitude_source {data : Partition} {basis : GlobalBasis}
   · simp [InclinedFrameIntervalBasis.pointAmplitude, InclinedFrameGlobalBasis.amplitude,
       InclinedFrameReduced.unit, InclinedFrameGlobalBasis.columnIndex, hactive, point.isLt,
       Subtype.ext_iff, Prod.ext_iff, Fin.ext_iff, and_assoc, and_left_comm, and_comm]
+    split_ifs <;> norm_num
   · simp [InclinedFrameIntervalBasis.pointAmplitude, InclinedFrameGlobalBasis.amplitude, hactive]
 
 theorem pointColumn_contains {bits : Nat} {data : Partition} {basis : GlobalBasis}
