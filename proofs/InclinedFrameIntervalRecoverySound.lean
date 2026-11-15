@@ -142,20 +142,33 @@ theorem fieldInputs_contains {bits : Nat} {data : Partition} {basis : GlobalBasi
   obtain ⟨actionX, hactionX, h⟩ := Option.bind_eq_some.mp h
   obtain ⟨actionY, hactionY, h⟩ := Option.bind_eq_some.mp h
   obtain ⟨actionMoment, hactionMoment, h⟩ := Option.bind_eq_some.mp h
-  obtain ⟨left, hleft, h⟩ := Option.bind_eq_some.mp h
-  obtain ⟨right, hright, h⟩ := Option.bind_eq_some.mp h
-  obtain ⟨p, hp, h⟩ := Option.bind_eq_some.mp h
-  obtain ⟨pEnd, hpEnd, h⟩ := Option.bind_eq_some.mp h
-  obtain ⟨q, hq, h⟩ := Option.bind_eq_some.mp h
-  obtain ⟨qEnd, hqEnd, h⟩ := Option.bind_eq_some.mp h
-  obtain ⟨pChange, hpChange, h⟩ := Option.bind_eq_some.mp h
-  obtain ⟨qChange, hqChange, h⟩ := Option.bind_eq_some.mp h
-  obtain ⟨dp, hdp, h⟩ := Option.bind_eq_some.mp h
-  obtain ⟨dq, hdq, h⟩ := Option.bind_eq_some.mp h
-  obtain ⟨offset, hoffset, h⟩ := Option.bind_eq_some.mp h
-  obtain ⟨x, hx, h⟩ := Option.bind_eq_some.mp h
-  obtain ⟨EA, hEA, h⟩ := Option.bind_eq_some.mp h
-  obtain ⟨EI, hEI, h⟩ := Option.bind_eq_some.mp h
+  obtain ⟨loads, hloads, h⟩ := Option.bind_eq_some.mp h
+  obtain ⟨slopes, hslopes, h⟩ := Option.bind_eq_some.mp h
+  obtain ⟨properties, hproperties, h⟩ := Option.bind_eq_some.mp h
+  unfold InclinedFrameIntervalRecovery.loadComponents at hloads
+  obtain ⟨left, hleft, hloads⟩ := Option.bind_eq_some.mp hloads
+  obtain ⟨right, hright, hloads⟩ := Option.bind_eq_some.mp hloads
+  obtain ⟨p, hp, hloads⟩ := Option.bind_eq_some.mp hloads
+  obtain ⟨pEnd, hpEnd, hloads⟩ := Option.bind_eq_some.mp hloads
+  obtain ⟨q, hq, hloads⟩ := Option.bind_eq_some.mp hloads
+  obtain ⟨qEnd, hqEnd, hloads⟩ := Option.bind_eq_some.mp hloads
+  have loadsEquality := Option.some.inj hloads
+  subst loads
+  unfold InclinedFrameIntervalRecovery.loadSlopes at hslopes
+  dsimp only at hslopes
+  obtain ⟨pChange, hpChange, hslopes⟩ := Option.bind_eq_some.mp hslopes
+  obtain ⟨qChange, hqChange, hslopes⟩ := Option.bind_eq_some.mp hslopes
+  obtain ⟨dp, hdp, hslopes⟩ := Option.bind_eq_some.mp hslopes
+  obtain ⟨dq, hdq, hslopes⟩ := Option.bind_eq_some.mp hslopes
+  have slopesEquality := Option.some.inj hslopes
+  subst slopes
+  unfold InclinedFrameIntervalRecovery.positionMaterial at hproperties
+  obtain ⟨offset, hoffset, hproperties⟩ := Option.bind_eq_some.mp hproperties
+  obtain ⟨x, hx, hproperties⟩ := Option.bind_eq_some.mp hproperties
+  obtain ⟨EA, hEA, hproperties⟩ := Option.bind_eq_some.mp hproperties
+  obtain ⟨EI, hEI, hproperties⟩ := Option.bind_eq_some.mp hproperties
+  have propertiesEquality := Option.some.inj hproperties
+  subst properties
   have hout := Option.some.inj h
   subst out
   obtain ⟨hL, hc, hs, _⟩ := InclinedFrameIntervalGeometrySound.piece_contains (hgeometry index)
