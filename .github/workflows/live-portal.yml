@@ -73,13 +73,13 @@ jobs:
           lake env bash -c 'export LEAN_PATH="$PWD:$LEAN_PATH"; lean ../.data/live-portal/InclinedIntegrationAudit.lean' 2>&1 | tee ../.data/live-portal/inclined-integration-axioms.log
           cd ..
           python3 qa/live-portal/audit.py --inclined-integration --check .data/live-portal/inclined-integration-axioms.log --output .data/live-portal/inclined-integration-axiom-audit.json
-      - name: Compile source-derived interval assembly and equilibrium
+      - name: Compile source-derived interval assembly and all physical outputs
         shell: bash
         run: |
           set -euo pipefail
           cd proofs
           failed=0
-          for module in FrameIntervalVector FrameIntervalVectorSound FrameIntervalElement FrameIntervalElementSound FrameIntervalSolve FrameIntervalSolveSound FrameIntervalAssembly FrameIntervalAssemblySound FrameIntervalLoad FrameIntervalLoadSound FrameIntervalTransform FrameIntervalTransformSound InclinedFrameAssemblySound InclinedFrameIntervalGeometry InclinedFrameIntervalGeometrySound InclinedFrameIntervalLoad InclinedFrameIntervalLoadSound InclinedFrameIntervalBasis InclinedFrameIntervalBasisSound InclinedFrameIntervalAssembly InclinedFrameIntervalAssemblySound InclinedFrameIntervalEquilibrium; do
+          for module in RationalFrameFields FrameIntervalVector FrameIntervalVectorSound FrameIntervalElement FrameIntervalElementSound FrameIntervalSolve FrameIntervalSolveSound FrameIntervalAssembly FrameIntervalAssemblySound FrameIntervalLoad FrameIntervalLoadSound FrameIntervalTransform FrameIntervalTransformSound InclinedFrameAssemblySound InclinedFrameIntervalGeometry InclinedFrameIntervalGeometrySound InclinedFrameIntervalLoad InclinedFrameIntervalLoadSound InclinedFrameIntervalBasis InclinedFrameIntervalBasisSound InclinedFrameIntervalAssembly InclinedFrameIntervalAssemblySound InclinedFrameIntervalEquilibrium FrameIntervalExpression FrameIntervalExpressionSound FrameIntervalRecovery FrameIntervalRecoverySound FrameIntervalAccuracy FrameIntervalAccuracySound InclinedFrameIntervalRecovery InclinedFrameIntervalRecoverySound InclinedFrameIntervalReactions InclinedFrameIntervalReactionsSound InclinedFrameIntervalOutputs InclinedFrameIntervalOutputsSound; do
             if ! lake env bash -c 'export LEAN_PATH="$PWD:$LEAN_PATH"; lean -o "$1.olean" "$1.lean"' -- "$module" 2>&1 | tee "../.data/live-portal/$module.log"; then
               failed=1
             fi
@@ -94,6 +94,15 @@ jobs:
           lake env bash -c 'export LEAN_PATH="$PWD:$LEAN_PATH"; lean ../.data/live-portal/InclinedAssemblyAudit.lean' 2>&1 | tee ../.data/live-portal/inclined-assembly-axioms.log
           cd ..
           python3 qa/live-portal/audit.py --inclined-assembly --check .data/live-portal/inclined-assembly-axioms.log --output .data/live-portal/inclined-assembly-axiom-audit.json
+      - name: Audit physical stability and all output accuracy claims
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 qa/live-portal/audit.py --inclined-outputs --emit .data/live-portal/InclinedOutputAudit.lean
+          cd proofs
+          lake env bash -c 'export LEAN_PATH="$PWD:$LEAN_PATH"; lean ../.data/live-portal/InclinedOutputAudit.lean' 2>&1 | tee ../.data/live-portal/inclined-output-axioms.log
+          cd ..
+          python3 qa/live-portal/audit.py --inclined-outputs --check .data/live-portal/inclined-output-axioms.log --output .data/live-portal/inclined-output-axiom-audit.json
       - name: Exercise the generic source decoder and exact predicate
         shell: bash
         run: |

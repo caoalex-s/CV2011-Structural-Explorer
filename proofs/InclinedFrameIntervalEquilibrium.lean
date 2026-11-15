@@ -75,5 +75,51 @@ theorem check_physical_equilibrium {bits : Nat} {data : Partition} {basis : Glob
   · intro column
     simpa only [lift_at_column] using hbounds column
 
+/-- Stability uses the original source's symmetric PSD stiffness, in addition
+    to checked uniqueness. No stability conclusion follows from an inverse
+    proposal or an unconstrained algebraic matrix alone. -/
+theorem check_positive_stiffness {bits : Nat} {data : Partition} {basis : GlobalBasis}
+    {certificate : Certificate data basis} (hcheck : check bits certificate = true)
+    (motion : InclinedFrameReal.Motion data) (hadmissible : SourceAllows data motion)
+    (hnonzero : motion ≠ 0) : 0 < InclinedFrameReal.stiffnessWork data motion motion := by
+  have hchecks : Checks bits certificate := of_decide_eq_true hcheck
+  have hpartition := hchecks.1
+  obtain ⟨hbasis, flatValues, hequilibrium, hunique, _⟩ := check_physical_equilibrium hcheck
+  let solution := liftCoordinates hbasis flatValues
+  have hnondegenerate : ∀ coordinates : Coordinates data basis,
+      (∀ variation, InclinedFrameReduced.form data basis coordinates variation = 0) → coordinates = 0 := by
+    intro coordinates hnull
+    have hperturbed : InclinedFrameReduced.Equilibrium data (embed data basis (solution+coordinates)) := by
+      constructor
+      · exact (range_equals_source_kernel hpartition hbasis _).mpr ⟨solution+coordinates, rfl⟩
+      · intro variation hallowed
+        obtain ⟨virtualCoordinates, rfl⟩ :=
+          (range_equals_source_kernel hpartition hbasis variation).mp hallowed
+        have hallowedVirtual : SourceAllows data (embed data basis virtualCoordinates) :=
+          (range_equals_source_kernel hpartition hbasis _).mpr ⟨virtualCoordinates, rfl⟩
+        have hwork := hequilibrium.2 _ hallowedVirtual
+        change InclinedFrameReduced.form data basis solution virtualCoordinates =
+          InclinedFrameReduced.load data basis virtualCoordinates at hwork
+        change InclinedFrameReduced.form data basis (solution+coordinates) virtualCoordinates =
+          InclinedFrameReduced.load data basis virtualCoordinates
+        rw [map_add, LinearMap.add_apply, hnull, add_zero]
+        exact hwork
+    have hequal := embed_injective data basis (hunique _ hperturbed)
+    exact add_left_cancel (show solution+coordinates = solution+0 by simpa only [add_zero] using hequal)
+  have hpositive := FrameReducedStability.positive_of_psd_nondegenerate
+    (InclinedFrameReduced.form data basis) (InclinedFrameReduced.form_symmetric data basis)
+    (InclinedFrameReduced.form_nonnegative data basis hpartition) hnondegenerate
+  obtain ⟨coordinates, hcoordinates⟩ :=
+    (range_equals_source_kernel hpartition hbasis motion).mp hadmissible
+  have hcoordinatesNonzero : coordinates ≠ 0 := by
+    intro hzero
+    apply hnonzero
+    rw [← hcoordinates, hzero]
+    exact (embedding data basis).map_zero
+  have hresult := hpositive coordinates hcoordinatesNonzero
+  change 0 < InclinedFrameReal.stiffnessWork data
+    (embed data basis coordinates) (embed data basis coordinates) at hresult
+  simpa only [hcoordinates] using hresult
+
 end
 end InclinedFrameIntervalEquilibrium

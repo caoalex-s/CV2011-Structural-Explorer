@@ -4,9 +4,28 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
-from audit import audit, INCLINED_FOUNDATION_MODULES, INCLINED_INTEGRATION_MODULES, INCLINED_ASSEMBLY_MODULES
+from audit import audit, INCLINED_FOUNDATION_MODULES, INCLINED_INTEGRATION_MODULES, INCLINED_ASSEMBLY_MODULES, INCLINED_OUTPUT_MODULES
 
 class AxiomAuditTests(unittest.TestCase):
+    def test_output_audit_includes_stability_recovery_and_accuracy(self):
+        repository = Path(__file__).resolve().parents[2]
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder) / 'Audit.lean'
+            subprocess.run([sys.executable, str(Path(__file__).with_name('audit.py')),
+                            '--inclined-outputs', '--emit', str(output)], cwd=repository, check=True)
+            lines = output.read_text(encoding='utf-8').splitlines()
+            imports = [line for line in lines if line.startswith('import ')]
+            claims = [line for line in lines if line.startswith('#print axioms ')]
+            self.assertEqual(imports, ['import ' + name for name in INCLINED_OUTPUT_MODULES])
+            self.assertEqual(len(imports), 50)
+            self.assertEqual(len(claims), len(set(claims)))
+            for name in ['InclinedFrameIntervalEquilibrium.check_positive_stiffness',
+                         'InclinedFrameIntervalRecoverySound.field_contains',
+                         'InclinedFrameIntervalReactionsSound.reaction_contains',
+                         'FrameIntervalAccuracySound.check_error',
+                         'InclinedFrameIntervalOutputsSound.checked_source_outputs']:
+                self.assertIn('#print axioms ' + name, claims)
+
     def test_assembly_audit_keeps_every_dependency_and_physical_conclusion(self):
         repository = Path(__file__).resolve().parents[2]
         with tempfile.TemporaryDirectory() as folder:
