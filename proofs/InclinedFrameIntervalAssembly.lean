@@ -10,6 +10,18 @@ import FrameIntervalSolve
 namespace InclinedFrameIntervalAssembly
 open InclinedFrameSource InclinedFrameBasis FrameIntervalOps
 
+/-- Compare every component of a finite vector. This constructive decision is
+    used when recomputed vectors are compared with certificate tables. -/
+private def finiteVectorEquality {size : Nat} {Value : Type} [DecidableEq Value]
+    (left right : Fin size → Value) : Decidable (left = right) :=
+  if equalComponents : ∀ index, left index = right index then
+    isTrue (funext equalComponents)
+  else
+    isFalse (fun equality => equalComponents (fun index => congrFun equality index))
+
+local instance {size : Nat} {Value : Type} [DecidableEq Value] :
+    DecidableEq (Fin size → Value) := finiteVectorEquality
+
 structure Certificate (data : Partition) (basis : GlobalBasis) where
   roots : Fin data.source.members.size → Bounds
   geometry : Fin data.pieces.size → InclinedFrameIntervalGeometry.PieceBounds
