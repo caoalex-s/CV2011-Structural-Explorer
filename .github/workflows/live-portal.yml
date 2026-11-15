@@ -180,6 +180,18 @@ jobs:
           cd ..
           python3 qa/live-portal/audit.py --frame --check .data/live-portal/frame-axioms.log --output .data/live-portal/frame-axiom-audit.json
           python3 -m unittest discover -s qa/live-portal -p 'test_*.py' -v
+      - name: Exercise inclined native packets and exact report correspondence
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e .data/live-portal/inclined-native
+          node qa/inclined-frame/packets.mjs .data/live-portal/inclined-native
+          cd proofs
+          timeout --kill-after=10s 180s lake env bash -c 'export LEAN_PATH="$PWD:$LEAN_PATH"; lean --run ../qa/inclined-frame/NativePackets.lean ../.data/live-portal/inclined-native' 2>&1 | tee ../.data/live-portal/inclined-native.log
+          timeout --kill-after=10s 180s lake env bash -c 'export LEAN_PATH="$PWD:$LEAN_PATH"; lean --run ../qa/inclined-frame/NativeReports.lean ../.data/live-portal/inclined-native' 2>&1 | tee ../.data/live-portal/inclined-reports.log
+          cd ..
+          python3 qa/inclined-frame/verify-native.py .data/live-portal/inclined-native.log | tee .data/live-portal/inclined-physical-reference.log
+          node qa/inclined-frame/verify-reports.mjs .data/live-portal/inclined-native .data/live-portal/inclined-native.log .data/live-portal/inclined-reports.log | tee .data/live-portal/inclined-report-correspondence.log
       - name: Reject a corrupted stiffness table through the actual-model proof
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_wasm }}
         run: cd proofs && lake env python3 ../qa/live-portal/negative-table.py
