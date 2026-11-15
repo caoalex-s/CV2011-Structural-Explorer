@@ -115,6 +115,37 @@ structure GlobalBasis where
   columns : Array Column
   deriving Inhabited, Repr, DecidableEq
 
+/-- Local slots 0/1/2 mean first translation, second translation and rotation.
+    Slot 0 is tangent amplitude when the translation mode is one. -/
+def Active (basis : PointBasis) (slot : Fin 3) : Prop :=
+  if slot = 0 then basis.translation ≤ 1
+  else if slot = 1 then basis.translation = 0
+  else basis.rotationFree = true
+
+instance (basis : PointBasis) (slot : Fin 3) : Decidable (Active basis slot) := by
+  unfold Active
+  infer_instance
+
+def columnSlot (column : Column) : Fin 3 :=
+  if column.kind = 1 then 1 else if column.kind = 3 then 2 else 0
+
+/-- Explicit finite ownership, uniqueness and coverage checks make the array
+    ordering a bijection with the independent source-coordinate index. -/
+def AllocationValid (data : Partition) (basis : GlobalBasis) : Prop :=
+  (∀ index : Fin basis.columns.size,
+    basis.columns[index.val]!.point < data.points.size ∧
+    Active basis.points[basis.columns[index.val]!.point]! (columnSlot basis.columns[index.val]!)) ∧
+  (∀ first second : Fin basis.columns.size,
+    basis.columns[first.val]!.point = basis.columns[second.val]!.point →
+    columnSlot basis.columns[first.val]! = columnSlot basis.columns[second.val]! → first = second) ∧
+  (∀ point : Fin data.points.size, ∀ slot : Fin 3, Active basis.points[point.val]! slot →
+    ∃ index : Fin basis.columns.size,
+      basis.columns[index.val]!.point = point.val ∧ columnSlot basis.columns[index.val]! = slot)
+
+instance (data : Partition) (basis : GlobalBasis) : Decidable (AllocationValid data basis) := by
+  unfold AllocationValid
+  infer_instance
+
 def rawGlobalBasis (data : Partition) : GlobalBasis :=
   let points := Array.ofFn fun point : Fin data.points.size => rawBasis data point.val
   ⟨points, allocatedColumns points⟩
@@ -125,7 +156,7 @@ def rawGlobalBasis (data : Partition) : GlobalBasis :=
 def GlobalBasisValid (data : Partition) (basis : GlobalBasis) : Prop :=
   basis.points.size = data.points.size ∧
   (∀ point : Fin data.points.size, BasisValid data point.val basis.points[point.val]!) ∧
-  basis.columns = allocatedColumns basis.points ∧ basis.columns.size ≤ 48
+  basis.columns = allocatedColumns basis.points ∧ basis.columns.size ≤ 48 ∧ AllocationValid data basis
 
 instance (data : Partition) (basis : GlobalBasis) : Decidable (GlobalBasisValid data basis) := by
   unfold GlobalBasisValid

@@ -6,9 +6,9 @@ import FrameReducedStability
     They do not assert source ownership, assembly correspondence or stability. -/
 namespace FrameMatrixResidual
 noncomputable section
-variable {n : Nat}
+variable {ι : Type*} [Fintype ι] [DecidableEq ι]
 
-def action (matrix : Fin n → Fin n → ℝ) : (Fin n → ℝ) →ₗ[ℝ] (Fin n → ℝ) where
+def action (matrix : ι → ι → ℝ) : (ι → ℝ) →ₗ[ℝ] (ι → ℝ) where
   toFun x i := ∑ j, matrix i j * x j
   map_add' x y := by
     funext i
@@ -17,11 +17,11 @@ def action (matrix : Fin n → Fin n → ℝ) : (Fin n → ℝ) →ₗ[ℝ] (Fin
     funext i
     simp [Finset.mul_sum, mul_left_comm, mul_assoc]
 
-def defect (matrix inverse : Fin n → Fin n → ℝ) (i j : Fin n) : ℝ :=
+def defect (matrix inverse : ι → ι → ℝ) (i j : ι) : ℝ :=
   (if i = j then 1 else 0) - ∑ k, inverse i k * matrix k j
 
-theorem row_sum_bound (matrix : Fin n → Fin n → ℝ) (q : ℝ) (hq : 0 ≤ q)
-    (hrows : ∀ i, (∑ j, |matrix i j|) ≤ q) (x : Fin n → ℝ) :
+theorem row_sum_bound (matrix : ι → ι → ℝ) (q : ℝ) (hq : 0 ≤ q)
+    (hrows : ∀ i, (∑ j, |matrix i j|) ≤ q) (x : ι → ℝ) :
     ‖action matrix x‖ ≤ q * ‖x‖ := by
   apply (pi_norm_le_iff_of_nonneg (mul_nonneg hq (norm_nonneg x))).mpr
   intro i
@@ -37,7 +37,7 @@ theorem row_sum_bound (matrix : Fin n → Fin n → ℝ) (q : ℝ) (hq : 0 ≤ q
     _ = (∑ j, |matrix i j|) * ‖x‖ := (Finset.sum_mul _ _ _).symm
     _ ≤ q * ‖x‖ := mul_le_mul_of_nonneg_right (hrows i) (norm_nonneg x)
 
-theorem defect_action (matrix inverse : Fin n → Fin n → ℝ) (x : Fin n → ℝ) :
+theorem defect_action (matrix inverse : ι → ι → ℝ) (x : ι → ℝ) :
     action (defect matrix inverse) x = x - action inverse (action matrix x) := by
   funext i
   have hproduct : (∑ j, (∑ k, inverse i k * matrix k j) * x j) =
@@ -55,7 +55,7 @@ theorem defect_action (matrix inverse : Fin n → Fin n → ℝ) (x : Fin n → 
   rw [hproduct]
   simp
 
-theorem defect_norm_bound (matrix inverse : Fin n → Fin n → ℝ)
+theorem defect_norm_bound (matrix inverse : ι → ι → ℝ)
     (q : ℝ) (hq : 0 ≤ q) (hrows : ∀ i, (∑ j, |defect matrix inverse i j|) ≤ q) :
     ∀ x, ‖x - action inverse (action matrix x)‖ ≤ q * ‖x‖ := by
   intro x
@@ -64,8 +64,8 @@ theorem defect_norm_bound (matrix inverse : Fin n → Fin n → ℝ)
 
 /-- Entrywise residual and row-sum checks imply unique solvability and a bound
     on every reduced displacement coordinate, including an empty reduced space. -/
-theorem enclosed_solution (matrix inverse : Fin n → Fin n → ℝ)
-    (force estimate : Fin n → ℝ) (q eta : ℝ)
+theorem enclosed_solution (matrix inverse : ι → ι → ℝ)
+    (force estimate : ι → ℝ) (q eta : ℝ)
     (hqzero : 0 ≤ q) (hqone : q < 1) (hetazero : 0 ≤ eta)
     (hrows : ∀ i, (∑ j, |defect matrix inverse i j|) ≤ q)
     (hresidual : ∀ i, |action inverse (force - action matrix estimate) i| ≤ eta) :
@@ -95,8 +95,8 @@ theorem enclosed_solution (matrix inverse : Fin n → Fin n → ℝ)
     Source admissibility and independent columns must be proved before using
     this result as stability of the original constrained frame. -/
 theorem positive_stiffness_of_defect
-    (matrix inverse : Fin n → Fin n → ℝ)
-    (form : (Fin n → ℝ) →ₗ[ℝ] (Fin n → ℝ) →ₗ[ℝ] ℝ)
+    (matrix inverse : ι → ι → ℝ)
+    (form : (ι → ℝ) →ₗ[ℝ] (ι → ℝ) →ₗ[ℝ] ℝ)
     (q : ℝ) (hqzero : 0 ≤ q) (hqone : q < 1)
     (hrows : ∀ i, (∑ j, |defect matrix inverse i j|) ≤ q)
     (hrepresentation : ∀ x y, form x y = ∑ i, y i * action matrix x i)

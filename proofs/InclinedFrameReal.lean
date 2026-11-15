@@ -155,17 +155,51 @@ def pieceLoad (data : Partition) (piece : Piece) : LocalActions :=
     (direction.sine * piece.vertical) (direction.sine * piece.verticalEnd)
     (direction.cosine * piece.vertical) (direction.cosine * piece.verticalEnd)
 
+def pointLoadWork (data : Partition) (index : Fin data.source.loads.size)
+    (variation : Motion data) : ℝ :=
+    let load := data.source.loads[index.val]!
+    let motion := pointMotion data variation (locate data load.member load.t)
+    if load.kind = 0 then (load.fx : ℝ)*motion 0 + (load.fy : ℝ)*motion 1
+    else if load.kind = 1 then (load.mz : ℝ)*motion 2 else 0
+
 /-- Virtual work includes every original point action at its owned cut, and
     the exact affine consistent load of every physical segment. -/
 def externalWork (data : Partition) (variation : Motion data) : ℝ :=
   (∑ s : Fin data.pieces.size,
     let piece := data.pieces[s.val]!
     ∑ i : Fin 6, pieceLoad data piece i * pieceMotion data piece variation i) +
-  ∑ i : Fin data.source.loads.size,
-    let load := data.source.loads[i.val]!
-    let motion := pointMotion data variation (locate data load.member load.t)
-    if load.kind = 0 then (load.fx : ℝ)*motion 0 + (load.fy : ℝ)*motion 1
-    else if load.kind = 1 then (load.mz : ℝ)*motion 2 else 0
+  ∑ i : Fin data.source.loads.size, pointLoadWork data i variation
+
+theorem pointLoadWork_add (data : Partition) (index : Fin data.source.loads.size)
+    (first second : Motion data) :
+    pointLoadWork data index (first+second) =
+      pointLoadWork data index first + pointLoadWork data index second := by
+  unfold pointLoadWork
+  simp only [pointMotion_add, Pi.add_apply]
+  split_ifs <;> ring
+
+theorem pointLoadWork_smul (data : Partition) (index : Fin data.source.loads.size)
+    (scalar : ℝ) (variation : Motion data) :
+    pointLoadWork data index (scalar • variation) = scalar * pointLoadWork data index variation := by
+  unfold pointLoadWork
+  simp only [pointMotion_smul, Pi.smul_apply, smul_eq_mul]
+  split_ifs <;> ring
+
+theorem externalWork_add (data : Partition) (first second : Motion data) :
+    externalWork data (first+second) = externalWork data first + externalWork data second := by
+  simp only [externalWork, pieceMotion_add, Pi.add_apply, pointLoadWork_add,
+    mul_add, Finset.sum_add_distrib]
+  ring
+
+theorem externalWork_smul (data : Partition) (scalar : ℝ) (variation : Motion data) :
+    externalWork data (scalar • variation) = scalar * externalWork data variation := by
+  simp [externalWork, pieceMotion_smul, pointLoadWork_smul, Finset.mul_sum,
+    mul_add, mul_assoc, mul_left_comm]
+
+def loadForm (data : Partition) : Motion data →ₗ[ℝ] ℝ where
+  toFun := externalWork data
+  map_add' := externalWork_add data
+  map_smul' := by intro scalar variation; simpa using externalWork_smul data scalar variation
 
 def residualWork (data : Partition) (motion variation : Motion data) : ℝ :=
   stiffnessWork data motion variation - externalWork data variation
