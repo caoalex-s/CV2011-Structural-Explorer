@@ -24,7 +24,9 @@ theorem defect_contains {size bits : Nat}
     (fun index => singleton_contains (inverse row index)) (fun index => hcontains index column)
   have hidentity : Contains (singletonBounds (if row = column then 1 else 0))
       (if row = column then (1 : ℝ) else 0) := by
-    split_ifs <;> exact singleton_contains _
+    by_cases hequal : row = column
+    · simpa [hequal] using singleton_contains (1 : Rat)
+    · simpa [hequal] using singleton_contains (0 : Rat)
   exact executable_subtract_contains hsubtract hidentity hproductContains
 
 theorem residual_contains {size bits : Nat}
