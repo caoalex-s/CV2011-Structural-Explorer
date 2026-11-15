@@ -119,6 +119,26 @@ jobs:
           lake env bash -c 'export LEAN_PATH="$PWD:$LEAN_PATH"; lean ../.data/live-portal/InclinedPacketAudit.lean' 2>&1 | tee ../.data/live-portal/inclined-packet-axioms.log
           cd ..
           python3 qa/live-portal/audit.py --inclined-packet --check .data/live-portal/inclined-packet-axioms.log --output .data/live-portal/inclined-packet-axiom-audit.json
+      - name: Compile and audit exact inclined report serialization
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd proofs
+          failed=0
+          for module in InclinedFrameIntervalReport InclinedFrameIntervalReportSound; do
+            echo "Compiling $module with a 300-second deadline"
+            if ! timeout --kill-after=10s 300s lake env bash -c 'export LEAN_PATH="$PWD:$LEAN_PATH"; lean -o "$1.olean" "$1.lean"' -- "$module" 2>&1 | tee "../.data/live-portal/$module.log"; then
+              echo "$module failed or exceeded its 300-second compilation deadline" | tee -a "../.data/live-portal/$module.log"
+              failed=1
+            fi
+          done
+          test "$failed" = 0
+          cd ..
+          python3 qa/live-portal/audit.py --inclined-report --emit .data/live-portal/InclinedReportAudit.lean
+          cd proofs
+          lake env bash -c 'export LEAN_PATH="$PWD:$LEAN_PATH"; lean ../.data/live-portal/InclinedReportAudit.lean' 2>&1 | tee ../.data/live-portal/inclined-report-axioms.log
+          cd ..
+          python3 qa/live-portal/audit.py --inclined-report --check .data/live-portal/inclined-report-axioms.log --output .data/live-portal/inclined-report-axiom-audit.json
       - name: Exercise the generic source decoder and exact predicate
         shell: bash
         run: |

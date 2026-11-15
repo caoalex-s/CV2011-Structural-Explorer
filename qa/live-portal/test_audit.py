@@ -7,6 +7,20 @@ import tempfile
 from audit import audit, INCLINED_FOUNDATION_MODULES, INCLINED_INTEGRATION_MODULES, INCLINED_ASSEMBLY_MODULES, INCLINED_OUTPUT_MODULES, INCLINED_PACKET_MODULES
 
 class AxiomAuditTests(unittest.TestCase):
+    def test_report_audit_extends_packet_scope_without_replacing_it(self):
+        repository = Path(__file__).resolve().parents[2]
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder) / 'Audit.lean'
+            subprocess.run([sys.executable, str(Path(__file__).with_name('audit.py')),
+                            '--inclined-report', '--emit', str(output)], cwd=repository, check=True)
+            lines = output.read_text(encoding='utf-8').splitlines()
+            imports = [line for line in lines if line.startswith('import ')]
+            claims = [line for line in lines if line.startswith('#print axioms ')]
+            self.assertEqual(imports[:54], ['import ' + name for name in INCLINED_PACKET_MODULES])
+            self.assertEqual(len(imports), 56)
+            self.assertEqual(len(claims), len(set(claims)))
+            self.assertIn('#print axioms InclinedFrameIntervalReportSound.checkReport_sound', claims)
+
     def test_packet_audit_binds_successful_returns_to_source_and_query(self):
         repository = Path(__file__).resolve().parents[2]
         with tempfile.TemporaryDirectory() as folder:

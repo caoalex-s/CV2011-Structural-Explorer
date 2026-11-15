@@ -59,6 +59,10 @@ INCLINED_PACKET_MODULES = INCLINED_OUTPUT_MODULES + (
     'InclinedFrameIntervalWire', 'InclinedFrameIntervalWireSound',
 )
 
+INCLINED_REPORT_MODULES = INCLINED_PACKET_MODULES + (
+    'InclinedFrameIntervalReport', 'InclinedFrameIntervalReportSound',
+)
+
 def expected_theorems(source, namespace='PortalSoundness'):
     names = re.findall(r'^(?:@\[[^\]]+\]\s*)?theorem\s+(\w+)', source, re.MULTILINE)
     if not names or len(names) != len(set(names)):
@@ -80,10 +84,12 @@ def main():
     parser.add_argument('--inclined-assembly', action='store_true', help='Audit source-derived interval assembly and enclosed physical equilibrium.')
     parser.add_argument('--inclined-outputs', action='store_true', help='Audit physical stability, recovery and midpoint accuracy.')
     parser.add_argument('--inclined-packet', action='store_true', help='Audit compact reconstruction and decoded source/query binding.')
+    parser.add_argument('--inclined-report', action='store_true', help='Audit exact serialized reports from source-bound checked outputs.')
     args = parser.parse_args()
-    if sum((args.frame, args.inclined_foundation, args.inclined_integration, args.inclined_assembly, args.inclined_outputs, args.inclined_packet)) > 1:
+    if sum((args.frame, args.inclined_foundation, args.inclined_integration, args.inclined_assembly, args.inclined_outputs, args.inclined_packet, args.inclined_report)) > 1:
         parser.error('Choose one audit scope.')
-    scoped_modules = (INCLINED_PACKET_MODULES if args.inclined_packet else
+    scoped_modules = (INCLINED_REPORT_MODULES if args.inclined_report else
+                      INCLINED_PACKET_MODULES if args.inclined_packet else
                       INCLINED_OUTPUT_MODULES if args.inclined_outputs else
                       INCLINED_ASSEMBLY_MODULES if args.inclined_assembly else
                       INCLINED_INTEGRATION_MODULES if args.inclined_integration else
