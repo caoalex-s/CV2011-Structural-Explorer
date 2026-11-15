@@ -69,7 +69,8 @@ def build {data : Partition} {basis : GlobalBasis} (bits : Nat)
     -- 2. Reuse exactly the matrix and load arithmetic checked by assembly.
     let projection := fun piece component column => localColumns piece column component
     let stiffness := fun piece => FrameIntervalElement.entry (geometry piece).stiffness
-    let actionProjection := fun index component column =>
+    let actionProjection := fun (index : Fin data.source.loads.size) (component : Fin 3)
+        (column : Fin basis.columns.size) =>
       let action := data.source.loads[index.val]!
       pointAt (locate data action.member action.t) column component
     let matrix ← tabulate basis.columns.size fun row =>
