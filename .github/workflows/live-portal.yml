@@ -240,6 +240,7 @@ jobs:
             .data/wasm-build/canonical/browser-trace.zip
             .data/wasm-build/canonical/portal-accepted.png
             .data/wasm-build/canonical/main-affine-accepted.png
+            .data/wasm-build/canonical/main-inclined-accepted.png
             .data/wasm-build/canonical/browser-results.json
             public/portal-checker/bundle
             !.data/live-portal-build/browser/node_modules

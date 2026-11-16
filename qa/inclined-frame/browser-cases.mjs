@@ -6,6 +6,7 @@ import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
 import { readFile, readdir } from 'node:fs/promises';
 import { resolve, extname } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 export async function runInclinedCases({ context, bundle, result }) {
@@ -13,6 +14,7 @@ export async function runInclinedCases({ context, bundle, result }) {
     const fixtures = JSON.parse(await readFile(resolve(directory, 'manifest.json'), 'utf8'));
     const manifestBytes = await readFile(resolve(bundle, 'manifest.json'));
     const manifest = JSON.parse(manifestBytes);
+    const { decodeAcceptedIntervalReport } = await import(pathToFileURL(resolve(bundle, 'frame-interval-result.js')).href);
     // Immutable served bytes bind both verification fetches and later imports.
     const served = new Map();
     for (const name of await readdir(bundle)) served.set(name, await readFile(resolve(bundle, name)));
@@ -99,7 +101,8 @@ export async function runInclinedCases({ context, bundle, result }) {
         const baseline = await readFile(resolve(directory, 'irrational-cantilever.txt'));
         const baselineReport = await readFile(resolve(directory, 'irrational-cantilever.report'));
         await abi(baseline);
-        assert.equal((await abi(baseline, { pointerOffset: 1 })).outputSize, 0);
+        const wrongPointer = await abi(baseline, { pointerOffset: 1 });
+        assert.equal(wrongPointer.code, 2); assert.equal(wrongPointer.outputSize, 0);
         await abi(baseline);
         const exact = await abi(await readFile('.data/general-frame-packets/1_two_spans.packet'));
         assert.equal(exact.code, 1); assert.equal(exact.outputSize, 0);
@@ -142,6 +145,7 @@ export async function runInclinedCases({ context, bundle, result }) {
             const report = await readFile(resolve(directory, fixture.name + '.report'));
             assert.equal(value.reportDigest, digest(report));
             assert.deepEqual(Buffer.from(value.report), report);
+            assert.deepEqual(value.interval, decodeAcceptedIntervalReport(report));
             measurements.worker.push({ name: fixture.name, elapsedMs, memoryBytes: value.memoryBytes });
         }
         for (const options of [{ shared: true }, { malformed: true }]) {
@@ -169,7 +173,8 @@ export async function runInclinedCases({ context, bundle, result }) {
         assert.equal((await worker(originalRequest)).value.state, 'accepted');
         measurements.terminationAndRestart = true;
         const allocation = await page.evaluate(() => window.inclinedHarness.call('abi', { action: 'allocation-failure' }));
-        assert(allocation.allocationFailed || allocation.error, JSON.stringify(allocation));
+        assert(allocation.allocationFailed || (allocation.errorName === 'RuntimeError' &&
+            /out of memory|Cannot enlarge memory|OOM|Aborted/i.test(allocation.error)), JSON.stringify(allocation));
         measurements.boundedAllocationFailure = allocation;
         result.cases.push('inclined-worker-deadline-termination-restart-and-bounded-wasm-allocation-failure');
         for (const [name, expected] of Object.entries(manifest.files)) {

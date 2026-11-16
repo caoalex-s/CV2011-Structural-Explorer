@@ -1,4 +1,15 @@
 /* Worked equations, quantities, and proof details. */
+.frame-interval-values {
+    table-layout: fixed;
+    width: 100%;
+}
+
+.frame-interval-values th,
+.frame-interval-values td {
+    overflow-wrap: anywhere;
+    vertical-align: top;
+}
+
 .worked-panel {
     min-width: 0;
 }
