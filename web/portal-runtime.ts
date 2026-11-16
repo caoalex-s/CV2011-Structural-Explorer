@@ -4,9 +4,10 @@ export type CheckerResult = { state: string; id?: number; artifact?: string; inp
 export const sha256 = async (bytes: Uint8Array): Promise<string> =>
     [...new Uint8Array(await crypto.subtle.digest('SHA-256', new Uint8Array(bytes)))].map(byte => byte.toString(16).padStart(2, '0')).join('');
 
-// Development ceiling shared with the isolated inclined browser diagnostics.
-// The final UI deadline must be checked against measured compiled runtimes.
-export const inclinedDeadlineMilliseconds = 180000;
+// Runtime diagnostic 1 measured 0.80–3.89 s for eight inclined worker fixtures.
+// Allow slower devices a bounded margin; larger/expensive models can still time
+// out inconclusively. Exact-cardinal requests retain their separate 1 s limit.
+export const inclinedDeadlineMilliseconds = 30000;
 
 export class PortalRuntime {
     private worker: Worker;
