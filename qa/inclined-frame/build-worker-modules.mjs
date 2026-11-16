@@ -9,7 +9,8 @@ const destination = process.argv[2];
 if (!destination) throw Error('Supply the existing artifact asset directory.');
 await import('../general-frame/build-worker-modules.mjs');
 for (const name of ['frame-interval', 'frame-interval-geometry', 'frame-interval-basis',
-    'frame-interval-model', 'frame-interval-solve', 'frame-interval-packet', 'frame-interval-result']) {
+    'frame-interval-model', 'frame-interval-solve', 'frame-interval-packet', 'frame-interval-result',
+    'frame-interval-abi']) {
     const source = await readFile(resolve('web', name + '.ts'), 'utf8');
     await writeFile(resolve(destination, name + '.js'), stripTypeScriptTypes(source));
 }
