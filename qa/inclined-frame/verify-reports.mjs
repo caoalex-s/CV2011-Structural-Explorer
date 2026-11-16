@@ -54,6 +54,11 @@ for (const fixture of manifest) {
     const packetHash = digest(resolve(directory, fixture.name + '.txt'));
     assert.equal(packetHash, fixture.sha256, 'Packet changed since fixture generation.');
     files[fixture.name + '.txt'] = packetHash;
+    if (fixture.requestSha256) {
+        const requestName = fixture.name + '.request.json';
+        assert.equal(digest(resolve(directory, requestName)), fixture.requestSha256);
+        files[requestName] = fixture.requestSha256;
+    }
     if (!native.accepted) continue;
     const values = decodeAcceptedIntervalReport(readFileSync(resolve(directory, fixture.name + '.report')));
     const intervals = [...values.fields, ...values.points.flatMap(point => point.reactions)];

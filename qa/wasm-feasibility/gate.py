@@ -16,18 +16,29 @@ import time
 from canonical_evidence import collect_manifest, archive_pass, clean_archived_build, compare_passes
 
 ROOT = Path.cwd()
-FRAME = sys.argv[1:] == ["--frame"]
+INCLINED = sys.argv[1:] == ["--inclined"]
+FRAME = INCLINED or sys.argv[1:] == ["--frame"]
 PORTAL = FRAME or sys.argv[1:] == ["--portal"]
-assert not sys.argv[1:] or PORTAL, "Use no arguments for smoke, --portal, or --frame."
-CHECKER_MODULE = "RationalFrameWire" if FRAME else "PortalChecker" if PORTAL else "SmokeChecker"
+assert not sys.argv[1:] or PORTAL, "Use no arguments for smoke, --portal, --frame, or --inclined."
+CHECKER_MODULE = "InclinedFrameIntervalReport" if INCLINED else "RationalFrameWire" if FRAME else "PortalChecker" if PORTAL else "SmokeChecker"
 CHECKER_MODULES = {"PortalChecker", "PortalTables"} if PORTAL else {"SmokeChecker"}
 if FRAME:
     CHECKER_MODULES.update({"RationalFrameModel", "RationalFramePartition", "RationalFrameChecker", "RationalFrameWire"})
+if INCLINED:
+    CHECKER_MODULES.update({
+        "FrameIntervalOps", "FrameIntervalGeometry", "FrameIntervalTrig", "FrameIntervalVector",
+        "FrameIntervalElement", "FrameIntervalSolve", "FrameIntervalAssembly", "FrameIntervalLoad",
+        "FrameIntervalTransform", "FrameIntervalExpression", "FrameIntervalRecovery", "FrameIntervalAccuracy",
+        "InclinedFrameSource", "InclinedFrameBasis", "InclinedFrameIntervalGeometry", "InclinedFrameIntervalLoad",
+        "InclinedFrameIntervalBasis", "InclinedFrameIntervalAssembly", "InclinedFrameIntervalRecovery",
+        "InclinedFrameIntervalReactions", "InclinedFrameIntervalOutputs", "InclinedFrameIntervalBuild",
+        "InclinedFrameIntervalWire", "InclinedFrameIntervalReport",
+    })
 OUTPUT = ROOT / (".data/live-portal-build" if PORTAL else ".data/wasm-gate")
 WORK = ROOT / ".data/wasm-build"
 CANONICAL = WORK / "canonical"
 SOURCES = ROOT / ("qa/live-portal" if PORTAL else "qa/wasm-feasibility")
-ABI = ROOT / "qa/general-frame/abi.c" if FRAME else SOURCES / "abi.c"
+ABI = ROOT / "qa/inclined-frame/abi.c" if INCLINED else ROOT / "qa/general-frame/abi.c" if FRAME else SOURCES / "abi.c"
 PINS = {
     "lean": "6caaee842e9495688c1567e78c0e68dbb96942aa",
     "emsdk": "a896e3d066448b3530dbcaa48869fafefd738f57",
@@ -37,7 +48,7 @@ PINS = {
     "playwright": "1.51.1",
 }
 receipt = {"pins": PINS, "stage": "setup", "passed": False,
-           "mode": "frame" if FRAME else "portal" if PORTAL else "smoke",
+           "mode": "inclined" if INCLINED else "frame" if FRAME else "portal" if PORTAL else "smoke",
            "proof": "see separate axioms.log and axiom-audit.json", "browser": "not reached",
            "repeatability": False, "runtime_gate_passed": False,
            "overall_gate_passed": False, "hosting_gate": "pending"}
@@ -71,9 +82,15 @@ def save_receipt():
     }
     receipt["dependency_lock_sha256"] = digest(ROOT / "proofs/lake-manifest.json")
     if FRAME:
-        receipt["files"]["qa/general-frame/abi.c"] = digest(ABI)
+        receipt["files"][str(ABI.relative_to(ROOT))] = digest(ABI)
         receipt["frame_sources"] = {f"web/{name}.ts": digest(ROOT / f"web/{name}.ts")
                                     for name in ["frame-rational", "model-evidence", "frame-candidate", "frame-packet", "frame-result"]}
+    if INCLINED:
+        receipt["files"].update({str(path.relative_to(ROOT)): digest(path)
+                                 for path in sorted((ROOT / "qa/inclined-frame").glob("*")) if path.is_file()})
+        receipt["inclined_sources"] = {str(path.relative_to(ROOT)): digest(path)
+            for path in sorted((ROOT / "web").glob("frame-interval*.ts"))}
+        receipt["inclined_sources"]["web/frame-worker-bytes.ts"] = digest(ROOT / "web/frame-worker-bytes.ts")
     (OUTPUT / "receipt.json").write_text(json.dumps(receipt, indent=2) + "\n")
 
 
@@ -89,7 +106,7 @@ def generate_c(environment, native_lean, index):
     generated.mkdir()
     prefix = Path(run([native_lean, "--print-prefix"], env=environment, capture=True))
     roots = [ROOT / "proofs", ROOT / "proofs/.lake/packages/batteries", prefix / "src/lean"]
-    pending = [CHECKER_MODULE, "PortalChecker"] if FRAME else [CHECKER_MODULE]
+    pending = [CHECKER_MODULE, "PortalChecker", "RationalFrameWire"] if FRAME else [CHECKER_MODULE]
     modules = {}
     while pending:
         module = pending.pop()
@@ -160,18 +177,23 @@ def build_artifact(index, environment, generated):
     assets = build / "assets"
     assets.mkdir()
     # The single authorized link experiment resolves this libc symbol before LTO.
+    exports = ['_checker_init', '_checker_check', '_input_ptr', '_input_capacity']
+    if INCLINED:
+        # Allocator exports allow the browser to exercise actual memory growth.
+        exports += ['_output_ptr', '_output_size', '_output_capacity', '_malloc', '_free']
     run(["em++", *flags, "-Wl,-u,ntohs", "--no-entry", wrapper, "-Wl,--start-group", archive,
          runtime / "lib/lean/libleanrt.a", libuv / "libuv.a", "-Wl,--end-group",
          "-sMODULARIZE=1", "-sEXPORT_ES6=1", "-sEXPORT_NAME=createChecker",
          "-sENVIRONMENT=web,worker", "-sALLOW_MEMORY_GROWTH=1",
          "-sINITIAL_MEMORY=33554432", "-sMAXIMUM_MEMORY=134217728",
          "-sPTHREAD_POOL_SIZE=0", "-sERROR_ON_UNDEFINED_SYMBOLS=1",
-         "-sEXPORTED_FUNCTIONS=['_checker_init','_checker_check','_input_ptr','_input_capacity']",
+         "-sEXPORTED_FUNCTIONS=" + json.dumps(exports),
          "--emit-symbol-map", "-o", assets / "checker.mjs"], env=environment)
     if FRAME:
         # Use the same Node type-stripping operation as the workspace build.
         # Include these modules in both clean manifests before comparison.
-        run(["node", ROOT / "qa/general-frame/build-worker-modules.mjs", assets])
+        builder = "qa/inclined-frame/build-worker-modules.mjs" if INCLINED else "qa/general-frame/build-worker-modules.mjs"
+        run(["node", ROOT / builder, assets])
     return assets
 
 
@@ -218,6 +240,8 @@ def main():
     receipt["proof_audit_sha256"] = digest(OUTPUT / "axiom-audit.json")
     if FRAME:
         receipt["frame_proof_audit_sha256"] = digest(OUTPUT / "frame-axiom-audit.json")
+    if INCLINED:
+        receipt["inclined_proof_audit_sha256"] = digest(OUTPUT / "inclined-report-axiom-audit.json")
     manifests = []
     for index in (1, 2):
         if index == 2:
@@ -254,7 +278,8 @@ def main():
     shutil.copy(SOURCES / "browser-test.mjs", browser / "browser-test.mjs")
     # Playwright uses the recorded CI host Node, not Emsdk's bundled Node 16.
     run(["node", browser / "browser-test.mjs", assets, SOURCES],
-        env={**os.environ, "CV2011_FRAME_GATE": "1" if FRAME else "0"})
+        env={**os.environ, "CV2011_FRAME_GATE": "1" if FRAME else "0",
+             "CV2011_INCLINED_GATE": "1" if INCLINED else "0"})
     shutil.copyfile(CANONICAL / "browser-results.json", OUTPUT / "browser-results.json")
     receipt["browser"] = json.loads((OUTPUT / "browser-results.json").read_text())
     receipt["browser_package_lock_sha256"] = digest(browser / "package-lock.json")
