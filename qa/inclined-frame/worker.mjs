@@ -10,7 +10,8 @@ const assets = {};
 const codeAssets = ['checker.wasm', 'checker.mjs', 'checker.worker.js', 'checker.mjs.symbols'];
 codeAssets.push('frame-rational.js', 'model-evidence.js', 'frame-candidate.js', 'frame-packet.js', 'frame-result.js',
     'frame-interval.js', 'frame-interval-geometry.js', 'frame-interval-basis.js', 'frame-interval-model.js',
-    'frame-interval-solve.js', 'frame-interval-packet.js', 'frame-interval-result.js', 'frame-interval-abi.js');
+    'frame-interval-solve.js', 'frame-interval-packet.js', 'frame-interval-result.js', 'frame-interval-abi.js',
+    'frame-worker-bytes.js');
 for (const name of codeAssets) {
     const response = await fetch(new URL(name, import.meta.url));
     if (!response.ok) throw Error('Missing checker asset');
@@ -27,22 +28,28 @@ const resultCode = await import('./frame-result.js');
 const intervalPacketCode = await import('./frame-interval-packet.js');
 const intervalResultCode = await import('./frame-interval-result.js');
 const { copyInclinedReport } = await import('./frame-interval-abi.js');
+const { captureCheckerBytes } = await import('./frame-worker-bytes.js');
 const candidates = new frameCode.FrameCandidates();
 self.onmessage = async ({ data }) => {
-    const { id, artifact } = data;
-    const bytes = new Uint8Array(data.bytes);
-    const inputDigest = await hash(bytes);
-    if (artifact !== manifest.files['checker.wasm']) { postMessage({ id, artifact, inputDigest, state: 'artifact-mismatch' }); return; }
-    if (bytes.length > capacity) { postMessage({ id, artifact, inputDigest, state: 'limit' }); return; }
+    let id, artifact, inputDigest;
     try {
-        if (data.protocol !== 'frame' && data.protocol !== 'portal') throw Error('Malformed checker protocol.');
+        if (!data || typeof data !== 'object' || Array.isArray(data)) throw Error('Malformed checker request.');
+        if (!Number.isSafeInteger(data.id) || data.id < 0 || typeof data.artifact !== 'string')
+            throw Error('Malformed checker request identity.');
+        id = data.id; artifact = data.artifact;
+        if (artifact !== manifest.files['checker.wasm']) { postMessage({ id, artifact, state: 'artifact-mismatch' }); return; }
+        const protocol = data.protocol;
+        if (protocol !== 'frame' && protocol !== 'portal') throw Error('Malformed checker protocol.');
+        // Reject malformed, shared or oversized containers before copying/hashing.
+        const bytes = captureCheckerBytes(data.bytes, capacity);
+        inputDigest = await hash(bytes);
         // The legacy decoder must never interpret an accepted generic packet
         // as the old fixed 21-value result, even when both share one ABI.
-        if (data.protocol === 'portal' && (bytes[0] === undefined ||
+        if (protocol === 'portal' && (bytes[0] === undefined ||
             (bytes[0] !== 45 && (bytes[0] < 48 || bytes[0] > 57)))) throw Error('Malformed portal packet.');
         let packet = bytes;
         let inclined = false;
-        if (data.protocol === 'frame') {
+        if (protocol === 'frame') {
             const source = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
             if (!source || typeof source !== 'object' || Array.isArray(source) ||
                 Object.keys(source).some(key => key !== 'model' && key !== 'query') || !source.model || !source.query)
@@ -68,7 +75,7 @@ self.onmessage = async ({ data }) => {
         const state = states[code] ?? 'error';
         // Only the bytes accepted by this ABI call supply displayed values.
         let checked, frame, interval, report, reportDigest, packetDigest;
-        if (code === 1 && data.protocol === 'frame') {
+        if (code === 1 && protocol === 'frame') {
             if (inclined) {
                 report = copyInclinedReport(module);
                 interval = intervalResultCode.decodeAcceptedIntervalReport(report);
@@ -80,8 +87,8 @@ self.onmessage = async ({ data }) => {
             checked = Array.from({ length: 21 }, (_, i) => ({ numerator: fields[2 * i], denominator: fields[2 * i + 1] }));
         }
         postMessage({ id, artifact, inputDigest, state, checked, frame, interval, report, reportDigest, packetDigest,
-            frameProtocol: data.protocol === 'frame' ? (inclined ? 'inclined' : 'exact') : undefined,
-            packet: code === 1 && data.protocol === 'frame' ? packet : undefined, memoryBytes: module.HEAPU8.byteLength });
+            frameProtocol: protocol === 'frame' ? (inclined ? 'inclined' : 'exact') : undefined,
+            packet: code === 1 && protocol === 'frame' ? packet : undefined, memoryBytes: module.HEAPU8.byteLength });
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         const state = message.startsWith('Unsupported:') ? 'unsupported' : message.startsWith('Limit:') ? 'limit' : 'inconclusive';
