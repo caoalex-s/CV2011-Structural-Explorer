@@ -29,10 +29,9 @@ export interface EnclosedSegment {
     transform: IntervalMatrix;
 }
 
-/** Assemble PᵀKP and PᵀF from owned source cuts and all support constraints.
- * Throws on unsupported source features or exhausted arithmetic/size budgets.
- * Returned intervals are proposals; they do not grant a checked status. */
-export function compileIntervalFrame(arithmetic: IntervalArithmetic, input: unknown, query: EvidenceQuery) {
+/** Validate source/query structure without constructing an interval matrix.
+ * This supports UI preflight; it grants no mathematical or checker status. */
+export function validateIntervalFrame(input: unknown, query: EvidenceQuery) {
     // Bound lists before strict parsing performs reference searches.
     if (!input || typeof input !== 'object') throw Error('Malformed frame source.');
     const outer = input as Record<string, unknown>;
@@ -60,7 +59,14 @@ export function compileIntervalFrame(arithmetic: IntervalArithmetic, input: unkn
         throw Error('Unsupported: select the interior endpoint limit or an explicit interior side.');
     for (const name of ['quantity', 'units', 'signConvention'] as const)
         if (query[name] !== frameQueryConvention[name]) throw Error('Unsupported: query convention mismatch.');
+    return model;
+}
 
+/** Assemble PᵀKP and PᵀF from owned source cuts and all support constraints.
+ * Throws on unsupported source features or exhausted arithmetic/size budgets.
+ * Returned intervals are proposals; they do not grant a checked status. */
+export function compileIntervalFrame(arithmetic: IntervalArithmetic, input: unknown, query: EvidenceQuery) {
+    const model = validateIntervalFrame(input, query);
     const constant = (n: number) => arithmetic.bounds(integer(n));
     const zeros = (rows: number, columns = rows): IntervalMatrix => Array.from({ length: rows }, () => Array.from({ length: columns }, () => constant(0)));
     const plus = arithmetic.add.bind(arithmetic);
