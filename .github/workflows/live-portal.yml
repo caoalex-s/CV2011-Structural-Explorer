@@ -4,6 +4,11 @@ on:
     branches: [codex/live-portal-checker, codex/general-frame-checker, codex/frame-worked-solutions]
   workflow_dispatch:
     inputs:
+      browser_only:
+        description: Replay browser tests against the hash-pinned diagnostic 2 artifact
+        type: boolean
+        required: false
+        default: false
       proof_only:
         description: Check current source and exact packets without running an installed bundle
         type: boolean
@@ -18,6 +23,7 @@ permissions:
   contents: read
 jobs:
   proof:
+    if: ${{ !inputs.browser_only }}
     runs-on: ubuntu-22.04
     timeout-minutes: 90
     steps:
@@ -259,3 +265,47 @@ jobs:
         with:
           name: live-portal-proof
           path: .data/live-portal
+  browser-replay:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.browser_only }}
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.25.0'
+      - name: Fetch fixed diagnostic 2 archives
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p .data/browser-replay
+          gh api repos/caoalex-s/CV2011-Structural-Explorer/actions/artifacts/14199281733/zip > .data/browser-replay/compiled.zip
+          gh api repos/caoalex-s/CV2011-Structural-Explorer/actions/artifacts/14199680267/zip > .data/browser-replay/proof.zip
+      - name: Verify unchanged artifact and proof-source bindings
+        run: python3 qa/inclined-frame/prepare-browser-replay.py
+      - name: Test current workspace with the fixed compiled bundle
+        run: |
+          pnpm install --frozen-lockfile --ignore-scripts
+          pnpm check
+          pnpm test
+          python3 qa/live-portal/check-installed.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: live-portal-browser-replay
+          include-hidden-files: true
+          path: |
+            .data/browser-replay/reuse-receipt.json
+            .data/live-portal-browser/browser-results.json
+            .data/live-portal-browser/browser-trace.zip
+            .data/live-portal-browser/main-inclined-accepted.png
+            .data/live-portal-browser/main-affine-accepted.png
+            .data/live-portal-browser/package-lock.json
