@@ -13,6 +13,9 @@ import { createFrameWorked } from './frame-worked.js';
 import { renderFrameWorked } from './frame-worked-view.js';
 import { decodeAcceptedIntervalReport } from './frame-interval-result.js';
 import { bindIntervalDisplay, renderIntervalValues } from './frame-interval-display.js';
+import { validateIntervalFrame } from './frame-interval-model.js';
+import { inclinedDeadlineMilliseconds } from './portal-runtime.js';
+import { createIntervalExplanation, renderIntervalExplanation } from './frame-interval-worked.js';
 
 export const isPortalWorkspace = location.pathname.replace(/index\.html$/, '').endsWith('/portal-checker/');
 // The same controller serves the main workspace and the compatible scoped URL.
@@ -112,6 +115,10 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                 host.querySelector<HTMLElement>('#frame-side-label')!.hidden = false;
                 host.querySelector<HTMLElement>('#frame-parameter-label')!.hidden = false;
                 host.querySelector('#portal-scope')!.textContent = 'The checker covers linear Euler–Bernoulli frames with positive EA and EI, fixed or pin supports, and rollers at 0, 90, 180, or 270 degrees. Point forces, couples, and linearly varying vertical loads may act over partial or overlapping member intervals. Distributed loads may change sign. Drawing labels are downward positive; the stored global-y forces are upward positive. Up to 8 members, 16 nodes, 16 active points, 16 segments, 16 supports, and 16 loads are supported within the arithmetic and one-second limits. Inputs retain their exact parsed binary64 values. Source and certificate rationals allow 128 digits, with 256 digits for normalized candidate intermediates and 513 before reduction. The packet limit is 1 MiB. A limit or timeout is inconclusive. N is positive in tension, M is positive in sagging, dM/dx = V, global y is upward, and rotation is counterclockwise. Diagram curves remain numerical. Acceptance relies on the proved compiled checker, its compiler and runtime, and the decoder and input binding. Edits are checked locally without invoking the Lean kernel.';
+                if (starting.supportsInclinedFrames) {
+                    host.querySelector('#portal-introduction')!.textContent = 'Generate a solution for the current rigid frame and selected section. Inclined members and rollers at arbitrary finite angles use checked output intervals.';
+                    host.querySelector('#portal-scope')!.textContent = `The checker covers linear Euler–Bernoulli frames with positive EA and EI and rigid joints. Supports may be fixed, pinned, or rollers at arbitrary finite degree angles. Point forces, couples, and linearly varying vertical loads may act over partial or overlapping member intervals. Original parsed binary64 coordinates, angles, and actions define the real model. Up to 8 members, 16 nodes, 16 active points, 16 segments, 16 supports, and 16 loads are admitted within the arithmetic budget and 1 MiB packet limit. The exact-cardinal route has a one-second deadline. Inclined requests have a ${inclinedDeadlineMilliseconds / 1000}-second deadline and are cancelled when the drawing or selected section changes. A timeout or failed enclosure check is inconclusive and does not establish a mechanism. N is positive in tension, M is positive in sagging with dM/dx = V, global y is upward, and rotation is counterclockwise. Diagram curves remain numerical. Acceptance relies on the proved compiled checker, its compiler and runtime, and the decoder and input binding.`;
+                }
             }
             update(member, parameter);
             // A single explicit Generate survives only the activation reload of
@@ -134,7 +141,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
         const report = result.frameProtocol === 'inclined' && result.report instanceof Uint8Array
             ? new Uint8Array(result.report) : null;
         const reportDigest = result.reportDigest;
-        if (await sha256(packet) !== result.packetDigest) throw Error('Accepted packet identity changed.');
+        if (await sha256(packet) !== packetDigest) throw Error('Accepted packet identity changed.');
         if (!requests.isCurrent(token) || checker !== runtime) return;
         if (result.frameProtocol === 'inclined') {
             if (!report || typeof reportDigest !== 'string' || await sha256(report) !== reportDigest)
@@ -155,7 +162,14 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
             certificate.textContent = exportText; exportButton.hidden = false;
             acceptedGeneration = () => {
                 if (!requests.isCurrent(token) || checker !== runtime) return;
-                workedOutput.innerHTML = presentation;
+                try {
+                    const explanation = createIntervalExplanation(sourceRequest.model, sourceRequest.query, values);
+                    workedOutput.innerHTML = renderIntervalExplanation(explanation, values);
+                    exportText = JSON.stringify({ ...receipt, explanation }, null, 2);
+                    certificate.textContent = exportText;
+                } catch {
+                    workedOutput.innerHTML = '<p>The separate numerical calculation could not reproduce a suitable teaching substitution. The accepted intervals and their accuracy bounds remain available below.</p>' + presentation;
+                }
                 workedOutput.hidden = false; collapse.hidden = false;
                 collapse.textContent = 'Collapse solution'; collapse.setAttribute('aria-expanded', 'true');
             };
@@ -221,6 +235,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
         clear(enabled ? 'Checking current drawing…' : 'Generate enables local checking and reloads this workspace once.');
         let snapshot: Model;
         let query: EvidenceQuery;
+        let frameMode: 'exact' | 'inclined' = 'exact';
         try {
             // Capture before any asynchronous work, including hashing and debounce.
             snapshot = structuredClone(modelAtPresent());
@@ -230,7 +245,12 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                 cutSide.options[0].disabled = parameter === 1;
                 cutSide.options[1].disabled = parameter === 0;
                 query = { member, parameter, cutSide: cutSide.value as 'left' | 'right', ...frameQueryConvention };
-                validateFrame(snapshot, query);
+                try { validateFrame(snapshot, query); }
+                catch (error) {
+                    if (!runtime?.supportsInclinedFrames || !(error instanceof Error) || !error.message.startsWith('Unsupported:')) throw error;
+                    validateIntervalFrame(snapshot, query);
+                    frameMode = 'inclined';
+                }
             } else {
                 const value = portalAmplitude(snapshot);
                 amplitude.value = String(value);
@@ -240,6 +260,9 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
             requests.update(snapshot, query);
         } catch (error) { clear(String(error)); return; }
         if (!enabled || !runtime) return;
+        // An edit cancels synchronous inclined arithmetic by terminating its
+        // worker. Recreate the checker before submitting the captured revision.
+        if (runtime.needsReset) { void start(); return; }
         const checker = runtime, token = requests.begin();
         debounce = setTimeout(async () => {
             try {
@@ -248,7 +271,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                     : encodeCandidate(portalCandidate(portalAmplitude(snapshot)));
                 const envelope = await createEvidenceEnvelope(snapshot, query);
                 if (!requests.isCurrent(token) || checker !== runtime) return;
-                const result = checker.supportsFrames ? await checker.checkFrame(bytes) : await checker.check(bytes);
+                const result = checker.supportsFrames ? await checker.checkFrame(bytes, frameMode) : await checker.check(bytes);
                 if (!requests.isCurrent(token) || checker !== runtime) return;
                 const current = requests.accept(token, result);
                 if (checker.supportsFrames) await displayFrame(current, envelope, token, checker, bytes);

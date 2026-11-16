@@ -4,15 +4,22 @@ export type CheckerResult = { state: string; id?: number; artifact?: string; inp
 export const sha256 = async (bytes: Uint8Array): Promise<string> =>
     [...new Uint8Array(await crypto.subtle.digest('SHA-256', new Uint8Array(bytes)))].map(byte => byte.toString(16).padStart(2, '0')).join('');
 
+// Development ceiling shared with the isolated inclined browser diagnostics.
+// The final UI deadline must be checked against measured compiled runtimes.
+export const inclinedDeadlineMilliseconds = 180000;
+
 export class PortalRuntime {
     private worker: Worker;
     private sequence = 0;
-    private current: { id: number; inputDigest: string; resolve: (result: CheckerResult) => void; timer: ReturnType<typeof setTimeout> } | null = null;
+    private current: { id: number; inputDigest: string; cancelOnEdit: boolean;
+        resolve: (result: CheckerResult) => void; timer: ReturnType<typeof setTimeout> } | null = null;
     private stopped = false;
     artifact = '';
     bundle = '';
     supportsFrames = false;
     supportsAffineFrames = false;
+    supportsInclinedFrames = false;
+    get needsReset(): boolean { return this.stopped; }
     onFailure: (reason: string) => void = () => {};
     readonly ready: Promise<void>;
 
@@ -40,6 +47,7 @@ export class PortalRuntime {
                     this.artifact = data.artifact; this.bundle = data.bundle;
                     this.supportsFrames = Array.isArray(data.protocols) && data.protocols.includes('frame');
                     this.supportsAffineFrames = Array.isArray(data.capabilities) && data.capabilities.includes('affine-vertical-v1');
+                    this.supportsInclinedFrames = Array.isArray(data.capabilities) && data.capabilities.includes('inclined-real-v1');
                     resolve();
                 } else this.receive(data);
             };
@@ -47,7 +55,13 @@ export class PortalRuntime {
     }
     invalidate(): void {
         this.sequence++;
-        if (this.current) { clearTimeout(this.current.timer); this.current.resolve({ state: 'stale' }); this.current = null; }
+        if (this.current) {
+            clearTimeout(this.current.timer);
+            // A worker cannot process a cancellation message while synchronous
+            // Lean arithmetic runs. Termination makes an edit responsive.
+            if (this.current.cancelOnEdit) { this.stopped = true; this.worker.terminate(); }
+            this.current.resolve({ state: 'stale' }); this.current = null;
+        }
     }
     receive(result: CheckerResult): boolean {
         const pending = this.current;
@@ -71,11 +85,13 @@ export class PortalRuntime {
     /** Source/query JSON is captured before hashing. Candidate construction
      * and exact checking both run inside the same bounded worker request.
      */
-    async checkFrame(bytes: Uint8Array): Promise<CheckerResult> {
-        if (!this.supportsFrames) { this.invalidate(); return { state: 'unsupported-runtime' }; }
-        return this.submit(bytes, 'frame');
+    async checkFrame(bytes: Uint8Array, mode: 'exact' | 'inclined' = 'exact'): Promise<CheckerResult> {
+        if (!this.supportsFrames || mode === 'inclined' && !this.supportsInclinedFrames) {
+            this.invalidate(); return { state: 'unsupported-runtime' };
+        }
+        return this.submit(bytes, 'frame', mode === 'inclined');
     }
-    private async submit(bytes: Uint8Array, protocol: 'portal' | 'frame'): Promise<CheckerResult> {
+    private async submit(bytes: Uint8Array, protocol: 'portal' | 'frame', inclined = false): Promise<CheckerResult> {
         this.invalidate();
         const id = this.sequence;
         if (this.stopped) return { state: 'reset-required' };
@@ -86,8 +102,8 @@ export class PortalRuntime {
             const timer = setTimeout(() => {
                 this.current = null; this.stopped = true; this.worker.terminate();
                 this.onFailure('Checker timed out. Reset to continue.'); resolve({ state: 'timeout' });
-            }, 1000);
-            this.current = { id, inputDigest, resolve, timer };
+            }, inclined ? inclinedDeadlineMilliseconds : 1000);
+            this.current = { id, inputDigest, cancelOnEdit: inclined, resolve, timer };
             this.worker.postMessage({ id, artifact: this.artifact, bytes: captured, protocol });
         });
     }

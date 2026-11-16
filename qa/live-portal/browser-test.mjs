@@ -140,6 +140,8 @@ try {
         if (inclined) {
             const { runInclinedCases } = await import(pathToFileURL(resolve('qa/inclined-frame/browser-cases.mjs')).href);
             await runInclinedCases({ context, output, bundle, result });
+            const { runMainInclinedCases } = await import(pathToFileURL(resolve('qa/inclined-frame/main-browser-cases.mjs')).href);
+            await runMainInclinedCases({ page, context, output, origin, base, result });
         }
         assert.deepEqual(result.errors, []);
         result.passed = true;
