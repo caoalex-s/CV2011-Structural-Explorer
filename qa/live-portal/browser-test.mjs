@@ -15,23 +15,30 @@ const root = process.cwd();
 const output = installedOutput ? resolve(installedOutput) : dirname(assets);
 const bundle = resolve('public/portal-checker/bundle');
 const installedManifest = installedOutput ? JSON.parse(await readFile(resolve(bundle, 'manifest.json'), 'utf8')) : null;
-const generic = installedManifest ? installedManifest.theorem === 'RationalFrameSoundness.acceptance_actual_frame'
-    : process.env.CV2011_FRAME_GATE === '1';
-const theorem = generic ? 'RationalFrameSoundness.acceptance_actual_frame' : 'PortalSoundness.acceptance_actual_portal';
-const abiPath = generic ? resolve('qa/general-frame/abi.c') : resolve(source, 'abi.c');
-const auditName = generic ? 'frame-axiom-audit.json' : 'axiom-audit.json';
+const inclined = installedManifest ? installedManifest.theorem === 'InclinedFrameIntervalReportSound.checkReport_sound'
+    : process.env.CV2011_INCLINED_GATE === '1';
+const generic = inclined || (installedManifest ? installedManifest.theorem === 'RationalFrameSoundness.acceptance_actual_frame'
+    : process.env.CV2011_FRAME_GATE === '1');
+const theorem = inclined ? 'InclinedFrameIntervalReportSound.checkReport_sound'
+    : generic ? 'RationalFrameSoundness.acceptance_actual_frame' : 'PortalSoundness.acceptance_actual_portal';
+const abiPath = inclined ? resolve('qa/inclined-frame/abi.c') : generic ? resolve('qa/general-frame/abi.c') : resolve(source, 'abi.c');
+const workerSource = inclined ? resolve('qa/inclined-frame/worker.mjs') : resolve(source, 'worker.mjs');
+const auditName = inclined ? 'inclined-report-axiom-audit.json' : generic ? 'frame-axiom-audit.json' : 'axiom-audit.json';
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 await mkdir(bundle, { recursive: true });
 await mkdir(output, { recursive: true });
 const files = {};
 const runtimeFiles = ['checker.wasm', 'checker.mjs', 'checker.worker.js', 'checker.mjs.symbols'];
 if (generic) runtimeFiles.push('frame-rational.js', 'model-evidence.js', 'frame-candidate.js', 'frame-packet.js', 'frame-result.js');
+if (inclined) runtimeFiles.push('frame-interval.js', 'frame-interval-geometry.js', 'frame-interval-basis.js',
+    'frame-interval-model.js', 'frame-interval-solve.js', 'frame-interval-packet.js', 'frame-interval-result.js',
+    'frame-interval-abi.js', 'frame-worker-bytes.js');
 for (const name of runtimeFiles) {
     const bytes = await readFile(resolve(assets, name));
     files[name] = digest(bytes);
     if (!installedOutput) await writeFile(resolve(bundle, name), bytes);
 }
-if (!installedOutput) await copyFile(resolve(source, 'worker.mjs'), resolve(bundle, 'worker.mjs'));
+if (!installedOutput) await copyFile(workerSource, resolve(bundle, 'worker.mjs'));
 const proofFiles = {};
 const proofNames = generic ? [...(await readdir('proofs')).filter(name => name.endsWith('.lean')), 'lean-toolchain', 'lake-manifest.json'].sort()
     : ['PortalChecker.lean', 'PortalTables.lean', 'PortalSoundness.lean', 'PortalFramePilot.lean', 'lean-toolchain', 'lake-manifest.json'];
@@ -45,10 +52,14 @@ if (installedOutput) {
     assert.equal(manifest.status, 'proved-compiled');
     assert.equal(manifest.theorem, theorem);
     if (generic) assert.equal(manifest.frameSemantics, 'affine-vertical-v1');
+    if (inclined) {
+        assert.equal(manifest.inclinedSemantics, 'real-binary64-v1');
+        assert.equal(manifest.legacyFrameAuditSha256, digest(await readFile('.data/live-portal/frame-axiom-audit.json')));
+    }
     assert.deepEqual(manifest.files, files);
     assert.deepEqual(manifest.proofFiles, proofFiles);
     assert.equal(manifest.workerSha256, digest(await readFile(resolve(bundle, 'worker.mjs'))));
-    assert.equal(manifest.workerSha256, digest(await readFile(resolve(source, 'worker.mjs'))));
+    assert.equal(manifest.workerSha256, digest(await readFile(workerSource)));
     assert.equal(manifest.abiSha256, digest(await readFile(abiPath)));
     assert.equal(manifest.axiomAuditSha256, digest(await readFile('.data/live-portal/' + auditName)));
 } else {
@@ -56,13 +67,17 @@ if (installedOutput) {
     assert.equal(buildReceipt.repeatability, true);
     const manifest = { status: 'proved-compiled', theorem,
         frameSemantics: generic ? 'affine-vertical-v1' : null,
+        inclinedSemantics: inclined ? 'real-binary64-v1' : null,
         sourceCommit: buildReceipt.commit, pins: buildReceipt.pins,
         buildManifests: [buildReceipt.manifest_1_sha256, buildReceipt.manifest_2_sha256],
-        stabilityWitness: generic ? 'RationalFrame.Stability.checked_unique' : 'PortalSoundness.fixed_inverse',
-        groupedReactions: generic ? 'RationalFrame.Reactions.checked_grouped_reactions' : 'PortalSoundness.accepted_grouped_reactions',
+        stabilityWitness: inclined ? 'InclinedFrameIntervalEquilibrium.check_positive_stiffness'
+            : generic ? 'RationalFrame.Stability.checked_unique' : 'PortalSoundness.fixed_inverse',
+        groupedReactions: inclined ? 'InclinedFrameIntervalReactionsSound.reaction_contains'
+            : generic ? 'RationalFrame.Reactions.checked_grouped_reactions' : 'PortalSoundness.accepted_grouped_reactions',
         files, proofFiles, workerSha256: digest(await readFile(resolve(bundle, 'worker.mjs'))),
         abiSha256: digest(await readFile(abiPath)),
         axiomAuditSha256: digest(await readFile('.data/live-portal-build/' + auditName)),
+        legacyFrameAuditSha256: inclined ? digest(await readFile('.data/live-portal-build/frame-axiom-audit.json')) : null,
         trust: 'Pinned Lean 4.19/C/Emscripten compilation, runtime, decoder and input binding. No kernel invocation per edit.' };
     await writeFile(resolve(bundle, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
 }
@@ -122,6 +137,10 @@ try {
         const { runMainCases } = await import(pathToFileURL(resolve('qa/general-frame/main-browser-cases.mjs')).href);
         await runMainCases({ page, context, output, origin, base, result,
             setOffline: async value => { offline = value; await context.setOffline(value); } });
+        if (inclined) {
+            const { runInclinedCases } = await import(pathToFileURL(resolve('qa/inclined-frame/browser-cases.mjs')).href);
+            await runInclinedCases({ context, output, bundle, result });
+        }
         assert.deepEqual(result.errors, []);
         result.passed = true;
     } else {

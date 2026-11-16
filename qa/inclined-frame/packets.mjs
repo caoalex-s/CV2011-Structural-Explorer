@@ -13,11 +13,17 @@ const { frameQueryConvention } = await import('../../web/frame-candidate.ts');
 const directory = resolve(process.argv[2] ?? '.data/inclined-frame-packets');
 mkdirSync(directory, { recursive: true });
 const manifest = [];
-function save(name, packet, expected) {
+function save(name, packet, expected, request) {
     const bytes = typeof packet === 'string' ? Buffer.from(packet) : packet;
     writeFileSync(resolve(directory, name + '.txt'), bytes);
-    manifest.push({ name, expected, bytes: bytes.length,
-        sha256: createHash('sha256').update(bytes).digest('hex') });
+    const entry = { name, expected, bytes: bytes.length,
+        sha256: createHash('sha256').update(bytes).digest('hex') };
+    if (request) {
+        const requestBytes = JSON.stringify(request);
+        writeFileSync(resolve(directory, name + '.request.json'), requestBytes);
+        entry.requestSha256 = createHash('sha256').update(requestBytes).digest('hex');
+    }
+    manifest.push(entry);
 }
 
 // 1. Irrational original member length, arbitrary global point force.
@@ -29,31 +35,36 @@ const source = {
 };
 const query = { member: 'AB', parameter: 1, cutSide: 'left', ...frameQueryConvention };
 const proposed = proposeInclinedPacket(source, query, 96);
-save('irrational-cantilever', proposed.packet, 'accept');
+save('irrational-cantilever', proposed.packet, 'accept', { model: source, query });
 
 // 2. Sign-changing affine loading with zero resultant and nonzero moment.
 const affine = structuredClone(source);
 affine.loads = [{ id: 'w', member: 'AB', kind: 'distributed', t: 0, end: 1,
     fx: 0, fy: -5, mz: 0, qEnd: 5 }];
-save('affine-zero-resultant', proposeInclinedPacket(affine, { ...query, parameter: 0.5 }, 96).packet, 'accept');
+const interiorQuery = { ...query, parameter: 0.5 };
+save('affine-zero-resultant', proposeInclinedPacket(affine, interiorQuery, 96).packet, 'accept',
+    { model: affine, query: interiorQuery });
 
 const reversed = structuredClone(source);
 reversed.members[0].a = 'B'; reversed.members[0].b = 'A';
 reversed.supports[0].t = 1;
 reversed.loads[0].t = reversed.loads[0].end = 0;
-save('reversed-cantilever', proposeInclinedPacket(reversed,
-    { ...query, parameter: 0, cutSide: 'right' }, 96).packet, 'accept');
+const reversedEndQuery = { ...query, parameter: 0, cutSide: 'right' };
+save('reversed-cantilever', proposeInclinedPacket(reversed, reversedEndQuery, 96).packet, 'accept',
+    { model: reversed, query: reversedEndQuery });
 save('cantilever-interior', proposeInclinedPacket(source,
-    { ...query, parameter: 0.5 }, 96).packet, 'accept');
+    interiorQuery, 96).packet, 'accept', { model: source, query: interiorQuery });
 save('reversed-interior', proposeInclinedPacket(reversed,
-    { ...query, parameter: 0.5 }, 96).packet, 'accept');
+    interiorQuery, 96).packet, 'accept', { model: reversed, query: interiorQuery });
 
 // A shared rigid point splits the same physical cantilever into two members.
 const shared = structuredClone(source);
 shared.nodes.push({ id: 'C', x: 2, y: 4 });
 shared.members.push({ id: 'BC', a: 'B', b: 'C', EA: 2000000, EI: 20000 });
 shared.loads[0].member = 'BC';
-save('shared-rigid-joint', proposeInclinedPacket(shared, { ...query, member: 'BC' }, 96).packet, 'accept');
+const sharedQuery = { ...query, member: 'BC' };
+save('shared-rigid-joint', proposeInclinedPacket(shared, sharedQuery, 96).packet, 'accept',
+    { model: shared, query: sharedQuery });
 
 const roller = structuredClone(source);
 roller.supports = [
@@ -62,9 +73,11 @@ roller.supports = [
     { id: 'B-alias', member: 'AB', kind: 'roller', t: 1, angle: 217 },
 ];
 roller.loads[0].t = roller.loads[0].end = 0.5;
-for (const cutSide of ['left', 'right'])
-    save('roller-interior-' + cutSide, proposeInclinedPacket(roller,
-        { ...query, parameter: 0.5, cutSide }, 96).packet, 'accept');
+for (const cutSide of ['left', 'right']) {
+    const rollerQuery = { ...query, parameter: 0.5, cutSide };
+    save('roller-interior-' + cutSide, proposeInclinedPacket(roller, rollerQuery, 96).packet, 'accept',
+        { model: roller, query: rollerQuery });
+}
 
 // 3. Root, inverse, protocol and preallocation failures must grant no result.
 const original = new TextDecoder().decode(proposed.packet);
