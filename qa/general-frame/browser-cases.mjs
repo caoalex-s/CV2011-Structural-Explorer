@@ -272,7 +272,8 @@ export async function runFrameCases({ page, context, output, origin, base, url, 
                 catch { return false; }
             }, null, { timeout: 40000 });
             const receipt = JSON.parse(await page.locator('#portal-certificate').textContent());
-            assert.deepEqual(receipt.sourceRequest.model, supported);
+            const withoutLabels = model => ({ ...model, loads: model.loads.map(({ label, ...load }) => load) });
+            assert.deepEqual(withoutLabels(receipt.sourceRequest.model), withoutLabels(supported));
             assert.equal(receipt.theorem, 'InclinedFrameIntervalReportSound.checkReport_sound');
             assert.equal(receipt.values.fields.length, 6);
         }

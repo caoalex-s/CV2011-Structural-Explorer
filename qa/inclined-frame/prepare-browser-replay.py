@@ -66,6 +66,11 @@ with zipfile.ZipFile(folder / 'compiled.zip') as archive:
     manifest_bytes = archive.read(bundle_prefix + 'manifest.json')
     bundle_manifest = json.loads(manifest_bytes)
     assert bundle_manifest['sourceCommit'] == compiled_commit
+    assert bundle_manifest['buildManifests'] == [receipt['manifest_1_sha256'], receipt['manifest_2_sha256']]
+    assert bundle_manifest['files'] == {
+        Path(name).name: expected for name, expected in manifests[0]['layers']['final_assets'].items()}
+    assert bundle_manifest['pins'] == receipt['pins']
+    assert bundle_manifest['abiSha256'] == receipt['files']['qa/inclined-frame/abi.c']
     for name, expected in bundle_manifest['proofFiles'].items():
         assert digest((root / 'proofs' / name).read_bytes()) == expected, name
     for name, expected in bundle_manifest['files'].items():
@@ -78,6 +83,8 @@ with zipfile.ZipFile(folder / 'compiled.zip') as archive:
     save(bundle_prefix + 'manifest.json', manifest_bytes)
 
 with zipfile.ZipFile(folder / 'proof.zip') as archive:
+    assert digest(archive.read('inclined-report-axiom-audit.json')) == bundle_manifest['axiomAuditSha256']
+    assert digest(archive.read('frame-axiom-audit.json')) == bundle_manifest['legacyFrameAuditSha256']
     for name in archive.namelist():
         if name.startswith('inclined-native/') or name in [
                 'axiom-audit.json', 'frame-axiom-audit.json', 'inclined-report-axiom-audit.json']:
