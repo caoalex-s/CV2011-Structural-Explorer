@@ -131,7 +131,7 @@ async function importModel(model) {
 try {
     if (generic) {
         const { runFrameCases } = await import(pathToFileURL(resolve('qa/general-frame/browser-cases.mjs')).href);
-        await runFrameCases({ page, context, output, origin, base, url, result,
+        await runFrameCases({ page, context, output, origin, base, url, result, inclined,
             setOffline: async value => { offline = value; await context.setOffline(value); } });
         result.passed = false;
         const { runMainCases } = await import(pathToFileURL(resolve('qa/general-frame/main-browser-cases.mjs')).href);

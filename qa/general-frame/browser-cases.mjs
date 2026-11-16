@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-export async function runFrameCases({ page, context, output, origin, base, url, result, setOffline }) {
+export async function runFrameCases({ page, context, output, origin, base, url, result, setOffline, inclined = false }) {
     assert.equal(process.platform, 'linux');
     assert.equal(process.env.GITHUB_ACTIONS, 'true');
     const support = (id, member, t, kind = 'roller') => ({ id, member, t, kind, angle: 90 });
@@ -259,9 +259,28 @@ export async function runFrameCases({ page, context, output, origin, base, url, 
     assert.match(await page.locator('#portal-status').textContent(), /incompatible with equilibrium/);
     result.cases.push('zero-load-mechanism-and-verified-incompatible-load');
 
-    for (const edit of [model => { model.nodes[1].y = 0.1; },
-        model => { model.supports[1].angle = 45; },
-        model => { model.members[0].connectionB = { axial: 'rigid', transverse: 'rigid', rotation: 'free' }; }]) {
+    const geometryEdits = [model => { model.nodes[1].y = 0.1; },
+        model => { model.supports[1].angle = 45; }];
+    // These were unsupported by the cardinal-only bundle. The inclined bundle
+    // must now accept them through its distinct report protocol.
+    if (inclined) {
+        for (const edit of geometryEdits) {
+            const supported = structuredClone(beam); edit(supported);
+            await importModel(supported); await select('beam');
+            await page.waitForFunction(() => {
+                try { return JSON.parse(document.getElementById('portal-certificate').textContent).protocol === 'CV2011_INCLINED_1'; }
+                catch { return false; }
+            }, null, { timeout: 40000 });
+            const receipt = JSON.parse(await page.locator('#portal-certificate').textContent());
+            assert.deepEqual(receipt.sourceRequest.model, supported);
+            assert.equal(receipt.theorem, 'InclinedFrameIntervalReportSound.checkReport_sound');
+            assert.equal(receipt.values.fields.length, 6);
+        }
+        result.cases.push('inclined-capability-replaces-cardinal-only-geometry-rejections');
+    }
+    const unsupportedEdits = inclined ? [] : geometryEdits;
+    unsupportedEdits.push(model => { model.members[0].connectionB = { axial: 'rigid', transverse: 'rigid', rotation: 'free' }; });
+    for (const edit of unsupportedEdits) {
         const unsupported = structuredClone(beam); edit(unsupported);
         await importModel(unsupported); await select('beam');
         await page.waitForFunction(() => document.getElementById('portal-status').textContent.includes('Unsupported'));
