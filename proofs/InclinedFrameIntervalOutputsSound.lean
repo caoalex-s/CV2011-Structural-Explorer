@@ -35,8 +35,8 @@ theorem accepts_sound {bits : Nat} {data : Partition} {basis : GlobalBasis}
       FieldReadouts data query outputs motion ∧ ReactionReadouts data outputs motion ∧
       ∀ variation, SourceAllows data variation → variation ≠ 0 →
         0 < InclinedFrameReal.stiffnessWork data variation variation := by
-  have hsplit : check bits certificate = true ∧ decide (OutputChecks bits certificate query outputs) = true :=
-    Bool.and_eq_true.mp h
+  have hsplit : check bits certificate = true ∧ decide (OutputChecks bits certificate query outputs) = true := by
+    simpa only [accepts, Bool.and_eq_true] using h
   have houtputs : OutputChecks bits certificate query outputs := of_decide_eq_true hsplit.2
   have hchecks : Checks bits certificate := of_decide_eq_true hsplit.1
   obtain ⟨hpartition, _, hgeometry, hprojection, hload, _, _⟩ := hchecks
