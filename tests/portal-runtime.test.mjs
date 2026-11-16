@@ -15,6 +15,25 @@ class WorkerFixture {
 }
 globalThis.Worker = WorkerFixture;
 
+test('digestless guard failures settle only the matching request and discard checked payloads', async () => {
+    const runtime = new PortalRuntime(new URL('https://example.invalid/worker.mjs'));
+    const worker = WorkerFixture.instances.at(-1);
+    worker.ready(); await runtime.ready;
+    const request = runtime.check(new Uint8Array([1]));
+    await new Promise(resolve => setTimeout(resolve, 10));
+    const { id } = worker.sent.at(-1);
+    const identity = { id, artifact: runtime.artifact };
+    assert.equal(runtime.receive({ ...identity, state: 'accepted' }), false);
+    assert.equal(runtime.receive({ ...identity, state: 'limit', id: id - 1 }), false);
+    assert.equal(runtime.receive({ ...identity, state: 'limit', artifact: 'old-artifact' }), false);
+    assert.equal(runtime.receive({ ...identity, state: 'limit', inputDigest: 'wrong' }), false);
+    assert.equal(runtime.receive({ ...identity, state: 'limit', message: 'Limit: oversized input.',
+        checked: [{ numerator: '1', denominator: '1' }], interval: { forged: true } }), true);
+    assert.deepEqual(await request, { ...identity, state: 'limit', message: 'Limit: oversized input.' });
+    assert.equal(worker.terminated, false);
+    runtime.dispose();
+});
+
 test('affine capability is explicit and absent from older generic runtime greetings', async () => {
     for (const supported of [false, true]) {
         const runtime = new PortalRuntime(new URL('https://example.invalid/worker.mjs'));

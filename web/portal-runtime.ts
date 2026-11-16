@@ -51,7 +51,18 @@ export class PortalRuntime {
     }
     receive(result: CheckerResult): boolean {
         const pending = this.current;
-        if (!pending || result.id !== pending.id || result.artifact !== this.artifact || result.inputDigest !== pending.inputDigest) return false;
+        if (!pending || !result || result.id !== pending.id || result.artifact !== this.artifact) return false;
+        // Input guards run before hashing. Their digestless replies can end a
+        // request only as failure, never supply checked values or acceptance.
+        if (result.inputDigest === undefined) {
+            if (!['inconclusive', 'limit', 'artifact-mismatch'].includes(result.state)) return false;
+            clearTimeout(pending.timer);
+            this.current = null;
+            pending.resolve({ state: result.state, id: pending.id, artifact: this.artifact,
+                message: typeof result.message === 'string' ? result.message : undefined });
+            return true;
+        }
+        if (result.inputDigest !== pending.inputDigest) return false;
         clearTimeout(pending.timer); this.current = null; pending.resolve(result); return true;
     }
     async check(bytes: Uint8Array): Promise<CheckerResult> {
