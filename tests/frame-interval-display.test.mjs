@@ -6,9 +6,22 @@ registerHooks({ resolve(specifier, context, next) {
         return next(specifier.replace(/\.js$/, '.ts'), context);
     return next(specifier, context);
 } });
-const { bindIntervalDisplay, renderIntervalValues } = await import('../web/frame-interval-display.ts');
+const { bindIntervalDisplay, renderIntervalValues, outwardDecimal } = await import('../web/frame-interval-display.ts');
 const { frameQueryConvention } = await import('../web/frame-candidate.ts');
 const rational = (numerator, denominator = '1') => ({ numerator, denominator });
+
+test('outward decimal endpoints contain positive, negative and zero-crossing rationals', () => {
+    for (const [numerator, denominator] of [['1', '3'], ['-1', '3'], ['0', '1'], ['-1', '100000'], ['123456789', '7']]) {
+        const value = rational(numerator, denominator);
+        const lower = outwardDecimal(value, 4, 'lower');
+        const upper = outwardDecimal(value, 4, 'upper');
+        const integer = text => BigInt(text.replace('.', ''));
+        assert.ok(integer(lower) * BigInt(denominator) <= BigInt(numerator) * 10000n);
+        assert.ok(integer(upper) * BigInt(denominator) >= BigInt(numerator) * 10000n);
+    }
+    assert.equal(outwardDecimal(rational('-1', '3'), 4, 'lower'), '-0.3334');
+    assert.equal(outwardDecimal(rational('-1', '3'), 4, 'upper'), '-0.3333');
+});
 
 function fixture() {
     // Representation only: these arbitrary intervals do not certify this model.

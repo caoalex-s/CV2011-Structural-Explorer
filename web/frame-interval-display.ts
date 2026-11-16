@@ -43,11 +43,31 @@ export function bindIntervalDisplay(input: unknown, query: EvidenceQuery, values
     }
 }
 
+/** Directed decimal rounding preserves enclosure using integer arithmetic. */
+export function outwardDecimal(value: Rational, digits: number, direction: 'lower' | 'upper'): string {
+    if (!Number.isInteger(digits) || digits < 0 || digits > 20) throw Error('Invalid display precision.');
+    const numerator = BigInt(value.numerator), denominator = BigInt(value.denominator);
+    if (denominator <= 0n) throw Error('Invalid display denominator.');
+    const scale = 10n ** BigInt(digits);
+    const scaled = numerator * scale;
+    let rounded = scaled / denominator;
+    if (scaled % denominator !== 0n) {
+        if (direction === 'lower' && scaled < 0n) rounded--;
+        if (direction === 'upper' && scaled > 0n) rounded++;
+    }
+    const magnitude = rounded < 0n ? -rounded : rounded;
+    const decimal = digits ? `${magnitude / scale}.${String(magnitude % scale).padStart(digits, '0')}` : String(magnitude);
+    return (rounded < 0n ? '-' : '') + decimal;
+}
+
 function row(label: string, unit: string, value: IntervalReadout, digits: number): string {
+    const lower = outwardDecimal(value.lower, digits + 3, 'lower');
+    const upper = outwardDecimal(value.upper, digits + 3, 'upper');
     return `<tr><th scope="row">${escape(label)} (${unit})</th>
       <td data-evidence="rounded-midpoint">≈ ${roundedDecimal(value.midpoint, digits)}</td>
-      <td data-evidence="exact-midpoint" style="overflow-wrap:anywhere">${exact(value.midpoint)}</td>
-      <td data-evidence="exact-enclosure" style="overflow-wrap:anywhere">[${exact(value.lower)}, ${exact(value.upper)}]</td></tr>`;
+      <td data-evidence="outward-enclosure">[${lower}, ${upper}]</td>
+      <td><details><summary>Exact values</summary><p>Midpoint:<br><span data-evidence="exact-midpoint">${exact(value.midpoint)}</span></p>
+      <p>Interval:<br><span data-evidence="exact-enclosure">[${exact(value.lower)}, ${exact(value.upper)}]</span></p></details></td></tr>`;
 }
 
 /** Render only parser-validated values after source binding and ABI acceptance. */
@@ -55,7 +75,7 @@ export function renderIntervalValues(values: IntervalValues): string {
     const fieldNames = ['Axial force N', 'Shear force V', 'Bending moment M', 'Rotation θ', 'Displacement ux', 'Displacement uy'];
     const fieldUnits = ['kN', 'kN', 'kN m', 'rad', 'm', 'm'];
     const table = (rows: string) => `<table class="frame-interval-values"><thead><tr><th>Quantity</th>
-      <th>Rounded midpoint</th><th>Exact midpoint</th><th>Exact interval</th></tr></thead><tbody>${rows}</tbody></table>`;
+      <th>Rounded midpoint</th><th>Outward decimal interval</th><th>Exact certificate values</th></tr></thead><tbody>${rows}</tbody></table>`;
     const fields = values.fields.map((value, index) => row(fieldNames[index], fieldUnits[index], value, index < 3 ? 6 : 10)).join('');
     const reactions = values.points.map(point => {
         const label = point.owner === 'node' ? `Node ${point.id}` : `Member ${point.id} at t = ${exact(point.parameter)}`;
@@ -63,7 +83,7 @@ export function renderIntervalValues(values: IntervalValues): string {
             row(['Grouped reaction Fx', 'Grouped reaction Fy', 'Grouped reaction Mz'][index], index === 2 ? 'kN m' : 'kN', value, 6)).join(''))}`;
     }).join('');
     return `<p>Member ${escape(values.query.member)} is evaluated at t = ${exact(values.query.parameter)} using the ${values.query.cutSide} limit. Each interval contains the corresponding value of the original linear frame model. The exact midpoint is the reported approximation covered by the accuracy bound.</p>
-      <p>For each exact midpoint m and real model value v, the checker establishes |m − v| ≤ a + 10⁻⁸|v|. The absolute tolerance a is 10⁻⁶ kN for forces, 10⁻⁶ kN m for moments, 10⁻¹⁰ rad for rotation, and 10⁻⁹ m for displacement. Rounded midpoint values help read the tables and have additional decimal rounding error.</p>
+      <p>For each exact midpoint m and real model value v, the checker establishes |m − v| ≤ a + 10⁻⁸|v|. The absolute tolerance a is 10⁻⁶ kN for forces, 10⁻⁶ kN m for moments, 10⁻¹⁰ rad for rotation, and 10⁻⁹ m for displacement. Rounded midpoint values help read the tables and have additional decimal rounding error. Decimal interval endpoints are rounded outward to retain containment. Expand Exact values to inspect the original rational interval and midpoint.</p>
       <h3>Selected section</h3>${table(fields)}
       <h3>Grouped reactions</h3><p>Each row gives the total reaction at its source point. Coincident supports share this resultant. The report does not assign separate reactions to individual coincident supports.</p>${reactions}`;
 }

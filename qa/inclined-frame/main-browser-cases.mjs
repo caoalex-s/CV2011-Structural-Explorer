@@ -52,6 +52,25 @@ export async function runMainInclinedCases({ page, context, output, origin, base
     const first = await accepted();
     assert.equal(first.report, nativeReport);
     await page.waitForFunction(() => document.querySelector('#frame-worked-output [data-evidence="exact-enclosure"]'));
+    const exact = value => value.denominator === '1' ? value.numerator : `${value.numerator}/${value.denominator}`;
+    const allValues = [...first.values.fields, ...first.values.points.flatMap(point => point.reactions)];
+    assert.deepEqual(await page.locator('#frame-worked-output [data-evidence="exact-midpoint"]').allTextContents(),
+        allValues.map(value => exact(value.midpoint)));
+    assert.deepEqual(await page.locator('#frame-worked-output [data-evidence="exact-enclosure"]').allTextContents(),
+        allValues.map(value => `[${exact(value.lower)}, ${exact(value.upper)}]`));
+    const outward = await page.locator('#frame-worked-output [data-evidence="outward-enclosure"]').allTextContents();
+    assert.equal(outward.length, allValues.length);
+    for (const [index, text] of outward.entries()) {
+        const match = /^\[(-?\d+\.\d+), (-?\d+\.\d+)\]$/.exec(text);
+        assert.ok(match);
+        const fraction = decimal => ({ numerator: BigInt(decimal.replace('.', '')),
+            denominator: 10n ** BigInt(decimal.split('.')[1].length) });
+        const lower = fraction(match[1]), upper = fraction(match[2]);
+        assert.ok(lower.numerator * BigInt(allValues[index].lower.denominator) <=
+            BigInt(allValues[index].lower.numerator) * lower.denominator);
+        assert.ok(upper.numerator * BigInt(allValues[index].upper.denominator) >=
+            BigInt(allValues[index].upper.numerator) * upper.denominator);
+    }
     assert.ok(await page.locator('#frame-worked-output [data-evidence="explanatory-numerical"]').count() > 0);
     assert.equal(await page.locator('#frame-worked-output .math-error').count(), 0);
     assert.match(await page.locator('#frame-worked-output').textContent(), /do not inherit the accuracy guarantee/);
