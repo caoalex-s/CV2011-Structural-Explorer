@@ -36,6 +36,9 @@ jobs:
         if: ${{ inputs.proof_only != true }}
       - run: pnpm test
         if: ${{ inputs.proof_only != true }}
+      - name: Bind the accepted inclined bundle to this source
+        if: ${{ inputs.proof_only != true }}
+        run: node scripts/check-inclined-bundle.mjs
       - run: python -m pip install -r requirements.txt
         if: ${{ inputs.proof_only != true }}
       - run: mkdir -p .data && python -m unittest discover -s tests -p 'test_*.py' -v
@@ -199,3 +202,43 @@ jobs:
     steps:
       - uses: actions/deploy-pages@v4
         id: deployment
+  published-inclined-smoke:
+    if: ${{ needs.deploy.result == 'success' }}
+    needs: deploy
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@v4
+        with:
+          name: github-pages
+          path: .data/pages-artifact
+      - name: Bind actual published bytes to the normal Pages artifact
+        run: python3 qa/inclined-frame/check-pages-binding.py before
+      - name: Install pinned browser tooling
+        run: |
+          npm install --prefix .data/published-inclined-tools --ignore-scripts --save-exact playwright@1.51.1
+          node .data/published-inclined-tools/node_modules/playwright/cli.js install --with-deps chromium
+      - name: Check the published main inclined worked solution
+        run: |
+          cp qa/inclined-frame/published-main.mjs .data/published-inclined-tools/published-main.mjs
+          timeout 300s node .data/published-inclined-tools/published-main.mjs
+      - name: Confirm publication identity after the smoke
+        if: always()
+        run: python3 qa/inclined-frame/check-pages-binding.py after
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: published-inclined-evidence
+          include-hidden-files: true
+          path: |
+            .data/published-inclined/
+            .data/published-inclined-tools/package-lock.json
