@@ -11,6 +11,8 @@ import { frameDescriptions, frameStatus } from './frame-display.js';
 import type { EvidenceQuery } from './model-evidence.js';
 import { createFrameWorked } from './frame-worked.js';
 import { renderFrameWorked } from './frame-worked-view.js';
+import { decodeAcceptedIntervalReport } from './frame-interval-result.js';
+import { bindIntervalDisplay, renderIntervalValues } from './frame-interval-display.js';
 
 export const isPortalWorkspace = location.pathname.replace(/index\.html$/, '').endsWith('/portal-checker/');
 // The same controller serves the main workspace and the compatible scoped URL.
@@ -127,8 +129,39 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
         if (!(result.packet instanceof Uint8Array) || typeof result.packetDigest !== 'string') throw Error('Missing accepted packet.');
         const packet = new Uint8Array(result.packet);
         const packetDigest = result.packetDigest;
+        // Capture both byte containers before the first digest await. Worker
+        // object fields are not the source of displayed mathematical values.
+        const report = result.frameProtocol === 'inclined' && result.report instanceof Uint8Array
+            ? new Uint8Array(result.report) : null;
+        const reportDigest = result.reportDigest;
         if (await sha256(packet) !== result.packetDigest) throw Error('Accepted packet identity changed.');
         if (!requests.isCurrent(token) || checker !== runtime) return;
+        if (result.frameProtocol === 'inclined') {
+            if (!report || typeof reportDigest !== 'string' || await sha256(report) !== reportDigest)
+                throw Error('Missing or changed accepted interval report.');
+            if (!requests.isCurrent(token) || checker !== runtime) return;
+            const values = decodeAcceptedIntervalReport(report);
+            const sourceRequest = JSON.parse(new TextDecoder().decode(sourceBytes));
+            bindIntervalDisplay(sourceRequest.model, sourceRequest.query, values);
+            const presentation = renderIntervalValues(values);
+            const receipt = { protocol: 'CV2011_INCLINED_1', reportProtocol: 'CV2011_INCLINED_RESULT_1',
+                ...token, bindings: envelope.bindings, artifact: result.artifact, bundle: checker.bundle,
+                inputDigest: result.inputDigest, packetDigest, reportDigest,
+                theorem: 'InclinedFrameIntervalReportSound.checkReport_sound', sourceRequest, values,
+                packet: new TextDecoder().decode(packet), report: new TextDecoder().decode(report) };
+            status.textContent = 'Accepted by the compiled proved checker: unique linear equilibrium with checked output intervals.';
+            readouts.innerHTML = presentation;
+            exportText = JSON.stringify(receipt, null, 2);
+            certificate.textContent = exportText; exportButton.hidden = false;
+            acceptedGeneration = () => {
+                if (!requests.isCurrent(token) || checker !== runtime) return;
+                workedOutput.innerHTML = presentation;
+                workedOutput.hidden = false; collapse.hidden = false;
+                collapse.textContent = 'Collapse solution'; collapse.setAttribute('aria-expanded', 'true');
+            };
+            if (generationRequested) { generationRequested = false; acceptedGeneration(); }
+            return;
+        }
         const frame = decodeAcceptedFramePacket(packet);
         status.textContent = `${frameStatus(frame)} Checked section: ${frame.query.cutSide} limit.`;
         readouts.replaceChildren(...frameDescriptions(frame).map(text => {
