@@ -4,10 +4,11 @@ on:
     branches: [codex/frame-hinges-stage2]
 permissions:
   contents: read
+  actions: read
 jobs:
   native:
     runs-on: ubuntu-22.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -29,7 +30,20 @@ jobs:
           lake env bash -euc '
             export LEAN_PATH="$PWD:$LEAN_PATH"
             for module in RationalFrameModel RationalFramePartition RationalFrameChecker RationalFrameWire HingeFrameChecker HingeFrameWire; do
-              lean -o "$module.olean" "$module.lean"
+              case "$module" in
+                HingeFrame*) lean -c "$module.c" -o "$module.olean" "$module.lean" ;;
+                *) lean -o "$module.olean" "$module.lean" ;;
+              esac
             done
             lean --run ../qa/hinge-frame/NativePackets.lean ../.data/hinge-packets
           '
+      - name: Link the browser checker
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash qa/hinge-frame/build-runtime.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hinge-browser-checker
+          path: .data/hinge-build/assets/
+          if-no-files-found: error
+          include-hidden-files: true
