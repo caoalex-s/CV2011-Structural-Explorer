@@ -73,7 +73,7 @@ def restrained (a : Assembly) (row : Nat) : Bool :=
     blocksDirection support d && pointIndex a support.member support.t d == row
 
 /-- Recover on the chosen member side with its absolute end rotations. -/
-def section (a : Assembly) (q : Query) (u : Array Rat) : Array Rat :=
+def sectionValues (a : Assembly) (q : Query) (u : Array Rat) : Array Rat :=
   match selectedSegment a.mesh q with
   | none => #[]
   | some s =>
@@ -95,7 +95,7 @@ def Checked (a : Assembly) (q : Query) (w : Certificate) : Prop :=
     w.loadWork = arrayDot f w.motion ∧ w.reactions = #[] ∧ w.readouts = #[] ∧ w.lower = #[] ∧ w.diagonal = #[]
   else FactorValid k free w ∧ w.reactions = residual k f w.motion ∧
     (∀ i : Fin n, restrained a i.val = false → w.reactions[i.val]! = 0) ∧
-    w.readouts = section a q w.motion ∧ w.loadWork = 0)
+    w.readouts = sectionValues a q w.motion ∧ w.loadWork = 0)
 
 instance (a : Assembly) (q : Query) (w : Certificate) : Decidable (Checked a q w) := by
   unfold Checked
