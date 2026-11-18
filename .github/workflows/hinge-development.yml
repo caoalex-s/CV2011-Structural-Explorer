@@ -47,3 +47,22 @@ jobs:
           path: .data/hinge-build/assets/
           if-no-files-found: error
           include-hidden-files: true
+  published-student-baseline:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm install --prefix .data/student-tools --ignore-scripts --save-exact playwright@1.51.1
+      - run: node .data/student-tools/node_modules/playwright/cli.js install --with-deps chromium
+      - run: node qa/hinge-frame/run-student-browser.mjs https://caoalex-s.github.io/CV2011-Structural-Explorer/ published
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: student-canvas-baseline
+          path: .data/student-results/
+          include-hidden-files: true
