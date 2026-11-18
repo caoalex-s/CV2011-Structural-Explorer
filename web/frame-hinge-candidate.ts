@@ -12,6 +12,14 @@ export interface HingeFrame extends CompiledFrame { released: ReleasedRotation[]
  * shared. The untrusted candidate uses the same element physics as the rigid
  * solver, with these physical coordinates assigned before assembly. */
 export function compileHingeFrame(input: unknown, query: EvidenceQuery): HingeFrame {
+    if (input && typeof input === 'object') {
+        const outer = input as Record<string, unknown>;
+        const source = (outer.version === 2 ? outer.model : outer) as Record<string, unknown> | undefined;
+        for (const key of ['members', 'nodes', 'supports', 'loads'] as const) {
+            const items = source?.[key];
+            if (Array.isArray(items) && items.length > frameLimits[key]) throw Error(`Limit: too many ${key}.`);
+        }
+    }
     const model = parseEvidenceModel(input);
     if (model.nodes.some(node => node.joint === 'semi-rigid'))
         throw Error('Unsupported: rotational springs.');

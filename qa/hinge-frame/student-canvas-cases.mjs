@@ -89,6 +89,7 @@ export async function runStudentCanvasCases({ page, base, output, target = 'publ
             response: await page.locator('#section-results').innerText(),
             checker: await page.locator('#portal-status').innerText(),
             checkerIntroduction: await page.locator('#portal-introduction').innerText(),
+            workedSolution: await page.locator('#frame-worked-output').innerText(),
             supportCount: await object('support').count(),
         };
         records.push(entry);
@@ -99,8 +100,22 @@ export async function runStudentCanvasCases({ page, base, output, target = 'publ
     async function worked() {
         await page.getByRole('button', { name: 'Generate worked solution' }).click();
         // First activation can reload the model. Observe a finished result or rejection.
-        await page.locator('#portal-status').filter({ hasText: /accepted|unsupported|inconclusive|error|failed|mechanism/i })
+        await page.locator('#portal-status')
+            .filter({ hasText: /accepted|unsupported|inconclusive|error|failed|mechanism/i })
+            .filter({ hasNotText: 'keep the original portal and change only its uniform BC load' })
             .waitFor({ state: 'visible', timeout: 40000 });
+    }
+
+    async function checkStage2(name, expected, checkerStatus) {
+        if (target !== 'stage2') return;
+        try {
+            await worked();
+            const entry = await capture(name, expected);
+            assert.match(entry.checker, checkerStatus);
+            assert.ok(entry.workedSolution.trim(), 'Generate did not display the worked solution');
+        } catch (error) {
+            records.push({ name, failure: String(error), checker: await page.locator('#portal-status').innerText() });
+        }
     }
 
     async function scenario(name, run) {
@@ -167,15 +182,19 @@ export async function runStudentCanvasCases({ page, base, output, target = 'publ
         await put('moment', 4);
         await page.getByLabel('Attached member').selectOption({ index: 0 });
         await capture('hinge-left-couple', '20 kN m CCW on AB side: Ay=Cy=5 kN, MA=0');
+        await checkStage2('hinge-left-couple-worked', 'The loaded AB face has M=+20 kN m and the BC face has M=0', /Accepted by the compiled hinge checker/);
         await page.getByLabel('Attached member').selectOption({ index: 1 });
         await capture('hinge-right-couple', '20 kN m CCW on BC side: Ay=10 kN, Cy=0, MA=40 kN m CCW');
+        await checkStage2('hinge-right-couple-worked', 'The AB face has M=0 and the loaded BC face has M=-20 kN m', /Accepted by the compiled hinge checker/);
         await page.getByRole('button', { name: 'Delete selected object' }).click();
         await put('pin', 0);
         await capture('hinge-pin-mechanism', 'Replacing fixed A with a pin creates a mechanism');
+        await checkStage2('hinge-pin-mechanism-worked', 'The downward load does work on the mechanism motion', /Checked mechanism.*incompatible/i);
         await put('fixed', 0);
         await put('roller', 8);
         await page.getByRole('button', { name: 'Delete selected object' }).click();
         await capture('hinge-no-roller-mechanism', 'Removing roller C leaves the right span free to rotate');
+        await checkStage2('hinge-no-roller-mechanism-worked', 'The downward load does work on the mechanism motion', /Checked mechanism.*incompatible/i);
     });
 
     await scenario('released-branch', async () => {
@@ -193,6 +212,11 @@ export async function runStudentCanvasCases({ page, base, output, target = 'publ
         await rotations.last().selectOption({ label: 'Released' });
         assert.deepEqual(await rotations.evaluateAll(elements => elements.map(element => element.value)), ['rigid', 'free']);
         await capture('one-released-branch', 'Stable, AB/BC continuous and the vertical branch released in rotation');
+        await put('force', 4, 1);
+        await setNumber('fx', 10);
+        await setNumber('fy', 0);
+        await capture('loaded-released-branch', 'The 10 kN horizontal load gives a -5 kN horizontal reaction at D and zero branch-end moment at B');
+        await checkStage2('loaded-released-branch-worked', 'The released branch face at B has zero end moment', /Accepted by the compiled hinge checker/);
         await put('joint', 0);
         assert.equal(await rotations.count(), 0);
         await capture('single-member-end-editor', 'Single incident member offers no side-specific release control');

@@ -28,6 +28,7 @@ def releases (source : Source) (rules : Connections) : List Nat :=
 structure Assembly where
   mesh : Compiled
   sides : List Nat
+  valid : PartitionValid mesh
 
 def Assembly.size (a : Assembly) := a.mesh.dofs + a.sides.length
 
@@ -73,12 +74,14 @@ def restrained (a : Assembly) (row : Nat) : Bool :=
     blocksDirection support d && pointIndex a support.member support.t d == row
 
 /-- Recover on the chosen member side with its absolute end rotations. -/
+def segmentMotion (a : Assembly) (s : Segment) (u : Array Rat) : Array Rat :=
+  (u.set! (3 * s.a + 2) u[index a s 2]!).set! (3 * s.b + 2) u[index a s 5]!
+
 def sectionValues (a : Assembly) (q : Query) (u : Array Rat) : Array Rat :=
   match selectedSegment a.mesh q with
   | none => #[]
   | some s =>
-    let motion := (u.set! (3 * s.a + 2) u[index a s 2]!).set! (3 * s.b + 2) u[index a s 5]!
-    recoverSegment s q.t motion
+    recoverSegment s q.t (segmentMotion a s u)
 
 def tabulate (n : Nat) (f : Nat → α) := ((List.range n).map f).toArray
 
@@ -130,10 +133,9 @@ def compile (geometry : Source) (rules : Connections) : Option Assembly := do
   guard (rules.joints.all (· ≤ 2) && rules.ends.all (· ≤ 2))
   guard (sourceValid geometry)
   let mesh ← compileModel geometry
-  guard (decide (PartitionValid mesh))
   let sides := releases geometry rules
   guard (!sides.isEmpty && mesh.dofs + sides.length ≤ 48)
-  return ⟨mesh, sides⟩
+  if valid : PartitionValid mesh then return ⟨mesh, sides, valid⟩ else none
 
 def accepts (geometry : Source) (rules : Connections) (q : Query) (w : Certificate) : Bool :=
   match compile geometry rules with

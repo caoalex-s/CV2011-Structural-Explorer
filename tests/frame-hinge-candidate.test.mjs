@@ -8,6 +8,8 @@ registerHooks({ resolve(specifier, context, next) {
 } });
 const { example } = await import('../web/engine.ts');
 const { compileHingeFrame } = await import('../web/frame-hinge-candidate.ts');
+const { hingePacket } = await import('../web/frame-hinge-packet.ts');
+const { decodeAcceptedHingePacket } = await import('../web/frame-hinge-result.ts');
 const { FrameCandidates, frameQueryConvention } = await import('../web/frame-candidate.ts');
 const { equal, integer, zero } = await import('../web/frame-rational.ts');
 const at = (member, parameter) => ({ ...frameQueryConvention, member, parameter,
@@ -43,4 +45,24 @@ test('removing the suspended span roller produces a loaded mechanism candidate',
     const result = solve(model, 'BC', 0.5);
     assert.equal(result.kind, 'mechanism');
     assert.ok(!equal(result.loadWork, zero));
+});
+
+test('named face results preserve end moments and separate rotation and support ownership', () => {
+    for (const referenceMember of ['AB', 'BC']) {
+        const model = example('hinge');
+        model.nodes.find(node => node.id === 'B').referenceMember = referenceMember;
+        const releaseMember = referenceMember === 'AB' ? 'BC' : 'AB';
+        const t = releaseMember === 'BC' ? 0 : 1;
+        model.supports.push({ id: 'S3', kind: 'fixed', member: releaseMember, t, angle: 0 });
+        const query = at(releaseMember, t);
+        const frame = compileHingeFrame(model, query);
+        const witness = new FrameCandidates().produce(frame);
+        const values = decodeAcceptedHingePacket(hingePacket(model, query, witness));
+        const released = values.faces.find(face => face.released);
+        assert.equal(released.member, releaseMember);
+        assert.equal(released.rotation.numerator, '0');
+        assert.equal(values.faces.length, 2);
+        assert.deepEqual(released.moment, values.readouts[2]);
+        assert.deepEqual(released.reaction, { numerator: String(witness.reactions.at(-1).n), denominator: String(witness.reactions.at(-1).d) });
+    }
 });

@@ -27,6 +27,7 @@ jobs:
       - name: Compile and exercise the source-derived hinge checker
         working-directory: proofs
         run: |
+          lake build MemberCutAdapter
           lake env bash -euc '
             export LEAN_PATH="$PWD:$LEAN_PATH"
             for module in RationalFrameModel RationalFramePartition RationalFrameChecker RationalFrameWire HingeFrameChecker HingeFrameWire; do
@@ -35,7 +36,9 @@ jobs:
                 *) lean -o "$module.olean" "$module.lean" ;;
               esac
             done
-            lean -o RationalFrameAlgebra.olean RationalFrameAlgebra.lean
+            for module in RationalFrameAlgebra RationalFrameFields RationalFrameInterpretation RationalFrameAssembly RationalFrameRecovery; do
+              lean -o "$module.olean" "$module.lean"
+            done
             lean HingeFrameSoundness.lean
             lean --run ../qa/hinge-frame/NativePackets.lean ../.data/hinge-packets
           '
