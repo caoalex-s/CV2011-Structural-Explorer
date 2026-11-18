@@ -1,0 +1,35 @@
+name: Verify hinge development
+on:
+  push:
+    branches: [codex/frame-hinges-stage2]
+permissions:
+  contents: read
+jobs:
+  native:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: node --test tests/frame-hinge-candidate.test.mjs
+      - run: node qa/hinge-frame/packets.mjs
+      - uses: leanprover/lean-action@ba3fdfe5c4476c925da13bf11a005ddb47e47aee
+        with:
+          lake-package-directory: proofs
+          build: 'false'
+          test: 'false'
+          use-mathlib-cache: 'true'
+      - name: Compile and exercise the source-derived hinge checker
+        working-directory: proofs
+        run: |
+          lake env bash -euc '
+            export LEAN_PATH="$PWD:$LEAN_PATH"
+            for module in RationalFrameModel RationalFramePartition RationalFrameChecker RationalFrameWire HingeFrameChecker HingeFrameWire; do
+              lean -o "$module.olean" "$module.lean"
+            done
+            lean --run ../qa/hinge-frame/NativePackets.lean ../.data/hinge-packets
+          '
