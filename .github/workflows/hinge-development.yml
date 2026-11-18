@@ -35,6 +35,8 @@ jobs:
                 *) lean -o "$module.olean" "$module.lean" ;;
               esac
             done
+            lean -o RationalFrameAlgebra.olean RationalFrameAlgebra.lean
+            lean HingeFrameSoundness.lean
             lean --run ../qa/hinge-frame/NativePackets.lean ../.data/hinge-packets
           '
       - name: Link the browser checker

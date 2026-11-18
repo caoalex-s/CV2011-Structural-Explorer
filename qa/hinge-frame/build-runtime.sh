@@ -29,3 +29,4 @@ em++ "${flags[@]}" -Wl,-u,ntohs --no-entry "${objects[@]}" -Wl,--start-group "$c
     -sPTHREAD_POOL_SIZE=0 -sERROR_ON_UNDEFINED_SYMBOLS=1 \
     '-sEXPORTED_FUNCTIONS=["_checker_init","_checker_check","_input_ptr","_input_capacity"]' \
     -o "$stage/assets/checker.mjs"
+node qa/hinge-frame/prepare-browser.mjs

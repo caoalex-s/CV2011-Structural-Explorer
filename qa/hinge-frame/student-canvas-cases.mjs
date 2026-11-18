@@ -1,5 +1,6 @@
 /** Exercise the visible student workflow in a fresh Playwright browser context. */
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -14,6 +15,15 @@ export async function runStudentCanvasCases({ page, base, output, target = 'publ
     const tool = name => page.locator(`button[data-tool="${name}"]`).click();
     const object = kind => canvas.locator(`[data-object="${kind}"]`);
     const field = name => page.locator(`[data-property="${name}"]`);
+    const closeProperties = page.getByRole('button', { name: 'Close properties' });
+    const initialDocument = await page.request.get(base);
+    const verification = await page.request.get(new URL('verification.json', base).href);
+    const served = {
+        url: page.url(), documentStatus: initialDocument.status(),
+        documentSha256: createHash('sha256').update(await initialDocument.body()).digest('hex'),
+        verificationStatus: verification.status(),
+        verification: verification.ok() ? await verification.json().catch(() => null) : null,
+    };
 
     async function blank() {
         await page.getByLabel('Start from').selectOption({ label: 'Blank canvas' });
@@ -29,13 +39,16 @@ export async function runStudentCanvasCases({ page, base, output, target = 'publ
 
     async function point(x, y = 0) {
         // The blank-canvas grid has a fixed view until Fit or Zoom is used.
+        if (await closeProperties.isVisible()) await closeProperties.click();
         await canvas.scrollIntoViewIfNeeded();
-        const screenPoint = await canvas.evaluate((svg, [x, y]) => {
+        const hit = await canvas.evaluate((svg, [x, y]) => {
             const viewPoint = new DOMPoint(500 + (x - 4) * 85, 200 - y * 85);
             const screen = viewPoint.matrixTransform(svg.getScreenCTM());
-            return [screen.x, screen.y];
+            const target = document.elementFromPoint(screen.x, screen.y);
+            return { point: [screen.x, screen.y], onCanvas: svg.contains(target), target: target?.tagName };
         }, [x, y]);
-        await page.mouse.click(...screenPoint);
+        assert.ok(hit.onCanvas, `Canvas point (${x}, ${y}) hit ${hit.target} instead`);
+        await page.mouse.click(...hit.point);
     }
 
     async function member(a, b) {
@@ -75,6 +88,8 @@ export async function runStudentCanvasCases({ page, base, output, target = 'publ
             section: await page.locator('#section-distance').innerText(),
             response: await page.locator('#section-results').innerText(),
             checker: await page.locator('#portal-status').innerText(),
+            checkerIntroduction: await page.locator('#portal-introduction').innerText(),
+            supportCount: await object('support').count(),
         };
         records.push(entry);
         await page.screenshot({ path: join(output, `${name}.png`), fullPage: true });
@@ -102,6 +117,8 @@ export async function runStudentCanvasCases({ page, base, output, target = 'publ
         await member([0, 0], [8, 0]);
         await put('pin', 0);
         await put('roller', 8);
+        assert.equal(await field('angle').inputValue(), '90');
+        assert.equal(await object('support').count(), 2);
         await put('force', 4);
         await setNumber('fy', -10);
         await capture('simple-beam-overview', 'Ay=By=5 kN, M at 4 m=20 kN m, stable determinate');
@@ -126,6 +143,8 @@ export async function runStudentCanvasCases({ page, base, output, target = 'publ
         await member([4, 0], [8, 0]);
         await put('fixed', 0);
         await put('roller', 8);
+        assert.equal(await field('angle').inputValue(), '90');
+        assert.equal(await object('support').count(), 2);
         await put('force', 6);
         await setNumber('fy', -10);
         await put('joint', 4);
@@ -179,6 +198,6 @@ export async function runStudentCanvasCases({ page, base, output, target = 'publ
         await capture('single-member-end-editor', 'Single incident member offers no side-specific release control');
     });
 
-    await writeFile(join(output, `student-canvas-${target}.json`), JSON.stringify({ target, records, errors }, null, 2) + '\n');
-    return { records, errors };
+    await writeFile(join(output, `student-canvas-${target}.json`), JSON.stringify({ target, served, records, errors }, null, 2) + '\n');
+    return { served, records, errors };
 }
