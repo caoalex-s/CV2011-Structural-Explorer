@@ -20,6 +20,7 @@ export class PortalRuntime {
     supportsFrames = false;
     supportsAffineFrames = false;
     supportsInclinedFrames = false;
+    supportsHingeFrames = false;
     get needsReset(): boolean { return this.stopped; }
     onFailure: (reason: string) => void = () => {};
     readonly ready: Promise<void>;
@@ -49,6 +50,7 @@ export class PortalRuntime {
                     this.supportsFrames = Array.isArray(data.protocols) && data.protocols.includes('frame');
                     this.supportsAffineFrames = Array.isArray(data.capabilities) && data.capabilities.includes('affine-vertical-v1');
                     this.supportsInclinedFrames = Array.isArray(data.capabilities) && data.capabilities.includes('inclined-real-v1');
+                    this.supportsHingeFrames = Array.isArray(data.capabilities) && data.capabilities.includes('hinge-cardinal-v1');
                     resolve();
                 } else this.receive(data);
             };
@@ -86,11 +88,12 @@ export class PortalRuntime {
     /** Source/query JSON is captured before hashing. Candidate construction
      * and exact checking both run inside the same bounded worker request.
      */
-    async checkFrame(bytes: Uint8Array, mode: 'exact' | 'inclined' = 'exact'): Promise<CheckerResult> {
-        if (!this.supportsFrames || mode === 'inclined' && !this.supportsInclinedFrames) {
+    async checkFrame(bytes: Uint8Array, mode: 'exact' | 'inclined' | 'hinge' = 'exact'): Promise<CheckerResult> {
+        if (!this.supportsFrames || mode === 'inclined' && !this.supportsInclinedFrames ||
+            mode === 'hinge' && !this.supportsHingeFrames) {
             this.invalidate(); return { state: 'unsupported-runtime' };
         }
-        return this.submit(bytes, 'frame', mode === 'inclined');
+        return this.submit(bytes, 'frame', mode !== 'exact');
     }
     private async submit(bytes: Uint8Array, protocol: 'portal' | 'frame', inclined = false): Promise<CheckerResult> {
         this.invalidate();

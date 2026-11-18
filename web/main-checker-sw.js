@@ -15,7 +15,9 @@ self.addEventListener('fetch', event => {
     const mainDocument = request.mode === 'navigate' && request.destination === 'document' &&
         [scope.pathname, scope.pathname + 'index.html'].includes(target.pathname);
     const bundle = scope.pathname + 'portal-checker/bundle/';
-    const checkerResource = target.pathname.startsWith(bundle) && runtimeFiles.has(target.pathname.slice(bundle.length));
+    const hingeWorker = scope.pathname + 'portal-checker/hinge/worker.mjs';
+    const checkerResource = target.pathname.startsWith(bundle) && runtimeFiles.has(target.pathname.slice(bundle.length)) ||
+        target.pathname === hingeWorker;
     if (!mainDocument && !checkerResource) return;
     if (request.cache === 'only-if-cached' && request.mode !== 'same-origin') return;
     event.respondWith(fetch(request).then(response => {

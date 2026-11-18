@@ -802,7 +802,13 @@ function record(event: string, answer: string, units: string): Promise<Attempt> 
 }
 // Components bind once. Model edits and navigation still share this controller.
 const controls = createWorkspaceControls({
-    selectTool: next => { tool = next; start = null; renderCanvas(); },
+    selectTool: next => {
+        tool = next; start = null;
+        // The floating inspector belongs to the previous selection. Clear it
+        // before placing a new object so it cannot intercept the target click.
+        if (next !== 'select' && selected) { selected = null; render(); }
+        else renderCanvas();
+    },
     selectLayer: next => { layer = next; render(); },
     selectMode: setMode,
 });

@@ -2,6 +2,8 @@
 import { EvidenceRequests, createEvidenceEnvelope } from './model-evidence.js';
 import { portalAmplitude, portalCandidate, encodeCandidate, portalQuery, outputIds, roundedDecimal, profileId } from './portal-candidate.js';
 import type { Model } from './engine.js';
+import { endConnection } from './engine.js';
+import { decodeAcceptedHingePacket } from './frame-hinge-result.js';
 import { PortalRuntime } from './portal-runtime.js';
 import { sha256 } from './portal-runtime.js';
 import type { CheckerResult } from './portal-runtime.js';
@@ -24,6 +26,10 @@ export const portalStorageKey = 'cv2011-checked-portal-model/v1';
 const scope = new URL('./', location.href);
 const isolationScript = new URL(isPortalWorkspace ? 'isolation-sw.js' : 'main-checker-sw.js', scope).href;
 const runtimeUrl = new URL(isPortalWorkspace ? './bundle/worker.mjs' : './portal-checker/bundle/worker.mjs', scope);
+const hingeUrl = new URL('../hinge/worker.mjs', runtimeUrl);
+function usesRelease(model: Model): boolean {
+    return model.members.some(member => (['a', 'b'] as const).some(end => endConnection(model, member, end).rotation === 'free'));
+}
 function ownsRegistration(registration: ServiceWorkerRegistration): boolean {
     return registration.scope === scope.href &&
         [registration.active, registration.waiting, registration.installing].filter(worker => worker !== null)
@@ -98,7 +104,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
     async function start() {
         stop(); clear('Starting local checker…');
         startingNow = true;
-        try { runtime = new PortalRuntime(runtimeUrl); }
+        try { runtime = new PortalRuntime(usesRelease(modelAtPresent()) ? hingeUrl : runtimeUrl); }
         catch (error) { startingNow = false; reset.hidden = false; clear(`Checking unavailable: ${String(error)}`); return; }
         const starting = runtime;
         starting.onFailure = reason => {
@@ -108,7 +114,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
         try {
             await starting.ready;
             if (starting !== runtime) return;
-            if (!starting.supportsAffineFrames) throw Error('This checker bundle predates affine-load support. Refresh after the updated checker is published.');
+            if (!starting.supportsAffineFrames && !starting.supportsHingeFrames) throw Error('The loaded checker does not support this frame.');
             enabled = true; startingNow = false; activate.hidden = true; deactivate.hidden = false; reset.hidden = false;
             if (starting.supportsFrames) {
                 amplitude.closest('label')!.hidden = true;
@@ -119,6 +125,10 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                     host.querySelector('#portal-introduction')!.textContent = 'Generate a solution for the current rigid frame and selected section. Inclined members and rollers at arbitrary finite angles use checked output intervals.';
                     host.querySelector('#portal-scope')!.textContent = `The checker covers linear Euler–Bernoulli frames with positive EA and EI and rigid joints. Supports may be fixed, pinned, or rollers at arbitrary finite degree angles. Point forces, couples, and linearly varying vertical loads may act over partial or overlapping member intervals. Original parsed binary64 coordinates, angles, and actions define the real model. Up to 8 members, 16 nodes, 16 active points, 16 segments, 16 supports, and 16 loads are admitted within the arithmetic budget and 1 MiB packet limit. The exact-cardinal route has a one-second deadline. Inclined requests have a ${inclinedDeadlineMilliseconds / 1000}-second deadline and are cancelled when the drawing or selected section changes. A timeout or failed enclosure check is inconclusive and does not establish a mechanism. N is positive in tension, M is positive in sagging with dM/dx = V, global y is upward, and rotation is counterclockwise. Diagram curves remain numerical. Acceptance relies on the proved compiled checker, its compiler and runtime, and the decoder and input binding.`;
                 }
+            }
+            if (starting.supportsHingeFrames) {
+                host.querySelector('#portal-introduction')!.textContent = 'Generate a solution for the selected section and inspect the rotations and moments at each hinge.';
+                host.querySelector('#portal-scope')!.textContent = 'This checker supports rotational releases on horizontal and vertical members with shared joint translations and cardinal roller restraints. Inclined released frames and elastic connections are outside this increment. The compiled checker verifies equilibrium, end moments and admissible mechanism motions.';
             }
             update(member, parameter);
             // A single explicit Generate survives only the activation reload of
@@ -143,6 +153,37 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
         const reportDigest = result.reportDigest;
         if (await sha256(packet) !== packetDigest) throw Error('Accepted packet identity changed.');
         if (!requests.isCurrent(token) || checker !== runtime) return;
+        if (checker.supportsHingeFrames) {
+            if (result.frameProtocol !== 'hinge') throw Error('Unexpected release checker response.');
+            const frame = decodeAcceptedHingePacket(packet);
+            status.textContent = frame.kind === 'solution' ? 'Accepted by the compiled hinge checker.' : frameStatus(frame);
+            const lines = frameDescriptions(frame);
+            for (const face of frame.faces) {
+                const description = face.released ? 'released' : 'joint rotation';
+                lines.push(`Node ${face.node}, member ${face.member}, end ${face.end} (${description}). Rotation ${roundedDecimal(face.rotation, 6)}${frame.kind === 'solution' ? ' rad' : ' in the mechanism motion'}.` +
+                    (face.moment ? ` Section moment ${roundedDecimal(face.moment, 3)} kN m.` : '') +
+                    (face.reaction && face.reaction.numerator !== '0' ? ` Separate end restraint moment ${roundedDecimal(face.reaction, 3)} kN m.` : ''));
+            }
+            const paragraphs = (items: string[]) => items.map(item => {
+                const line = document.createElement('p'); line.textContent = item; return line;
+            });
+            readouts.replaceChildren(...paragraphs(lines));
+            exportText = JSON.stringify({ protocol: 'CV2011_HINGE_1', ...token, bindings: envelope.bindings,
+                artifact: checker.artifact, bundle: checker.bundle, inputDigest: result.inputDigest, packetDigest,
+                theorem: 'HingeFrame.Wire.accepted_bytes', sourceRequest: JSON.parse(new TextDecoder().decode(sourceBytes)),
+                packet: new TextDecoder().decode(packet), values: frame }, null, 2);
+            certificate.textContent = exportText; exportButton.hidden = false;
+            acceptedGeneration = () => {
+                if (!requests.isCurrent(token) || checker !== runtime) return;
+                const teaching = ['The connected ends move together horizontally and vertically. Each released end has its own rotation.'];
+                if (frame.kind === 'solution') teaching.push('Balance moments on each released end. With no applied couple or rotational restraint there, the internal end moment is zero. A couple acts on the member selected in the drawing.');
+                workedOutput.replaceChildren(...paragraphs([...teaching, ...lines]));
+                workedOutput.hidden = false; collapse.hidden = false; collapse.textContent = 'Collapse solution';
+                collapse.setAttribute('aria-expanded', 'true');
+            };
+            if (generationRequested) { generationRequested = false; acceptedGeneration(); }
+            return;
+        }
         if (result.frameProtocol === 'inclined') {
             if (!report || typeof reportDigest !== 'string' || await sha256(report) !== reportDigest)
                 throw Error('Missing or changed accepted interval report.');
@@ -235,19 +276,23 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
         clear(enabled ? 'Checking current drawing…' : 'Generate enables local checking and reloads this workspace once.');
         let snapshot: Model;
         let query: EvidenceQuery;
-        let frameMode: 'exact' | 'inclined' = 'exact';
+        let frameMode: 'exact' | 'inclined' | 'hinge' = 'exact';
         try {
             // Capture before any asynchronous work, including hashing and debounce.
             snapshot = structuredClone(modelAtPresent());
+            if (startingNow) { clear('Starting local checker…'); return; }
+            const hinge = usesRelease(snapshot);
+            if (enabled && runtime && runtime.supportsHingeFrames !== hinge) { void start(); return; }
             if (!runtime || runtime.supportsFrames) {
                 if (parameter === 0) cutSide.value = 'right';
                 if (parameter === 1) cutSide.value = 'left';
                 cutSide.options[0].disabled = parameter === 1;
                 cutSide.options[1].disabled = parameter === 0;
                 query = { member, parameter, cutSide: cutSide.value as 'left' | 'right', ...frameQueryConvention };
-                try { validateFrame(snapshot, query); }
+                if (hinge) frameMode = 'hinge';
+                else try { validateFrame(snapshot, query); }
                 catch (error) {
-                    if (!runtime?.supportsInclinedFrames || !(error instanceof Error) || !error.message.startsWith('Unsupported:')) throw error;
+                    if (runtime && !runtime.supportsInclinedFrames || !(error instanceof Error) || !error.message.startsWith('Unsupported:')) throw error;
                     validateIntervalFrame(snapshot, query);
                     frameMode = 'inclined';
                 }
