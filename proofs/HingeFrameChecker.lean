@@ -82,6 +82,29 @@ def sectionValues (a : Assembly) (q : Query) (u : Array Rat) : Array Rat :=
 
 def tabulate (n : Nat) (f : Nat → α) := ((List.range n).map f).toArray
 
+def faceQuery (side : Nat) : Query :=
+  let start := side % 2 == 0
+  ⟨side / 2, if start then 0 else 1, start, 1⟩
+
+/-- A point couple works on the rotation of the end selected in the drawing. -/
+def faceCouple (a : Assembly) (q : Query) : Rat :=
+  (a.mesh.source.loads.toList.map fun load =>
+    if load.kind == 1 && load.member == q.member && load.t == q.t then load.mz else 0).sum
+
+/-- Compare the one-sided section moment with the external couple and any
+    rotational support reaction on the same released end. -/
+def FaceBalance (a : Assembly) (w : Certificate) (side : Nat) : Prop :=
+  let q := faceQuery side
+  let values := sectionValues a q w.motion
+  let row := pointIndex a q.member q.t 2
+  values.size = 6 ∧
+    (if q.right then -values[2]! else values[2]!) =
+      faceCouple a q + (if restrained a row then w.reactions[row]! else 0)
+
+instance (a : Assembly) (w : Certificate) (side : Nat) : Decidable (FaceBalance a w side) := by
+  unfold FaceBalance
+  infer_instance
+
 def Checked (a : Assembly) (q : Query) (w : Certificate) : Prop :=
   let n := a.size
   let k := tabulate n fun i => tabulate n (stiffness a i)
@@ -95,7 +118,8 @@ def Checked (a : Assembly) (q : Query) (w : Certificate) : Prop :=
     w.loadWork = arrayDot f w.motion ∧ w.reactions = #[] ∧ w.readouts = #[] ∧ w.lower = #[] ∧ w.diagonal = #[]
   else FactorValid k free w ∧ w.reactions = residual k f w.motion ∧
     (∀ i : Fin n, restrained a i.val = false → w.reactions[i.val]! = 0) ∧
-    w.readouts = sectionValues a q w.motion ∧ w.loadWork = 0)
+    w.readouts = sectionValues a q w.motion ∧ w.loadWork = 0 ∧
+    (∀ side : Fin a.sides.length, FaceBalance a w (a.sides.get side)))
 
 instance (a : Assembly) (q : Query) (w : Certificate) : Decidable (Checked a q w) := by
   unfold Checked

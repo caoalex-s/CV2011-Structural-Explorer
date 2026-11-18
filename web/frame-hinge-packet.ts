@@ -5,7 +5,7 @@
  * remain presentation metadata bound by the surrounding evidence envelope.
  */
 import type { EvidenceQuery } from './model-evidence.js';
-import { type FrameCertificate, frameLimits } from './frame-candidate.js';
+import { type FrameCertificate, frameLimits, recoverFrame } from './frame-candidate.js';
 import { type Fraction, binary64, fraction, maxRationalDigits } from './frame-rational.js';
 
 import { compileHingeFrame } from './frame-hinge-candidate.js';
@@ -16,7 +16,8 @@ export const hingePacketVersion = 'CV2011_HINGE_1';
  * stiffness, force or restraint mask is an authoritative packet input.
  */
 export function hingePacket(input: unknown, query: EvidenceQuery, witness: FrameCertificate): Uint8Array {
-    const { model, released } = compileHingeFrame(input, query);
+    const frame = compileHingeFrame(input, query);
+    const { model, released } = frame;
     const fields: string[] = [hingePacketVersion];
     const natural = (value: number, maximum: number) => {
         if (!Number.isInteger(value) || value < 0 || value > maximum) throw Error('Malformed packet count or index.');
@@ -90,6 +91,12 @@ export function hingePacket(input: unknown, query: EvidenceQuery, witness: Frame
         witness.readouts.forEach(rational);
     }
     rational(witness.loadWork);
+    if (!mechanism) for (const member of model.members) {
+        for (const parameter of [0, 1]) {
+            const face = { ...query, member: member.id, parameter, cutSide: parameter === 0 ? 'right' as const : 'left' as const };
+            rational(recoverFrame({ ...frame, query: face }, witness.motion)[2]);
+        }
+    }
     const bytes = new TextEncoder().encode(fields.join('\n'));
     if (bytes.length > frameLimits.bytes) throw Error('Limit: checker packet exceeds 1 MiB.');
     return bytes;

@@ -6,6 +6,7 @@ open RationalFrame.Wire (Decoder token natural rational identifier vector)
 
 structure HingePacket extends RationalFrame.Wire.Packet where
   rules : Connections
+  moments : Array Rat
 
 def packet (fields : Array String) : Decoder HingePacket := do
   if (← token fields) != "CV2011_HINGE_1" then throw ()
@@ -93,9 +94,11 @@ def packet (fields : Array String) : Decoder HingePacket := do
     readouts ← vector fields 6
   else if freeCount != 0 then throw ()
   let loadWork ← rational fields
+  let moments ← vector fields (if mechanism == 0 then 2 * memberCount else 0)
   if (← get) != fields.size then throw ()
   return {
     rules := ⟨joints, ends⟩
+    moments := moments
     source := { nodes := nodes, members := members, supports := supports, loads := loads }
     query := { member := member, t := t, right := right == 1, convention := convention }
     certificate := {
@@ -116,10 +119,37 @@ def decode (input : String) : Option HingePacket := do
       | .error _ => none
       | .ok (value, _) => some value
 
+def recoveredMoments (a : Assembly) (value : HingePacket) : Array Rat :=
+  let w := value.certificate
+  if w.mechanism then #[] else tabulate (2 * value.source.members.size) fun side =>
+    (sectionValues a (faceQuery side) w.motion)[2]!
+
+def checkValue (value : HingePacket) : Bool :=
+  match HingeFrame.compile value.source value.rules with
+  | none => false
+  | some a => queryValid a.mesh value.query && decide (Checked a value.query value.certificate) &&
+      (value.moments == recoveredMoments a value)
+
 @[export hinge_frame_check]
 def checkString (input : String) : UInt32 :=
   match decode input with
   | none => 2
-  | some value => if HingeFrame.accepts value.source value.rules value.query value.certificate then 1 else 0
+  | some value => if checkValue value then 1 else 0
+
+theorem accepted_bytes (input : String) (accepted : checkString input = 1) :
+    ∃ value a, decode input = some value ∧
+      HingeFrame.compile value.source value.rules = some a ∧
+      RationalFrame.queryValid a.mesh value.query = true ∧
+      HingeFrame.Checked a value.query value.certificate ∧ value.moments = recoveredMoments a value := by
+  cases h : decode input with
+  | none => simp [checkString, h] at accepted
+  | some value =>
+    cases compiled : HingeFrame.compile value.source value.rules with
+    | none => simp [checkString, h, checkValue, compiled] at accepted
+    | some a =>
+      have ok : checkValue value = true := by
+        cases result : checkValue value <;> simp_all [checkString]
+      simp only [checkValue, compiled, Bool.and_eq_true, decide_eq_true_eq, beq_iff_eq] at ok
+      exact ⟨value, a, rfl, compiled, ok.1.1, ok.1.2, ok.2⟩
 
 end HingeFrame.Wire

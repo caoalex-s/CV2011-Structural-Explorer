@@ -10,7 +10,7 @@ try {
     page.setDefaultTimeout(10000);
     const result = await runStudentCanvasCases({ page, base, target, output: '.data/student-results' });
     console.log(JSON.stringify(result, null, 2));
-    if (result.errors.length || result.records.some(record => record.error)) process.exitCode = 1;
+    if (result.errors.length || result.records.some(record => record.failure)) process.exitCode = 1;
 } finally {
     await browser.close();
 }
