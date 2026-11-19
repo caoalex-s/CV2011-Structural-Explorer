@@ -265,12 +265,17 @@ export async function runSpringStudentCases({ page, base, output, validateWorked
 
     // 4. Measure the labels and arcs at the same physical attachment, then
     // check that opening the second label selects its own signed action.
-    await scenario('coincident-couples', async () => {
+    async function checkCoupleLabels(name, jointHeight) {
         await member([0, 0], [4, 0]);
-        await member([4, 0], [8, 0]);
+        if (jointHeight) {
+            // Move the existing joint numerically while retaining its incidence.
+            await place('joint', 4);
+            await numberField(field('y'), jointHeight);
+        }
+        await member([4, jointHeight], [8, 0]);
         await place('fixed', 0);
         for (const magnitude of [10, -4]) {
-            await place('moment', 4);
+            await place('moment', 4, jointHeight);
             await field('member').selectOption({ index: 1 });
             await numberField(field('t'), 0);
             await numberField(field('mz'), magnitude);
@@ -290,9 +295,10 @@ export async function runSpringStudentCases({ page, base, output, validateWorked
             const { x, y, width, height } = label.getBoundingClientRect();
             return { center, samples, label: label.textContent, box: { x, y, width, height } };
         }));
-        records.push({ name: 'coincident-couples', geometry });
+        const canvasBox = await canvas.boundingBox();
+        records.push({ name, geometry, canvasBox });
         assert.equal(geometry.length, 2);
-        assert.deepEqual(geometry[0].center, [500, 200]);
+        assert.deepEqual(geometry[0].center, [500, 200 - 85 * jointHeight]);
         assert.deepEqual(geometry[1].center, geometry[0].center);
         for (const { center, samples } of geometry) {
             const radii = samples.map(([x, y]) => Math.hypot(x - center[0], y - center[1]));
@@ -300,6 +306,12 @@ export async function runSpringStudentCases({ page, base, output, validateWorked
         }
         const [a, b] = geometry.map(couple => couple.box);
         assert.ok(a.width > 0 && b.width > 0 && a.height > 0 && b.height > 0);
+        assert.ok(canvasBox);
+        for (const label of [a, b]) {
+            assert.ok(label.x >= canvasBox.x && label.y >= canvasBox.y &&
+                label.x + label.width <= canvasBox.x + canvasBox.width &&
+                label.y + label.height <= canvasBox.y + canvasBox.height, 'A couple label is clipped by the canvas');
+        }
         assert.ok(a.y + a.height <= b.y || b.y + b.height <= a.y || a.x + a.width <= b.x || b.x + b.width <= a.x,
             'The two couple label boxes overlap');
         await chooseTool('select');
@@ -307,8 +319,11 @@ export async function runSpringStudentCases({ page, base, output, validateWorked
         assert.equal(Number(await field('mz').inputValue()), -4);
         assert.equal(Number(await field('t').inputValue()), 0);
         assert.equal(await field('member').locator('option:checked').textContent(), 'B–C');
-        await page.screenshot({ path: join(output, 'coincident-couples.png'), fullPage: true });
-    });
+        await page.screenshot({ path: join(output, `${name}.png`), fullPage: true });
+    }
+    for (const [name, height] of [['coincident-couples', 0], ['coincident-couples-near-top', 2]]) {
+        await scenario(name, () => checkCoupleLabels(name, height));
+    }
 
     const result = { records, errors };
     await writeFile(join(output, 'student-canvas-springs.json'), JSON.stringify(result, null, 2) + '\n');

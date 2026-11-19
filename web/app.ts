@@ -254,6 +254,7 @@ function loadDrawing(load: Load) {
     const color = courseColors.force;
     const tag = `class="clickable" data-object="load" data-id="${escape(load.id)}"`;
     // Concentric arcs keep each applied couple centred on its attachment.
+    const labelBelow = p.y < canvasHeight / 2;
     const preceding = model.loads.slice(0, model.loads.indexOf(load));
     const coupleLane = load.kind === 'moment' ? preceding.filter(other => {
         if (other.kind !== 'moment') return false;
@@ -261,13 +262,13 @@ function loadDrawing(load: Load) {
         return Math.hypot(origin.x - p.x, origin.y - p.y) < 1;
     }).length : 0;
     if (load.kind === 'force' && Math.hypot(load.fx, load.fy) < 1e-12 || load.kind === 'moment' && Math.abs(load.mz) < 1e-12)
-        return `<g ${tag}><circle cx="${p.x}" cy="${p.y}" r="16" class="node-hit"/><text x="${p.x + 8}" y="${p.y - (load.kind === 'moment' ? 35 + 10 * coupleLane : 15)}" dy="${-coupleLane}em" class="svg-label">${symbolLabel(label)} = 0 ${load.kind === 'force' ? 'kN' : 'kN m'}</text></g>`;
+        return `<g ${tag}><circle cx="${p.x}" cy="${p.y}" r="16" class="node-hit"/><text x="${p.x + 8}" y="${load.kind === 'moment' ? (labelBelow ? p.y + 49 + 10 * coupleLane : p.y - 35 - 10 * coupleLane) : p.y - 15}" dy="${labelBelow ? coupleLane : -coupleLane}em" class="svg-label">${symbolLabel(label)} = 0 ${load.kind === 'force' ? 'kN' : 'kN m'}</text></g>`;
     if (load.kind === 'force') {
         const magnitude = Math.hypot(load.fx, load.fy);
         return `<g ${tag}>${forceSymbol(p.x, p.y, load.fx, load.fy, color, `${label} = ${number(magnitude)} kN`)}</g>`;
     }
     if (load.kind === 'moment') {
-        return `<g ${tag}>${momentSymbol(p.x, p.y, load.mz, color, `${label} = ${number(Math.abs(load.mz))} kN m`, 25 + 10 * coupleLane, coupleLane)}</g>`;
+        return `<g ${tag}>${momentSymbol(p.x, p.y, load.mz, color, `${label} = ${number(Math.abs(load.mz))} kN m`, 25 + 10 * coupleLane, coupleLane, labelBelow)}</g>`;
     }
     const end = screen(position(model, load.member, load.end));
     const max = Math.max(Math.abs(load.fy), Math.abs(load.qEnd), 1);

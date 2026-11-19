@@ -51,11 +51,12 @@ export function momentGeometry(x: number, y: number, moment: number, radius = 25
         end: { x: x + radius * Math.cos(endAngle), y: y - radius * Math.sin(endAngle) },
         tangent: { x: -sense * Math.sin(endAngle), y: -sense * Math.cos(endAngle) }, sweep: positive ? 0 : 1 };
 }
-export function momentSymbol(x: number, y: number, moment: number, color: string, label = '', radius = 25, labelLane = 0): string {
+export function momentSymbol(x: number, y: number, moment: number, color: string, label = '', radius = 25, labelLane = 0, labelBelow = false): string {
     if (Math.abs(moment) < 1e-12) return '';
     const { start, end, tangent, sweep } = momentGeometry(x, y, moment, radius);
+    const labelY = labelBelow ? y + radius + 24 : y - radius - 10;
     const arc = `M ${start.x} ${start.y} A ${radius} ${radius} 0 1 ${sweep} ${end.x} ${end.y}`;
-    return `<g data-vector="moment" data-origin-x="${x}" data-origin-y="${y}"><path class="hit" d="${arc}"/><path d="${arc}" fill="none" stroke="${color}" stroke-width="1.8"/>${arrowHead(end.x, end.y, tangent.x, tangent.y, color)}${label ? `<text x="${x}" y="${y - radius - 10}" dy="${-labelLane}em" text-anchor="middle" class="svg-label" style="fill:${color}">${symbolLabel(label)}</text>` : ''}</g>`;
+    return `<g data-vector="moment" data-origin-x="${x}" data-origin-y="${y}"><path class="hit" d="${arc}"/><path d="${arc}" fill="none" stroke="${color}" stroke-width="1.8"/>${arrowHead(end.x, end.y, tangent.x, tangent.y, color)}${label ? `<text x="${x}" y="${labelY}" dy="${labelBelow ? labelLane : -labelLane}em" text-anchor="middle" class="svg-label" style="fill:${color}">${symbolLabel(label)}</text>` : ''}</g>`;
 }
 /** A spiral marks a rotational spring. Its centre is the joint itself. */
 export function rotationalSpring(x: number, y: number, color = courseColors.member): string {
