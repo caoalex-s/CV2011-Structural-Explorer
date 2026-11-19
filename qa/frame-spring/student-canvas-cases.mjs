@@ -3,6 +3,7 @@
  * so the runner can also check the final spring-specific readout format.
  */
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -164,6 +165,18 @@ export async function runSpringStudentCases({ page, base, output, validateWorked
         assert.match(entry.checker, /^Accepted/i);
         assert.ok(entry.workedSolution.trim(), 'Generate did not render a worked solution');
         if (typeof expected.stiffness === 'number' && expected.stiffness > 0) {
+            const receipt = JSON.parse(await page.locator('#portal-certificate').textContent());
+            const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+            assert.equal(receipt.protocol, 'CV2011_ROTATIONAL_SPRING_1');
+            assert.match(receipt.artifact, /^[0-9a-f]{64}$/);
+            assert.match(receipt.bundle, /^[0-9a-f]{64}$/);
+            assert.equal(hash(JSON.stringify(receipt.sourceRequest)), receipt.inputDigest);
+            assert.equal(hash(receipt.packet), receipt.packetDigest);
+            assert.equal(hash(receipt.report), receipt.reportDigest);
+            assert.equal(receipt.sourceRequest.query.member, await page.locator('#section-member').inputValue());
+            assert.equal(receipt.sourceRequest.query.parameter, atEnd ? 1 : 0);
+            entry.receipt = { artifact: receipt.artifact, bundle: receipt.bundle, inputDigest: receipt.inputDigest,
+                packetDigest: receipt.packetDigest, reportDigest: receipt.reportDigest };
             const springSide = page.locator('#frame-worked-output [data-spring-side]');
             assert.equal(await springSide.count(), 1);
             const values = { 'relative-rotation': expected.rotationJump, 'transmitted-moment': expected.springMoment,

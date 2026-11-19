@@ -98,10 +98,13 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
     let startingNow = false;
     let exportText = '';
     let acceptedGeneration: (() => void) | null = null;
-    let generationRequested = false;
+    let pendingGeneration: string | null = null;
     const generationStorage = storageKey + '/generate';
     const sideStorage = storageKey + '/cut-side';
-    const generationKey = () => JSON.stringify({ model: modelAtPresent(), member, parameter, side: cutSide.value });
+    // At a member endpoint only its inward face can be selected, even while
+    // a newly selected checker is still starting and the selector is updating.
+    const generationKey = () => JSON.stringify({ model: modelAtPresent(), member, parameter,
+        side: parameter === 0 ? 'right' : parameter === 1 ? 'left' : cutSide.value });
     try {
         const saved = JSON.parse(sessionStorage.getItem(sideStorage) || 'null');
         if (saved?.model === JSON.stringify(modelAtPresent()) && ['left', 'right'].includes(saved.side)) cutSide.value = saved.side;
@@ -157,7 +160,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
             update(member, parameter);
             // A single explicit Generate survives only the activation reload of
             // the same saved drawing. Subsequent edits revoke generation intent.
-            if (sessionStorage.getItem(generationStorage) === generationKey()) generationRequested = true;
+            if (sessionStorage.getItem(generationStorage) === generationKey()) pendingGeneration = generationKey();
             sessionStorage.removeItem(generationStorage);
         } catch (error) { if (starting === runtime) { stop(); startingNow = false; reset.hidden = false; clear(`Checking unavailable: ${String(error)}`); } }
     }
@@ -224,7 +227,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                 workedOutput.prepend(axes);
                 collapse.textContent = 'Collapse solution'; collapse.setAttribute('aria-expanded', 'true');
             };
-            if (generationRequested) { generationRequested = false; acceptedGeneration(); }
+            if (pendingGeneration === generationKey()) { pendingGeneration = null; acceptedGeneration(); }
             return;
         }
         if (checker.supportsHingeFrames) {
@@ -270,7 +273,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                 workedOutput.hidden = false; collapse.hidden = false; collapse.textContent = 'Collapse solution';
                 collapse.setAttribute('aria-expanded', 'true');
             };
-            if (generationRequested) { generationRequested = false; acceptedGeneration(); }
+            if (pendingGeneration === generationKey()) { pendingGeneration = null; acceptedGeneration(); }
             return;
         }
         if (result.frameProtocol === 'inclined') {
@@ -303,7 +306,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                 workedOutput.hidden = false; collapse.hidden = false;
                 collapse.textContent = 'Collapse solution'; collapse.setAttribute('aria-expanded', 'true');
             };
-            if (generationRequested) { generationRequested = false; acceptedGeneration(); }
+            if (pendingGeneration === generationKey()) { pendingGeneration = null; acceptedGeneration(); }
             return;
         }
         const frame = decodeAcceptedFramePacket(packet);
@@ -333,7 +336,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                 workedOutput.textContent = `The checked results remain available in Verification. The explanatory solution could not be generated: ${String(error)}`;
             }
         };
-        if (generationRequested) { generationRequested = false; acceptedGeneration(); }
+        if (pendingGeneration === generationKey()) { pendingGeneration = null; acceptedGeneration(); }
     }
     function display(result: CheckerResult, envelope: Awaited<ReturnType<typeof createEvidenceEnvelope>>, token: { revision: number; request: number }) {
         if (result.state !== 'accepted' || !Array.isArray(result.checked) || result.checked.length !== 21) {
@@ -359,7 +362,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
     }
     function update(nextMember: string, nextParameter: number) {
         member = nextMember; parameter = nextParameter;
-        generationRequested = false;
+        if (pendingGeneration !== generationKey()) pendingGeneration = null;
         sectionParameter.value = String(parameter);
         clearTimeout(debounce); runtime?.invalidate(); requests.invalidate();
         clear(enabled ? 'Checking current drawing…' : 'Generate enables local checking and reloads this workspace once.');
@@ -418,16 +421,16 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
     cutSide.onchange = () => update(member, parameter);
     generate.onclick = () => {
         if (acceptedGeneration) { acceptedGeneration(); return; }
+        pendingGeneration = generationKey();
         if (!enabled) {
-            sessionStorage.setItem(generationStorage, generationKey());
+            sessionStorage.setItem(generationStorage, pendingGeneration);
             if (runtime) {
-                if (startingNow) generationRequested = true;
-                else void start();
+                if (!startingNow) void start();
                 return;
             }
             activate.click(); return;
         }
-        generationRequested = true;
+
     };
     collapse.onclick = () => {
         workedOutput.hidden = !workedOutput.hidden;
