@@ -14,10 +14,13 @@ structure System where
   pivots : Array (Nat × Row)
 
 def subtractMultiple (target pivot : Row) (factor : Rat) : Row :=
-  if factor = 0 then target else target.mapIdx fun i a => a - factor*pivot[i]!
+  if factor = 0 then target else Array.ofFn fun i : Fin target.size => target[i.val]! - factor*pivot[i.val]!
 
-def reduce (system : System) (row : Row) : Row :=
-  system.pivots.foldl (fun r entry => subtractMultiple r entry.2 r[entry.1]!) row
+def applyPivots : List (Nat × Row) → Row → Row
+  | [], row => row
+  | (index,pivot) :: tail, row => applyPivots tail (subtractMultiple row pivot row[index]!)
+
+def reduce (system : System) (row : Row) : Row := applyPivots system.pivots.toList row
 
 /-- Echelon rows may be kept in insertion order. Each later pivot row
 has zero coefficient at every preceding pivot. -/
