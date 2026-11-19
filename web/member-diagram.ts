@@ -89,7 +89,7 @@ export function renderMemberDiagram(bytes: Uint8Array, member: string, label: st
     title.textContent = 'Checked shear and bending moment diagrams · ' + label;
     section.append(title);
     const equation = math(String.raw`V=V_0+q_0\xi+g\xi^2/2,\qquad M=M_0+V_0\xi+q_0\xi^2/2+g\xi^3/6`, true);
-    section.insertAdjacentHTML('beforeend', '<p>Measure x in metres from the first drawn end. On each interval starting at a, ξ = x − a. The signed transverse load is q(ξ) = q₀ + gξ, with q₀ in kN/m and g in kN/m². Integrating dV/dx = q and dM/dx = V gives</p>' + equation);
+    section.insertAdjacentHTML('beforeend', '<p>Measure x in metres from the first drawn end. On each interval starting at a, ξ = x − a. The signed transverse load is q(ξ) = q₀ + gξ, with q₀ in kN/m and g in kN/m². For a piece from member fraction a to b, take the signed vertical intensity fᵧ = −w for a downward-positive load w. Its end intensities give B = (b − a)ΔX fᵧ₀ and C = (b − a)ΔX(fᵧ₁ − fᵧ₀)/2. Integrating dV/dx = q and dM/dx = V gives</p>' + equation);
     const direction = cosine === 1 ? 'For this rightward horizontal member, positive editor load w acts downwards, so q = −w.' :
         cosine === -1 ? 'For this leftward horizontal member, positive editor load w acts in the positive local transverse direction, so q = w.' :
         'On this vertical member, the vertical distributed load has zero transverse component.';
@@ -122,7 +122,7 @@ export function renderInclinedMemberDiagram(bytes: Uint8Array, member: string, l
     title.textContent = 'Checked shear and bending moment diagrams · ' + label;
     section.append(title);
     const description = document.createElement('p');
-    description.textContent = `The drawn member has ΔX = ${dx} m and ΔY = ${dy} m. Its length is L = √(ΔX² + ΔY²). Measure x from its first end. On each piece, t runs from 0 to 1 and ℓ is the piece length. A vertical load projects onto the local transverse axis with factor ΔX/L. Integrating dV/dx = q and dM/dx = V gives`;
+    description.textContent = `The drawn member has ΔX = ${dx} m and ΔY = ${dy} m. Its length is L = √(ΔX² + ΔY²). Measure x from its first end. On each piece, t runs from 0 to 1 and ℓ is the piece length. A vertical load projects onto the local transverse axis with factor ΔX/L. For a piece from member fraction a to b, take the signed vertical intensity fᵧ = −w for a downward-positive load w. Its end intensities give B = (b − a)ΔX fᵧ₀ and C = (b − a)ΔX(fᵧ₁ − fᵧ₀)/2. Integrating dV/dx = q and dM/dx = V gives`;
     section.append(description);
     section.insertAdjacentHTML('beforeend', math(String.raw`V(t)=V_0+Bt+Ct^2,\quad M(t)=M_0+\ell t(V_0+Bt/2+Ct^2/3)`,true));
     const midpoint = (q: string[]) => approximate(q[0])/2+approximate(q[1])/2;

@@ -26,7 +26,7 @@ fi
 if [[ "${1:-}" == inclined-diagram ]]; then
     folder=inclined-diagram-assets
     sources=(proofs/HingeFrameChecker.c proofs/InclinedRelease{,Wire}.c proofs/FrameSpring{,Wire}.c
-        proofs/MemberDiagram.c proofs/InclinedDiagram{,Wire}.c qa/inclined-diagram/abi.c)
+        proofs/MemberDiagram.c proofs/InclinedDiagramStatics.c proofs/InclinedDiagram{,Wire}.c qa/inclined-diagram/abi.c)
 fi
 mkdir -p "$stage/$folder"
 objects=()

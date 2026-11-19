@@ -1,5 +1,6 @@
 import MemberDiagram
 import FrameIntervalExpression
+import InclinedDiagramStatics
 
 /-! Inclined member fields in fractional piece distance t. Multiplying the
 direction cosine by the piece length gives its signed horizontal projection,
@@ -15,6 +16,10 @@ structure Piece where
   momentStart : Bounds
   linear : Rat
   quadratic : Rat
+  -- Reduced forms for L*V₀ and M₀ on the same global equilibrium system.
+  scaledShear : Statics.Row := #[]
+  initialMoment : Statics.Row := #[]
+  lengthColumn : Nat := 0
   deriving Inhabited
 
 def singleton (r : Rat) : Bounds := ⟨r,r⟩
@@ -100,7 +105,19 @@ structure Candidate where
   /-- For rational stations, V(t)−V(0) is rational. It proves exact
   equality/order on the same piece without comparing two uncertain baselines. -/
   shearOffset : Option Rat
+  signature : Statics.Row
   deriving Inhabited
+
+/-- Quantities in the same shear group all use the same positive multiplier
+L. Moments are compared directly. At rational stations their forms are
+linear in end actions, spring torques and source lengths. -/
+def fieldSignature (p : Piece) (moment : Bool) (t : Rat) : Statics.Row := Id.run do
+  if p.scaledShear.isEmpty then return #[]
+  if moment then
+    let span := (p.right-p.left)*t
+    let linear := p.initialMoment.mapIdx fun i a => a + span*p.scaledShear[i]!
+    return linear.modify p.lengthColumn (· + span*t*(p.linear/2+t*p.quadratic/3))
+  return p.scaledShear.modify p.lengthColumn (· + t*(p.linear+t*p.quadratic))
 
 def row (bits piece : Nat) (p : Piece) (moment : Bool) (side : String) (station : Station) : Option Candidate := do
   let t ← stationBox p station
@@ -111,7 +128,10 @@ def row (bits piece : Nat) (p : Piece) (moment : Bool) (side : String) (station 
   let offset := match station with
     | .fixed v => if moment then none else some (v*(p.linear+v*p.quadratic))
     | _ => none
-  return ⟨piece,side,station,t,x,y,offset⟩
+  let signature := match station with
+    | .fixed value => fieldSignature p moment value
+    | _ => #[]
+  return ⟨piece,side,station,t,x,y,offset,signature⟩
 
 def interior (bits piece : Nat) (p : Piece) (moment : Bool) (station : Station) : Option (Option Candidate) := do
   let t ← stationBox p station
@@ -140,6 +160,7 @@ def compareValues (a b : Candidate) : OrderEvidence :=
     let x := a.shearOffset.getD 0
     let y := b.shearOffset.getD 0
     if x < y then .less else if x = y then .equal else .greater
+  else if !a.signature.isEmpty && a.signature == b.signature then .equal
   else if a.y.upper < b.y.lower then .less
   else if b.y.upper < a.y.lower then .greater
   else if a.y.lower = a.y.upper ∧ b.y.lower = b.y.upper ∧ a.y.lower = b.y.lower then .equal

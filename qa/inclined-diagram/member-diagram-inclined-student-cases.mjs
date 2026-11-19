@@ -181,6 +181,15 @@ export async function runInclinedMemberDiagramStudentCases({ page, base, output 
         compareInclinedDiagram(observed, expected);
 
         // Confirm that the worked panel displays the interval data it exports.
+        const renderedPieces = await diagram.locator('[data-piece]').evaluateAll(rows => rows.map(row => ({ ...row.dataset })));
+        assert.equal(renderedPieces.length, observed.pieces.length);
+        for (const [index, piece] of observed.pieces.entries()) {
+            const visible = renderedPieces[index];
+            assert.deepEqual([visible.left, visible.right, visible.b, visible.c], [piece.a, piece.b, piece.B, piece.C]);
+            assert.deepEqual([visible.lengthLow, visible.lengthHigh], piece.length);
+            assert.deepEqual([visible.vLow, visible.vHigh], piece.startShear);
+            assert.deepEqual([visible.mLow, visible.mHigh], piece.startMoment);
+        }
         const rendered = await diagram.locator('[data-candidate]').evaluateAll(rows => rows.map(row => ({ ...row.dataset })));
         assert.equal(rendered.length, observed.candidates.length);
         for (const row of observed.candidates) {
@@ -191,7 +200,8 @@ export async function runInclinedMemberDiagramStudentCases({ page, base, output 
             assert.deepEqual([match.yLow, match.yHigh], row.value);
             assert.deepEqual([match.min, match.max], [String(row.min), String(row.max)]);
         }
-        const entry = { name, route, status, text, report, observed, member: chosen, rendered,
+        const entry = { name, route, status, text, report, observed, member: chosen, rendered, renderedPieces,
+            hasNumericalExplanation: Boolean(receipt.explanation),
             receipt: { artifact, bundle, packetDigest, reportDigest, inputDigest: receipt.inputDigest } };
         records.push(entry);
         await page.screenshot({ path: join(output, name + '.png'), fullPage: true });
@@ -304,7 +314,7 @@ export async function runInclinedMemberDiagramStudentCases({ page, base, output 
             await page.getByLabel('Joint connection').selectOption({ label: 'Semi-rigid joint' });
             await number('rotationStiffness', 5000);
             const expected = inclinedSpringSpan(reversed);
-            await collect(name, 'CV2011_ROTATIONAL_SPRING_1', 1, expected, (model, chosen) => {
+            const result = await collect(name, 'CV2011_ROTATIONAL_SPRING_1', 1, expected, (model, chosen) => {
                 const joint = model.nodes.find(node => node.x === B[0] && node.y === B[1]);
                 assert.deepEqual([joint.joint, joint.rotationStiffness], ['semi-rigid', 5000]);
                 certifySource(model, chosen, first, last, [
@@ -312,10 +322,13 @@ export async function runInclinedMemberDiagramStudentCases({ page, base, output 
                     { kind: 'moment', t: tipParameter, mz: 30 },
                 ], [['fixed', ...A]]);
             });
+            result.spring = {};
             for (const [key, reference] of [['relative-rotation', expected.relativeRotation], ['transmitted-moment', expected.springMoment]]) {
                 const readout = page.locator(`#frame-worked-output [data-spring-value="${key}"]`);
                 assert.ok(await readout.isVisible());
-                compareBounds([await readout.getAttribute('data-lower'), await readout.getAttribute('data-upper')], reference, key);
+                const bounds = [await readout.getAttribute('data-lower'), await readout.getAttribute('data-upper')];
+                compareBounds(bounds, reference, key);
+                result.spring[key] = bounds;
             }
         });
     }

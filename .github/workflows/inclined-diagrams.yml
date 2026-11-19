@@ -53,7 +53,7 @@ jobs:
           lake env bash -euc '
             export LEAN_PATH="$PWD:$LEAN_PATH"
             python3 ../qa/inclined-release/compile.py FrameSpringWire HingeFrameWire
-            for module in HingeFrameChecker HingeFrameWire InclinedRelease InclinedReleaseWire FrameSpring FrameSpringWire MemberDiagram InclinedDiagram InclinedDiagramWire; do
+            for module in HingeFrameChecker HingeFrameWire InclinedRelease InclinedReleaseWire FrameSpring FrameSpringWire MemberDiagram InclinedDiagramStatics InclinedDiagram InclinedDiagramWire; do
               lean -c "$module.c" -o "$module.olean" "$module.lean"
             done
             lean --run ../qa/inclined-diagram/Native.lean ../.data/inclined-diagram/*.packet ../.data/inclined-diagram/*.reject

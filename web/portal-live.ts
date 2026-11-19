@@ -335,15 +335,17 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
             certificate.textContent = exportText; exportButton.hidden = false;
             acceptedGeneration = () => {
                 if (!requests.isCurrent(token) || checker !== runtime) return;
+                let diagramReceipt: object = receipt;
                 try {
                     const explanation = createIntervalExplanation(sourceRequest.model, sourceRequest.query, values);
                     workedOutput.innerHTML = renderIntervalExplanation(explanation, values, sourceRequest.model);
-                    exportText = JSON.stringify({ ...receipt, explanation }, null, 2);
+                    diagramReceipt = { ...receipt, explanation };
+                    exportText = JSON.stringify(diagramReceipt, null, 2);
                     certificate.textContent = exportText;
                 } catch {
                     workedOutput.innerHTML = '<p>The separate numerical calculation could not reproduce a suitable teaching substitution. The accepted intervals and their accuracy bounds remain available below.</p>' + presentation;
                 }
-                drawDiagram(sourceRequest.model, sourceRequest.query.member, receipt, 'inclined-diagram');
+                drawDiagram(sourceRequest.model, sourceRequest.query.member, diagramReceipt, 'inclined-diagram');
                 workedOutput.hidden = false; collapse.hidden = false;
                 collapse.textContent = 'Collapse solution'; collapse.setAttribute('aria-expanded', 'true');
             };

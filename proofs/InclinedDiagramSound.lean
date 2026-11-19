@@ -2,6 +2,7 @@ import InclinedDiagramWire
 import MemberDiagramSound
 import FrameIntervalExpressionSound
 import FrameSpringSound
+import InclinedReleaseFields
 
 namespace InclinedDiagram.Sound
 open FrameIntervalOps FrameEnclosure Set
@@ -82,6 +83,46 @@ theorem evaluate_fits {bits p s m t box out} (h : fits p s) (ht : Contains box t
   have enclosed := FrameIntervalExpressionSound.enclose_contains (quantity p m) computed inputs
   cases m <;> simpa [quantity,FrameIntervalExpressionSound.evaluate,state,field,moment,shear,span] using enclosed
 
+open InclinedFrameSource InclinedFrameBasis InclinedFrameIntervalAssembly
+
+/-- The initial forces are the physical element end actions. Rotations may
+be independent at a release or coupled by a spring; the premise only asks
+for enclosures of the solved point motion on the actual assembly. -/
+def physicalState (data : Partition) (motion : InclinedFrameReal.Motion data)
+    (index : Fin data.pieces.size) : State :=
+  let segment := data.pieces[index.val]!
+  let member := data.source.members[segment.member]!
+  let direction := InclinedFrameReal.memberDirection data segment.member
+  let actions := LocalFrameFields.endActions (InclinedFrameReal.pieceMotion data segment motion)
+    (InclinedFrameReal.pieceLength data segment) member.EA member.EI
+    (direction.sine*segment.vertical) (direction.sine*segment.verticalEnd)
+    (direction.cosine*segment.vertical) (direction.cosine*segment.verticalEnd)
+  ⟨InclinedFrameReal.memberLength data segment.member, actions 1, -(actions 2)⟩
+
+theorem fromSource_fits {data : Partition} {basis : GlobalBasis} {bits : Nat}
+    {cert : Certificate data basis} {index : Fin data.pieces.size}
+    {p : InclinedDiagram.Piece} (physical : InclinedFrameReal.Motion data)
+    (partition : PartitionValid data) (geometry : GeometryChecks bits cert)
+    (loads : LoadChecks bits cert) (nodes : InclinedRelease.Fields.NodeEnclosures bits cert physical)
+    (computed : fromSource bits cert index = some p) : fits p (physicalState data physical index) := by
+  unfold fromSource at computed
+  dsimp only at computed
+  obtain ⟨member, hm, rest⟩ := Option.bind_eq_some.mp computed
+  obtain ⟨motionBox, hl, rest⟩ := Option.bind_eq_some.mp rest
+  obtain ⟨v, hv, rest⟩ := Option.bind_eq_some.mp rest
+  obtain ⟨negM, hn, rest⟩ := Option.bind_eq_some.mp rest
+  obtain ⟨root, hr, eq⟩ := Option.bind_eq_some.mp rest
+  cases eq
+  have motion := InclinedRelease.Fields.localMotion_contains physical geometry nodes hl
+  have shearBound := InclinedRelease.Fields.endAction_contains partition physical geometry loads motion hv
+  have momentBound := InclinedRelease.Fields.endAction_contains partition physical geometry loads motion hn
+  rcases partition with ⟨hsource, _, _, _, _, _, _, pieces, _, _, _, _⟩
+  have segment := pieces index
+  refine ⟨(InclinedFrameIntervalGeometrySound.member_contains hr).1,shearBound,?_,
+    InclinedFrameReal.member_positive data hsource ⟨_,segment.1.1⟩,segment.2.2.2.1⟩
+  simpa [physicalState] using scaled (-1) momentBound
+
+#print axioms fromSource_fits
 #print axioms station_fits
 #print axioms evaluate_fits
 end
