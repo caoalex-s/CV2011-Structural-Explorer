@@ -30,6 +30,18 @@ for (const stiffness of [0, 2500, 5000]) {
                 const start = tokens.length - 2*(coordinates**2 + coordinates);
                 for (let i=0; i<coordinates**2; i++) tokens[start + 2*i] = '0';
                 await writeFile(filename + '.reject', tokens.join('\n'));
+                if (stiffness === 5000 && member === 'BC' && load === 'point') {
+                    // Replace the source while retaining the old numerical proposal.
+                    const edited = structuredClone(model);
+                    edited.nodes[1].rotationStiffness = 1e8;
+                    const changed = proposeSpringPacket(edited, query, 96);
+                    const source = new TextDecoder().decode(changed.packet).split('\n').slice(0,start);
+                    const previous = new TextDecoder().decode(packet).split('\n').slice(start);
+                    await writeFile(dir + 'changed-source.reject', [...source,...previous].join('\n'));
+                    edited.nodes[1].rotationStiffness = stiffness;
+                    edited.nodes[2].y = 2;
+                    await writeFile(dir + 'inclined-outside-cardinal.reject', proposeSpringPacket(edited,query,96).packet);
+                }
             } else {
                 const witness = new FrameCandidates().produce(compileHingeFrame(model, query));
                 await writeFile(filename + '.packet', hingePacket(model, query, witness));
