@@ -109,9 +109,46 @@ jobs:
           lake env bash -euc '
             set -o pipefail
             export LEAN_PATH="$PWD:$LEAN_PATH"
-            test -s MemberDiagramReport.lean
-            python3 ../qa/inclined-release/compile.py MemberDiagramReport | tee release-axioms.log
-            grep -F "MemberDiagram.Sound.accepted_report" release-axioms.log
+            test -s JointMemberDiagramSound.lean
+            python3 ../qa/inclined-release/compile.py JointMemberDiagramSound | tee release-axioms.log
+            grep -F "JointMemberDiagram.Sound.spring_accepted" release-axioms.log
             ! grep -E "sorryAx|declaration uses .sorry." release-axioms.log
           '
 
+  student-drawings:
+    needs: diagrams
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.25.0'
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm run check
+      - run: pnpm test
+      - run: node scripts/check-inclined-bundle.mjs
+      - uses: actions/download-artifact@v4
+        with:
+          name: joint-diagram-checker
+          path: public/portal-checker/joint-diagram
+      - run: pnpm build
+      - run: npm install --prefix .data/student-tools --ignore-scripts --save-exact playwright@1.51.1
+      - run: node .data/student-tools/node_modules/playwright/cli.js install --with-deps chromium
+      - name: Exercise ordinary drawing controls on the development site
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 --directory dist > "$RUNNER_TEMP/hinge-server.log" 2>&1 &
+          server=$!
+          trap 'kill "$server"' EXIT
+          node qa/hinge-frame/run-student-browser.mjs http://127.0.0.1:8765/ joint-diagram
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: student-canvas-development
+          path: .data/student-results/
+          include-hidden-files: true

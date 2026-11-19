@@ -180,6 +180,37 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
         const reportDigest = result.reportDigest;
         if (await sha256(packet) !== packetDigest) throw Error('Accepted packet identity changed.');
         if (!requests.isCurrent(token) || checker !== runtime) return;
+        function drawDiagram(source: Model, member: string, receipt: object, joint: boolean) {
+            diagramRuntime?.dispose();
+            const extra = new PortalRuntime(new URL(joint ? '../joint-diagram/worker.mjs' : '../diagram/worker.mjs', runtimeUrl));
+            diagramRuntime = extra;
+            const progress = document.createElement('p');
+            progress.textContent = 'Checking the whole-member diagrams…';
+            workedOutput.append(progress);
+            const current = () => requests.isCurrent(token) && checker === runtime && diagramRuntime === extra;
+            void (async () => {
+                try {
+                    await extra.ready;
+                    if (!current()) return;
+                    const checked = await extra.checkDiagram(packet);
+                    if (!current()) return;
+                    if (checked.state !== 'accepted' || checked.frameProtocol !== 'diagram' || checked.inputDigest !== packetDigest ||
+                        !(checked.report instanceof Uint8Array) || await sha256(checked.report) !== checked.reportDigest)
+                        throw Error('Whole-member bounds could not be certified.');
+                    if (!current()) return;
+                    const selected = source.members.find(m => m.id === member)!;
+                    const start = source.nodes.find(n => n.id === selected.a)!;
+                    const end = source.nodes.find(n => n.id === selected.b)!;
+                    progress.replaceWith(renderMemberDiagram(checked.report, selected.id, memberLabel(source, selected), Math.sign(end.x - start.x)));
+                    exportText = JSON.stringify({ ...receipt, diagram: { protocol: 'CV2011_DIAGRAM_1',
+                        artifact: extra.artifact, bundle: extra.bundle, packetDigest, reportDigest: checked.reportDigest,
+                        report: new TextDecoder().decode(checked.report) } }, null, 2);
+                    certificate.textContent = exportText;
+                } catch (error) {
+                    if (current()) progress.textContent = 'Whole-member check inconclusive. ' + String(error);
+                } finally { extra.dispose(); }
+            })();
+        }
         if (checker.supportsInclinedReleases) {
             if (result.frameProtocol !== (checker.supportsSprings ? 'spring' : 'inclined-release') || !report || typeof reportDigest !== 'string' || await sha256(report) !== reportDigest)
                 throw Error('Missing or changed inclined release report.');
@@ -216,9 +247,10 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
             };
             status.textContent = checker.supportsSprings ? 'Accepted by the compiled rotational spring checker.' : 'Accepted by the compiled inclined release checker.';
             render(readouts);
-            exportText = JSON.stringify({ protocol: checker.supportsSprings ? 'CV2011_ROTATIONAL_SPRING_1' : 'CV2011_INCLINED_RELEASE_1', ...token, bindings: envelope.bindings,
+            const receipt = { protocol: checker.supportsSprings ? 'CV2011_ROTATIONAL_SPRING_1' : 'CV2011_INCLINED_RELEASE_1', ...token, bindings: envelope.bindings,
                 artifact: checker.artifact, bundle: checker.bundle, inputDigest: result.inputDigest, packetDigest, reportDigest,
-                sourceRequest: source, values, packet: new TextDecoder().decode(packet), report: new TextDecoder().decode(report) }, null, 2);
+                sourceRequest: source, values, packet: new TextDecoder().decode(packet), report: new TextDecoder().decode(report) };
+            exportText = JSON.stringify(receipt, null, 2);
             certificate.textContent = exportText; exportButton.hidden = false;
             acceptedGeneration = () => {
                 if (!requests.isCurrent(token) || checker !== runtime) return;
@@ -226,6 +258,8 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                 const axes = document.createElement('p'); axes.textContent = direction;
                 workedOutput.prepend(axes);
                 collapse.textContent = 'Collapse solution'; collapse.setAttribute('aria-expanded', 'true');
+                if (checker.supportsSprings && !needsInclinedGeometry(drawing))
+                    drawDiagram(drawing, values.query.member, receipt, true);
             };
             if (pendingGeneration === generationKey()) { pendingGeneration = null; acceptedGeneration(); }
             return;
@@ -260,10 +294,11 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                 const line = document.createElement('p'); line.textContent = item; return line;
             });
             readouts.replaceChildren(...paragraphs(lines));
-            exportText = JSON.stringify({ protocol: 'CV2011_HINGE_1', ...token, bindings: envelope.bindings,
+            const receipt = { protocol: 'CV2011_HINGE_1', ...token, bindings: envelope.bindings,
                 artifact: checker.artifact, bundle: checker.bundle, inputDigest: result.inputDigest, packetDigest,
                 theorem: 'HingeFrame.Wire.accepted_bytes', sourceRequest,
-                packet: new TextDecoder().decode(packet), values: frame, drawingLabels: lines }, null, 2);
+                packet: new TextDecoder().decode(packet), values: frame, drawingLabels: lines };
+            exportText = JSON.stringify(receipt, null, 2);
             certificate.textContent = exportText; exportButton.hidden = false;
             acceptedGeneration = () => {
                 if (!requests.isCurrent(token) || checker !== runtime) return;
@@ -272,6 +307,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                 workedOutput.replaceChildren(...paragraphs([...teaching, ...lines]));
                 workedOutput.hidden = false; collapse.hidden = false; collapse.textContent = 'Collapse solution';
                 collapse.setAttribute('aria-expanded', 'true');
+                if (frame.kind === 'solution') drawDiagram(drawing, frame.query.member, receipt, true);
             };
             if (pendingGeneration === generationKey()) { pendingGeneration = null; acceptedGeneration(); }
             return;
@@ -333,36 +369,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                 exportText = JSON.stringify({ ...receipt, workedSolution: report }, null, 2);
                 certificate.textContent = exportText;
                 if (frame.kind !== 'solution') return;
-                diagramRuntime?.dispose();
-                const extra = new PortalRuntime(new URL('../diagram/worker.mjs', runtimeUrl));
-                diagramRuntime = extra;
-                const progress = document.createElement('p');
-                progress.textContent = 'Checking the whole-member diagrams…';
-                workedOutput.append(progress);
-                const current = () => requests.isCurrent(token) && checker === runtime && diagramRuntime === extra;
-                void (async () => {
-                    try {
-                        await extra.ready;
-                        if (!current()) return;
-                        const checked = await extra.checkDiagram(packet);
-                        if (!current()) return;
-                        if (checked.state !== 'accepted' || checked.frameProtocol !== 'diagram' || checked.inputDigest !== packetDigest ||
-                            !(checked.report instanceof Uint8Array) || await sha256(checked.report) !== checked.reportDigest)
-                            throw Error('Whole-member bounds could not be certified.');
-                        if (!current()) return;
-                        const source = receipt.sourceRequest.model as Model;
-                        const selected = source.members.find(m => m.id === frame.query.member)!;
-                        const start = source.nodes.find(n => n.id === selected.a)!;
-                        const end = source.nodes.find(n => n.id === selected.b)!;
-                        progress.replaceWith(renderMemberDiagram(checked.report, selected.id, memberLabel(source, selected), Math.sign(end.x - start.x)));
-                        exportText = JSON.stringify({ ...receipt, workedSolution: report, diagram: { protocol: 'CV2011_DIAGRAM_1',
-                            artifact: extra.artifact, bundle: extra.bundle, packetDigest, reportDigest: checked.reportDigest,
-                            report: new TextDecoder().decode(checked.report) } }, null, 2);
-                        certificate.textContent = exportText;
-                    } catch (error) {
-                        if (current()) progress.textContent = 'Whole-member check inconclusive. ' + String(error);
-                    } finally { extra.dispose(); }
-                })();
+                drawDiagram(receipt.sourceRequest.model, frame.query.member, { ...receipt, workedSolution: report }, false);
             } catch (error) {
                 workedOutput.textContent = `The checked results remain available in Verification. The explanatory solution could not be generated: ${String(error)}`;
             }
