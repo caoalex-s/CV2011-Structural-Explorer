@@ -44,7 +44,7 @@ theorem element_balance (motion : FrameInterfaces.LocalDofs) (ell EA EI c s f₀
   · linear_combination ell*(-a 1-ell*c*(f₀+f₁)/2) * unit
 
 def value {n : Nat} (state : Fin n → ℝ) (row : Row) :=
-  ∑ i, (row[i.val]! : ℝ)*state i
+  ∑ i, ((row[i.val]! : Rat) : ℝ)*state i
 
 def validRow {n : Nat} (state : Fin n → ℝ) (row : Row) :=
   row.size = n ∧ value state row = 0
@@ -93,8 +93,7 @@ theorem insert_preserves {n} (state : Fin n → ℝ) (system : System) (equation
   unfold insert
   dsimp only
   split
-  · exact old
-  next pivot hp =>
+  next pivot =>
     have reduced := pivots_preserve state system.pivots.toList old equation row.1
     have size : (reduce system equation).size = n := reduced.1
     have zero : value state (reduce system equation) = 0 := reduced.2.trans row.2
@@ -103,6 +102,7 @@ theorem insert_preserves {n} (state : Fin n → ℝ) (system : System) (equation
     rcases member with before | rfl
     · exact old e before
     · exact ⟨by simp [size],by rw [divided_value state _ _ size,zero,zero_div]⟩
+  · exact old
 
 open InclinedFrameSource InclinedFrameReal
 
