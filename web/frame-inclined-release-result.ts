@@ -2,26 +2,9 @@
  * This parser validates representation and identities; it grants no checked status.
  * Decimal rendering must remain separate from these exact rational values.
  */
-import type { Rational } from './portal-candidate.js';
 import { fraction, type Fraction, encoded } from './frame-rational.js';
 
-export interface IntervalReadout {
-    lower: Rational;
-    upper: Rational;
-    midpoint: Rational;
-}
-export interface IntervalPoint {
-    owner: 'node' | 'member';
-    index: number;
-    id: string;
-    parameter: Rational;
-    reactions: IntervalReadout[];
-}
-export interface IntervalValues {
-    query: { member: string; parameter: Rational; cutSide: 'left' | 'right'; convention: 1 };
-    fields: IntervalReadout[];
-    points: IntervalPoint[];
-}
+import type { IntervalPoint, IntervalReadout } from './frame-interval-result.js';
 
 export function decodeInclinedReleaseReport(bytes: Uint8Array) {
     if (bytes.length > 262144) throw Error('Interval report exceeds its byte budget.');

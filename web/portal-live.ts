@@ -178,6 +178,12 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
             bindIntervalDisplay({ ...drawing, nodes: drawing.nodes.map(n => ({ ...n, joint: 'rigid' })),
                 members: drawing.members.map(({connectionA, connectionB, ...m}) => m) }, source.query, values);
             const labels = nodeLabels(drawing);
+            const selected = drawing.members.find(m => m.id === values.query.member)!;
+            const first = drawing.nodes.find(node => node.id === selected.a)!;
+            const last = drawing.nodes.find(node => node.id === selected.b)!;
+            const dx = last.x - first.x, dy = last.y - first.y;
+            const length = Math.hypot(dx, dy);
+            const direction = `Local x runs from ${labels.get(first.id)} to ${labels.get(last.id)}. The member spans ΔX = ${dx} m and ΔY = ${dy} m. Its direction cosines are c ≈ ${(dx/length).toFixed(6)} and s ≈ ${(dy/length).toFixed(6)}. A global force (Fx, Fy) has local components cFx + sFy along the member and −sFx + cFy transverse to it.`;
             const faceLines = values.faces.map(face => {
                 const m = drawing.members.find(m => m.id === face.member);
                 const end = face.end === 0 ? 'a' : 'b';
@@ -185,7 +191,9 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                     throw Error('Member end differs from the captured drawing.');
                 const role = face.released ? 'independent released-end rotation' :
                     referenceMember(drawing, face.node) === m.id ? 'reference rotation at the joint' : 'shares the reference rotation';
-                return `Node ${labels.get(face.node)}, member ${memberLabel(drawing, m)} (${role}). Shared displacement ux ≈ ${roundedDecimal(face.ux.midpoint, 6)} m, uy ≈ ${roundedDecimal(face.uy.midpoint, 6)} m. Rotation ≈ ${roundedDecimal(face.rotation.midpoint, 6)} rad. Section moment ≈ ${roundedDecimal(face.moment.midpoint, 6)} kN m.`;
+                const couple = drawing.loads.filter(load => load.kind === 'moment' && load.member === m.id && load.t === face.end)
+                    .reduce((total, load) => total + load.mz, 0);
+                return `Node ${labels.get(face.node)}, member ${memberLabel(drawing, m)} (${role}). Shared displacement ux ≈ ${roundedDecimal(face.ux.midpoint, 6)} m, uy ≈ ${roundedDecimal(face.uy.midpoint, 6)} m. Rotation ≈ ${roundedDecimal(face.rotation.midpoint, 6)} rad. Applied end couple ${couple} kN m (counterclockwise positive). Section moment ≈ ${roundedDecimal(face.moment.midpoint, 6)} kN m.`;
             });
             const presentation = renderIntervalValues(values, drawing);
             const render = (element: HTMLElement) => {
@@ -202,6 +210,8 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
             acceptedGeneration = () => {
                 if (!requests.isCurrent(token) || checker !== runtime) return;
                 render(workedOutput); workedOutput.hidden = false; collapse.hidden = false;
+                const axes = document.createElement('p'); axes.textContent = direction;
+                workedOutput.prepend(axes);
                 collapse.textContent = 'Collapse solution'; collapse.setAttribute('aria-expanded', 'true');
             };
             if (generationRequested) { generationRequested = false; acceptedGeneration(); }

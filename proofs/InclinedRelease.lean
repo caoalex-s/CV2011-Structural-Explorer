@@ -126,6 +126,18 @@ def build (l : Layout) (bits : Nat)
 
 open InclinedFrameIntervalAssembly
 
+/-- Compare every component of a finite vector. This constructive decision is
+    used when recomputed vectors are compared with certificate tables. -/
+private def finiteVectorEquality {size : Nat} {Value : Type} [DecidableEq Value]
+    (left right : Fin size → Value) : Decidable (left = right) :=
+  if equalComponents : ∀ index, left index = right index then
+    isTrue (funext equalComponents)
+  else
+    isFalse (fun equality => equalComponents (fun index => congrFun equality index))
+
+local instance {size : Nat} {Value : Type} [DecidableEq Value] :
+    DecidableEq (Fin size → Value) := finiteVectorEquality
+
 def Projections (l : Layout) (bits : Nat) (c : Certificate l.expanded l.basis) : Prop :=
   (∀ p col, pointColumn l bits col p.val = some (c.pointColumns p col)) ∧
   (∀ i col, FrameIntervalTransform.localPiece bits (c.geometry i).cosine (c.geometry i).sine

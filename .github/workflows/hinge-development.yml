@@ -44,8 +44,9 @@ jobs:
             lean HingeFrameSoundness.lean
             lean --run ../qa/hinge-frame/NativePackets.lean ../.data/hinge-packets
             python3 ../qa/inclined-release/compile.py InclinedReleaseWire
-            lean --run ../qa/inclined-release/Native.lean ../.data/inclined-release/*.packet
+            lean --run ../qa/inclined-release/Native.lean ../.data/inclined-release/*.packet ../.data/inclined-release/*.reject
           '
+      - run: node qa/inclined-release/check-native-reports.mjs
       - name: Link the browser checker
         env:
           GH_TOKEN: ${{ github.token }}
@@ -137,10 +138,32 @@ jobs:
           build: 'false'
           test: 'false'
           use-mathlib-cache: 'true'
+      - id: dependencies
+        name: Identify unchanged proof dependencies
+        run: echo "key=$(git ls-tree -r HEAD proofs | grep -v 'proofs/InclinedRelease' | sha256sum | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@v4
+        id: proof-cache
+        with:
+          path: |
+            proofs/*.olean
+            proofs/.lake/build
+          key: linux-release-proof-v1-${{ steps.dependencies.outputs.key }}
       - name: Compile reusable interval mechanics
+        if: steps.proof-cache.outputs.cache-hit != 'true'
         working-directory: proofs
         run: |
           lake build ExactGeometry
+          lake env bash -euc 'export LEAN_PATH="$PWD:$LEAN_PATH"; python3 ../qa/inclined-release/compile.py HingeFrameChecker InclinedFrameIntervalReactionsSound InclinedFrameIntervalReport'
+      - uses: actions/cache/save@v4
+        if: steps.proof-cache.outputs.cache-hit != 'true'
+        with:
+          path: |
+            proofs/*.olean
+            proofs/.lake/build
+          key: linux-release-proof-v1-${{ steps.dependencies.outputs.key }}
+      - name: Prove released-frame equilibrium and recovery
+        working-directory: proofs
+        run: |
           lake env bash -euc '
             set -o pipefail
             export LEAN_PATH="$PWD:$LEAN_PATH"
