@@ -13,11 +13,10 @@ def fromSource {data : Partition} {basis : GlobalBasis} (bits : Nat)
   let member := data.source.members[source.member]!
   let dx := data.source.nodes[member.b]!.x-data.source.nodes[member.a]!.x
   let span := source.right-source.left
-  let memberIndex : Fin data.source.members.size ← if h : source.member < data.source.members.size then some ⟨source.member,h⟩ else none
   let motion ← localMotion bits cert i
   let v ← endAction bits cert i motion 1
   let negM ← endAction bits cert i motion 2
-  let root ← InclinedFrameIntervalGeometry.member bits data source.member (cert.roots memberIndex)
+  let root ← InclinedFrameIntervalGeometry.member bits data source.member (InclinedFrameIntervalAssembly.rootAt cert source.member)
   return ⟨source.left,source.right,root.length,v,scale (-1) negM,
     dx*span*source.vertical, dx*span*(source.verticalEnd-source.vertical)/2,#[],#[],0⟩
 

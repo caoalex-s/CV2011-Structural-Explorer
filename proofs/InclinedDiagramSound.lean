@@ -109,8 +109,8 @@ theorem fromSource_fits {data : Partition} {basis : GlobalBasis} {bits : Nat}
     (computed : fromSource bits cert index = some p) : fits p (physicalState data physical index) := by
   unfold fromSource at computed
   dsimp only at computed
-  obtain ⟨member, hm, rest⟩ := Option.bind_eq_some.mp computed
-  obtain ⟨motionBox, hl, rest⟩ := Option.bind_eq_some.mp rest
+
+  obtain ⟨motionBox, hl, rest⟩ := Option.bind_eq_some.mp computed
   obtain ⟨v, hv, rest⟩ := Option.bind_eq_some.mp rest
   obtain ⟨negM, hn, rest⟩ := Option.bind_eq_some.mp rest
   obtain ⟨root, hr, eq⟩ := Option.bind_eq_some.mp rest
@@ -124,6 +124,32 @@ theorem fromSource_fits {data : Partition} {basis : GlobalBasis} {bits : Nat}
     InclinedFrameReal.member_positive data hsource ⟨_,segment.1.1⟩,segment.2.2.2.1⟩
   simpa [physicalState] using scaled (-1) momentBound
 
+/-- Integrate the actual local affine load through the piece. The two
+variable shear coefficients use the horizontal source projection because
+the physical member length times its direction cosine is exactly ΔX. -/
+theorem normalized_fields (motion : FrameInterfaces.LocalDofs)
+    (L fraction EA EI c sn dx f₀ f₁ t : ℝ) (length : L*fraction ≠ 0)
+    (axial : EA ≠ 0) (bending : EI ≠ 0) (horizontal : L*c = dx) :
+    let ell := L*fraction
+    let B := dx*fraction*f₀
+    let C := dx*fraction*(f₁-f₀)/2
+    let actions := LocalFrameFields.endActions motion ell EA EI (sn*f₀) (sn*f₁) (c*f₀) (c*f₁)
+    (LocalFrameFields.shear motion ell EI (c*f₀) (c*f₁)).eval (ell*t) = actions 1+t*(B+t*C) ∧
+    (LocalFrameFields.moment motion ell EI (c*f₀) (c*f₁)).eval (ell*t) =
+      -(actions 2)+ell*t*(actions 1+t*(B/2+t*(C/3))) := by
+  subst dx
+  have h := RationalFrame.Fields.affine_recovery motion (L*fraction) EA EI
+    (sn*f₀) (sn*f₁) (c*f₀) (c*f₁) (L*fraction*t) length axial bending
+  dsimp only
+  constructor
+  · rw [h.2.1]
+    field_simp [length]
+    ring
+  · rw [h.2.2.1]
+    field_simp [length]
+    ring
+
+#print axioms normalized_fields
 #print axioms fromSource_fits
 #print axioms station_fits
 #print axioms evaluate_fits
