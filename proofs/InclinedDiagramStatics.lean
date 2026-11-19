@@ -30,56 +30,69 @@ def insert (system : System) (equation : Row) : System := Id.run do
   let normalized := remainder.map (· / remainder[pivot]!)
   return {system with pivots := system.pivots.push (pivot,normalized)}
 
+def coefficient (slot : Nat) : List (Nat × Rat) → Rat
+  | [] => 0
+  | (i,a) :: rest => (if slot = i then a else 0) + coefficient slot rest
+
 def equation (width : Nat) (terms : List (Nat × Rat)) : Row :=
-  terms.foldl (fun row term => row.modify term.1 (· + term.2)) (Array.replicate width 0)
+  Array.ofFn fun i : Fin width => coefficient i.val terms
 
 def loadComponent (load : RationalFrame.Load) (d : Nat) : Rat :=
   if load.kind = 0 then if d = 0 then load.fx else if d = 1 then load.fy else 0
   else if load.kind = 1 && d = 2 then load.mz else 0
 
-/-- An uncertain roller tangent cannot seed a rational equilibrium equation.
-All other columns of the same assembly remain usable. -/
-def columnEquation {data : Partition} {basis : GlobalBasis} (cert : Certificate data basis)
-    (torques : Array (Fin basis.columns.size → Rat)) (col : Fin basis.columns.size)
-    (width : Nat) : Option Row := do
-  let mut row := Array.replicate width (0 : Rat)
-  for i in [:data.pieces.size] do
-    let segment := data.pieces[i]!
-    for component in [:6] do
-      let point := if component < 3 then segment.a else segment.b
-      let v := pointColumnAt cert point col ⟨component%3,Nat.mod_lt _ (by decide)⟩
-      guard (v.lower = v.upper)
-      row := row.set! (6*i+component) v.lower
-  for i in [:torques.size] do
-    row := row.set! (6*data.pieces.size+i) (torques[i]! col)
-  let mut applied : Rat := 0
-  for load in data.source.loads do
-    for component in List.finRange 3 do
-      let v := pointColumnAt cert (locate data load.member load.t) col component
-      guard (v.lower = v.upper)
-      applied := applied + v.lower*loadComponent load component.val
-  return row.set! (width-1) (-applied)
+def endPoint (segment : Piece) (component : Fin 6) :=
+  if component.val < 3 then segment.a else segment.b
+
+def globalSlot (component : Fin 6) : Fin 3 := ⟨component.val%3,Nat.mod_lt _ (by decide)⟩
+
+def width (data : Partition) (torques : Nat) :=
+  6*data.pieces.size+torques+data.source.members.size+1
+
+def elementTerms (data : Partition) (torques : Nat) (i : Fin data.pieces.size) :
+    List (List (Nat × Rat)) :=
+  let segment := data.pieces[i.val]!
+  let member := data.source.members[segment.member]!
+  let a := data.source.nodes[member.a]!
+  let b := data.source.nodes[member.b]!
+  let fraction := segment.right-segment.left
+  let dx := fraction*(b.x-a.x)
+  let dy := fraction*(b.y-a.y)
+  let len := 6*data.pieces.size+torques+segment.member
+  let k := 6*i.val
+  [[(k,1),(k+3,1)],[(k+1,1),(k+4,1),(len,fraction*(segment.vertical+segment.verticalEnd)/2)],
+    [(k+2,1),(k+5,1),(k+4,dx),(k+3,-dy),(len,fraction*dx*(segment.vertical+2*segment.verticalEnd)/6)]]
+
+/-- Only point directions with exact amplitudes can seed a rational
+equilibrium equation. Other columns remain available independently. -/
+def columnTerms {data : Partition} {basis : GlobalBasis} (cert : Certificate data basis)
+    (torques : Array (Fin basis.columns.size → Rat)) (col : Fin basis.columns.size) :
+    Option (List (Nat × Rat)) :=
+  let amp := fun p d => pointColumnAt cert p col d
+  if ∀ point : Fin data.points.size, ∀ d : Fin 3,
+      (amp point.val d).lower = (amp point.val d).upper then
+    let ends := (List.finRange data.pieces.size).flatMap fun i =>
+      (List.finRange 6).map fun d => (6*i.val+d.val,(amp (endPoint data.pieces[i.val]! d) (globalSlot d)).lower)
+    let springs := (List.finRange torques.size).map fun i => (6*data.pieces.size+i.val,torques[i.val]! col)
+    let external := FrameSpring.sumRational fun i : Fin data.source.loads.size =>
+      let load := data.source.loads[i.val]!
+      FrameSpring.sumRational fun d : Fin 3 =>
+        (amp (locate data load.member load.t) d).lower * loadComponent load d.val
+    some (ends ++ springs ++ [(width data torques.size-1,-external)])
+  else none
+
+def seedTerms {data : Partition} {basis : GlobalBasis} (cert : Certificate data basis)
+    (torques : Array (Fin basis.columns.size → Rat)) :=
+  (List.finRange data.pieces.size).flatMap (elementTerms data torques.size) ++
+    (List.finRange basis.columns.size).filterMap (columnTerms cert torques)
+
+def insertRows (width : Nat) : List (List (Nat × Rat)) → System → System
+  | [], system => system
+  | terms :: tail, system => insertRows width tail (insert system (equation width terms))
 
 def assemble {data : Partition} {basis : GlobalBasis} (cert : Certificate data basis)
-    (torques : Array (Fin basis.columns.size → Rat)) : System := Id.run do
-  let unknowns := 6*data.pieces.size + torques.size
-  let width := unknowns + data.source.members.size + 1
-  let mut system : System := ⟨unknowns,width,#[]⟩
-  for i in [:data.pieces.size] do
-    let segment := data.pieces[i]!
-    let a := data.points[segment.a]!
-    let b := data.points[segment.b]!
-    let fraction := segment.right-segment.left
-    let len := unknowns + segment.member
-    let k := 6*i
-    -- Global force and moment balance about the first end. The affine
-    -- load has resultant ell*(f0+f1)/2 and first moment ell*dx*(f0+2*f1)/6.
-    system := insert system (equation width [(k,1),(k+3,1)])
-    system := insert system (equation width [(k+1,1),(k+4,1),(len,fraction*(segment.vertical+segment.verticalEnd)/2)])
-    system := insert system (equation width [(k+2,1),(k+5,1),(k+4,b.x-a.x),(k+3,a.y-b.y),
-      (len,fraction*(b.x-a.x)*(segment.vertical+2*segment.verticalEnd)/6)])
-  for col in List.finRange basis.columns.size do
-    if let some row := columnEquation cert torques col width then system := insert system row
-  return system
+    (torques : Array (Fin basis.columns.size → Rat)) : System :=
+  let n := width data torques.size
+  insertRows n (seedTerms cert torques) ⟨6*data.pieces.size+torques.size,n,#[]⟩
 
 end InclinedDiagram.Statics

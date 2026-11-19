@@ -98,12 +98,50 @@ theorem insert_preserves {n} (state : Fin n → ℝ) (system : System) (equation
     have size : (reduce system equation).size = n := reduced.1
     have zero : value state (reduce system equation) = 0 := reduced.2.trans row.2
     intro e member
-    simp only [Array.toList_push,List.mem_append,List.mem_singleton] at member
-    rcases member with before | rfl
-    · exact old e before
+    have memArray := Array.mem_def.mpr member
+    rcases Array.mem_push.mp memArray with before | rfl
+    · exact old e (Array.mem_def.mp before)
     · exact ⟨by simp [size],by rw [divided_value state _ _ size,zero,zero_div]⟩
   · exact old
 
+def atSlot {n} (state : Fin n → ℝ) (index : Nat) : ℝ :=
+  if h : index < n then state ⟨index,h⟩ else 0
+
+def termsValue {n} (state : Fin n → ℝ) (terms : List (Nat × Rat)) : ℝ :=
+  (terms.map fun term => (term.2:ℝ)*atSlot state term.1).sum
+
+theorem equation_value {n} (state : Fin n → ℝ) (terms : List (Nat × Rat)) :
+    value state (equation n terms) = termsValue state terms := by
+  have entry (i : Fin n) (xs : List (Nat × Rat)) :
+      ((equation n xs)[i.val]! : Rat) = coefficient i.val xs := by simp [equation,i.isLt]
+  unfold value
+  simp_rw [entry]
+  induction terms with
+  | nil => simp [coefficient,termsValue]
+  | cons term rest ih =>
+    obtain ⟨index,a⟩ := term
+    simp only [coefficient,Rat.cast_add,add_mul,Finset.sum_add_distrib,ih]
+    congr 1
+    by_cases h : index < n
+    · let j : Fin n := ⟨index,h⟩
+      have same (i : Fin n) : (i.val = index) ↔ i = j := Fin.ext_iff.symm
+      simp [same,apply_ite,ite_mul,atSlot,h,j]
+    · have different (i : Fin n) : i.val ≠ index := by omega
+      simp [different,atSlot,h]
+
+theorem inserted_rows_valid {n} (state : Fin n → ℝ) (rows : List (List (Nat × Rat))) (system : System)
+    (old : ∀ e ∈ system.pivots.toList, validRow state e.2)
+    (zero : ∀ terms ∈ rows, termsValue state terms = 0) :
+    ∀ e ∈ (insertRows n rows system).pivots.toList, validRow state e.2 := by
+  induction rows generalizing system with
+  | nil => exact old
+  | cons terms tail ih =>
+    have row : validRow state (equation n terms) :=
+      ⟨by simp [equation],(equation_value state terms).trans (zero terms List.mem_cons_self)⟩
+    exact ih _ (insert_preserves state system _ old row)
+      (fun xs mem => zero xs (List.mem_cons_of_mem _ mem))
+
+#print axioms inserted_rows_valid
 open InclinedFrameSource InclinedFrameReal
 
 /-- Rigid-frame virtual work in end-action form. Distributed loads already

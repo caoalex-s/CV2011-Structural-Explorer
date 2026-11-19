@@ -148,6 +148,66 @@ theorem normalized_fields (motion : FrameInterfaces.LocalDofs)
     field_simp [length]
     ring
 
+def sourceShape (data : Partition) (i : Fin data.pieces.size) (p : InclinedDiagram.Piece) :=
+  let seg := data.pieces[i.val]!
+  let member := data.source.members[seg.member]!
+  let dx := data.source.nodes[member.b]!.x-data.source.nodes[member.a]!.x
+  p.left = seg.left ∧ p.right = seg.right ∧
+  p.linear = dx*(seg.right-seg.left)*seg.vertical ∧
+  p.quadratic = dx*(seg.right-seg.left)*(seg.verticalEnd-seg.vertical)/2
+
+theorem fromSource_shape {data : Partition} {basis : GlobalBasis} {bits : Nat}
+    {cert : Certificate data basis} {i : Fin data.pieces.size} {p}
+    (done : fromSource bits cert i = some p) : sourceShape data i p := by
+  unfold fromSource at done
+  dsimp only at done
+  simp only [Option.bind_eq_bind,Option.bind_eq_some,Option.some.injEq] at done
+  obtain ⟨_,_,_,_,_,_,_,_,rfl⟩ := done
+  exact ⟨rfl,rfl,rfl,rfl⟩
+
+theorem source_fields {data : Partition} (valid : PartitionValid data)
+    (motion : InclinedFrameReal.Motion data) (i : Fin data.pieces.size)
+    (p : InclinedDiagram.Piece) (shape : sourceShape data i p) (t : ℝ) :
+    let parameter := (p.left:ℝ)+((p.right:ℝ)-p.left)*t
+    let actual := InclinedFrameReal.fieldValues data data.pieces[i.val]! motion parameter
+    shear p (physicalState data motion i) t = actual 1 ∧
+    moment p (physicalState data motion i) t = actual 2 := by
+  let seg := data.pieces[i.val]!
+  let member := data.source.members[seg.member]!
+  let orientation := InclinedFrameReal.memberDirection data seg.member
+  let L := InclinedFrameReal.memberLength data seg.member
+  let fraction := (seg.right:ℝ)-seg.left
+  let dx := data.source.nodes[member.b]!.x-data.source.nodes[member.a]!.x
+  have properties := InclinedFrameReal.piece_properties data valid i
+  have positive : 0 < L*fraction := properties.1
+  rcases valid with ⟨source, _, _, _, _, _, _, pieces, _, _, _, _⟩
+  have segment := pieces i
+  have horizontal : L*orientation.cosine = (dx:ℝ) := by
+    simpa [L,orientation,dx,member,InclinedFrameReal.memberLength,InclinedFrameReal.memberDirection,
+      InclinedFrameReal.endpoints,ExactGeometry.dx] using
+      (ExactGeometry.direction_components _ _ (InclinedFrameReal.endpoints_distinct data source
+        ⟨seg.member,segment.1.1⟩)).1
+  have recovered := normalized_fields (InclinedFrameReal.pieceMotion data seg motion)
+    L fraction member.EA member.EI orientation.cosine orientation.sine dx seg.vertical seg.verticalEnd t
+    (ne_of_gt positive) (ne_of_gt properties.2.1) (ne_of_gt properties.2.2) horizontal
+  have nonzero : fraction ≠ 0 := by
+    have strict : 0 < fraction := by exact_mod_cast sub_pos.mpr segment.2.2.2.1
+    exact ne_of_gt strict
+  have location : L*fraction*((seg.left:ℝ)+fraction*t-seg.left)/fraction = L*fraction*t := by
+    field_simp
+    ring
+  obtain ⟨left,right,linear,quadratic⟩ := shape
+  dsimp only
+  simp only [shear,moment,span,physicalState,InclinedFrameReal.fieldValues,Matrix.cons_val_one,
+    Matrix.cons_val_zero,left,right,linear,quadratic,Rat.cast_mul,Rat.cast_sub,Rat.cast_div,Rat.cast_ofNat]
+  change _ = (LocalFrameFields.shear _ _ _ _ _).eval
+    (L*fraction*((seg.left:ℝ)+fraction*t-seg.left)/fraction) ∧
+    _ = (LocalFrameFields.moment _ _ _ _ _).eval
+    (L*fraction*((seg.left:ℝ)+fraction*t-seg.left)/fraction)
+  rw [location]
+  exact ⟨recovered.1.symm,recovered.2.symm⟩
+
+#print axioms source_fields
 #print axioms normalized_fields
 #print axioms fromSource_fits
 #print axioms station_fits
