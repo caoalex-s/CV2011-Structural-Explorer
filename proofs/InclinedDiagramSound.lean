@@ -6,7 +6,8 @@ import InclinedReleaseFields
 import InclinedDiagramStaticsSound
 
 namespace InclinedDiagram.Sound
-open FrameIntervalOps FrameEnclosure Set
+open FrameIntervalOps Set
+open FrameEnclosure (Contains)
 noncomputable section
 
 structure State where

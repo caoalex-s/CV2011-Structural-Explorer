@@ -1,7 +1,8 @@
 import InclinedDiagramSound
 
 namespace InclinedDiagram.Sound
-open FrameIntervalOps FrameEnclosure Set
+open FrameIntervalOps Set
+open FrameEnclosure (Contains)
 noncomputable section
 
 def slope (p : Piece) (s : State) (m : Bool) (t : ℝ) :=
