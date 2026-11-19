@@ -1,0 +1,71 @@
+name: Verify inclined whole-member diagrams
+on:
+  push:
+    branches: [codex/inclined-member-diagrams]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  diagrams:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: leanprover/lean-action@ba3fdfe5c4476c925da13bf11a005ddb47e47aee
+        with:
+          lake-package-directory: proofs
+          build: 'false'
+          test: 'false'
+          use-mathlib-cache: 'true'
+      - id: dependencies
+        name: Identify unchanged proof dependencies
+        run: echo "key=$(git ls-tree -r HEAD proofs | grep -Ev 'proofs/(MemberDiagram|CardinalSpring|JointMemberDiagram|InclinedDiagram)' | sha256sum | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@v4
+        id: proof-cache
+        with:
+          path: |
+            proofs/*.olean
+            proofs/.lake/build
+          key: linux-cardinal-joint-deps-v2-${{ steps.dependencies.outputs.key }}
+          restore-keys: linux-diagram-deps-v1-${{ steps.dependencies.outputs.key }}
+      - name: Compile reusable interval mechanics
+        if: steps.proof-cache.outputs.cache-hit != 'true'
+        working-directory: proofs
+        run: |
+          lake build ExactGeometry
+          lake env bash -euc 'export LEAN_PATH="$PWD:$LEAN_PATH"; python3 ../qa/inclined-release/compile.py RationalFrameSoundness FrameSpringSound HingeFrameSoundness'
+      - uses: actions/cache/save@v4
+        if: steps.proof-cache.outputs.cache-hit != 'true'
+        with:
+          path: |
+            proofs/*.olean
+            proofs/.lake/build
+          key: linux-cardinal-joint-deps-v2-${{ steps.dependencies.outputs.key }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: node qa/inclined-diagram/packets.mjs
+      - name: Compile and exercise the source-bound checker
+        working-directory: proofs
+        run: |
+          lake env bash -euc '
+            export LEAN_PATH="$PWD:$LEAN_PATH"
+            python3 ../qa/inclined-release/compile.py FrameSpringWire HingeFrameWire
+            for module in HingeFrameChecker HingeFrameWire InclinedRelease InclinedReleaseWire FrameSpring FrameSpringWire MemberDiagram InclinedDiagram InclinedDiagramWire; do
+              lean -c "$module.c" -o "$module.olean" "$module.lean"
+            done
+            lean --run ../qa/inclined-diagram/Native.lean ../.data/inclined-diagram/*.packet ../.data/inclined-diagram/*.reject
+          '
+      - run: cat .data/inclined-diagram/h2-forward.packet.report
+      - name: Build browser checker
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash qa/member-diagram/build-runtime.sh inclined-diagram
+      - uses: actions/upload-artifact@v4
+        with:
+          name: inclined-diagram-checker
+          path: .data/hinge-build/inclined-diagram-assets/
+          include-hidden-files: true
+

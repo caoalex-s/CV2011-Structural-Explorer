@@ -23,6 +23,11 @@ if [[ "${1:-}" == joint ]]; then
     sources=(proofs/HingeFrame{Checker,Wire}.c proofs/InclinedRelease{,Wire}.c proofs/FrameSpring{,Wire}.c
         proofs/MemberDiagram.c proofs/CardinalSpring.c proofs/JointMemberDiagram.c qa/joint-diagram/abi.c)
 fi
+if [[ "${1:-}" == inclined-diagram ]]; then
+    folder=inclined-diagram-assets
+    sources=(proofs/HingeFrameChecker.c proofs/InclinedRelease{,Wire}.c proofs/FrameSpring{,Wire}.c
+        proofs/MemberDiagram.c proofs/InclinedDiagram{,Wire}.c qa/inclined-diagram/abi.c)
+fi
 mkdir -p "$stage/$folder"
 objects=()
 for source in "${sources[@]}"; do
