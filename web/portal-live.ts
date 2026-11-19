@@ -352,7 +352,9 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                         if (!current()) return;
                         const source = receipt.sourceRequest.model as Model;
                         const selected = source.members.find(m => m.id === frame.query.member)!;
-                        progress.replaceWith(renderMemberDiagram(checked.report, selected.id, memberLabel(source, selected)));
+                        const start = source.nodes.find(n => n.id === selected.a)!;
+                        const end = source.nodes.find(n => n.id === selected.b)!;
+                        progress.replaceWith(renderMemberDiagram(checked.report, selected.id, memberLabel(source, selected), Math.sign(end.x - start.x)));
                         exportText = JSON.stringify({ ...receipt, workedSolution: report, diagram: { protocol: 'CV2011_DIAGRAM_1',
                             artifact: extra.artifact, bundle: extra.bundle, packetDigest, reportDigest: checked.reportDigest,
                             report: new TextDecoder().decode(checked.report) } }, null, 2);

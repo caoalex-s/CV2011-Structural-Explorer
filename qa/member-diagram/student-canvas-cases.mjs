@@ -2,6 +2,7 @@
  * Run with a fresh Playwright page and the synthetic development site URL.
  */
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -98,8 +99,8 @@ export function compareRationalToRadical(endpoint, radical) {
     const [a, b, c, d, e] = radical.map(BigInt);
     const shifted = top - a * bottom;
     const sign = value => value < 0n ? -1 : value > 0n ? 1 : 0;
-    const leftSign = sign(shifted), rightSign = sign(b);
-    if (leftSign !== rightSign) return sign(BigInt(leftSign - rightSign));
+    const leftSign = sign(shifted), rightSign = d === 0n ? 0 : sign(b);
+    if (leftSign !== rightSign) return leftSign < rightSign ? -1 : 1;
     if (leftSign === 0) return 0;
     const comparison = shifted ** 2n * c ** 2n * e - b ** 2n * bottom ** 2n * d;
     return leftSign * sign(comparison);
@@ -234,6 +235,16 @@ export async function runMemberDiagramStudentCases({ page, base, output }) {
         assert.match(text, /kN/);
         assert.match(text, /kN\s*[·⋅]?\s*m/);
         compareDiagram(observed, expected);
+        const receipt = JSON.parse(await page.locator('#portal-certificate').textContent());
+        const hash = contents => createHash('sha256').update(contents).digest('hex');
+        assert.equal(receipt.diagram.protocol, 'CV2011_DIAGRAM_1');
+        assert.equal(receipt.sourceRequest.query.member, await page.getByLabel('Inspect member').inputValue());
+        assert.equal(hash(JSON.stringify(receipt.sourceRequest)), receipt.inputDigest);
+        assert.equal(hash(receipt.packet), receipt.diagram.packetDigest);
+        assert.equal(hash(receipt.diagram.report), receipt.diagram.reportDigest);
+        const { artifact, bundle, packetDigest, reportDigest } = receipt.diagram;
+        for (const digest of [artifact, bundle, packetDigest, reportDigest]) assert.match(digest, /^[a-f0-9]{64}$/);
+        result.receipt = { artifact, bundle, packetDigest, reportDigest, inputDigest: receipt.inputDigest };
         await page.screenshot({ path: join(output, `${name}.png`), fullPage: true });
     }
 

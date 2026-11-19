@@ -103,8 +103,8 @@ jobs:
           lake env bash -euc '
             set -o pipefail
             export LEAN_PATH="$PWD:$LEAN_PATH"
-            test -s MemberDiagramSound.lean
-            python3 ../qa/inclined-release/compile.py MemberDiagramExtrema | tee release-axioms.log
+            test -s MemberDiagramCoverage.lean
+            python3 ../qa/inclined-release/compile.py MemberDiagramCoverage | tee release-axioms.log
             ! grep -E "sorryAx|declaration uses .sorry." release-axioms.log
           '
 

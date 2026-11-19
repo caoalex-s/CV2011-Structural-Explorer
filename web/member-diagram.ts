@@ -10,8 +10,10 @@ const rational = (s: string) => /^-?(?:0|[1-9]\d*)\/[1-9]\d*$/.test(s);
 const exact = (s: string) => s.endsWith('/1') ? s.slice(0, -2) : s;
 function approximate(s: string): number {
     const [a, b] = s.split('/').map(BigInt);
-    // Divide integers first to avoid overflowing both operands of the ratio.
-    return Number(a / b) + Number((a % b) * 1000000000000000n / b) / 1e15;
+    if (a === 0n) return 0;
+    const digits = (a < 0n ? -a : a).toString(), divisor = b.toString();
+    const mantissa = (v: string) => Number(v[0] + '.' + v.slice(1,17));
+    return (a < 0n ? -1 : 1) * mantissa(digits) / mantissa(divisor) * 10 ** (digits.length - divisor.length);
 }
 function bounds(pair: string[], flat = false): string {
     if (pair[0] === pair[1]) return exact(pair[0]);
@@ -43,16 +45,19 @@ function plot(field: Field, pieces: Piece[], rows: Row[]): string {
     const y = (v: number) => 88 - v / peak * 60;
     // Cubic Bézier end tangents reproduce each polynomial in the affine plot
     // coordinates. Each one-sided piece gets its own path at a jump.
+    let drawable = Number.isFinite(length) && length > 0 && Number.isFinite(peak);
     const paths = pieces.map(piece => {
         const a = approximate(piece.start), b = approximate(piece.end), h = b-a;
         const [c0,c1,c2,c3] = piece[field].map(approximate);
         const right = c0 + h*(c1 + h*(c2 + h*c3));
         const slope = c1 + h*(2*c2 + 3*h*c3);
+        if (![x(a),x(a+h/3),x(b-h/3),x(b),y(c0),y(c0+h*c1/3),y(right-h*slope/3),y(right)].every(Number.isFinite)) drawable = false;
         return `<path d="M ${x(a)} ${y(c0)} C ${x(a+h/3)} ${y(c0+h*c1/3)} ${x(b-h/3)} ${y(right-h*slope/3)} ${x(b)} ${y(right)}" fill="none" stroke="#087f78" stroke-width="2.5"/>`;
     }).join('');
+    if (!drawable) return '<p>The drawing scale exceeds the plotting range. The table gives the checked values.</p>';
     return `<svg viewBox="0 0 650 188" role="img" aria-label="${field} diagram, positive upward, distance along the member in metres" style="width:100%;max-width:650px"><path d="M52 17V155 M52 88H616" fill="none" stroke="currentColor" opacity=".5"/><text x="8" y="15">${field} (${unit[field]})</text><text x="47" y="177">0</text><text x="612" y="177" text-anchor="end">${length.toPrecision(5)} m</text>${paths}</svg>`;
 }
-export function renderMemberDiagram(bytes: Uint8Array, member: string, label: string): HTMLElement {
+export function renderMemberDiagram(bytes: Uint8Array, member: string, label: string, cosine: number): HTMLElement {
     const lines = new TextDecoder('utf-8', {fatal:true}).decode(bytes).split('\n');
     const id = Array.from({length:member.length}, (_, i) => member.charCodeAt(i).toString(16).padStart(4,'0')).join('');
     if (bytes.length > 262144 || lines.shift() !== 'CV2011_DIAGRAM_1' || lines.shift() !== id)
@@ -77,7 +82,16 @@ export function renderMemberDiagram(bytes: Uint8Array, member: string, label: st
     section.append(title);
     const equation = math(String.raw`V=V_0+q_0\xi+g\xi^2/2,\qquad M=M_0+V_0\xi+q_0\xi^2/2+g\xi^3/6`, true);
     section.insertAdjacentHTML('beforeend', '<p>Measure x in metres from the first drawn end. On each interval starting at a, ξ = x − a. The signed transverse load is q(ξ) = q₀ + gξ, with q₀ in kN/m and g in kN/m². Integrating dV/dx = q and dM/dx = V gives</p>' + equation);
-    pieces.forEach((p, i) => section.insertAdjacentHTML('beforeend', `<div data-piece="${i}" data-start="${p.start}" data-end="${p.end}" data-shear="${p.V}" data-moment="${p.M}"><h4>Interval ${exact(p.start)} to ${exact(p.end)} m</h4>${math(`V(\\xi)=${formula(p.V)}\\;\\mathrm{kN},\\qquad M(\\xi)=${formula(p.M)}\\;\\mathrm{kN\\,m}`,true)}</div>`));
+    const direction = cosine === 1 ? 'For this rightward horizontal member, positive editor load w acts downwards, so q = −w.' :
+        cosine === -1 ? 'For this leftward horizontal member, positive editor load w acts in the positive local transverse direction, so q = w.' :
+        'On this vertical member, the vertical distributed load has zero transverse component.';
+    const sign = document.createElement('p'); sign.textContent = direction; section.append(sign);
+    pieces.forEach((p, i) => {
+        const [n,d] = p.V[2].split('/').map(BigInt);
+        const gradient = d % 2n === 0n ? n + '/' + (d / 2n) : (2n*n) + '/' + d;
+        const parameters = `Using V₀ = ${exact(p.V[0])} kN, M₀ = ${exact(p.M[0])} kN·m, q₀ = ${exact(p.V[1])} kN/m and g = ${exact(gradient)} kN/m², substitute ξ = x − (${exact(p.start)} m).`;
+        section.insertAdjacentHTML('beforeend', `<div data-piece="${i}" data-start="${p.start}" data-end="${p.end}" data-shear="${p.V}" data-moment="${p.M}"><h4>Interval ${exact(p.start)} to ${exact(p.end)} m</h4><p>${parameters}</p>${math(`V(\\xi)=${formula(p.V)}\\;\\mathrm{kN},\\qquad M(\\xi)=${formula(p.M)}\\;\\mathrm{kN\\,m}`,true)}</div>`);
+    });
     for (const field of ['V','M'] as const) {
         const entries = rows.filter(row => row.field === field);
         section.insertAdjacentHTML('beforeend', `<h4>${field==='V'?'Shear force':'Bending moment'}</h4>`+plot(field,pieces,entries)+
