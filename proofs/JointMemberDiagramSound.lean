@@ -91,7 +91,7 @@ cardinal equations. Fixed coordinates have their prescribed zero values. -/
 theorem unique_free_motion {s w} (h : CardinalSpring.Equilibrium s (CardinalSpring.matrix s) w) :
     let free := CardinalSpring.freeRows s
     let k : Matrix (Fin free.size) (Fin free.size) ℝ := fun i j =>
-      (CardinalSpring.matrix s)[free[i.val]!]![free[j.val]!]!
+      (((CardinalSpring.matrix s)[free[i.val]!]!)[free[j.val]!]! : ℝ)
     let u := fun i : Fin free.size => (w.motion[free[i.val]!]! : ℝ)
     let f := fun i : Fin free.size => ((CardinalSpring.loads s)[free[i.val]!]! : ℝ)
     k.mulVec u = f ∧ ∀ other, k.mulVec other = f → other = u := by
@@ -116,10 +116,44 @@ theorem original_incidence {p s} (compiled : CardinalSpring.compile p = some s) 
   obtain ⟨mesh,_,rest⟩ := Option.bind_eq_some.mp rest
   split at rest
   next =>
+    dsimp only at rest
     split at rest
     next valid => cases rest; exact valid.2
     next => contradiction
   next => contradiction
+
+/-- Recover the two rotations from the original member incidence, including
+the reference member explicitly selected at a shared node. -/
+theorem source_gap {p s} (compiled : CardinalSpring.compile p = some s)
+    (u : Array Rat) (side : Nat) (listed : side ∈ s.beam.sides) :
+    let face := HingeFrame.faceQuery side
+    let source := s.beam.mesh.source
+    let node := InclinedRelease.endpoint source.members[face.member]! side
+    let ref := HingeFrame.reference source node
+    let refT : Rat := if source.members[ref]!.a = node then 0 else 1
+    CardinalSpring.gap s u side =
+      u[HingeFrame.pointIndex s.beam face.member face.t 2]! - u[HingeFrame.pointIndex s.beam ref refT 2]! := by
+  obtain ⟨_,_,own,reference⟩ := original_incidence compiled side listed
+  dsimp only
+  rw [own,reference]
+  rfl
+
+theorem resolved_system {p s} (compiled : CardinalSpring.compile p = some s) :
+    ∃ layout, FrameSpring.resolve p.source p.rules = some (layout,s.stiffnesses) ∧
+      compileModel p.source = some s.beam.mesh ∧ s.beam.sides = layout.sides.toList := by
+  obtain ⟨⟨layout,ks⟩,resolved,rest⟩ := Option.bind_eq_some.mp compiled
+  obtain ⟨mesh,built,rest⟩ := Option.bind_eq_some.mp rest
+  split at rest
+  next =>
+    dsimp only at rest
+    split at rest
+    next => cases rest; exact ⟨layout,resolved,built,rfl⟩
+    next => contradiction
+  next => contradiction
+
+theorem free_complete (s : CardinalSpring.System) (i : Nat) :
+    i ∈ (CardinalSpring.freeRows s).toList ↔ i < s.beam.size ∧ HingeFrame.restrained s.beam i = false := by
+  simp [CardinalSpring.freeRows,List.mem_filter,Bool.not_eq_true]
 
 /-- Derivative of k Δθ²/2 under a unit variation of coordinate row.
 A second variation in column col yields exactly the entry added to K. -/
@@ -201,6 +235,8 @@ theorem accepted_dispatch {input output} (h : checkReport input = some output) :
 #print axioms unloaded_hinge_endpoint
 #print axioms accepted_dispatch
 #print axioms unique_free_motion
+#print axioms source_gap
+#print axioms resolved_system
 #print axioms original_incidence
 #print axioms energy_stiffness
 #print axioms signed_face
