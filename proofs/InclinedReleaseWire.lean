@@ -116,9 +116,9 @@ structure Evaluated {α : Type} (op : Option α) where
   computed : op = some value
 
 def evaluate {α : Type} (op : Option α) : Option (Evaluated op) :=
-  match h : op with
+  match op with
   | none => none
-  | some value => some ⟨value, h⟩
+  | some value => some ⟨value, rfl⟩
 
 structure Accurate (quantity : Fin 9) (op : Option Bounds) extends Evaluated op where
   accuracy : FrameIntervalAccuracy.check quantity value = true
