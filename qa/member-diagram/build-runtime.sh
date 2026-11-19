@@ -16,9 +16,16 @@ git -C "$stage/emsdk" checkout -q --detach FETCH_HEAD
 "$stage/emsdk/emsdk" activate 3.1.44
 source "$stage/emsdk/emsdk_env.sh"
 flags=(-O2 -flto -pthread -fwasm-exceptions -I "$core/runtime/include")
-mkdir -p "$stage/diagram-assets"
+folder=diagram-assets
+sources=(proofs/MemberDiagram.c qa/member-diagram/abi.c)
+if [[ "${1:-}" == joint ]]; then
+    folder=joint-diagram-assets
+    sources=(proofs/HingeFrame{Checker,Wire}.c proofs/InclinedRelease{,Wire}.c proofs/FrameSpring{,Wire}.c
+        proofs/MemberDiagram.c proofs/CardinalSpring.c proofs/JointMemberDiagram.c qa/joint-diagram/abi.c)
+fi
+mkdir -p "$stage/$folder"
 objects=()
-for source in proofs/MemberDiagram.c qa/member-diagram/abi.c; do
+for source in "${sources[@]}"; do
     object="$stage/$(basename "$source" .c).o"
     emcc "${flags[@]}" -c "$source" -o "$object"
     objects+=("$object")
@@ -29,5 +36,5 @@ em++ "${flags[@]}" -Wl,-u,ntohs --no-entry "${objects[@]}" -Wl,--start-group "$c
     -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=33554432 -sMAXIMUM_MEMORY=134217728 \
     -sPTHREAD_POOL_SIZE=0 -sERROR_ON_UNDEFINED_SYMBOLS=1 \
     '-sEXPORTED_FUNCTIONS=["_checker_init","_checker_check","_input_ptr","_input_capacity","_output_ptr","_output_size","_output_capacity"]' \
-    -o "$stage/diagram-assets/checker.mjs"
-node qa/member-diagram/prepare.mjs
+    -o "$stage/$folder/checker.mjs"
+node qa/member-diagram/prepare.mjs "$stage/$folder/"

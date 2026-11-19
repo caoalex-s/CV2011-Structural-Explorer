@@ -155,9 +155,9 @@ def segmentAt (data : Compiled) (m : Nat) (i : Index data m) : Segment :=
 def originAt (data : Compiled) (m : Nat) (i : Index data m) :=
   memberLength data.source m * (segmentAt data m i).left
 
-def pieceRows (data : Compiled) (m : Nat) (motion : Array Rat) (moment : Bool) (i : Index data m) :=
+def pieceRows (data : Compiled) (m : Nat) (motion : Segment → Array Rat) (moment : Bool) (i : Index data m) :=
   let s := segmentAt data m i
-  candidates (polynomial s motion moment) i.val (originAt data m i) s.length
+  candidates (polynomial s (motion s) moment) i.val (originAt data m i) s.length
 
 structure Evaluated {α : Type} (computation : Option α) where
   value : α
@@ -175,13 +175,13 @@ def gather : (n : Nat) → (V : Fin n → Type) → ((i : Fin n) → Option (V i
     let tail ← gather n (fun i => V i.succ) (fun i => entry i.succ)
     return Fin.cases head tail
 
-structure Sheet (data : Compiled) (m : Nat) (motion : Array Rat) where
+structure Sheet (data : Compiled) (m : Nat) (motion : Segment → Array Rat) where
   rows : (moment : Bool) → (i : Index data m) → Evaluated (pieceRows data m motion moment i)
 
 def allRows {data m motion} (sheet : Sheet data m motion) (moment : Bool) :=
   (List.finRange (selected data m).length).flatMap fun i => (sheet.rows moment i).value
 
-def buildSheet (data : Compiled) (m : Nat) (motion : Array Rat) : Option (Sheet data m motion) := do
+def buildSheet (data : Compiled) (m : Nat) (motion : Segment → Array Rat) : Option (Sheet data m motion) := do
   let table := fun flag => gather (selected data m).length _ fun i => evaluateOption (pieceRows data m motion flag i)
   let shear ← table false
   let moment ← table true
@@ -192,7 +192,7 @@ def encode {data m motion} (sheet : Sheet data m motion) : String :=
     let s := segmentAt data m i
     let origin := originAt data m i
     String.intercalate " " (["P", number origin, number (origin+s.length)] ++
-      coefficients (polynomial s motion false) ++ coefficients (polynomial s motion true))
+      coefficients (polynomial s (motion s) false) ++ coefficients (polynomial s (motion s) true))
   String.intercalate "\n" (["CV2011_DIAGRAM_1", data.source.members[m]!.id] ++ pieces ++
     extremaRows "V" (allRows sheet false) ++ extremaRows "M" (allRows sheet true))
 
@@ -201,7 +201,7 @@ def checkReport (input : String) : Option String := do
   let p ← RationalFrame.Wire.decode input
   if !p.certificate.mechanism && accepts p.source p.query p.certificate then
     let data ← compileModel p.source
-    let sheet ← buildSheet data p.query.member p.certificate.motion
+    let sheet ← buildSheet data p.query.member (fun _ => p.certificate.motion)
     if ranked (allRows sheet false) && ranked (allRows sheet true) && (encode sheet).utf8ByteSize ≤ 262144 then
       return encode sheet
     else none

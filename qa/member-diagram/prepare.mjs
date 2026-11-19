@@ -1,6 +1,6 @@
 import { copyFile, readdir, readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-const folder = '.data/hinge-build/diagram-assets/';
+const folder = process.argv[2] ?? '.data/hinge-build/diagram-assets/';
 for (const module of ['frame-worker-bytes.js', 'frame-interval-abi.js']) {
     await copyFile('public/portal-checker/spring/' + module, folder + module);
 }
