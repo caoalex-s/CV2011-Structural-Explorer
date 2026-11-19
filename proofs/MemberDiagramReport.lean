@@ -126,7 +126,7 @@ theorem tied_max_location {data m motion flag} (sheet : Sheet data m motion)
     ∃ r ∈ (sheet.rows flag i).value,
       represents (polynomial (segmentAt data m i) motion flag) (originAt data m i) r x ∧
       (allRows sheet flag).all (fun s => lessEqual s r) = true := by
-  have hm : IsMaxOn _ _ x := fun z hz => bound _ ⟨i,z,hz,rfl⟩
+  have hm : IsMaxOn (field (polynomial (segmentAt data m i) motion flag)) (Icc (0:ℝ) (segmentAt data m i).length) x := fun z hz => bound _ ⟨i,z,hz,rfl⟩
   obtain ⟨r,hr,rep⟩ := locate_extreme (sheet.rows flag i).computed x hx (Or.inl hm)
   refine ⟨r,hr,rep,(flags r (mem_allRows.mpr ⟨i,hr⟩)).2.mpr ?_⟩
   rw [rep.2]
@@ -139,7 +139,7 @@ theorem tied_min_location {data m motion flag} (sheet : Sheet data m motion)
     ∃ r ∈ (sheet.rows flag i).value,
       represents (polynomial (segmentAt data m i) motion flag) (originAt data m i) r x ∧
       (allRows sheet flag).all (lessEqual r) = true := by
-  have hm : IsMinOn _ _ x := fun z hz => bound _ ⟨i,z,hz,rfl⟩
+  have hm : IsMinOn (field (polynomial (segmentAt data m i) motion flag)) (Icc (0:ℝ) (segmentAt data m i).length) x := fun z hz => bound _ ⟨i,z,hz,rfl⟩
   obtain ⟨r,hr,rep⟩ := locate_extreme (sheet.rows flag i).computed x hx (Or.inr hm)
   refine ⟨r,hr,rep,(flags r (mem_allRows.mpr ⟨i,hr⟩)).1.mpr ?_⟩
   rw [rep.2]
@@ -194,6 +194,9 @@ theorem accepted_report {input output : String} (h : checkReport input = some ou
     next => contradiction
   next => contradiction
 
+#print axioms physical_fields
+#print axioms tied_min_location
+#print axioms tied_max_location
 #print axioms accepted_report
 end
 end MemberDiagram.Sound

@@ -56,6 +56,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: bash qa/member-diagram/build-runtime.sh
+      - name: Compare installed checker with the clean Linux build
+        run: diff -qr public/portal-checker/diagram .data/hinge-build/diagram-assets
       - uses: actions/upload-artifact@v4
         with:
           name: member-diagram-checker
@@ -111,7 +113,6 @@ jobs:
           '
 
   student-drawings:
-    needs: diagrams
     runs-on: ubuntu-22.04
     timeout-minutes: 20
     steps:
@@ -128,10 +129,6 @@ jobs:
       - run: pnpm run check
       - run: pnpm test
       - run: node scripts/check-inclined-bundle.mjs
-      - uses: actions/download-artifact@v4
-        with:
-          name: member-diagram-checker
-          path: public/portal-checker/diagram
       - run: pnpm build
       - run: npm install --prefix .data/student-tools --ignore-scripts --save-exact playwright@1.51.1
       - run: node .data/student-tools/node_modules/playwright/cli.js install --with-deps chromium
