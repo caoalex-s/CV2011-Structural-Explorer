@@ -1,4 +1,4 @@
-/** Compact untrusted proposals for InclinedFrameIntervalWire.
+/** Compact untrusted proposals for FrameSpring.Wire.
  * Original binary64 source values retain their exact rational interpretation.
  * Lean reconstructs every interval table and output; this module grants no status.
  */
@@ -21,6 +21,9 @@ export const springPacketVersion = 'CV2011_ROTATIONAL_SPRING_1';
 export function proposeSpringPacket(input: unknown, query: EvidenceQuery, bits: number) {
     const arithmetic = new IntervalArithmetic(bits);
     const model = parseEvidenceModel(input);
+    for (const key of ['nodes', 'members', 'loads', 'supports'] as const) {
+        if (model[key].length > frameLimits[key]) throw Error(`Limit: too many ${key}.`);
+    }
     // Retain each spring rotation as a separate coordinate. The free-end
     // layout supplies the beam contribution, then each spring adds k b bᵀ.
     const kinematicModel: Model = { ...model,
