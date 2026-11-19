@@ -23,7 +23,7 @@ theorem point_contains {l : Layout} {bits : Nat} {c : Certificate l.expanded l.b
     have h := proj.1 ⟨p, hin⟩ col
     simp only [pointColumn, Option.bind_eq_bind, Option.bind_eq_some, Option.some.injEq] at h
     obtain ⟨shared, hs, own, ho, eq⟩ := h
-    rw [← eq]
+    rw [← Option.some.inj eq]
     by_cases rotation : d.val == 2
     · simpa [unitMotion, rotation] using InclinedFrameIntervalBasisSound.synthesize_contains ho d
     · simpa [unitMotion, rotation] using InclinedFrameIntervalBasisSound.synthesize_contains hs d
@@ -87,8 +87,11 @@ theorem nodal_motion {l : Layout} {bits : Nat} {c : Certificate l.expanded l.bas
   have hy' := FrameIntervalVectorSound.dot_contains hy (fun j => point_contains proj p j 1) sol
   have hr' := FrameIntervalVectorSound.dot_contains hr (fun j => point_contains proj p j 2) sol
   intro i
-  by_cases hp : p < l.expanded.points.size <;> fin_cases i <;>
-    simp_all [InclinedFrameReal.pointMotion, motion]
+  by_cases hp : p < l.expanded.points.size
+  · fin_cases i <;> simp_all [InclinedFrameReal.pointMotion, motion]
+  · simp only [InclinedFrameReal.pointMotion, dif_neg hp, Pi.zero_apply, zero_mul,
+      Finset.sum_const_zero] at hx' hy' hr' ⊢
+    fin_cases i <;> assumption
 
 end
 end InclinedRelease.Sound

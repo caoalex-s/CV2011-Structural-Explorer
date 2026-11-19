@@ -104,6 +104,11 @@ def decode (input : String) : Option Packet := do
       | .error _ => none
       | .ok (value, _) => some value
 
+def groupReaction (l : Layout) (bits : Nat) (point : Nat) (d : Fin 3)
+    (raw : Fin l.expanded.points.size → Fin 3 → Bounds) : Option Bounds :=
+  FrameIntervalAssembly.sumTerms bits fun i : Fin l.expanded.points.size =>
+    if l.parent[i.val]! == point then some (raw i d) else some ⟨0,0⟩
+
 /-- Sum residuals on all ends sharing a joint. Relative hinge forces cancel
     and the total is the ground reaction at the original source point. -/
 def resultFields (l : Layout) (bits : Nat) (cert : InclinedFrameIntervalAssembly.Certificate l.expanded l.basis)
@@ -122,8 +127,7 @@ def resultFields (l : Layout) (bits : Nat) (cert : InclinedFrameIntervalAssembly
     let id := if member then l.original.source.members[p.index]!.id else l.original.source.nodes[p.index]!.id
     out := out ++ [if member then "1" else "0", toString p.index, id] ++ rationalFields p.t
     for d in List.finRange 3 do
-      let reaction ← FrameIntervalAssembly.sumTerms bits fun i : Fin l.expanded.points.size =>
-        if l.parent[i.val]! == point then some (raw i d) else some ⟨0,0⟩
+      let reaction ← groupReaction l bits point d raw
       guard (FrameIntervalAccuracy.check (InclinedFrameIntervalOutputs.reactionQuantity d) reaction)
       out := out ++ intervalFields reaction
   let sideNode := fun side => endpoint l.original.source.members[side/2]! side

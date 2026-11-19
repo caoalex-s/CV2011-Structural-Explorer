@@ -111,7 +111,7 @@ export async function runStudentCanvasCases({ page, base, output, target = 'publ
     }
 
     async function checkStage2(name, expected, checkerStatus) {
-        if (target !== 'stage2') return;
+        if (target === 'published') return;
         try {
             await worked();
             const entry = await capture(name, expected);
