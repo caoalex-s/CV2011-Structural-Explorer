@@ -1,0 +1,10 @@
+{
+  "files": {
+    "checker.mjs": "297e3d54e45090dbbee8f3177efa98f2a1447438cba9d71ff77a265013159aa9",
+    "checker.wasm": "eeea9fd67b5794e786281ed28ed98e31455373986e26cef328e65e8e59db6db0",
+    "checker.worker.js": "622849d7b03eed12b8a2b3f10e9960e3a641590ecd1d660d3846c4808e1a0280",
+    "frame-interval-abi.js": "cba4e31d075d554531ef5e4e0b3be209f86e17ec06b6ff4af722e442bfb4ddd2",
+    "frame-worker-bytes.js": "f4aab75c1c3f44de41ef07c68437a7439f926e544777b7c80734e912b3854b68",
+    "worker.mjs": "2b7d0bb8fb7c487393daa8eda18a250d09f3816cca5a1b205ffb044dd68873f2"
+  }
+}

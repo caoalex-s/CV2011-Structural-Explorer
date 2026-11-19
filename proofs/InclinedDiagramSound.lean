@@ -162,7 +162,8 @@ theorem fromSource_shape {data : Partition} {basis : GlobalBasis} {bits : Nat}
   unfold fromSource at done
   dsimp only at done
   simp only [Option.bind_eq_bind,Option.bind_eq_some,Option.some.injEq] at done
-  obtain ⟨_,_,_,_,_,_,_,_,rfl⟩ := done
+  obtain ⟨_,_,_,_,_,_,_,_,result⟩ := done
+  cases result
   exact ⟨rfl,rfl,rfl,rfl⟩
 
 theorem source_fields {data : Partition} (valid : PartitionValid data)
@@ -191,7 +192,7 @@ theorem source_fields {data : Partition} (valid : PartitionValid data)
     L fraction member.EA member.EI orientation.cosine orientation.sine dx seg.vertical seg.verticalEnd t
     (ne_of_gt positive) (ne_of_gt properties.2.1) (ne_of_gt properties.2.2) horizontal
   have nonzero : fraction ≠ 0 := by
-    have strict : 0 < fraction := by exact_mod_cast sub_pos.mpr segment.2.2.2.1
+    have strict : 0 < fraction := by dsimp [fraction,seg]; exact_mod_cast sub_pos.mpr segment.2.2.2.1
     exact ne_of_gt strict
   have location : L*fraction*((seg.left:ℝ)+fraction*t-seg.left)/fraction = L*fraction*t := by
     field_simp
@@ -205,7 +206,7 @@ theorem source_fields {data : Partition} (valid : PartitionValid data)
     _ = (LocalFrameFields.moment _ _ _ _ _).eval
     (L*fraction*((seg.left:ℝ)+fraction*t-seg.left)/fraction)
   rw [location]
-  exact ⟨recovered.1.symm,recovered.2.symm⟩
+  constructor <;> first | simpa [dx,member,seg,fraction,L,orientation,InclinedFrameReal.pieceLength] using recovered.1.symm | simpa [dx,member,seg,fraction,L,orientation,InclinedFrameReal.pieceLength] using recovered.2.symm
 
 #print axioms source_fields
 #print axioms normalized_fields

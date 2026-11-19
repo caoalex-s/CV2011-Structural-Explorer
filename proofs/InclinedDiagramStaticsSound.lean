@@ -124,7 +124,7 @@ theorem equation_value {n} (state : Fin n → ℝ) (terms : List (Nat × Rat)) :
     congr 1
     by_cases h : index < n
     · let j : Fin n := ⟨index,h⟩
-      have same (i : Fin n) : (i.val = index) ↔ i = j := Fin.ext_iff.symm
+      have same (i : Fin n) : (i.val = index) ↔ i = j := ⟨fun eq => Fin.ext eq,fun eq => congrArg Fin.val eq⟩
       simp [same,apply_ite,ite_mul,atSlot,h,j]
     · have different (i : Fin n) : i.val ≠ index := by omega
       simp [different,atSlot,h]
