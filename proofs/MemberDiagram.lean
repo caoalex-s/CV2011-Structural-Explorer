@@ -36,16 +36,15 @@ def evaluate (f : Cubic) (x : Radical) : Radical :=
 
 def flat (f : Cubic) := f.f1 == 0 && f.f2 == 0 && f.f3 == 0
 
-def stationary (f : Cubic) : List Radical :=
-  let a := 3*f.f3
-  let b := 2*f.f2
-  let c := f.f1
+def roots (a b c : Rat) : List Radical :=
   let d := b*b - 4*a*c
   if a == 0 then
     if b == 0 then [] else [rational (-c/b)]
   else if d < 0 then []
   else if d == 0 then [rational (-b/(2*a))]
   else [⟨-b/(2*a), -1/(2*a), d⟩, ⟨-b/(2*a), 1/(2*a), d⟩]
+
+def stationary (f : Cubic) := roots (3*f.f3) (2*f.f2) f.f1
 
 structure Box where
   lo : Rat
@@ -62,25 +61,22 @@ def bisectNat (n : Nat) : Nat → Nat → Nat → Nat
 /-- Each bound is checked by squaring, so correctness does not depend on the
 integer square-root proposal. A perfect rational square has zero width. -/
 def sqrtBox (d : Rat) : Option Box := do
-  guard (0 ≤ d)
   let scale := (2:Nat)^80
   let n := d.num.natAbs * d.den * scale * scale
   let root := bisectNat n (n.log2+3) 0 (n+1)
   let lo := mkRat (Int.ofNat root) (d.den*scale)
   let hi := if lo*lo == d then lo else mkRat (Int.ofNat (root+1)) (d.den*scale)
-  guard (0 ≤ lo && lo*lo ≤ d && 0 ≤ hi && d ≤ hi*hi)
-  return ⟨lo, hi⟩
+  if 0 ≤ lo ∧ lo*lo ≤ d ∧ 0 ≤ hi ∧ d ≤ hi*hi then some ⟨lo, hi⟩ else none
 
 def enclosure (r : Radical) : Option Box := do
   let s ← sqrtBox r.d
   let near := r.a + r.b*s.lo
   let far := r.a + r.b*s.hi
   let box : Box := if r.b < 0 then ⟨far, near⟩ else ⟨near, far⟩
-  guard (box.hi-box.lo ≤ (1:Rat)/100000000)
-  return box
+  if box.hi-box.lo ≤ (1:Rat)/100000000 then some box else none
 
 def sameValue (x y : Radical) : Bool :=
-  x.a == y.a && x.b*x.b*x.d == y.b*y.b*y.d && (x.b < 0) == (y.b < 0)
+  decide (x.a = y.a ∧ x.b*x.b*x.d = y.b*y.b*y.d ∧ (0 ≤ x.b ∧ 0 ≤ y.b ∨ x.b ≤ 0 ∧ y.b ≤ 0))
 
 structure Candidate where
   piece : Nat
@@ -98,11 +94,10 @@ def candidate (f : Cubic) (piece : Nat) (side : String) (origin : Rat) (x : Radi
 
 def candidates (f : Cubic) (piece : Nat) (origin len : Rat) : Option (List Candidate) := do
   guard (len > 0)
-  if flat f then
-    let value ← candidate f piece "flat" origin (rational 0)
-    return [{value with x := ⟨origin, origin+len⟩}]
   let left ← candidate f piece "start" origin (rational 0)
   let right ← candidate f piece "end" origin (rational len)
+  if flat f then
+    return [left, {left with side := "flat", x := ⟨origin, origin+len⟩}, right]
   let middle ← (stationary f).mapM fun root => do
     let box ← enclosure root
     if box.hi ≤ 0 || len ≤ box.lo then return none

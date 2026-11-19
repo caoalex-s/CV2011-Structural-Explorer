@@ -6,6 +6,7 @@ import { endConnection, nodeLabels, referenceMember } from './engine.js';
 import { memberLabel } from './model-view.js';
 import { decodeAcceptedHingePacket } from './frame-hinge-result.js';
 import { decodeInclinedReleaseReport } from './frame-inclined-release-result.js';
+import { renderMemberDiagram } from './member-diagram.js';
 import { springExplanation } from './frame-spring-worked.js';
 import { PortalRuntime } from './portal-runtime.js';
 import { sha256 } from './portal-runtime.js';
@@ -113,7 +114,9 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
     window.addEventListener('beforeunload', () => sessionStorage.setItem(sideStorage,
         JSON.stringify({ model: JSON.stringify(modelAtPresent()), side: cutSide.value })));
 
+    let diagramRuntime: PortalRuntime | null = null;
     function clear(message: string) {
+        diagramRuntime?.dispose(); diagramRuntime = null;
         status.textContent = message; readouts.replaceChildren(); certificate.textContent = '';
         exportText = ''; exportButton.hidden = true;
         acceptedGeneration = null; workedOutput.replaceChildren(); collapse.hidden = true;
@@ -329,6 +332,35 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                 collapse.textContent = 'Collapse solution'; collapse.setAttribute('aria-expanded', 'true');
                 exportText = JSON.stringify({ ...receipt, workedSolution: report }, null, 2);
                 certificate.textContent = exportText;
+                if (frame.kind !== 'solution') return;
+                diagramRuntime?.dispose();
+                const extra = new PortalRuntime(new URL('../diagram/worker.mjs', runtimeUrl));
+                diagramRuntime = extra;
+                const progress = document.createElement('p');
+                progress.textContent = 'Checking the whole-member diagrams…';
+                workedOutput.append(progress);
+                const current = () => requests.isCurrent(token) && checker === runtime && diagramRuntime === extra;
+                void (async () => {
+                    try {
+                        await extra.ready;
+                        if (!current()) return;
+                        const checked = await extra.checkDiagram(packet);
+                        if (!current()) return;
+                        if (checked.state !== 'accepted' || checked.frameProtocol !== 'diagram' || checked.inputDigest !== packetDigest ||
+                            !(checked.report instanceof Uint8Array) || await sha256(checked.report) !== checked.reportDigest)
+                            throw Error('Whole-member bounds could not be certified.');
+                        if (!current()) return;
+                        const source = receipt.sourceRequest.model as Model;
+                        const selected = source.members.find(m => m.id === frame.query.member)!;
+                        progress.replaceWith(renderMemberDiagram(checked.report, selected.id, memberLabel(source, selected)));
+                        exportText = JSON.stringify({ ...receipt, workedSolution: report, diagram: { protocol: 'CV2011_DIAGRAM_1',
+                            artifact: extra.artifact, bundle: extra.bundle, packetDigest, reportDigest: checked.reportDigest,
+                            report: new TextDecoder().decode(checked.report) } }, null, 2);
+                        certificate.textContent = exportText;
+                    } catch (error) {
+                        if (current()) progress.textContent = 'Whole-member check inconclusive. ' + String(error);
+                    } finally { extra.dispose(); }
+                })();
             } catch (error) {
                 workedOutput.textContent = `The checked results remain available in Verification. The explanatory solution could not be generated: ${String(error)}`;
             }

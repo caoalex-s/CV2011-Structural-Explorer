@@ -86,6 +86,9 @@ export class PortalRuntime {
         if (result.inputDigest !== pending.inputDigest) return false;
         clearTimeout(pending.timer); this.current = null; pending.resolve(result); return true;
     }
+    async checkDiagram(bytes: Uint8Array): Promise<CheckerResult> {
+        return this.submit(bytes, 'frame', true);
+    }
     async check(bytes: Uint8Array): Promise<CheckerResult> {
         return this.submit(bytes, 'portal');
     }

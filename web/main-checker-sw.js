@@ -17,7 +17,7 @@ self.addEventListener('fetch', event => {
     const bundle = scope.pathname + 'portal-checker/bundle/';
     const hingeWorker = scope.pathname + 'portal-checker/hinge/worker.mjs';
     const checkerResource = target.pathname.startsWith(bundle) && runtimeFiles.has(target.pathname.slice(bundle.length)) ||
-        target.pathname === scope.pathname + 'portal-checker/spring/worker.mjs' || target.pathname === hingeWorker || target.pathname === scope.pathname + 'portal-checker/inclined-release/worker.mjs';
+        target.pathname === scope.pathname + 'portal-checker/diagram/worker.mjs' || target.pathname === scope.pathname + 'portal-checker/spring/worker.mjs' || target.pathname === hingeWorker || target.pathname === scope.pathname + 'portal-checker/inclined-release/worker.mjs';
     if (!mainDocument && !checkerResource) return;
     if (request.cache === 'only-if-cached' && request.mode !== 'same-origin') return;
     event.respondWith(fetch(request).then(response => {

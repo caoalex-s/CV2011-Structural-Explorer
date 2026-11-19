@@ -1,3 +1,5 @@
+import { captureCheckerBytes } from './frame-worker-bytes.js';
+import { copyInclinedReport } from './frame-interval-abi.js';
 async function digest(bytes) {
     return [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))]
         .map(byte => byte.toString(16).padStart(2, '0')).join('');
@@ -24,8 +26,7 @@ self.onmessage = async ({ data }) => {
     try {
         if (!Number.isSafeInteger(id) || id < 0 || data.protocol !== 'frame' || data.artifact !== artifact)
             throw Error('Invalid checker request.');
-        if (!(data.bytes instanceof Uint8Array) || data.bytes.length > module._input_capacity()) throw Error('Invalid diagram packet.');
-        const bytes = new Uint8Array(data.bytes);
+        const bytes = captureCheckerBytes(data.bytes, module._input_capacity());
         inputDigest = await digest(bytes);
         const packet = bytes;
         const pointer = module._input_ptr();
@@ -35,9 +36,7 @@ self.onmessage = async ({ data }) => {
             postMessage({ id, artifact, inputDigest, state: ['inconclusive', '', 'malformed', 'limit'][code] || 'inconclusive' });
             return;
         }
-        const output = module._output_ptr(), size = module._output_size();
-        if (size < 1 || size > module._output_capacity() || output + size > module.HEAPU8.length) throw Error('Invalid diagram size.');
-        const report = module.HEAPU8.slice(output, output + size);
+        const report = copyInclinedReport(module);
         postMessage({ id, artifact, inputDigest, state: 'accepted', frameProtocol: 'diagram', report, reportDigest: await digest(report),
             packetDigest: await digest(packet), packet });
     } catch (error) {
