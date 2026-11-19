@@ -115,6 +115,58 @@ theorem element_terms_zero {data : Partition} (valid : PartitionValid data)
     rw [len,xpos,ypos]
     convert balance.2.2 using 1 <;> dsimp [globalActions,FrameTransform.toGlobal6,forceX,forceY,ell,pieceLength,L,fraction,seg,direction] <;> ring
 
+open InclinedRelease (Layout)
+open InclinedRelease.Sound (unitMotion projection)
+
+theorem point_work (data : Partition) (i : Fin data.source.loads.size) (v : Motion data) :
+    pointLoadWork data i v =
+      ∑ d : Fin 3, pointMotion data v (locate data data.source.loads[i.val]!.member data.source.loads[i.val]!.t) d *
+        InclinedFrameAssemblySound.sourceAction data i d := by
+  unfold pointLoadWork InclinedFrameAssemblySound.sourceAction
+  split_ifs <;> simp_all [Fin.sum_univ_succ] <;> ring
+
+theorem release_force (l : Layout) (row : Fin l.basis.columns.size) :
+    InclinedRelease.Sound.force l row = externalWork l.expanded (unitMotion l row) := by
+  unfold InclinedRelease.Sound.force externalWork
+  simp only [point_work]
+  congr 1
+  apply Finset.sum_congr rfl
+  intro p _
+  apply Finset.sum_congr rfl
+  intro i _
+  exact mul_comm _ _
+
+theorem release_entry (l : Layout) (row col : Fin l.basis.columns.size) :
+    InclinedRelease.Sound.matrix l row col =
+    stiffnessWork l.expanded (unitMotion l col) (unitMotion l row) := by
+  simp [InclinedRelease.Sound.matrix,projection,stiffnessWork,Finset.mul_sum,mul_assoc]
+
+theorem release_matrix_action (l : Layout) (row : Fin l.basis.columns.size)
+    (z : Fin l.basis.columns.size → ℝ) :
+    FrameMatrixResidual.action (InclinedRelease.Sound.matrix l) z row =
+      stiffnessWork l.expanded (InclinedRelease.Sound.motion l z) (unitMotion l row) := by
+  have physical : InclinedRelease.Sound.motion l z = ∑ col, z col • unitMotion l col := by
+    funext p d
+    simp [InclinedRelease.Sound.motion,Finset.sum_apply,Pi.smul_apply,mul_comm]
+  rw [physical]
+  change (∑ col, InclinedRelease.Sound.matrix l row col * z col) =
+    stiffnessForm l.expanded (∑ col, z col • unitMotion l col) (unitMotion l row)
+  simp [release_entry,map_sum,LinearMap.sum_apply,map_smul,stiffnessForm,stiffnessVariation,mul_comm]
+
+/-- Released frames satisfy ordinary end-action work on each of the
+actual shared-translation, member-owned-rotation unit variations. -/
+theorem released_work (l : Layout) (z : Fin l.basis.columns.size → ℝ)
+    (solved : FrameMatrixResidual.action (InclinedRelease.Sound.matrix l) z = InclinedRelease.Sound.force l)
+    (row : Fin l.basis.columns.size) :
+    (∑ i, InclinedFrameIntervalReactionsSound.actualPieceWork l.expanded (InclinedRelease.Sound.motion l z)
+      (unitMotion l row) i) = ∑ i, pointLoadWork l.expanded i (unitMotion l row) := by
+  have eq := congrFun solved row
+  rw [release_matrix_action,release_force] at eq
+  rw [InclinedFrameIntervalReactionsSound.total_piece_work l.valid,eq]
+  unfold externalWork
+  ring
+
+#print axioms released_work
 #print axioms element_terms_zero
 end
 end InclinedDiagram.Statics.Sound

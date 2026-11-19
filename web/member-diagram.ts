@@ -146,14 +146,14 @@ export function renderInclinedMemberDiagram(bytes: Uint8Array, member: string, l
             const [piece,side,tLo,tHi,xLo,xHi,yLo,yHi,lo,hi]=f;
             peak[tag]=Math.max(peak[tag],Math.abs(approximate(yLo)),Math.abs(approximate(yHi)));
             const sideText = {start:'Right-hand limit',end:'Left-hand limit',flat:'Constant interval',interior:'Stationary point'}[side];
-            rows[tag].push(`<tr data-candidate data-piece-index="${piece}" data-field="${tag}" data-side="${side}" data-t-low="${tLo}" data-t-high="${tHi}" data-x-low="${xLo}" data-x-high="${xHi}" data-y-low="${yLo}" data-y-high="${yHi}" data-min="${lo==='1'}" data-max="${hi==='1'}"><td>${sideText}</td><td>${bounds([tLo,tHi],side==='flat')}</td><td>${bounds([xLo,xHi],side==='flat')}</td><td>${bounds([yLo,yHi])}</td><td>${[lo==='1'?'Minimum':'',hi==='1'?'Maximum':''].filter(Boolean).join(' and ')||'—'}</td></tr>`);
+            rows[tag].push(`<tr data-candidate data-piece-index="${piece}" data-field="${tag}" data-side="${side}" data-t-low="${tLo}" data-t-high="${tHi}" data-x-low="${xLo}" data-x-high="${xHi}" data-y-low="${yLo}" data-y-high="${yHi}" data-min="${lo==='1'}" data-max="${hi==='1'}"><td>${sideText}</td><td>${bounds([tLo,tHi],side==='flat')}</td><td>${bounds([xLo,xHi])}</td><td>${bounds([yLo,yHi])}</td><td>${[lo==='1'?'Minimum':'',hi==='1'?'Maximum':''].filter(Boolean).join(' and ')||'—'}</td></tr>`);
         } else throw Error('Invalid record in the inclined diagram report.');
     }
     if (!count || !rows.V.length || !rows.M.length) throw Error('Incomplete inclined diagram.');
     for (const field of ['V','M'] as const) {
         section.insertAdjacentHTML('beforeend',`<h4>${field==='V'?'Shear force':'Bending moment'}</h4>`+
             drawPlot(field,physicalLength,peak[field]||1,curves[field])+
-            `<p>The sketch uses midpoint coefficients. The table encloses the section values and every whole-member extremum. Interior candidates satisfy ${field==='V'?'q = 0':'V = 0'}.</p><table><thead><tr><th>Member side</th><th>Piece fraction t</th><th>x (m)</th><th>${field} (${unit[field]})</th><th>Whole-member extremum</th></tr></thead><tbody>${rows[field].join('')}</tbody></table>`);
+            `<p>The sketch uses midpoint coefficients. The table encloses the section values and every whole-member extremum. For a constant interval, the distance bounds enclose both ends. Interior candidates satisfy ${field==='V'?'q = 0':'V = 0'}.</p><table><thead><tr><th>Member side</th><th>Piece fraction t</th><th>x (m)</th><th>${field} (${unit[field]})</th><th>Whole-member extremum</th></tr></thead><tbody>${rows[field].join('')}</tbody></table>`);
     }
     return section;
 }

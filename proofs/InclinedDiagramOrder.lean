@@ -1,4 +1,4 @@
-import InclinedDiagramExtrema
+import InclinedDiagramCoverage
 
 namespace InclinedDiagram.Sound
 open FrameEnclosure (Contains)
