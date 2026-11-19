@@ -20,8 +20,15 @@ try {
         await writeFile('.data/student-results/served.json', JSON.stringify(served, null, 2));
     }
     const page = await context.newPage();
+    const workers = new Set();
+    const services = new Set();
+    page.on('worker', worker => workers.add(worker.url()));
+    context.on('serviceworker', worker => services.add(worker.url()));
     page.setDefaultTimeout(10000);
     const result = await runStudentCanvasCases({ page, base, target, output: '.data/student-results' });
+    const identity = { browser: browser.version(), userAgent: await page.evaluate(() => navigator.userAgent),
+        url: page.url(), workers: [...workers], serviceWorkers: [...services] };
+    await writeFile('.data/student-results/browser-identity.json', JSON.stringify(identity, null, 2));
     console.log(JSON.stringify(result, null, 2));
     if (result.errors.length || result.records.some(record => record.failure)) process.exitCode = 1;
 } finally {

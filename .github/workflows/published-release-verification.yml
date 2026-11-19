@@ -1,0 +1,47 @@
+name: Verify published combined release
+on:
+  push:
+    branches: [codex/published-release-verification]
+permissions:
+  actions: read
+  contents: read
+env:
+  RELEASE_SHA: 56d72556e61042ecce4d14896793bb2bcd47c44c
+  PAGES_RUN: '44443273239'
+jobs:
+  published-drawings:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Confirm the source of the deployment and wait for publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(gh run view "$PAGES_RUN" --json headSha --jq .headSha)" = "$RELEASE_SHA"
+          test "$(gh run view "$PAGES_RUN" --json headBranch --jq .headBranch)" = main
+          git diff --exit-code "$RELEASE_SHA" HEAD -- public web proofs qa/hinge-frame/student-canvas-cases.mjs
+          gh run watch "$PAGES_RUN" --exit-status --interval 30
+      - uses: actions/download-artifact@v4
+        with:
+          name: github-pages
+          path: .data/pages-artifact
+          run-id: ${{ env.PAGES_RUN }}
+          github-token: ${{ github.token }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm install --prefix .data/student-tools --ignore-scripts --save-exact playwright@1.51.1
+      - run: node .data/student-tools/node_modules/playwright/cli.js install --with-deps chromium
+      - run: python3 qa/inclined-release/published-binding.py before
+      - run: node qa/hinge-frame/run-student-browser.mjs https://caoalex-s.github.io/CV2011-Structural-Explorer/ stage3
+      - run: python3 qa/inclined-release/published-binding.py after
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: published-release-drawings
+          path: .data/student-results/
+          include-hidden-files: true
