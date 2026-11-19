@@ -39,7 +39,11 @@ export async function runStudentCanvasCases({ page, base, output, target = 'publ
 
     async function point(x, y = 0) {
         // The blank-canvas grid has a fixed view until Fit or Zoom is used.
-        if (await closeProperties.isVisible()) await closeProperties.click();
+        if (target === 'stage2') {
+            assert.equal(await closeProperties.isVisible(), false, 'Placement tool left the previous Properties panel open');
+        } else if (await closeProperties.isVisible()) {
+            await closeProperties.click();
+        }
         await canvas.scrollIntoViewIfNeeded();
         const hit = await canvas.evaluate((svg, [x, y]) => {
             const viewPoint = new DOMPoint(500 + (x - 4) * 85, 200 - y * 85);

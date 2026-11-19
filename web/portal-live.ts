@@ -2,7 +2,8 @@
 import { EvidenceRequests, createEvidenceEnvelope } from './model-evidence.js';
 import { portalAmplitude, portalCandidate, encodeCandidate, portalQuery, outputIds, roundedDecimal, profileId } from './portal-candidate.js';
 import type { Model } from './engine.js';
-import { endConnection } from './engine.js';
+import { endConnection, nodeLabels, referenceMember } from './engine.js';
+import { memberLabel } from './model-view.js';
 import { decodeAcceptedHingePacket } from './frame-hinge-result.js';
 import { PortalRuntime } from './portal-runtime.js';
 import { sha256 } from './portal-runtime.js';
@@ -156,11 +157,26 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
         if (checker.supportsHingeFrames) {
             if (result.frameProtocol !== 'hinge') throw Error('Unexpected release checker response.');
             const frame = decodeAcceptedHingePacket(packet);
+            const sourceRequest = JSON.parse(new TextDecoder().decode(sourceBytes));
+            const drawing: Model = sourceRequest.model;
+            const labels = nodeLabels(drawing);
+            const memberName = (id: string) => {
+                const member = drawing.members.find(item => item.id === id);
+                if (!member) throw Error('Accepted member missing from the captured drawing.');
+                return memberLabel(drawing, member);
+            };
+            const nodeName = (id: string) => {
+                const label = labels.get(id);
+                if (!label) throw Error('Accepted node missing from the captured drawing.');
+                return label;
+            };
             status.textContent = frame.kind === 'solution' ? 'Accepted by the compiled hinge checker.' : frameStatus(frame);
-            const lines = frameDescriptions(frame);
+            const lines = frameDescriptions({ ...frame, query: { ...frame.query, member: memberName(frame.query.member) },
+                points: frame.points.map(point => ({ ...point, id: point.owner === 'member' ? memberName(point.id) : nodeName(point.id) })) });
             for (const face of frame.faces) {
-                const description = face.released ? 'released' : 'joint rotation';
-                lines.push(`Node ${face.node}, member ${face.member}, end ${face.end} (${description}). Rotation ${roundedDecimal(face.rotation, 6)}${frame.kind === 'solution' ? ' rad' : ' in the mechanism motion'}.` +
+                const description = face.released ? 'independent released-end rotation' :
+                    referenceMember(drawing, face.node) === face.member ? 'reference rotation at the joint' : 'shares the reference rotation';
+                lines.push(`Node ${nodeName(face.node)}, member ${memberName(face.member)} (${description}). Rotation ${roundedDecimal(face.rotation, 6)}${frame.kind === 'solution' ? ' rad' : ' in the mechanism motion'}.` +
                     (face.moment ? ` Section moment ${roundedDecimal(face.moment, 3)} kN m.` : '') +
                     (face.reaction && face.reaction.numerator !== '0' ? ` Separate end restraint moment ${roundedDecimal(face.reaction, 3)} kN m.` : ''));
             }
@@ -170,8 +186,8 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
             readouts.replaceChildren(...paragraphs(lines));
             exportText = JSON.stringify({ protocol: 'CV2011_HINGE_1', ...token, bindings: envelope.bindings,
                 artifact: checker.artifact, bundle: checker.bundle, inputDigest: result.inputDigest, packetDigest,
-                theorem: 'HingeFrame.Wire.accepted_bytes', sourceRequest: JSON.parse(new TextDecoder().decode(sourceBytes)),
-                packet: new TextDecoder().decode(packet), values: frame }, null, 2);
+                theorem: 'HingeFrame.Wire.accepted_bytes', sourceRequest,
+                packet: new TextDecoder().decode(packet), values: frame, drawingLabels: lines }, null, 2);
             certificate.textContent = exportText; exportButton.hidden = false;
             acceptedGeneration = () => {
                 if (!requests.isCurrent(token) || checker !== runtime) return;
