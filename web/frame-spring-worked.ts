@@ -42,10 +42,14 @@ export function springExplanation(model: Model, report: ReturnType<typeof decode
         substitution.append('Δθ ≈ (', value('end-rotation', endFace.rotation), ' − (', value('reference-rotation', refFace.rotation),
             ')) rad ≈ ', value('relative-rotation', spring.relativeRotation), ' rad. T ≈ (', String(k), ' kN m/rad) × (',
             roundedDecimal(spring.relativeRotation.midpoint, 8), ' rad) ≈ ', value('transmitted-moment', spring.transmittedMoment), ' kN m.');
+        const action = spring.transmittedMoment.midpoint;
+        const opposite = { numerator: String(-BigInt(action.numerator)), denominator: action.denominator };
+        substitution.append(' The spring couples are approximately ', roundedDecimal(action, 8),
+            ' kN m on the reference and ', roundedDecimal(opposite, 8), ' kN m on the connected end.');
         const balance = document.createElement('p');
         balance.textContent = 'For the connected end, let C be the sum of externally applied and support couples there, counterclockwise positive. ' +
-            (end === 'a' ? 'At local x = 0, the sagging-positive section moment is M = T − C.' :
-                'At local x = L, the sagging-positive section moment is M = C − T.') +
+            (end === 'a' ? 'At local x = 0, the section moment in the local sign convention is M = T − C.' :
+                'At local x = L, the section moment in the local sign convention is M = C − T.') +
             ' The checked section moment on this face is approximately ' + roundedDecimal(endFace.moment.midpoint, 8) + ' kN m.';
         box.append(title, law, substitution, balance);
         result.push(box);

@@ -59,6 +59,7 @@ jobs:
             lean --run ../qa/inclined-release/Native.lean ../.data/inclined-release/*.packet ../.data/inclined-release/*.reject
           '
       - run: node qa/inclined-release/check-native-reports.mjs
+      - run: node qa/frame-spring/check-native-reports.mjs
       - name: Link the browser checker
         env:
           GH_TOKEN: ${{ github.token }}
@@ -123,6 +124,7 @@ jobs:
           server=$!
           trap 'kill "$server"' EXIT
           node qa/hinge-frame/run-student-browser.mjs http://127.0.0.1:8765/ stage3
+          node qa/hinge-frame/run-student-browser.mjs http://127.0.0.1:8765/ springs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
