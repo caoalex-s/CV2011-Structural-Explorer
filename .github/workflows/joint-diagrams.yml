@@ -63,6 +63,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: bash qa/member-diagram/build-runtime.sh joint
+      - name: Compare the checked-in joint checker with the clean Linux build
+        run: diff -qr public/portal-checker/joint-diagram .data/hinge-build/joint-diagram-assets
       - uses: actions/upload-artifact@v4
         with:
           name: joint-diagram-checker
@@ -119,7 +121,6 @@ jobs:
           '
 
   student-drawings:
-    needs: diagrams
     runs-on: ubuntu-22.04
     timeout-minutes: 20
     steps:
@@ -136,10 +137,6 @@ jobs:
       - run: pnpm run check
       - run: pnpm test
       - run: node scripts/check-inclined-bundle.mjs
-      - uses: actions/download-artifact@v4
-        with:
-          name: joint-diagram-checker
-          path: public/portal-checker/joint-diagram
       - run: pnpm build
       - run: npm install --prefix .data/student-tools --ignore-scripts --save-exact playwright@1.51.1
       - run: node .data/student-tools/node_modules/playwright/cli.js install --with-deps chromium
@@ -148,7 +145,9 @@ jobs:
           python3 -m http.server 8765 --bind 127.0.0.1 --directory dist > "$RUNNER_TEMP/hinge-server.log" 2>&1 &
           server=$!
           trap 'kill "$server"' EXIT
-          node qa/hinge-frame/run-student-browser.mjs http://127.0.0.1:8765/ joint-diagram
+          for target in diagram springs stage3 joint-diagram; do
+            node qa/hinge-frame/run-student-browser.mjs http://127.0.0.1:8765/ "$target"
+          done
       - uses: actions/upload-artifact@v4
         if: always()
         with:
