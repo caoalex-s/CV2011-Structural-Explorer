@@ -28,6 +28,13 @@ for (const reversed of [false,true]) {
         end: 1, fx: 0, fy: 0, mz: 10, qEnd: 0 });
     const loaded = proposeInclinedReleasePacket(model, query, 96);
     await writeFile(dir + '/' + name + '-couple.packet', loaded.packet);
+    if (!reversed) {
+        const fixedEnd = structuredClone(model);
+        fixedEnd.loads = fixedEnd.loads.filter(load => load.kind === 'moment');
+        fixedEnd.supports.push({ id: 'fixed-at-release', kind: 'fixed', member: span.id, t: 0, angle: 0 });
+        const supported = proposeInclinedReleasePacket(fixedEnd, query, 96);
+        await writeFile(dir + '/fixed-at-release.packet', supported.packet);
+    }
     // The final n canonical fractions are the proposed amplitudes. Perturbing
     // the inverse to zero destroys the contraction even for an unloaded model.
     const tokens = new TextDecoder().decode(loaded.packet).split('\n');

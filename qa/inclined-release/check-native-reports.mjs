@@ -13,6 +13,15 @@ function enclosed(interval, expected) {
     assert.ok(number(interval.lower) <= expected + tolerance && expected - tolerance <= number(interval.upper),
         `Expected ${expected} within [${number(interval.lower)}, ${number(interval.upper)}]`);
 }
+// With the only couple applied on a fixed released end, the restraint takes
+// that couple directly. It does no work on the other end's rotation.
+const fixedEnd = decodeInclinedReleaseReport(await readFile('.data/inclined-release/fixed-at-release.packet.report'));
+for (const face of fixedEnd.faces) {
+    enclosed(face.rotation, 0);
+    enclosed(face.moment, 0);
+}
+enclosed(fixedEnd.points.find(point => point.id === 'B').reactions[2], -10);
+for (const field of fixedEnd.fields) enclosed(field, 0);
 for (const direction of ['forward', 'reverse']) {
     for (const loaded of [false, true]) {
         const name = direction + (loaded ? '-couple' : '');

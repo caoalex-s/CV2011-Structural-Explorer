@@ -25,6 +25,16 @@ jobs:
           build: 'false'
           test: 'false'
           use-mathlib-cache: 'true'
+      - id: dependencies
+        name: Identify unchanged proof dependencies
+        run: echo "key=$(git ls-tree -r HEAD proofs | grep -v 'proofs/InclinedRelease' | sha256sum | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@v4
+        id: proof-cache
+        with:
+          path: |
+            proofs/*.olean
+            proofs/.lake/build
+          key: linux-release-proof-v1-${{ steps.dependencies.outputs.key }}
       - name: Compile and exercise the source-derived hinge checker
         working-directory: proofs
         run: |

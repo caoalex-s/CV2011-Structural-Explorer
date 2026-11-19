@@ -24,7 +24,7 @@ theorem accepted_bytes {input output : String} (accepted : Wire.checkReport inpu
   split at remainder
   next ok =>
     obtain ⟨fields, hf, last⟩ := Option.bind_eq_some.mp remainder
-    dsimp only at last
+    try dsimp only at last
     split at last
     next =>
       have value := Option.some.inj last
