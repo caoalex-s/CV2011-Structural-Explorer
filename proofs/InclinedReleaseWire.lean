@@ -89,7 +89,7 @@ def packet (fields : Array String) : Decoder Packet := do
     inverse := inverse.push (← vector fields basis.columns.size)
   let estimate ← vector fields basis.columns.size
   if (← get) != fields.size then throw ()
-  return ⟨original, query, bits, roots, inverse, estimate, rules⟩
+  return ⟨⟨original, query, bits, roots, inverse, estimate⟩, rules⟩
 
 /-- Reject oversized/non-ASCII input before splitting or allocating field arrays.
     The native ABI must enforce the same byte cap before constructing a String. -/
@@ -152,7 +152,7 @@ def report (value : Packet) : Option String := do
     roots := fun i => value.roots[i.val]!, inverse := fun i j => value.inverse[i.val]![j.val]!,
     estimate := fun i => value.estimate[i.val]! }
   let cert ← build l value.bits proposal
-  guard (FrameIntervalSolve.check value.bits cert.matrix cert.force cert.solve)
+  guard (verified l value.bits cert)
   let fields ← resultFields l value.bits cert value.query
   let result := String.intercalate "\n" fields
   guard (result.utf8ByteSize ≤ 262144)

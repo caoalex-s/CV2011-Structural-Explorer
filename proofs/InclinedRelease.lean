@@ -121,4 +121,20 @@ def build (l : Layout) (bits : Nat)
           residual := residual, transformedResidual := transformedResidual,
           contraction := contraction, residualBound := residualBound, solution := solution } }
 
+open InclinedFrameIntervalAssembly
+
+def Projections (l : Layout) (bits : Nat) (c : Certificate l.expanded l.basis) : Prop :=
+  (∀ p col, pointColumn l bits col p.val = some (c.pointColumns p col)) ∧
+  (∀ i col, FrameIntervalTransform.localPiece bits (c.geometry i).cosine (c.geometry i).sine
+    (pointColumnAt c l.expanded.pieces[i.val]!.a col)
+    (pointColumnAt c l.expanded.pieces[i.val]!.b col) = some (c.localColumns i col))
+
+instance (l : Layout) (bits : Nat) (c : Certificate l.expanded l.basis) : Decidable (Projections l bits c) := by
+  unfold Projections
+  infer_instance
+
+def verified (l : Layout) (bits : Nat) (c : Certificate l.expanded l.basis) : Bool :=
+  decide (GeometryChecks bits c ∧ Projections l bits c ∧ LoadChecks bits c ∧ AssemblyChecks bits c) &&
+    FrameIntervalSolve.check bits c.matrix c.force c.solve
+
 end InclinedRelease

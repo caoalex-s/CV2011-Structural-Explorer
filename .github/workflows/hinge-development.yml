@@ -123,3 +123,24 @@ jobs:
           name: student-canvas-development
           path: .data/student-results/
           include-hidden-files: true
+  inclined-release-soundness:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: leanprover/lean-action@ba3fdfe5c4476c925da13bf11a005ddb47e47aee
+        with:
+          lake-package-directory: proofs
+          build: 'false'
+          test: 'false'
+          use-mathlib-cache: 'true'
+      - name: Compile reusable interval mechanics
+        working-directory: proofs
+        run: |
+          lake build ExactGeometry
+          lake env bash -euc '
+            export LEAN_PATH="$PWD:$LEAN_PATH"
+            python3 ../qa/inclined-release/compile.py InclinedReleaseFields
+          '
