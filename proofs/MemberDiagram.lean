@@ -199,11 +199,12 @@ def encode {data m motion} (sheet : Sheet data m motion) : String :=
 @[export member_diagram_report]
 def checkReport (input : String) : Option String := do
   let p ← RationalFrame.Wire.decode input
-  guard (!p.certificate.mechanism && accepts p.source p.query p.certificate)
-  let data ← compileModel p.source
-  let sheet ← buildSheet data p.query.member p.certificate.motion
-  if ranked (allRows sheet false) && ranked (allRows sheet true) && (encode sheet).utf8ByteSize ≤ 262144 then
-    return encode sheet
+  if !p.certificate.mechanism && accepts p.source p.query p.certificate then
+    let data ← compileModel p.source
+    let sheet ← buildSheet data p.query.member p.certificate.motion
+    if ranked (allRows sheet false) && ranked (allRows sheet true) && (encode sheet).utf8ByteSize ≤ 262144 then
+      return encode sheet
+    else none
   else none
 
 end MemberDiagram

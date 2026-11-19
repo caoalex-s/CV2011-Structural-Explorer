@@ -78,5 +78,73 @@ theorem piece_bounds {f p o len rows} (ok : candidates f p o len = some rows)
   obtain ⟨s,hs,es⟩ := locate v hv (Or.inr lower)
   exact ⟨⟨r,hr,er.2.symm ▸ upper hx⟩,⟨s,hs,es.2.symm ▸ lower hx⟩⟩
 
+/-- Include both limits at a load discontinuity by quantifying independently
+over the closed domain of every selected source piece. -/
+def attained {data m motion} (_sheet : Sheet data m motion) (moment : Bool) (y : ℝ) :=
+  ∃ (i : Index data m) (x : ℝ), x ∈ Icc (0:ℝ) (segmentAt data m i).length ∧
+    field (polynomial (segmentAt data m i) motion moment) x = y
+
+theorem attained_row {data m motion moment row} {sheet : Sheet data m motion}
+    (h : row ∈ allRows sheet moment) : attained sheet moment (val row.exactY) := by
+  obtain ⟨i,hi⟩ := mem_allRows.mp h
+  obtain ⟨_,_,x,hx,rep⟩ := (piece_complete (sheet.rows moment i).computed).2.1 row hi
+  exact ⟨i,x,hx,rep.2.symm⟩
+
+def correctFlags {data m motion} (sheet : Sheet data m motion) (moment : Bool) :=
+  ∀ r ∈ allRows sheet moment,
+    ((allRows sheet moment).all (lessEqual r) = true ↔
+      ∀ y, attained sheet moment y → val r.exactY ≤ y) ∧
+    ((allRows sheet moment).all (fun s => lessEqual s r) = true ↔
+      ∀ y, attained sheet moment y → y ≤ val r.exactY)
+
+theorem global_flags {data m motion moment} {sheet : Sheet data m motion}
+    (rank : ranked (allRows sheet moment) = true) : correctFlags sheet moment := by
+  intro r hr
+  simp only [List.all_eq_true]
+  constructor
+  · constructor
+    · intro flags y ⟨i,x,hx,eq⟩
+      obtain ⟨s,hs,low⟩ := (piece_bounds (sheet.rows moment i).computed hx).2
+      have mem := (mem_allRows (sheet := sheet) (moment := moment)).2 ⟨i,hs⟩
+      exact eq ▸ (le_trans ((ranked_comparison rank hr mem).mp (flags s mem)) low)
+    · intro bound s hs
+      exact (ranked_comparison rank hr hs).mpr (bound _ (attained_row hs))
+  · constructor
+    · intro flags y ⟨i,x,hx,eq⟩
+      obtain ⟨s,hs,high⟩ := (piece_bounds (sheet.rows moment i).computed hx).1
+      have mem := (mem_allRows (sheet := sheet) (moment := moment)).2 ⟨i,hs⟩
+      exact eq ▸ (le_trans high ((ranked_comparison rank mem hr).mp (flags s mem)))
+    · intro bound s hs
+      exact (ranked_comparison rank hs hr).mpr (bound _ (attained_row hs))
+
+open RationalFrameSoundness RationalFrame.Interpretation
+
+theorem accepted_report {input output : String} (h : checkReport input = some output) :
+    ∃ (p : RationalFrame.Wire.Packet) (data : Compiled) (valid : PartitionValid data) (sheet : Sheet data p.query.member p.certificate.motion),
+      RationalFrame.Wire.decode input = some p ∧ compileModel p.source = some data ∧
+      data.source = p.source ∧ ActualModel data valid ∧ StableResult data valid p.query p.certificate ∧
+      output = encode sheet ∧ correctFlags sheet false ∧ correctFlags sheet true := by
+  obtain ⟨p,decoded,rest⟩ := Option.bind_eq_some.mp h
+  change (if !p.certificate.mechanism && accepts p.source p.query p.certificate then _ else none) = some output at rest
+  split at rest
+  next accepted =>
+    simp only [Bool.and_eq_true, Bool.not_eq_true'] at accepted
+    obtain ⟨data,compiled,rest⟩ := Option.bind_eq_some.mp rest
+    obtain ⟨sheet,built,result⟩ := Option.bind_eq_some.mp rest
+    split at result
+    next ranks =>
+      cases result
+      obtain ⟨_,other,valid,comp,src,_,_,actual,stable⟩ :=
+        acceptance_actual_frame p.source p.query p.certificate accepted.2
+      rw [compiled] at comp
+      cases comp
+      simp only [accepted.1, Bool.false_eq_true, if_false] at stable
+      simp only [Bool.and_eq_true] at ranks
+      exact ⟨p,data,valid,sheet,decoded,compiled,src,actual,stable,rfl,
+        global_flags ranks.1.1,global_flags ranks.1.2⟩
+    next => contradiction
+  next => contradiction
+
+#print axioms accepted_report
 end
 end MemberDiagram.Sound

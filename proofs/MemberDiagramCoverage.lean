@@ -72,7 +72,7 @@ theorem piece_complete {f p o len rows} (ok : candidates f p o len = some rows) 
       obtain ⟨all, only⟩ := collected hm
       refine ⟨lenPos, ?_, ?_⟩
       · intro r hr'
-        simp only [List.mem_cons, List.mem_append, List.mem_singleton] at hr'
+        simp only [List.mem_cons, List.mem_append, List.mem_singleton, List.not_mem_nil, or_false] at hr'
         rcases hr' with rfl | h | rfl
         · exact vl
         · obtain ⟨root, _, hroot⟩ := only r h

@@ -106,6 +106,7 @@ jobs:
             export LEAN_PATH="$PWD:$LEAN_PATH"
             test -s MemberDiagramReport.lean
             python3 ../qa/inclined-release/compile.py MemberDiagramReport | tee release-axioms.log
+            grep -F "MemberDiagram.Sound.accepted_report' depends on axioms:" release-axioms.log
             ! grep -E "sorryAx|declaration uses .sorry." release-axioms.log
           '
 
