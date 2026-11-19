@@ -207,7 +207,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
             const values = decodeAcceptedIntervalReport(report);
             const sourceRequest = JSON.parse(new TextDecoder().decode(sourceBytes));
             bindIntervalDisplay(sourceRequest.model, sourceRequest.query, values);
-            const presentation = renderIntervalValues(values);
+            const presentation = renderIntervalValues(values, sourceRequest.model);
             const receipt = { protocol: 'CV2011_INCLINED_1', reportProtocol: 'CV2011_INCLINED_RESULT_1',
                 ...token, bindings: envelope.bindings, artifact: result.artifact, bundle: checker.bundle,
                 inputDigest: result.inputDigest, packetDigest, reportDigest,
@@ -221,7 +221,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                 if (!requests.isCurrent(token) || checker !== runtime) return;
                 try {
                     const explanation = createIntervalExplanation(sourceRequest.model, sourceRequest.query, values);
-                    workedOutput.innerHTML = renderIntervalExplanation(explanation, values);
+                    workedOutput.innerHTML = renderIntervalExplanation(explanation, values, sourceRequest.model);
                     exportText = JSON.stringify({ ...receipt, explanation }, null, 2);
                     certificate.textContent = exportText;
                 } catch {

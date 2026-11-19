@@ -1,5 +1,5 @@
 /** Numerical teaching substitutions kept separate from accepted interval data. */
-import { analyse } from './engine.js';
+import { analyse, type Model } from './engine.js';
 import type { EvidenceQuery } from './model-evidence.js';
 import type { IntervalValues } from './frame-interval-result.js';
 import { validateIntervalFrame } from './frame-interval-model.js';
@@ -61,7 +61,7 @@ export function createIntervalExplanation(input: unknown, query: EvidenceQuery, 
         geometry: { ax: a.x, ay: a.y, bx: b.x, by: b.y, length: Math.hypot(b.x - a.x, b.y - a.y) } };
 }
 
-export function renderIntervalExplanation(explanation: ReturnType<typeof createIntervalExplanation>, values: IntervalValues): string {
+export function renderIntervalExplanation(explanation: ReturnType<typeof createIntervalExplanation>, values: IntervalValues, drawing?: Model): string {
     const { inputs, span } = explanation;
     const rounded = (value: number) => numberLatex(value);
     const units: Record<string, string> = { x: 'm', L: 'm', c: '', s: '', EA: 'kN', EI: 'kN m²',
@@ -83,5 +83,5 @@ export function renderIntervalExplanation(explanation: ReturnType<typeof createI
       <table><thead><tr><th>Operand</th><th>Numerical estimate</th><th>Unit</th></tr></thead><tbody>${Object.entries(inputs).map(([key, value]) => `<tr><td>${math(symbols[key])}</td><td>${math('\\approx ' + rounded(value))}</td><td>${units[key]}</td></tr>`).join('')}</tbody></table>
       <p>The starting element actions are a₁, a₂, and a₃. Starting displacements u₀ and v₀ are local translations, and θ₀ is the starting rotation. Equilibrium and integration of the axial and bending strains give the following section fields:</p>
       <h3>3. Field equations and numerical substitutions</h3>${rules}
-      <h3>4. Accepted intervals and exact midpoint accuracy</h3>${renderIntervalValues(values)}`;
+      <h3>4. Accepted intervals and exact midpoint accuracy</h3>${renderIntervalValues(values, drawing)}`;
 }

@@ -18,6 +18,7 @@ jobs:
           node-version: '24'
       - run: node --test tests/frame-hinge-candidate.test.mjs
       - run: node qa/hinge-frame/packets.mjs
+      - run: node qa/inclined-release/packets.mjs
       - uses: leanprover/lean-action@ba3fdfe5c4476c925da13bf11a005ddb47e47aee
         with:
           lake-package-directory: proofs
@@ -41,6 +42,8 @@ jobs:
             done
             lean HingeFrameSoundness.lean
             lean --run ../qa/hinge-frame/NativePackets.lean ../.data/hinge-packets
+            python3 ../qa/inclined-release/compile.py InclinedReleaseWire
+            lean --run ../qa/inclined-release/Native.lean ../.data/inclined-release/*.packet
           '
       - name: Link the browser checker
         env:
