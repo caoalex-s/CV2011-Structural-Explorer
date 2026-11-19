@@ -92,7 +92,9 @@ function checkDrawnSource(model, family, mode) {
     const [load] = model.loads;
     const host = members.get(load.member);
     if (family === 'nodal') {
-        assert.deepEqual([load.kind, nodeAt(host, load.t), load.fx, load.fy, load.mz], ['force', 4, 0, -10, 0]);
+        // The editor also stores defaults for other load kinds. Only a
+        // moment record applies a nodal couple; the single record here is a force.
+        assert.deepEqual([load.kind, nodeAt(host, load.t), load.fx, load.fy], ['force', 4, 0, -10]);
     } else {
         assert.deepEqual([load.kind, nodeAt(host, load.t), nodeAt(host, load.end), load.fy, load.qEnd],
             ['distributed', 0, 4, -4, 4]);
