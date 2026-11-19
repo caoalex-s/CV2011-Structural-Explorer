@@ -30,3 +30,19 @@ em++ "${flags[@]}" -Wl,-u,ntohs --no-entry "${objects[@]}" -Wl,--start-group "$c
     '-sEXPORTED_FUNCTIONS=["_checker_init","_checker_check","_input_ptr","_input_capacity"]' \
     -o "$stage/assets/checker.mjs"
 node qa/hinge-frame/prepare-browser.mjs
+
+mkdir -p "$stage/inclined-assets"
+objects=()
+for source in proofs/HingeFrameChecker.c proofs/InclinedRelease{,Wire}.c qa/inclined-release/abi.c; do
+    object="$stage/$(basename "$source" .c).o"
+    emcc "${flags[@]}" -c "$source" -o "$object"
+    objects+=("$object")
+done
+em++ "${flags[@]}" -Wl,-u,ntohs --no-entry "${objects[@]}" -Wl,--start-group "$core/checker-core.a" \
+    "$core/runtime/lib/lean/libleanrt.a" "$core/runtime/libuv/src/libuv/libuv.a" -Wl,--end-group \
+    -sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=createChecker -sENVIRONMENT=web,worker \
+    -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=33554432 -sMAXIMUM_MEMORY=134217728 \
+    -sPTHREAD_POOL_SIZE=0 -sERROR_ON_UNDEFINED_SYMBOLS=1 \
+    '-sEXPORTED_FUNCTIONS=["_checker_init","_checker_check","_input_ptr","_input_capacity","_output_ptr","_output_size","_output_capacity"]' \
+    -o "$stage/inclined-assets/checker.mjs"
+node qa/inclined-release/prepare-browser.mjs

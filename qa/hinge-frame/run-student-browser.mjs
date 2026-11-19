@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 
 const [base, target] = process.argv.slice(2);
-if (!base || !['published', 'stage2'].includes(target)) throw Error('Expected site URL and review target.');
+if (!base || !['published', 'stage2', 'stage3'].includes(target)) throw Error('Expected site URL and review target.');
 const browser = await chromium.launch({ headless: true });
 try {
     const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });

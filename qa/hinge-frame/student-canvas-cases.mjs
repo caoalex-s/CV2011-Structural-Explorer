@@ -39,7 +39,7 @@ export async function runStudentCanvasCases({ page, base, output, target = 'publ
 
     async function point(x, y = 0) {
         // The blank-canvas grid has a fixed view until Fit or Zoom is used.
-        if (target === 'stage2') {
+        if (target === 'stage2' || target === 'stage3') {
             assert.equal(await closeProperties.isVisible(), false, 'Placement tool left the previous Properties panel open');
         } else if (await closeProperties.isVisible()) {
             await closeProperties.click();
@@ -132,6 +132,45 @@ export async function runStudentCanvasCases({ page, base, output, target = 'publ
         }
     }
 
+    function assertCanvasMemberName(entry, name) {
+        assert.ok(entry.workedSolution.includes(`Member ${name}`), `Worked solution is missing member ${name}`);
+        assert.doesNotMatch(entry.workedSolution, /\b(?:Node J|Member M)[0-9a-f]{6}\b/);
+    }
+
+    async function checkInclinedRelease(name, memberIndex, parameter, memberName, expected) {
+        await selected.selectOption({ index: memberIndex });
+        const parameterInput = page.getByLabel('Member parameter t');
+        await parameterInput.fill(String(parameter));
+        assert.equal(Number(await parameterInput.inputValue()), parameter);
+        await worked();
+        const entry = await capture(name, expected);
+        assert.match(entry.status, /^Stable/);
+        assert.match(entry.checker, /^Accepted/i);
+        assert.equal(entry.supportCount, 2);
+        assertCanvasMemberName(entry, memberName);
+
+        // Compare the hand values with the interval endpoints shown to students.
+        const solution = page.locator('#frame-worked-output');
+        const tableAfter = label => solution.getByRole('heading', { name: label, exact: true })
+            .locator('xpath=following-sibling::table[1]');
+        async function compareIntervals(table, values) {
+            const intervals = await table.locator('[data-evidence="outward-enclosure"]').allTextContents();
+            assert.ok(intervals.length >= values.length, 'Missing checked intervals');
+            for (const [i, reference] of values.entries()) {
+                const bounds = /^\s*\[\s*(-?[\d.]+),\s*(-?[\d.]+)\s*\]\s*$/.exec(intervals[i]);
+                assert.ok(bounds, `Invalid outward interval: ${intervals[i]}`);
+                const [, lower, upper] = bounds.map(Number);
+                const roundingSlack = 16 * Number.EPSILON * Math.max(1, Math.abs(reference));
+                assert.ok(lower - roundingSlack <= reference && reference <= upper + roundingSlack,
+                    `Hand value ${reference} is outside ${intervals[i]}`);
+                assert.ok(upper - lower < 4e-6, `Unexpectedly wide force or moment interval: ${intervals[i]}`);
+            }
+        }
+        await compareIntervals(tableAfter('Selected section'), expected.sectionNVM);
+        await compareIntervals(tableAfter('Node A'), expected.reactionA);
+        await compareIntervals(tableAfter('Node C'), expected.reactionC);
+    }
+
     await scenario('simple-beam', async () => {
         await member([0, 0], [8, 0]);
         await put('pin', 0);
@@ -154,7 +193,11 @@ export async function runStudentCanvasCases({ page, base, output, target = 'publ
         await setNumber('fy', -10);
         await capture('inclined-roller-overview', 'A=(-20,-10) kN and B=(20,20) kN by global equilibrium');
         await worked();
-        await capture('inclined-roller-worked', 'Accepted checked intervals containing the hand reactions');
+        const entry = await capture('inclined-roller-worked', 'Accepted checked intervals containing the hand reactions');
+        if (target === 'stage3') {
+            assert.match(entry.checker, /^Accepted/i);
+            assertCanvasMemberName(entry, 'A–B');
+        }
     });
 
     await scenario('interior-hinge', async () => {
@@ -225,6 +268,61 @@ export async function runStudentCanvasCases({ page, base, output, target = 'publ
         assert.equal(await rotations.count(), 0);
         await capture('single-member-end-editor', 'Single incident member offers no side-specific release control');
     });
+
+    if (target === 'stage3') for (const reversed of [false, true]) {
+        const direction = reversed ? 'reversed' : 'forward';
+        const inclinedName = reversed ? 'C–B' : 'B–C';
+        const hingeParameter = reversed ? 1 : 0;
+        const quarterParameter = reversed ? 0.75 : 0.25;
+        const orientation = reversed ? -1 : 1;
+
+        await scenario(`inclined-release-${direction}`, async () => {
+            await member([0, 0], [4, 0]);
+            await member(reversed ? [8, 2] : [4, 0], reversed ? [4, 0] : [8, 2]);
+            await put('fixed', 0);
+            await put('roller', 8, 2);
+            await setNumber('angle', 45);
+            assert.equal(await object('support').count(), 2);
+            await put('force', 6, 1);
+            await setNumber('t', 0.5); // Numeric edit removes distance-grid rounding on the incline.
+            await setNumber('fy', -10);
+            await put('joint', 4);
+            await page.getByLabel('Joint connection').selectOption({ label: 'Internal pin / hinge' });
+            assert.equal(await canvas.locator('[data-joint-symbol="pinned"]').count(), 1);
+
+            // Moments on the B–C free body about B give 2 Cx = 20 - Q_BC,
+            // because Cx = Cy. Moments about A then give MA = 60 - 6 Cx - Q.
+            // On the B face the retained-end force is (-Cx, 10 - Cy). In
+            // B-to-C axes (c,s)=(2,1)/sqrt(5), N=-c Bx-s By and V=-s Bx+c By.
+            // At 1/4 of the physical span from B, M=-Q_BC+V*sqrt(5)/2.
+            const baseline = { sectionNVM: [20 / Math.sqrt(5), 10 / Math.sqrt(5), 5 * orientation],
+                reactionA: [-10, 0, 0], reactionC: [10, 10, 0] };
+            await checkInclinedRelease(`${direction}-quarter`, 1, quarterParameter, inclinedName, baseline);
+
+            await put('moment', 4);
+            const attachment = page.getByLabel('Attached member');
+            await attachment.selectOption({ index: 0 });
+            await setNumber('t', 1);
+            await setNumber('mz', 10);
+            const onAB = { reactionA: [-10, 0, -10], reactionC: [10, 10, 0] };
+            await checkInclinedRelease(`${direction}-couple-ab-loaded-face`, 0, 1, 'A–B',
+                { ...onAB, sectionNVM: [10, 0, 10] });
+            await checkInclinedRelease(`${direction}-couple-ab-released-face`, 1, hingeParameter, inclinedName,
+                { ...onAB, sectionNVM: [baseline.sectionNVM[0], baseline.sectionNVM[1], 0] });
+
+            await attachment.selectOption({ index: 1 });
+            await setNumber('t', hingeParameter);
+            const onIncline = { reactionA: [-5, 5, 20], reactionC: [5, 5, 0] };
+            const inclinedAxial = Math.sqrt(5);
+            const inclinedShear = 15 / Math.sqrt(5);
+            await checkInclinedRelease(`${direction}-couple-incline-unloaded-face`, 0, 1, 'A–B',
+                { ...onIncline, sectionNVM: [5, 5, 0] });
+            await checkInclinedRelease(`${direction}-couple-incline-loaded-face`, 1, hingeParameter, inclinedName,
+                { ...onIncline, sectionNVM: [inclinedAxial, inclinedShear, -10 * orientation] });
+            await checkInclinedRelease(`${direction}-couple-incline-quarter`, 1, quarterParameter, inclinedName,
+                { ...onIncline, sectionNVM: [inclinedAxial, inclinedShear, -2.5 * orientation] });
+        });
+    }
 
     await writeFile(join(output, `student-canvas-${target}.json`), JSON.stringify({ target, served, records, errors }, null, 2) + '\n');
     return { served, records, errors };

@@ -5,6 +5,7 @@ import type { Model } from './engine.js';
 import { endConnection, nodeLabels, referenceMember } from './engine.js';
 import { memberLabel } from './model-view.js';
 import { decodeAcceptedHingePacket } from './frame-hinge-result.js';
+import { decodeInclinedReleaseReport } from './frame-inclined-release-result.js';
 import { PortalRuntime } from './portal-runtime.js';
 import { sha256 } from './portal-runtime.js';
 import type { CheckerResult } from './portal-runtime.js';
@@ -28,6 +29,14 @@ const scope = new URL('./', location.href);
 const isolationScript = new URL(isPortalWorkspace ? 'isolation-sw.js' : 'main-checker-sw.js', scope).href;
 const runtimeUrl = new URL(isPortalWorkspace ? './bundle/worker.mjs' : './portal-checker/bundle/worker.mjs', scope);
 const hingeUrl = new URL('../hinge/worker.mjs', runtimeUrl);
+const inclinedReleaseUrl = new URL('../inclined-release/worker.mjs', runtimeUrl);
+function needsInclinedGeometry(model: Model): boolean {
+    return model.supports.some(s => s.kind === 'roller' && ![0,90,180,270].includes(s.angle)) ||
+        model.members.some(member => {
+            const a = model.nodes.find(n => n.id === member.a)!, b = model.nodes.find(n => n.id === member.b)!;
+            return a.x !== b.x && a.y !== b.y;
+        });
+}
 function usesRelease(model: Model): boolean {
     return model.members.some(member => (['a', 'b'] as const).some(end => endConnection(model, member, end).rotation === 'free'));
 }
@@ -105,7 +114,10 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
     async function start() {
         stop(); clear('Starting local checker…');
         startingNow = true;
-        try { runtime = new PortalRuntime(usesRelease(modelAtPresent()) ? hingeUrl : runtimeUrl); }
+        try {
+            const drawing = modelAtPresent();
+            runtime = new PortalRuntime(usesRelease(drawing) ? (needsInclinedGeometry(drawing) ? inclinedReleaseUrl : hingeUrl) : runtimeUrl);
+        }
         catch (error) { startingNow = false; reset.hidden = false; clear(`Checking unavailable: ${String(error)}`); return; }
         const starting = runtime;
         starting.onFailure = reason => {
@@ -131,6 +143,8 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                 host.querySelector('#portal-introduction')!.textContent = 'Generate a solution for the selected section and inspect the rotations and moments at each hinge.';
                 host.querySelector('#portal-scope')!.textContent = 'This checker supports rotational releases on horizontal and vertical members with shared joint translations and cardinal roller restraints. Inclined released frames and elastic connections are outside this increment. The compiled checker verifies equilibrium, end moments and admissible mechanism motions.';
             }
+            if (starting.supportsInclinedReleases)
+                host.querySelector('#portal-scope')!.textContent = 'Inclined members and roller directions use interval arithmetic. A release preserves the joint translations and gives the member end its own rotation. An inconclusive calculation leaves stability undetermined.';
             update(member, parameter);
             // A single explicit Generate survives only the activation reload of
             // the same saved drawing. Subsequent edits revoke generation intent.
@@ -149,11 +163,50 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
         const packetDigest = result.packetDigest;
         // Capture both byte containers before the first digest await. Worker
         // object fields are not the source of displayed mathematical values.
-        const report = result.frameProtocol === 'inclined' && result.report instanceof Uint8Array
+        const report = (result.frameProtocol === 'inclined' || result.frameProtocol === 'inclined-release') && result.report instanceof Uint8Array
             ? new Uint8Array(result.report) : null;
         const reportDigest = result.reportDigest;
         if (await sha256(packet) !== packetDigest) throw Error('Accepted packet identity changed.');
         if (!requests.isCurrent(token) || checker !== runtime) return;
+        if (checker.supportsInclinedReleases) {
+            if (result.frameProtocol !== 'inclined-release' || !report || typeof reportDigest !== 'string' || await sha256(report) !== reportDigest)
+                throw Error('Missing or changed inclined release report.');
+            if (!requests.isCurrent(token) || checker !== runtime) return;
+            const source = JSON.parse(new TextDecoder().decode(sourceBytes));
+            const drawing: Model = source.model;
+            const values = decodeInclinedReleaseReport(report);
+            bindIntervalDisplay({ ...drawing, nodes: drawing.nodes.map(n => ({ ...n, joint: 'rigid' })),
+                members: drawing.members.map(({connectionA, connectionB, ...m}) => m) }, source.query, values);
+            const labels = nodeLabels(drawing);
+            const faceLines = values.faces.map(face => {
+                const m = drawing.members.find(m => m.id === face.member);
+                const end = face.end === 0 ? 'a' : 'b';
+                if (!m || m[end] !== face.node || (endConnection(drawing, m, end).rotation === 'free') !== face.released)
+                    throw Error('Member end differs from the captured drawing.');
+                const role = face.released ? 'independent released-end rotation' :
+                    referenceMember(drawing, face.node) === m.id ? 'reference rotation at the joint' : 'shares the reference rotation';
+                return `Node ${labels.get(face.node)}, member ${memberLabel(drawing, m)} (${role}). Shared displacement ux ≈ ${roundedDecimal(face.ux.midpoint, 6)} m, uy ≈ ${roundedDecimal(face.uy.midpoint, 6)} m. Rotation ≈ ${roundedDecimal(face.rotation.midpoint, 6)} rad. Section moment ≈ ${roundedDecimal(face.moment.midpoint, 6)} kN m.`;
+            });
+            const presentation = renderIntervalValues(values, drawing);
+            const render = (element: HTMLElement) => {
+                element.innerHTML = presentation;
+                const title = document.createElement('h3'); title.textContent = 'Member ends at released joints';
+                element.prepend(title, ...faceLines.map(text => { const line = document.createElement('p'); line.textContent = text; return line; }));
+            };
+            status.textContent = 'Accepted by the compiled inclined release checker.';
+            render(readouts);
+            exportText = JSON.stringify({ protocol: 'CV2011_INCLINED_RELEASE_1', ...token, bindings: envelope.bindings,
+                artifact: checker.artifact, bundle: checker.bundle, inputDigest: result.inputDigest, packetDigest, reportDigest,
+                sourceRequest: source, values, packet: new TextDecoder().decode(packet), report: new TextDecoder().decode(report) }, null, 2);
+            certificate.textContent = exportText; exportButton.hidden = false;
+            acceptedGeneration = () => {
+                if (!requests.isCurrent(token) || checker !== runtime) return;
+                render(workedOutput); workedOutput.hidden = false; collapse.hidden = false;
+                collapse.textContent = 'Collapse solution'; collapse.setAttribute('aria-expanded', 'true');
+            };
+            if (generationRequested) { generationRequested = false; acceptedGeneration(); }
+            return;
+        }
         if (checker.supportsHingeFrames) {
             if (result.frameProtocol !== 'hinge') throw Error('Unexpected release checker response.');
             const frame = decodeAcceptedHingePacket(packet);
@@ -298,7 +351,8 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
             snapshot = structuredClone(modelAtPresent());
             if (startingNow) { clear('Starting local checker…'); return; }
             const hinge = usesRelease(snapshot);
-            if (enabled && runtime && runtime.supportsHingeFrames !== hinge) { void start(); return; }
+            if (enabled && runtime && (runtime.supportsHingeFrames !== hinge ||
+                hinge && runtime.supportsInclinedReleases !== needsInclinedGeometry(snapshot))) { void start(); return; }
             if (!runtime || runtime.supportsFrames) {
                 if (parameter === 0) cutSide.value = 'right';
                 if (parameter === 1) cutSide.value = 'left';
