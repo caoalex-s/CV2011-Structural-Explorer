@@ -143,20 +143,23 @@ def resultFields (l : Layout) (bits : Nat) (cert : InclinedFrameIntervalAssembly
       intervalFields (motion 0) ++ intervalFields (motion 1) ++ intervalFields (motion 2) ++ intervalFields moment
   return out
 
-def report (value : Packet) : Option String := do
-  let l ← layout value.source value.rules
+def proposalFor (l : Layout) (value : Packet) : Option (InclinedFrameIntervalBuild.Proposal l.expanded l.basis) := do
   let n := l.basis.columns.size
   guard (value.roots.size == l.expanded.source.members.size && value.inverse.size == n &&
     value.estimate.size == n && value.inverse.all (fun row => row.size == n))
-  let proposal : InclinedFrameIntervalBuild.Proposal l.expanded l.basis := {
+  return {
     roots := fun i => value.roots[i.val]!, inverse := fun i j => value.inverse[i.val]![j.val]!,
     estimate := fun i => value.estimate[i.val]! }
+
+def report (value : Packet) : Option String := do
+  let l ← layout value.source value.rules
+  let proposal ← proposalFor l value
   let cert ← build l value.bits proposal
-  guard (verified l value.bits cert)
-  let fields ← resultFields l value.bits cert value.query
-  let result := String.intercalate "\n" fields
-  guard (result.utf8ByteSize ≤ 262144)
-  return result
+  if verified l value.bits cert then
+    let fields ← resultFields l value.bits cert value.query
+    let result := String.intercalate "\n" fields
+    if result.utf8ByteSize ≤ 262144 then some result else none
+  else none
 
 @[export inclined_release_report]
 def checkReport (input : String) : Option String := do report (← decode input)

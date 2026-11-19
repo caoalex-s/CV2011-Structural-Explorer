@@ -16,6 +16,7 @@ structure Layout where
   sides : Array Nat
   parent : Array Nat
   basis : GlobalBasis
+  valid : PartitionValid expanded
 
 def endpoint (m : Member) (side : Nat) : Nat := if side % 2 == 0 then m.a else m.b
 
@@ -46,7 +47,9 @@ def layout (source : Source) (rules : HingeFrame.Connections) : Option Layout :=
     {shared with translation := if independent then 2 else shared.translation, rotationFree := own.rotationFree}
   let basis : GlobalBasis := ⟨points, allocatedColumns points⟩
   guard (basis.columns.size ≤ 48 && workScore expanded basis ≤ 2000000)
-  return ⟨original, expanded, sides, Array.ofFn (fun i : Fin expanded.points.size => parent[i.val]?.getD i.val), basis⟩
+  if valid : PartitionValid expanded then
+    return ⟨original, expanded, sides, Array.ofFn (fun i : Fin expanded.points.size => parent[i.val]?.getD i.val), basis, valid⟩
+  else none
 
 /-- Use the same unit translation at all incident ends while preserving the
     separate rotational restraint at each end. -/

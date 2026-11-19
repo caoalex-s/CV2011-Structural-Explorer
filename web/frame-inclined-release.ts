@@ -10,6 +10,14 @@ import { intervalDot } from './frame-interval-solve.js';
 import { zero, one } from './frame-rational.js';
 
 export function compileInclinedRelease(arithmetic: IntervalArithmetic, input: unknown, query: EvidenceQuery) {
+    if (input && typeof input === 'object') {
+        const outer = input as Record<string, unknown>;
+        const raw = (outer.version === 2 ? outer.model : outer) as Record<string, unknown> | undefined;
+        for (const key of ['members', 'nodes', 'supports', 'loads'] as const) {
+            const items = raw?.[key];
+            if (Array.isArray(items) && items.length > frameLimits[key]) throw Error(`Limit: too many ${key}.`);
+        }
+    }
     const model = parseEvidenceModel(input);
     const expanded: Model = { ...model,
         nodes: model.nodes.map(node => ({ ...node, joint: 'rigid', referenceMember: undefined })),

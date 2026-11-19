@@ -8,7 +8,7 @@ namespace InclinedRelease.Fields
 open InclinedFrameSource InclinedFrameBasis InclinedFrameIntervalAssembly FrameEnclosure
 open InclinedFrameIntervalRecoverySound (checked_selection)
 open InclinedFrameIntervalReactions
-open InclinedFrameIntervalReactionsSound (virtualMotion virtualPoint_contains appliedAction_contains total_piece_work)
+open InclinedFrameIntervalReactionsSound (actualPieceWork virtualMotion virtualPoint_contains appliedAction_contains total_piece_work)
 noncomputable section
 
 def NodeEnclosures {data : Partition} {basis : GlobalBasis} (bits : Nat)
