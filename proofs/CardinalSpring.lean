@@ -12,16 +12,29 @@ structure System where
   beam : HingeFrame.Assembly
   stiffnesses : Array Rat
 
+def referenceRow (s : System) (side : Nat) :=
+  3 * InclinedRelease.endpoint s.beam.mesh.source.members[side/2]! side + 2
+
+def ConnectedRows (s : System) : Prop :=
+  ∀ side ∈ s.beam.sides, let q := HingeFrame.faceQuery side
+    let source := s.beam.mesh.source
+    let node := InclinedRelease.endpoint source.members[q.member]! side
+    let ref := HingeFrame.reference source node
+    let refT : Rat := if source.members[ref]!.a = node then 0 else 1
+    ref < source.members.size ∧ (source.members[ref]!.a = node ∨ source.members[ref]!.b = node) ∧
+    HingeFrame.pointIndex s.beam q.member q.t 2 = s.beam.mesh.dofs + s.beam.sides.idxOf side ∧
+    HingeFrame.pointIndex s.beam ref refT 2 = referenceRow s side
+
+instance (s : System) : Decidable (ConnectedRows s) := by unfold ConnectedRows; infer_instance
+
 def compile (p : FrameSpring.Wire.Packet) : Option System := do
   let (layout, ks) ← FrameSpring.resolve p.source p.rules
   let mesh ← compileModel p.source
   if valid : PartitionValid mesh then
     let a : HingeFrame.Assembly := ⟨mesh, layout.sides.toList, valid⟩
-    if a.size ≤ 48 then some ⟨a,ks⟩ else none
+    let s : System := ⟨a,ks⟩
+    if a.size ≤ 48 ∧ ConnectedRows s then some s else none
   else none
-
-def referenceRow (s : System) (side : Nat) :=
-  3 * InclinedRelease.endpoint s.beam.mesh.source.members[side/2]! side + 2
 
 def gapColumn (s : System) (side row : Nat) : Rat :=
   let own := s.beam.mesh.dofs + s.beam.sides.idxOf side
@@ -55,7 +68,10 @@ def Equilibrium (s : System) (k : Array (Array Rat)) (w : Certificate) : Prop :=
   FactorValid k (freeRows s) w ∧ w.motion.size = s.beam.size ∧
   w.reactions = residual k (loads s) w.motion ∧
   (∀ i : Fin s.beam.size, if HingeFrame.restrained s.beam i then w.motion[i.val]! = 0 else w.reactions[i.val]! = 0) ∧
-  (∀ i : Fin s.beam.sides.length, faceLaw s w (s.beam.sides.get i))
+  (∀ i : Fin s.beam.sides.length, faceLaw s w (s.beam.sides.get i)) ∧
+  (∀ i : Fin (freeRows s).size,
+    sumFin (freeRows s).size (fun j => k[(freeRows s)[i.val]!]![(freeRows s)[j.val]!]! * w.motion[(freeRows s)[j.val]!]!) =
+      (loads s)[(freeRows s)[i.val]!]!)
 
 instance (s : System) (k : Array (Array Rat)) (w : Certificate) : Decidable (Equilibrium s k w) := by
   unfold Equilibrium; infer_instance

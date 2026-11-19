@@ -82,7 +82,7 @@ theorem piece_bounds {f p o len rows} (ok : candidates f p o len = some rows)
 over the closed domain of every selected source piece. -/
 def attained {data m motion} (_sheet : Sheet data m motion) (moment : Bool) (y : ℝ) :=
   ∃ (i : Index data m) (x : ℝ), x ∈ Icc (0:ℝ) (segmentAt data m i).length ∧
-    field (polynomial (segmentAt data m i) (motion (segmentAt data m i)) moment) x = y
+    field (polynomial (segmentAt data m i) motion moment) x = y
 
 theorem attained_row {data m motion moment row} {sheet : Sheet data m motion}
     (h : row ∈ allRows sheet moment) : attained sheet moment (val row.exactY) := by
@@ -122,11 +122,11 @@ interval, belongs to the location box of a flagged row on that piece. -/
 theorem tied_max_location {data m motion flag} (sheet : Sheet data m motion)
     (flags : correctFlags sheet flag) (i : Index data m) (x : ℝ)
     (hx : x ∈ Icc (0:ℝ) (segmentAt data m i).length)
-    (bound : ∀ y, attained sheet flag y → y ≤ field (polynomial (segmentAt data m i) (motion (segmentAt data m i)) flag) x) :
+    (bound : ∀ y, attained sheet flag y → y ≤ field (polynomial (segmentAt data m i) motion flag) x) :
     ∃ r ∈ (sheet.rows flag i).value,
-      represents (polynomial (segmentAt data m i) (motion (segmentAt data m i)) flag) (originAt data m i) r x ∧
+      represents (polynomial (segmentAt data m i) motion flag) (originAt data m i) r x ∧
       (allRows sheet flag).all (fun s => lessEqual s r) = true := by
-  have hm : IsMaxOn (field (polynomial (segmentAt data m i) (motion (segmentAt data m i)) flag)) (Icc (0:ℝ) (segmentAt data m i).length) x := fun z hz => bound _ ⟨i,z,hz,rfl⟩
+  have hm : IsMaxOn (field (polynomial (segmentAt data m i) motion flag)) (Icc (0:ℝ) (segmentAt data m i).length) x := fun z hz => bound _ ⟨i,z,hz,rfl⟩
   obtain ⟨r,hr,rep⟩ := locate_extreme (sheet.rows flag i).computed x hx (Or.inl hm)
   refine ⟨r,hr,rep,(flags r (mem_allRows.mpr ⟨i,hr⟩)).2.mpr ?_⟩
   rw [rep.2]
@@ -135,11 +135,11 @@ theorem tied_max_location {data m motion flag} (sheet : Sheet data m motion)
 theorem tied_min_location {data m motion flag} (sheet : Sheet data m motion)
     (flags : correctFlags sheet flag) (i : Index data m) (x : ℝ)
     (hx : x ∈ Icc (0:ℝ) (segmentAt data m i).length)
-    (bound : ∀ y, attained sheet flag y → field (polynomial (segmentAt data m i) (motion (segmentAt data m i)) flag) x ≤ y) :
+    (bound : ∀ y, attained sheet flag y → field (polynomial (segmentAt data m i) motion flag) x ≤ y) :
     ∃ r ∈ (sheet.rows flag i).value,
-      represents (polynomial (segmentAt data m i) (motion (segmentAt data m i)) flag) (originAt data m i) r x ∧
+      represents (polynomial (segmentAt data m i) motion flag) (originAt data m i) r x ∧
       (allRows sheet flag).all (lessEqual r) = true := by
-  have hm : IsMinOn (field (polynomial (segmentAt data m i) (motion (segmentAt data m i)) flag)) (Icc (0:ℝ) (segmentAt data m i).length) x := fun z hz => bound _ ⟨i,z,hz,rfl⟩
+  have hm : IsMinOn (field (polynomial (segmentAt data m i) motion flag)) (Icc (0:ℝ) (segmentAt data m i).length) x := fun z hz => bound _ ⟨i,z,hz,rfl⟩
   obtain ⟨r,hr,rep⟩ := locate_extreme (sheet.rows flag i).computed x hx (Or.inr hm)
   refine ⟨r,hr,rep,(flags r (mem_allRows.mpr ⟨i,hr⟩)).1.mpr ?_⟩
   rw [rep.2]
@@ -169,7 +169,7 @@ theorem physical_fields (data : Compiled) (valid : PartitionValid data) (m : Nat
   exact fields
 
 theorem accepted_report {input output : String} (h : checkReport input = some output) :
-    ∃ (p : RationalFrame.Wire.Packet) (data : Compiled) (valid : PartitionValid data) (sheet : Sheet data p.query.member (fun _ => p.certificate.motion)),
+    ∃ (p : RationalFrame.Wire.Packet) (data : Compiled) (valid : PartitionValid data) (sheet : Sheet data p.query.member p.certificate.motion),
       RationalFrame.Wire.decode input = some p ∧ compileModel p.source = some data ∧
       data.source = p.source ∧ ActualModel data valid ∧ StableResult data valid p.query p.certificate ∧
       output = encode sheet ∧ correctFlags sheet false ∧ correctFlags sheet true := by
