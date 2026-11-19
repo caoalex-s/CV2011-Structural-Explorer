@@ -45,7 +45,8 @@ export function renderInspector(options: InspectorOptions): void {
             let value: ConnectionRule = input.value === 'spring' ? (direction === 'rotation' ? 20000 : 100000) : input.value as ConnectionRule;
             if (input.dataset.stiffness) {
                 value = Number(input.value);
-                if (!Number.isFinite(value) || value <= 0) { toast('Use a positive spring stiffness, or choose Released.'); inspector(); return; }
+                if (input.value.trim() === '' || !Number.isFinite(value) || value < 0 || (direction !== 'rotation' && value === 0)) { toast('Use a positive spring stiffness, or choose Released.'); inspector(); return; }
+                if (direction === 'rotation' && value === 0) value = 'free';
             }
             commit(() => {
                 // Preserve every other end when converting a preset to a mixed joint.
@@ -105,8 +106,12 @@ export function renderInspector(options: InspectorOptions): void {
         }
         container.innerHTML = html + '<button id="delete-selected">Delete selected object</button>';
         container.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-property]').forEach(input => input.addEventListener('change', () => {
-            const key = input.dataset.property!;
-            const value = input.type === 'checkbox' ? (input as HTMLInputElement).checked : ['kind', 'joint', 'referenceMember', 'member', 'label'].includes(key) ? input.value.trim() : Number(input.value) * Number(input.dataset.direction || 1);
+            let key = input.dataset.property!;
+            let value = input.type === 'checkbox' ? (input as HTMLInputElement).checked : ['kind', 'joint', 'referenceMember', 'member', 'label'].includes(key) ? input.value.trim() : Number(input.value) * Number(input.dataset.direction || 1);
+            if (key === 'rotationStiffness') {
+                if (input.value.trim() === '' || Number(value) < 0) { toast('Enter a nonnegative rotational stiffness.'); inspector(); return; }
+                if (value === 0) { key = 'joint'; value = 'pinned'; }
+            }
             if (key === 'label' && (!validLoadLabel(String(value), item.kind as Load['kind']) || model.loads.some(load => load.id !== selected!.id && loadLabels(model).get(load.id) === value))) {
                 toast('Enter a unique load symbol, such as P_1, M_0, or w_1.');
                 inspector();

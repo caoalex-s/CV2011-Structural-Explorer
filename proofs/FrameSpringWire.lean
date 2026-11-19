@@ -110,21 +110,32 @@ def decode (input : String) : Option Packet := do
       | .ok (value, _) => some value
 
 /-- Append each constitutive readout to the field report from the same solve. -/
-def springValues (l : Layout) (bits : Nat) (c : Cert l) (side : Nat) (k : Rat) := do
+def springValues (l : Layout) (bits : Nat) (c : Cert l) (side : Nat) (k : Rat) : Option (Bounds × Bounds) := do
   let own ← InclinedFrameIntervalRecovery.nodalMotion bits c (facePoint l side)
   let ref ← InclinedFrameIntervalRecovery.nodalMotion bits c (faceNode l side)
   let slip ← measure 3 (subtract bits (own 2) (ref 2))
   let moment ← measure 2 (multiply bits ⟨k,k⟩ slip.value)
   return (slip.value, moment.value)
 
+def activeSides (l : Layout) (ks : Array Rat) := l.sides.filter fun side => ks[side]! > 0
+
+abbrev Transfers (l : Layout) (ks : Array Rat) (bits : Nat) (c : Cert l) :=
+  (i : Fin (activeSides l ks).size) →
+    let side := (activeSides l ks)[i.val]!
+    Evaluated (springValues l bits c side ks[side]!)
+
+def readTransfers (l : Layout) (ks : Array Rat) (bits : Nat) (c : Cert l) : Option (Transfers l ks bits c) :=
+  gather (activeSides l ks).size _ fun i =>
+    let side := (activeSides l ks)[i.val]!
+    evaluate (springValues l bits c side ks[side]!)
+
 def encodeSprings (l : Layout) (ks : Array Rat) (bits : Nat) (c : Cert l)
-    {q : RationalFrame.Query} (fields : Values l bits c q) : Option String := do
-  let mut out := [encode fields, "CV2011_SPRINGS_1"]
-  for side in l.sides do
-    let k := ks[side]!
-    if k > 0 then
-      let (slip, moment) ← springValues l bits c side k
-      out := out ++ [toString side] ++ rationalFields k ++ intervalFields slip ++ intervalFields moment
+    {q : RationalFrame.Query} (fields : Values l bits c q) (transfers : Transfers l ks bits c) : String := Id.run do
+  let mut out := [InclinedRelease.Wire.encode fields, "CV2011_SPRINGS_1"]
+  for i in List.finRange (activeSides l ks).size do
+    let side := (activeSides l ks)[i.val]!
+    let (slip, moment) := (transfers i).value
+    out := out ++ [toString side] ++ rationalFields ks[side]! ++ intervalFields slip ++ intervalFields moment
   return String.intercalate "\n" out
 
 def proposalFor (l : Layout) (value : Packet) : Option (InclinedFrameIntervalBuild.Proposal l.expanded l.basis) := do
@@ -141,7 +152,8 @@ def report (value : Packet) : Option String := do
   let cert ← FrameSpring.build l ks value.bits proposal
   if FrameSpring.verified l ks value.bits cert then
     let fields ← readValues l value.bits cert value.query
-    let result ← encodeSprings l ks value.bits cert fields
+    let transfers ← readTransfers l ks value.bits cert
+    let result := encodeSprings l ks value.bits cert fields transfers
     if result.utf8ByteSize ≤ 262144 then some result else none
   else none
 

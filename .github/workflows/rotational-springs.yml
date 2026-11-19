@@ -129,7 +129,7 @@ jobs:
           name: student-canvas-development
           path: .data/student-results/
           include-hidden-files: true
-  inclined-release-soundness:
+  spring-soundness:
     runs-on: ubuntu-22.04
     timeout-minutes: 45
     steps:
@@ -171,6 +171,6 @@ jobs:
           lake env bash -euc '
             set -o pipefail
             export LEAN_PATH="$PWD:$LEAN_PATH"
-            python3 ../qa/inclined-release/compile.py InclinedReleaseReportSound | tee release-axioms.log
+            python3 ../qa/inclined-release/compile.py FrameSpringSound | tee release-axioms.log
             ! grep -E "sorryAx|declaration uses .sorry." release-axioms.log
           '

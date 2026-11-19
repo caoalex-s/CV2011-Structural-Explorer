@@ -261,7 +261,7 @@ function loadDrawing(load: Load) {
         return Math.hypot(origin.x - p.x, origin.y - p.y) < 1;
     }).length : 0;
     if (load.kind === 'force' && Math.hypot(load.fx, load.fy) < 1e-12 || load.kind === 'moment' && Math.abs(load.mz) < 1e-12)
-        return `<g ${tag}><circle cx="${p.x}" cy="${p.y}" r="16" class="node-hit"/><text x="${p.x + 8}" y="${p.y - 15 - 20 * coupleLane}" class="svg-label">${symbolLabel(label)} = 0 ${load.kind === 'force' ? 'kN' : 'kN m'}</text></g>`;
+        return `<g ${tag}><circle cx="${p.x}" cy="${p.y}" r="16" class="node-hit"/><text x="${p.x + 8}" y="${p.y - (load.kind === 'moment' ? 35 + 20 * coupleLane : 15)}" class="svg-label">${symbolLabel(label)} = 0 ${load.kind === 'force' ? 'kN' : 'kN m'}</text></g>`;
     if (load.kind === 'force') {
         const magnitude = Math.hypot(load.fx, load.fy);
         return `<g ${tag}>${forceSymbol(p.x, p.y, load.fx, load.fy, color, `${label} = ${number(magnitude)} kN`)}</g>`;

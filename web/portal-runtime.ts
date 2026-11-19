@@ -21,6 +21,7 @@ export class PortalRuntime {
     supportsAffineFrames = false;
     supportsInclinedFrames = false;
     supportsHingeFrames = false;
+    supportsSprings = false;
     supportsInclinedReleases = false;
     get needsReset(): boolean { return this.stopped; }
     onFailure: (reason: string) => void = () => {};
@@ -51,7 +52,8 @@ export class PortalRuntime {
                     this.supportsFrames = Array.isArray(data.protocols) && data.protocols.includes('frame');
                     this.supportsAffineFrames = Array.isArray(data.capabilities) && data.capabilities.includes('affine-vertical-v1');
                     this.supportsInclinedFrames = Array.isArray(data.capabilities) && data.capabilities.includes('inclined-real-v1');
-                    this.supportsInclinedReleases = Array.isArray(data.capabilities) && data.capabilities.includes('hinge-inclined-v1');
+                    this.supportsSprings = Array.isArray(data.capabilities) && data.capabilities.includes('spring-rotation-v1');
+                    this.supportsInclinedReleases = this.supportsSprings || Array.isArray(data.capabilities) && data.capabilities.includes('hinge-inclined-v1');
                     this.supportsHingeFrames = this.supportsInclinedReleases || Array.isArray(data.capabilities) && data.capabilities.includes('hinge-cardinal-v1');
                     resolve();
                 } else this.receive(data);

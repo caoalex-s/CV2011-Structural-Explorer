@@ -44,9 +44,9 @@ def relativeColumn (l : Layout) (side : Nat) (col : Fin l.basis.columns.size) : 
 /-- The Hessian of the physical rotational spring energy contributes k bᵀb.
 Fixed rotations have zero amplitude. No penalty stiffness is introduced. -/
 def coupling (l : Layout) (ks : Array Rat) (r c : Fin l.basis.columns.size) : Rat :=
-  (List.finRange l.sides.size).foldr (fun i total =>
+  ∑ i : Fin l.sides.size,
     let side := l.sides[i.val]!
-    ks[side]! * relativeColumn l side r * relativeColumn l side c + total) 0
+    ks[side]! * relativeColumn l side r * relativeColumn l side c
 
 def stiffenedEntry (bits : Nat) (k : Rat) (beam : Option Bounds) : Option Bounds := do
   let value ← beam

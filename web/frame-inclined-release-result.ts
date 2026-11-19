@@ -6,7 +6,7 @@ import { fraction, type Fraction, encoded } from './frame-rational.js';
 
 import type { IntervalPoint, IntervalReadout } from './frame-interval-result.js';
 
-export function decodeInclinedReleaseReport(bytes: Uint8Array) {
+export function decodeInclinedReleaseReport(bytes: Uint8Array, springReport = false) {
     if (bytes.length > 262144) throw Error('Interval report exceeds its byte budget.');
     // Check original bytes: TextDecoder otherwise silently strips a UTF-8 BOM.
     for (const byte of bytes)
@@ -14,7 +14,7 @@ export function decodeInclinedReleaseReport(bytes: Uint8Array) {
     const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
     let lines = 1;
     for (const character of text) if (character === '\n') lines++;
-    if (lines > 1024) throw Error('Too many interval report fields.');
+    if (lines > (springReport ? 1536 : 1024)) throw Error('Too many interval report fields.');
     const tokens = text.split('\n');
     let position = 0;
     const token = (): string => {
@@ -79,6 +79,16 @@ export function decodeInclinedReleaseReport(bytes: Uint8Array) {
         node: identifier(), member: identifier(), end: natural(1), released: natural(1) === 1,
         ux: interval(), uy: interval(), rotation: interval(), moment: interval(),
     }));
+    const springs: { side: number; stiffness: ReturnType<typeof encoded>; relativeRotation: IntervalReadout; transmittedMoment: IntervalReadout }[] = [];
+    if (springReport) {
+        if (token() !== 'CV2011_SPRINGS_1') throw Error('Missing spring report.');
+        while (position < tokens.length) {
+            const side = natural(15), stiffness = rational();
+            if (stiffness.n <= 0n || springs.some(spring => spring.side === side)) throw Error('Invalid spring identity or stiffness.');
+            springs.push({ side, stiffness: encoded(stiffness), relativeRotation: interval(), transmittedMoment: interval() });
+        }
+        if (!springs.length) throw Error('Empty spring report.');
+    }
     if (position !== tokens.length) throw Error('Unexpected trailing interval report fields.');
-    return { query: { member, parameter: encoded(parameter), cutSide, convention: 1 as const }, fields, points, faces };
+    return { query: { member, parameter: encoded(parameter), cutSide, convention: 1 as const }, fields, points, faces, springs };
 }

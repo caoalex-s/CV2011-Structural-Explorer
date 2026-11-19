@@ -6,6 +6,7 @@ import { endConnection, nodeLabels, referenceMember } from './engine.js';
 import { memberLabel } from './model-view.js';
 import { decodeAcceptedHingePacket } from './frame-hinge-result.js';
 import { decodeInclinedReleaseReport } from './frame-inclined-release-result.js';
+import { springExplanation } from './frame-spring-worked.js';
 import { PortalRuntime } from './portal-runtime.js';
 import { sha256 } from './portal-runtime.js';
 import type { CheckerResult } from './portal-runtime.js';
@@ -30,6 +31,10 @@ const isolationScript = new URL(isPortalWorkspace ? 'isolation-sw.js' : 'main-ch
 const runtimeUrl = new URL(isPortalWorkspace ? './bundle/worker.mjs' : './portal-checker/bundle/worker.mjs', scope);
 const hingeUrl = new URL('../hinge/worker.mjs', runtimeUrl);
 const inclinedReleaseUrl = new URL('../inclined-release/worker.mjs', runtimeUrl);
+const springUrl = new URL('../spring/worker.mjs', runtimeUrl);
+function usesSpring(model: Model): boolean {
+    return model.members.some(member => (['a', 'b'] as const).some(end => typeof endConnection(model, member, end).rotation === 'number'));
+}
 function needsInclinedGeometry(model: Model): boolean {
     return model.supports.some(s => s.kind === 'roller' && ![0,90,180,270].includes(s.angle)) ||
         model.members.some(member => {
@@ -116,7 +121,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
         startingNow = true;
         try {
             const drawing = modelAtPresent();
-            runtime = new PortalRuntime(usesRelease(drawing) ? (needsInclinedGeometry(drawing) ? inclinedReleaseUrl : hingeUrl) : runtimeUrl);
+            runtime = new PortalRuntime(usesSpring(drawing) ? springUrl : usesRelease(drawing) ? (needsInclinedGeometry(drawing) ? inclinedReleaseUrl : hingeUrl) : runtimeUrl);
         }
         catch (error) { startingNow = false; reset.hidden = false; clear(`Checking unavailable: ${String(error)}`); return; }
         const starting = runtime;
@@ -145,6 +150,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
             }
             if (starting.supportsInclinedReleases)
                 host.querySelector('#portal-scope')!.textContent = 'Inclined members and roller directions use interval arithmetic. A release preserves the joint translations and gives the member end its own rotation. An inconclusive calculation leaves stability undetermined.';
+            if (starting.supportsSprings) host.querySelector('#portal-scope')!.textContent = 'The checker uses the rotational stiffness specified at each connected end. Translations are shared at the joint. A failed interval check leaves stability undetermined.';
             update(member, parameter);
             // A single explicit Generate survives only the activation reload of
             // the same saved drawing. Subsequent edits revoke generation intent.
@@ -163,18 +169,18 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
         const packetDigest = result.packetDigest;
         // Capture both byte containers before the first digest await. Worker
         // object fields are not the source of displayed mathematical values.
-        const report = (result.frameProtocol === 'inclined' || result.frameProtocol === 'inclined-release') && result.report instanceof Uint8Array
+        const report = (result.frameProtocol === 'inclined' || result.frameProtocol === 'inclined-release' || result.frameProtocol === 'spring') && result.report instanceof Uint8Array
             ? new Uint8Array(result.report) : null;
         const reportDigest = result.reportDigest;
         if (await sha256(packet) !== packetDigest) throw Error('Accepted packet identity changed.');
         if (!requests.isCurrent(token) || checker !== runtime) return;
         if (checker.supportsInclinedReleases) {
-            if (result.frameProtocol !== 'inclined-release' || !report || typeof reportDigest !== 'string' || await sha256(report) !== reportDigest)
+            if (result.frameProtocol !== (checker.supportsSprings ? 'spring' : 'inclined-release') || !report || typeof reportDigest !== 'string' || await sha256(report) !== reportDigest)
                 throw Error('Missing or changed inclined release report.');
             if (!requests.isCurrent(token) || checker !== runtime) return;
             const source = JSON.parse(new TextDecoder().decode(sourceBytes));
             const drawing: Model = source.model;
-            const values = decodeInclinedReleaseReport(report);
+            const values = decodeInclinedReleaseReport(report, checker.supportsSprings);
             bindIntervalDisplay({ ...drawing, nodes: drawing.nodes.map(n => ({ ...n, joint: 'rigid' })),
                 members: drawing.members.map(({connectionA, connectionB, ...m}) => m) }, source.query, values);
             const labels = nodeLabels(drawing);
@@ -187,9 +193,9 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
             const faceLines = values.faces.map(face => {
                 const m = drawing.members.find(m => m.id === face.member);
                 const end = face.end === 0 ? 'a' : 'b';
-                if (!m || m[end] !== face.node || (endConnection(drawing, m, end).rotation === 'free') !== face.released)
+                if (!m || m[end] !== face.node || (endConnection(drawing, m, end).rotation !== 'rigid') !== face.released)
                     throw Error('Member end differs from the captured drawing.');
-                const role = face.released ? 'independent released-end rotation' :
+                const role = typeof endConnection(drawing, m, end).rotation === 'number' ? 'spring-connected end rotation' : face.released ? 'independent released-end rotation' :
                     referenceMember(drawing, face.node) === m.id ? 'reference rotation at the joint' : 'shares the reference rotation';
                 const couples = drawing.loads.filter(load => load.kind === 'moment' && load.member === m.id && load.t === face.end);
                 const actions = couples.length ? `Applied ${couples.length === 1 ? 'couple' : 'couples'} on this end as drawn, ${couples.map(load => `${load.mz} kN m`).join(', ')} (counterclockwise positive).` : 'No couple is applied to this end.';
@@ -198,12 +204,13 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
             const presentation = renderIntervalValues(values, drawing);
             const render = (element: HTMLElement) => {
                 element.innerHTML = presentation;
-                const title = document.createElement('h3'); title.textContent = 'Member ends at released joints';
+                const title = document.createElement('h3'); title.textContent = checker.supportsSprings ? 'Member ends at rotational springs' : 'Member ends at released joints';
+                for (const line of springExplanation(drawing, values)) element.append(line);
                 element.prepend(title, ...faceLines.map(text => { const line = document.createElement('p'); line.textContent = text; return line; }));
             };
-            status.textContent = 'Accepted by the compiled inclined release checker.';
+            status.textContent = checker.supportsSprings ? 'Accepted by the compiled rotational spring checker.' : 'Accepted by the compiled inclined release checker.';
             render(readouts);
-            exportText = JSON.stringify({ protocol: 'CV2011_INCLINED_RELEASE_1', ...token, bindings: envelope.bindings,
+            exportText = JSON.stringify({ protocol: checker.supportsSprings ? 'CV2011_ROTATIONAL_SPRING_1' : 'CV2011_INCLINED_RELEASE_1', ...token, bindings: envelope.bindings,
                 artifact: checker.artifact, bundle: checker.bundle, inputDigest: result.inputDigest, packetDigest, reportDigest,
                 sourceRequest: source, values, packet: new TextDecoder().decode(packet), report: new TextDecoder().decode(report) }, null, 2);
             certificate.textContent = exportText; exportButton.hidden = false;
@@ -360,9 +367,10 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
             // Capture before any asynchronous work, including hashing and debounce.
             snapshot = structuredClone(modelAtPresent());
             if (startingNow) { clear('Starting local checker…'); return; }
-            const hinge = usesRelease(snapshot);
+            const spring = usesSpring(snapshot);
+            const hinge = spring || usesRelease(snapshot);
             if (enabled && runtime && (runtime.supportsHingeFrames !== hinge ||
-                hinge && runtime.supportsInclinedReleases !== needsInclinedGeometry(snapshot))) { void start(); return; }
+                runtime.supportsSprings !== spring || hinge && runtime.supportsInclinedReleases !== (spring || needsInclinedGeometry(snapshot)))) { void start(); return; }
             if (!runtime || runtime.supportsFrames) {
                 if (parameter === 0) cutSide.value = 'right';
                 if (parameter === 1) cutSide.value = 'left';
