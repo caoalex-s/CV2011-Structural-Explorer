@@ -75,6 +75,66 @@ theorem extremum_covered {bits i p s m candidates} (h : fits p s)
   exact Or.inr (Or.inr (extreme.elim (fun mx => (mx.isLocalMax near).hasDerivAt_eq_zero deriv)
     (fun mn => (mn.isLocalMin near).hasDerivAt_eq_zero deriv)))
 
+theorem all_rows_attained {bits i p s m candidates} (h : fits p s)
+    (made : rows bits i p m = some candidates) {r} (mem : r ∈ candidates) :
+    stationValue p s r.station ∈ Icc 0 1 ∧
+    Contains r.y (field p s m (stationValue p s r.station)) ∧ r.piece = i := by
+  obtain ⟨a,ha,rest⟩ := Option.bind_eq_some.mp made
+  obtain ⟨b,hb,rest⟩ := Option.bind_eq_some.mp rest
+  obtain ⟨_,_,boundA,sa,ia⟩ := row_bounds h ha
+  obtain ⟨_,_,boundB,sb,ib⟩ := row_bounds h hb
+  have start : stationValue p s a.station ∈ Icc 0 1 ∧
+      Contains a.y (field p s m (stationValue p s a.station)) ∧ a.piece = i := by
+    rw [sa]; exact ⟨by simp [stationValue],boundA,ia⟩
+  have finish : stationValue p s b.station ∈ Icc 0 1 ∧
+      Contains b.y (field p s m (stationValue p s b.station)) ∧ b.piece = i := by
+    rw [sb]; exact ⟨by simp [stationValue],boundB,ib⟩
+  by_cases flatPiece : flat p m = true
+  · simp [flatPiece] at rest
+    subst candidates
+    simp only [List.mem_cons,List.mem_singleton] at mem
+    rcases mem with rfl | rfl | rfl
+    · exact start
+    · exact start
+    · exact finish
+  · simp only [flatPiece,↓reduceIte] at rest
+    obtain ⟨stations,_,rest⟩ := Option.bind_eq_some.mp rest
+    obtain ⟨mid,hm,eq⟩ := Option.bind_eq_some.mp rest
+    cases eq
+    simp only [List.mem_cons,List.mem_append,List.mem_singleton] at mem
+    rcases mem with rfl | inner | rfl
+    · exact start
+    · obtain ⟨root,_,inside⟩ := (collected hm).2 r inner
+      obtain ⟨t,ht,result⟩ := Option.bind_eq_some.mp inside
+      have located := station_fits h ht
+      split at result
+      · cases result
+      next =>
+        split at result
+        next domain =>
+          obtain ⟨entry,he,eq⟩ := Option.bind_eq_some.mp result
+          cases eq
+          obtain ⟨_,_,hy,hs,hi⟩ := row_bounds h he
+          rw [hs]
+          have left : (0:ℝ) < t.lower := by exact_mod_cast domain.1
+          have right : (t.upper:ℝ) < 1 := by exact_mod_cast domain.2
+          exact ⟨⟨left.le.trans located.1,located.2.trans right.le⟩,hy,hi⟩
+        next => cases result
+    · exact finish
+
+theorem piece_range {bits i p s m candidates} (h : fits p s)
+    (made : rows bits i p m = some candidates) (t : ℝ) (domain : t ∈ Icc 0 1) :
+    (∃ lo ∈ candidates, field p s m (stationValue p s lo.station) ≤ field p s m t) ∧
+    (∃ hi ∈ candidates, field p s m t ≤ field p s m (stationValue p s hi.station)) := by
+  have continuous : Continuous (field p s m) := by cases m <;> simp [field,shear,moment] <;> fun_prop
+  obtain ⟨x,hx,low⟩ := isCompact_Icc.exists_isMinOn ⟨t,domain⟩ continuous.continuousOn
+  obtain ⟨y,hy,high⟩ := isCompact_Icc.exists_isMaxOn ⟨t,domain⟩ continuous.continuousOn
+  obtain ⟨a,ha,ra⟩ := extremum_covered h made hx (Or.inr low)
+  obtain ⟨b,hb,rb⟩ := extremum_covered h made hy (Or.inl high)
+  exact ⟨⟨a,ha,ra.2.2.2.symm ▸ low domain⟩,⟨b,hb,rb.2.2.2.symm ▸ high domain⟩⟩
+
+#print axioms all_rows_attained
+#print axioms piece_range
 #print axioms extremum_covered
 end
 end InclinedDiagram.Sound

@@ -230,6 +230,66 @@ theorem column_terms_zero {data : Partition} {basis : GlobalBasis} (cert : Certi
     linarith
   next => cases accepted
 
+def WorkColumns {data : Partition} {basis : GlobalBasis} (cert : Certificate data basis)
+    (motion : Motion data) (springs : Array (Fin basis.columns.size → Rat)) (torque : Fin springs.size → ℝ) :=
+  ∀ col, ∃ v, UnitContains cert col v ∧
+    (∑ i, InclinedFrameIntervalReactionsSound.actualPieceWork data motion v i) +
+      (∑ j : Fin springs.size, (springs[j.val]! col : ℝ)*torque j) = ∑ i, pointLoadWork data i v
+
+theorem all_rows_valid {data : Partition} {basis : GlobalBasis} {cert : Certificate data basis}
+    {motion : Motion data} {springs : Array (Fin basis.columns.size → Rat)} {torque : Fin springs.size → ℝ}
+    (partition : PartitionValid data) (work : WorkColumns cert motion springs torque) :
+    ∀ e ∈ (assemble cert springs).pivots.toList, validRow (frameState motion torque) e.2 := by
+  apply inserted_rows_valid
+  · simp
+  · intro terms member
+    rcases List.mem_append.mp member with element | column
+    · obtain ⟨i,_,hi⟩ := List.mem_flatMap.mp element
+      exact element_terms_zero partition motion torque i terms hi
+    · obtain ⟨col,_,hc⟩ := List.mem_filterMap.mp column
+      obtain ⟨v,enclosed,eq⟩ := work col
+      exact column_terms_zero cert motion v col enclosed springs torque eq hc
+
+theorem insert_dimensions (sys : System) (eq : Row) :
+    (insert sys eq).width = sys.width ∧ (insert sys eq).unknowns = sys.unknowns := by
+  unfold insert
+  dsimp only
+  split <;> exact ⟨rfl,rfl⟩
+
+theorem system_dimensions (n) (rows) (sys : System) :
+    (insertRows n rows sys).width = sys.width ∧ (insertRows n rows sys).unknowns = sys.unknowns := by
+  induction rows generalizing sys with
+  | nil => exact ⟨rfl,rfl⟩
+  | cons eq tail ih =>
+    have next := insert_dimensions sys (equation n eq)
+    have rest := ih (insert sys (equation n eq))
+    exact ⟨rest.1.trans next.1,rest.2.trans next.2⟩
+
+open InclinedFrameGlobalBasis
+theorem rigid_columns {data : Partition} {basis : GlobalBasis} {bits} {cert : Certificate data basis}
+    (valid : PartitionValid data) (allocation : GlobalBasisValid data basis)
+    (columns : ProjectionChecks bits cert) (motion : Motion data)
+    (equilibrium : InclinedFrameReduced.Equilibrium data motion) :
+    WorkColumns cert motion #[] (fun i => Fin.elim0 i) := by
+  intro col
+  let coords := InclinedFrameReduced.unit data basis (columnIndex allocation col)
+  let variation := embed data basis coords
+  refine ⟨variation,?_,?_⟩
+  · exact fun p d => InclinedFrameIntervalAssemblySound.pointColumnAt_contains allocation columns p col d
+  · have allowed := (range_equals_source_kernel valid allocation variation).mpr ⟨coords,rfl⟩
+    simpa using rigid_work valid equilibrium variation allowed
+
+theorem release_columns (l : Layout) {bits} {cert : Certificate l.expanded l.basis}
+    (columns : InclinedRelease.Projections l bits cert) (z : Fin l.basis.columns.size → ℝ)
+    (equilibrium : FrameMatrixResidual.action (InclinedRelease.Sound.matrix l) z = InclinedRelease.Sound.force l) :
+    WorkColumns cert (InclinedRelease.Sound.motion l z) #[] (fun i => Fin.elim0 i) := by
+  intro col
+  exact ⟨unitMotion l col, fun p d => InclinedRelease.Sound.point_contains columns p col d,
+    by simpa using released_work l z equilibrium col⟩
+
+#print axioms rigid_columns
+#print axioms release_columns
+#print axioms all_rows_valid
 #print axioms column_terms_zero
 #print axioms released_work
 #print axioms element_terms_zero
