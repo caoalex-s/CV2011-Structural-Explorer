@@ -5,6 +5,8 @@ import FrameSpringSound
 
 namespace JointMemberDiagram.Sound
 open RationalFrame MemberDiagram MemberDiagram.Sound
+open scoped BigOperators Matrix
+noncomputable section
 
 /-- Every piece uses the translations at its two ends and its actual pair of
 member-end rotations. The real coordinate x includes either one-sided limit. -/
@@ -151,6 +153,53 @@ theorem signed_face {s w} (eqn : CardinalSpring.Equilibrium s (CardinalSpring.ma
   change (if q.right then -M else M) + T = C at balance
   split <;> rename_i hq <;> simp [hq] at balance <;> linarith
 
+/-- Use local x = 0 on a first face and local x = L on a last face.
+The equality includes external and support couples on the selected face. -/
+theorem spring_endpoint {s w m} (eqn : CardinalSpring.Equilibrium s (CardinalSpring.matrix s) w)
+    (ends : EndValues s.beam m w.motion) (i : Index s.beam.mesh m)
+    (j : Fin s.beam.sides.length) (first : Bool)
+    (sideEq : s.beam.sides.get j = if first then 2*m else 2*m+1)
+    (boundary : if first then (segmentAt s.beam.mesh m i).left = 0 else (segmentAt s.beam.mesh m i).right = 1) :
+    let side := s.beam.sides.get j
+    let q := HingeFrame.faceQuery side
+    let piece := segmentAt s.beam.mesh m i
+    let f := polynomial piece (memberMotion s.beam m w.motion) true
+    let T := s.stiffnesses[side]! * CardinalSpring.gap s w.motion side
+    let C := HingeFrame.faceCouple s.beam q + (if HingeFrame.restrained s.beam
+      (HingeFrame.pointIndex s.beam q.member q.t 2) then w.reactions[HingeFrame.pointIndex s.beam q.member q.t 2]! else 0)
+    evalRat f (if first then 0 else piece.length) = if q.right then T-C else C-T := by
+  dsimp only
+  have law := signed_face eqn j
+  dsimp only at law
+  cases first <;> simp only [Bool.false_eq_true, if_false, if_true] at sideEq boundary ⊢
+  · rw [(ends i).2 boundary, ← sideEq]; exact law
+  · rw [(ends i).1 boundary, ← sideEq]; exact law
+
+theorem unloaded_hinge_endpoint {a q w m} (checked : HingeFrame.Checked a q w)
+    (stable : w.mechanism = false) (ends : EndValues a m w.motion) (i : Index a.mesh m)
+    (j : Fin a.sides.length) (first : Bool)
+    (sideEq : a.sides.get j = if first then 2*m else 2*m+1)
+    (boundary : if first then (segmentAt a.mesh m i).left = 0 else (segmentAt a.mesh m i).right = 1)
+    (unloaded : HingeFrame.faceCouple a (HingeFrame.faceQuery (a.sides.get j)) = 0)
+    (free : let face := HingeFrame.faceQuery (a.sides.get j)
+      HingeFrame.restrained a (HingeFrame.pointIndex a face.member face.t 2) = false) :
+    let piece := segmentAt a.mesh m i
+    evalRat (polynomial piece (memberMotion a m w.motion) true) (if first then 0 else piece.length) = 0 := by
+  dsimp only
+  have law := HingeFrame.unloaded_release a q w checked stable j unloaded free
+  cases first <;> simp only [Bool.false_eq_true, if_false, if_true] at sideEq boundary ⊢
+  · rw [(ends i).2 boundary, ← sideEq]; exact law
+  · rw [(ends i).1 boundary, ← sideEq]; exact law
+
+theorem accepted_dispatch {input output} (h : checkReport input = some output) :
+    (input.startsWith "CV2011_HINGE_1\n" = true ∧ hingeReport input = some output) ∨
+    (input.startsWith "CV2011_HINGE_1\n" = false ∧ springReport input = some output) := by
+  unfold checkReport at h
+  split at h <;> simp_all
+
+#print axioms spring_endpoint
+#print axioms unloaded_hinge_endpoint
+#print axioms accepted_dispatch
 #print axioms unique_free_motion
 #print axioms original_incidence
 #print axioms energy_stiffness
@@ -159,4 +208,5 @@ theorem signed_face {s w} (eqn : CardinalSpring.Equilibrium s (CardinalSpring.ma
 #print axioms hinge_accepted
 #print axioms spring_accepted
 #print axioms spring_positive
+end
 end JointMemberDiagram.Sound

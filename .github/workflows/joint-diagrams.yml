@@ -57,6 +57,7 @@ jobs:
             done
             lean --run ../qa/joint-diagram/Native.lean ../.data/joint-diagram/*.packet ../.data/joint-diagram/*.reject
           '
+      - run: node qa/joint-diagram/check-reports.mjs
       - name: Build browser checker
         env:
           GH_TOKEN: ${{ github.token }}
