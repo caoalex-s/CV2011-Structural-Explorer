@@ -6,6 +6,8 @@ import os
 from pathlib import Path
 import sys
 import tarfile
+import time
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 base = "https://caoalex-s.github.io/CV2011-Structural-Explorer/"
@@ -38,11 +40,20 @@ assert {"index.html", "portal-runtime.js", "main-checker-sw.js", "verification.j
 
 def live_hash(name):
     request = Request(base + name, headers={"Cache-Control": "no-cache"})
-    with urlopen(request, timeout=45) as response:
-        assert response.status == 200 and response.url == base + name
-        return name, sha256(response.read()).hexdigest()
+    for attempt in range(5):
+        try:
+            with urlopen(request, timeout=45) as response:
+                assert response.status == 200 and response.url == base + name, name
+                return name, sha256(response.read()).hexdigest()
+        except (URLError, TimeoutError) as error:
+            print(f"{name}: attempt {attempt + 1}: {error}", flush=True)
+            if isinstance(error, HTTPError) and error.code not in {429, 500, 502, 503, 504}:
+                raise
+            if attempt == 4:
+                raise
+            time.sleep(2 ** (attempt + 1))
 
-with ThreadPoolExecutor(max_workers=6) as pool:
+with ThreadPoolExecutor(max_workers=2) as pool:
     actual = dict(pool.map(live_hash, expected))
 assert actual == expected, [name for name in expected if expected[name] != actual[name]]
 report = {"commit": release, "pages_run": os.environ["PAGES_RUN"], "phase": phase,
