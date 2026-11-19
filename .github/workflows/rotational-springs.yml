@@ -64,6 +64,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: bash qa/hinge-frame/build-runtime.sh
+      - name: Compare all installed release checkers with the clean Linux builds
+        run: |
+          diff -qr public/portal-checker/hinge .data/hinge-build/assets
+          diff -qr public/portal-checker/inclined-release .data/hinge-build/inclined-assets
+          diff -qr public/portal-checker/spring .data/hinge-build/spring-assets
       - uses: actions/upload-artifact@v4
         with:
           name: inclined-release-checker
@@ -82,7 +87,6 @@ jobs:
           path: .data/hinge-build/spring-assets/
           include-hidden-files: true
   development-student-drawings:
-    needs: native
     runs-on: ubuntu-22.04
     timeout-minutes: 20
     steps:
@@ -99,22 +103,6 @@ jobs:
       - run: pnpm run check
       - run: pnpm test
       - run: node scripts/check-inclined-bundle.mjs
-      - uses: actions/download-artifact@v4
-        with:
-          name: hinge-browser-checker
-          path: .data/rebuilt-hinge
-      - name: Verify the installed release checker matches the clean Linux build
-        run: diff -qr public/portal-checker/hinge .data/rebuilt-hinge
-      - uses: actions/download-artifact@v4
-        with:
-          name: inclined-release-checker
-          path: .data/rebuilt-inclined-release
-      - name: Compare the installed inclined release checker with the clean build
-        run: diff -qr public/portal-checker/inclined-release .data/rebuilt-inclined-release
-      - uses: actions/download-artifact@v4
-        with:
-          name: spring-checker
-          path: public/portal-checker/spring
       - run: pnpm build
       - run: npm install --prefix .data/student-tools --ignore-scripts --save-exact playwright@1.51.1
       - run: node .data/student-tools/node_modules/playwright/cli.js install --with-deps chromium
@@ -167,7 +155,7 @@ jobs:
             proofs/*.olean
             proofs/.lake/build
           key: linux-release-proof-v1-${{ steps.dependencies.outputs.key }}
-      - name: Prove released-frame equilibrium and recovery
+      - name: Prove spring equilibrium, restoring couples and reported intervals
         working-directory: proofs
         run: |
           lake env bash -euc '
