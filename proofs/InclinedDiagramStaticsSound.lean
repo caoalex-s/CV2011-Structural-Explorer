@@ -62,7 +62,7 @@ theorem subtract_value {n} (state : Fin n → ℝ) (a b : Row) (k : Rat)
     apply Finset.sum_congr rfl
     intro i _
     have inside : i.val < a.size := by simpa only [width] using i.isLt
-    simp [subtractMultiple,zero,inside]
+    simp [subtractMultiple,zero,inside,getElem!_pos]
     ring
 
 theorem pivots_preserve {n} (state : Fin n → ℝ) (pivots : List (Nat × Row))
@@ -84,7 +84,7 @@ theorem divided_value {n} (state : Fin n → ℝ) (a : Row) (k : Rat) (width : a
   apply Finset.sum_congr rfl
   intro i _
   have inside : i.val < a.size := by simpa only [width] using i.isLt
-  simp [inside]
+  simp [inside,getElem!_pos]
   ring
 
 theorem insert_preserves {n} (state : Fin n → ℝ) (system : System) (equation : Row)
@@ -113,7 +113,7 @@ def termsValue {n} (state : Fin n → ℝ) (terms : List (Nat × Rat)) : ℝ :=
 theorem equation_value {n} (state : Fin n → ℝ) (terms : List (Nat × Rat)) :
     value state (equation n terms) = termsValue state terms := by
   have entry (i : Fin n) (xs : List (Nat × Rat)) :
-      ((equation n xs)[i.val]! : Rat) = coefficient i.val xs := by simp [equation,i.isLt]
+      ((equation n xs)[i.val]! : Rat) = coefficient i.val xs := by simp [equation,i.isLt,getElem!_pos]
   unfold value
   simp_rw [entry]
   induction terms with

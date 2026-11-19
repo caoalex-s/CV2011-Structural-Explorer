@@ -140,6 +140,14 @@ def interior (bits piece : Nat) (p : Piece) (moment : Bool) (station : Station) 
     (row bits piece p moment "interior" station).bind (fun v => some (some v))
   else none
 
+def collectStations (entry : Station → Option (Option Candidate)) :
+    List Station → Option (List Candidate)
+  | [] => some []
+  | station :: tail => do
+    let value ← entry station
+    let rest ← collectStations entry tail
+    return value.toList ++ rest
+
 def rows (bits piece : Nat) (p : Piece) (moment : Bool) : Option (List Candidate) := do
   let a ← row bits piece p moment "start" (.fixed 0)
   let b ← row bits piece p moment "end" (.fixed 1)
@@ -148,8 +156,8 @@ def rows (bits piece : Nat) (p : Piece) (moment : Bool) : Option (List Candidate
     pure [a,plateau,b]
   else
     let stations ← stationary p moment
-    let inner ← stations.mapM (interior bits piece p moment)
-    pure (a :: inner.reduceOption ++ [b])
+    let inner ← collectStations (interior bits piece p moment) stations
+    pure (a :: inner ++ [b])
 
 inductive OrderEvidence where | less | equal | greater | unresolved
   deriving BEq, DecidableEq, Inhabited

@@ -33,15 +33,19 @@ theorem two_roots {p : Piece} {s : State} {t : ℝ} (curved : p.quadratic ≠ 0)
   have factors : (2*(p.quadratic:ℝ)*t+p.linear-Real.sqrt (disc p s))*
       (2*(p.quadratic:ℝ)*t+p.linear+Real.sqrt (disc p s)) = 0 := by
     nlinarith only [square,squareRoot]
+  let d := 2*(p.quadratic:ℝ)
+  have hd : d ≠ 0 := mul_ne_zero (by norm_num) nc
   rcases mul_eq_zero.mp factors with positive | negative
   · right
-    simp [stationValue]
-    field_simp
-    linear_combination -positive
+    change -(p.linear:ℝ)/d + (1/d)*Real.sqrt (disc p s) = t
+    calc
+      _ = (-(p.linear:ℝ)+Real.sqrt (disc p s))/d := by ring
+      _ = t := (div_eq_iff hd).mpr (by dsimp [d]; linarith)
   · left
-    simp [stationValue]
-    field_simp
-    linear_combination -negative
+    change -(p.linear:ℝ)/d + (-1/d)*Real.sqrt (disc p s) = t
+    calc
+      _ = (-(p.linear:ℝ)-Real.sqrt (disc p s))/d := by ring
+      _ = t := (div_eq_iff hd).mpr (by dsimp [d]; linarith)
 
 theorem singleton_value {b : Bounds} {x : ℝ} {a : Rat} (h : Contains b x)
     (eq : b = singleton a) : x = a := by
@@ -102,7 +106,7 @@ theorem stationary_complete {p s m roots t} (h : fits p s) (nonflat : flat p m =
           rw [discZero] at square
           norm_num at square
           exact square
-        simp [stationary,hc,← show d = discriminant p from rfl,not_lt.mpr nonneg,eq] at listed
+        simp [stationary,hc,← show d = discriminant p from rfl,not_lt.mpr nonneg,eq,singleton] at listed
         subst roots
         refine ⟨_, List.mem_singleton_self _, ?_⟩
         have hc' : (p.quadratic:ℝ) ≠ 0 := by exact_mod_cast hc
@@ -156,6 +160,32 @@ theorem interior_kept {bits i p s m r out} (h : fits p s)
     cases result
     exact ⟨v,rfl,hv⟩
   · cases rest
+
+theorem collected {entry : Station → Option (Option Candidate)} {roots : List Station} {rows : List Candidate}
+    (computed : collectStations entry roots = some rows) :
+    (∀ r ∈ roots, ∃ out, entry r = some out ∧ ∀ z ∈ out.toList, z ∈ rows) ∧
+    (∀ z ∈ rows, ∃ r ∈ roots, entry r = some (some z)) := by
+  induction roots generalizing rows with
+  | nil => simp [collectStations] at computed; subst rows; simp
+  | cons r tail ih =>
+    obtain ⟨out, h, rest⟩ := Option.bind_eq_some.mp computed
+    obtain ⟨others, ho, result⟩ := Option.bind_eq_some.mp rest
+    cases result
+    obtain ⟨all, only⟩ := ih ho
+    constructor
+    · intro x hx
+      rcases List.mem_cons.mp hx with rfl | hx
+      · exact ⟨out,h,fun _ hz => List.mem_append_left _ hz⟩
+      · obtain ⟨v, hv, inc⟩ := all x hx
+        exact ⟨v,hv,fun z hz => List.mem_append_right _ (inc z hz)⟩
+    · intro z hz
+      rcases List.mem_append.mp hz with first | later
+      · cases out with
+        | none => simp at first
+        | some w => simp at first; subst w; exact ⟨r, List.mem_cons_self, h⟩
+      · obtain ⟨x,hx,hit⟩ := only z later
+        exact ⟨x,List.mem_cons_of_mem _ hx,hit⟩
+
 
 #print axioms row_bounds
 #print axioms stationary_complete
