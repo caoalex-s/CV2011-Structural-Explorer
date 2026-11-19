@@ -92,7 +92,7 @@ theorem all_rows_attained {bits i p s m candidates} (h : fits p s)
   by_cases flatPiece : flat p m = true
   · simp [flatPiece] at rest
     subst candidates
-    simp only [List.mem_cons,List.mem_singleton] at mem
+    simp only [List.mem_cons,List.mem_singleton,List.not_mem_nil,or_false] at mem
     rcases mem with rfl | rfl | rfl
     · exact start
     · exact start
@@ -101,8 +101,8 @@ theorem all_rows_attained {bits i p s m candidates} (h : fits p s)
     obtain ⟨stations,_,rest⟩ := Option.bind_eq_some.mp rest
     obtain ⟨mid,hm,eq⟩ := Option.bind_eq_some.mp rest
     cases eq
-    simp only [List.mem_cons,List.mem_append,List.mem_singleton] at mem
-    rcases mem with rfl | inner | rfl
+    simp only [List.mem_cons,List.mem_append,List.mem_singleton,List.not_mem_nil,or_false] at mem
+    rcases mem with (rfl | inner) | rfl
     · exact start
     · obtain ⟨root,_,inside⟩ := (collected hm).2 r inner
       obtain ⟨t,ht,result⟩ := Option.bind_eq_some.mp inside
@@ -126,7 +126,7 @@ theorem piece_range {bits i p s m candidates} (h : fits p s)
     (made : rows bits i p m = some candidates) (t : ℝ) (domain : t ∈ Icc 0 1) :
     (∃ lo ∈ candidates, field p s m (stationValue p s lo.station) ≤ field p s m t) ∧
     (∃ hi ∈ candidates, field p s m t ≤ field p s m (stationValue p s hi.station)) := by
-  have continuous : Continuous (field p s m) := by cases m <;> simp [field,shear,moment] <;> fun_prop
+  have continuous : Continuous (field p s m) := continuous_iff_continuousAt.mpr fun t => (field_derivative p s m t).continuousAt
   obtain ⟨x,hx,low⟩ := isCompact_Icc.exists_isMinOn ⟨t,domain⟩ continuous.continuousOn
   obtain ⟨y,hy,high⟩ := isCompact_Icc.exists_isMaxOn ⟨t,domain⟩ continuous.continuousOn
   obtain ⟨a,ha,ra⟩ := extremum_covered h made hx (Or.inr low)

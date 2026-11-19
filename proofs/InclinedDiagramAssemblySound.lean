@@ -270,6 +270,8 @@ theorem system_dimensions (n) (rows) (sys : System) :
     have rest := ih (insert sys (equation n eq))
     exact ⟨rest.1.trans next.1,rest.2.trans next.2⟩
 
+theorem empty_work (f : Fin 0 → ℝ) : (∑ i, f i) = 0 := by simp
+
 open InclinedFrameGlobalBasis
 theorem rigid_columns {data : Partition} {basis : GlobalBasis} {bits} {cert : Certificate data basis}
     (valid : PartitionValid data) (allocation : GlobalBasisValid data basis)
@@ -282,7 +284,7 @@ theorem rigid_columns {data : Partition} {basis : GlobalBasis} {bits} {cert : Ce
   refine ⟨variation,?_,?_⟩
   · exact fun p d => InclinedFrameIntervalAssemblySound.pointColumnAt_contains allocation columns p col d
   · have allowed := (range_equals_source_kernel valid allocation variation).mpr ⟨coords,rfl⟩
-    simpa using rigid_work valid equilibrium variation allowed
+    rw [empty_work,add_zero]; exact rigid_work valid equilibrium variation allowed
 
 theorem release_columns (l : Layout) {bits} {cert : Certificate l.expanded l.basis}
     (columns : InclinedRelease.Projections l bits cert) (z : Fin l.basis.columns.size → ℝ)
@@ -290,8 +292,75 @@ theorem release_columns (l : Layout) {bits} {cert : Certificate l.expanded l.bas
     WorkColumns cert (InclinedRelease.Sound.motion l z) #[] (fun i => Fin.elim0 i) := by
   intro col
   exact ⟨unitMotion l col, fun p d => InclinedRelease.Sound.point_contains columns p col d,
-    by simpa using released_work l z equilibrium col⟩
+    by rw [empty_work,add_zero]; exact released_work l z equilibrium col⟩
 
+theorem array_sum {α} [Inhabited α] (xs : Array α) (f : α → ℝ) :
+    (∑ i : Fin xs.size, f xs[i.val]!) = (xs.toList.map f).sum := by
+  rw [← fin_sum]
+  congr 1
+  apply List.ext_getElem
+  · simp
+  · intro i h1 h2
+    simp [getElem!_pos,List.finRange,List.map_ofFn,h1,h2]
+
+theorem omit_zero (xs : List Nat) (ks : Array Rat) (f : Nat → ℝ) :
+    ((xs.filter (fun side => ks[side]! != 0)).map (fun side => (ks[side]! : Rat)*f side)).sum =
+      (xs.map (fun side => (ks[side]! : Rat)*f side)).sum := by
+  induction xs with
+  | nil => simp
+  | cons a tail ih =>
+    by_cases zero : ks[a]! = 0 <;> simp [zero,ih]
+
+def springSides (l : Layout) (ks : Array Rat) := l.sides.filter (fun side => ks[side]! != 0)
+def springColumns (l : Layout) (ks : Array Rat) := (springSides l ks).map (FrameSpring.relativeColumn l)
+
+def unitGap (l : Layout) (z : Fin l.basis.columns.size → ℝ) (side : Nat) :=
+  ∑ col, (FrameSpring.relativeColumn l side col : ℝ)*z col
+
+def physicalTorques (l : Layout) (ks : Array Rat) (z : Fin l.basis.columns.size → ℝ)
+    (i : Fin (springColumns l ks).size) :=
+  let side := (springSides l ks)[i.val]!
+  (ks[side]! : Rat)*unitGap l z side
+
+theorem coupling_action (l : Layout) (ks : Array Rat) (z : Fin l.basis.columns.size → ℝ)
+    (row : Fin l.basis.columns.size) :
+    (∑ j : Fin (springColumns l ks).size,
+      ((springColumns l ks)[j.val]! row : ℝ)*physicalTorques l ks z j) =
+    ∑ col, (FrameSpring.coupling l ks row col : ℝ)*z col := by
+  let f (side : Nat) := (FrameSpring.relativeColumn l side row : ℝ)*unitGap l z side
+  have reduced :
+      (∑ j : Fin (springColumns l ks).size, ((springColumns l ks)[j.val]! row : ℝ)*physicalTorques l ks z j) =
+      ∑ j : Fin (springSides l ks).size, ((ks[(springSides l ks)[j.val]!]! : Rat) : ℝ)*f (springSides l ks)[j.val]! := by
+    simp only [springColumns,Array.size_map]
+    apply Finset.sum_congr rfl
+    intro i _
+    simp [getElem!_pos,i.isLt,physicalTorques,f]
+    ring
+  rw [reduced,array_sum]
+  simp only [springSides,Array.toList_filter,omit_zero,←array_sum]
+  simp only [FrameSpring.coupling,FrameSpring.Sound.sumRational_cast,Rat.cast_mul,Finset.sum_mul]
+  rw [Finset.sum_comm]
+  apply Finset.sum_congr rfl
+  intro i _
+  simp [f,unitGap,Finset.mul_sum,mul_assoc]
+
+theorem spring_columns (l : Layout) (ks : Array Rat) {bits} {cert : Certificate l.expanded l.basis}
+    (columns : InclinedRelease.Projections l bits cert) (z : Fin l.basis.columns.size → ℝ)
+    (equilibrium : FrameMatrixResidual.action (FrameSpring.Sound.physicalMatrix l ks) z = InclinedRelease.Sound.force l) :
+    WorkColumns cert (InclinedRelease.Sound.motion l z) (springColumns l ks) (physicalTorques l ks z) := by
+  intro col
+  refine ⟨unitMotion l col,fun p d => InclinedRelease.Sound.point_contains columns p col d,?_⟩
+  have solved := congrFun equilibrium col
+  change (∑ c, (InclinedRelease.Sound.matrix l col c + (FrameSpring.coupling l ks col c:ℝ))*z c) = _ at solved
+  simp only [add_mul,Finset.sum_add_distrib] at solved
+  have beam := release_matrix_action l col z
+  change (∑ c, InclinedRelease.Sound.matrix l col c*z c) = _ at beam
+  rw [beam,release_force] at solved
+  rw [InclinedFrameIntervalReactionsSound.total_piece_work l.valid,coupling_action]
+  unfold externalWork at solved
+  linarith
+
+#print axioms spring_columns
 #print axioms rigid_columns
 #print axioms release_columns
 #print axioms all_rows_valid
