@@ -46,12 +46,9 @@ theorem piece_complete {f p o len rows} (ok : candidates f p o len = some rows) 
       ∃ r ∈ rows, represents f o r x := by
   unfold candidates at ok
   by_cases lenPos : 0 < len
-  · simp only [gt_iff_lt, lenPos, guard, pure, SeqRight.seqRight, Bind.bind, Option.bind] at ok
-    -- Strip the two successful endpoint evaluations.
-    split at ok <;> try contradiction
-    rename_i left hl
-    split at ok <;> try contradiction
-    rename_i right hr
+  · rw [if_pos lenPos] at ok
+    obtain ⟨left,hl,rest⟩ := Option.bind_eq_some.mp ok
+    obtain ⟨right,hr,ok⟩ := Option.bind_eq_some.mp rest
     have hL : (0:ℝ) < len := by exact_mod_cast lenPos
     have zero : val (rational 0) = 0 := by simp [val,rational]
     have length : val (rational len) = len := by simp [val,rational]
@@ -70,9 +67,8 @@ theorem piece_complete {f p o len rows} (ok : candidates f p o len = some rows) 
       exact ⟨lenPos, by simpa [plateau] using And.intro vl (And.intro vp vr),
         fun x hx _ => ⟨plateau, by simp [plateau], covers x hx⟩⟩
     · simp only [hf, Bool.false_eq_true, ↓reduceIte] at ok
-      split at ok <;> try contradiction
-      rename_i middle hm
-      cases ok
+      obtain ⟨middle,hm,eq⟩ := Option.bind_eq_some.mp ok
+      cases eq
       obtain ⟨all, only⟩ := collected hm
       refine ⟨lenPos, ?_, ?_⟩
       · intro r hr'

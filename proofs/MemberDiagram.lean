@@ -102,8 +102,9 @@ def candidate (f : Cubic) (piece : Nat) (side : String) (origin : Rat) (x : Radi
 
 def rootCandidate (f : Cubic) (piece : Nat) (origin len : Rat) (root : Radical) : Option (Option Candidate) := do
   let box ← enclosure root
-  if box.hi ≤ 0 || len ≤ box.lo then return none
-  if 0 < box.lo ∧ box.hi < len then return some (← candidate f piece "interior" origin root)
+  if box.hi ≤ 0 ∨ len ≤ box.lo then pure none
+  else if 0 < box.lo ∧ box.hi < len then
+    (candidate f piece "interior" origin root).bind (fun row => some (some row))
   else none
 
 /-- Keep a result for each stationary root in order; outside roots return none. -/
@@ -114,14 +115,16 @@ def collectRoots (entry : Radical → Option (Option Candidate)) : List Radical 
     let rest ← collectRoots entry tail
     return value.toList ++ rest
 
-def candidates (f : Cubic) (piece : Nat) (origin len : Rat) : Option (List Candidate) := do
-  guard (len > 0)
-  let left ← candidate f piece "start" origin (rational 0)
-  let right ← candidate f piece "end" origin (rational len)
-  if flat f then
-    return [left, {left with side := "flat", x := ⟨origin, origin+len⟩}, right]
-  let middle ← collectRoots (rootCandidate f piece origin len) (stationary f)
-  return left :: middle ++ [right]
+def candidates (f : Cubic) (piece : Nat) (origin len : Rat) : Option (List Candidate) :=
+  if 0 < len then do
+    let left ← candidate f piece "start" origin (rational 0)
+    let right ← candidate f piece "end" origin (rational len)
+    if flat f then
+      pure [left, {left with side := "flat", x := ⟨origin, origin+len⟩}, right]
+    else
+      let middle ← collectRoots (rootCandidate f piece origin len) (stationary f)
+      pure (left :: (middle ++ [right]))
+  else none
 
 /-- Comparisons use disjoint certified enclosures or equality of the exact
 radicals. An unresolved ordering causes the entire diagram to be inconclusive. -/

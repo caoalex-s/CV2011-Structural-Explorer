@@ -102,10 +102,11 @@ theorem kept {f p o r out} {len : Rat} (inside : 0 < val r ∧ val r < (len : �
   obtain ⟨_, lo, hi⟩ := enclosure_checked hb
   have h0 : ¬ box.hi ≤ 0 := by exact_mod_cast (show ¬ (box.hi : ℝ) ≤ 0 by linarith [inside.1])
   have hL : ¬ len ≤ box.lo := by exact_mod_cast (show ¬ (len : ℝ) ≤ box.lo by linarith [inside.2])
-  simp only [decide_eq_false h0, decide_eq_false hL, Bool.false_or, Bool.false_eq_true, if_false] at rest
+  change (if box.hi ≤ 0 ∨ len ≤ box.lo then some none else _) = some out at rest
+  rw [if_neg (not_or.mpr ⟨h0,hL⟩)] at rest
   split at rest
   next => obtain ⟨z,hz,eq⟩ := Option.bind_eq_some.mp rest; cases eq; exact ⟨z,rfl,hz⟩
-  next => cases rest
+  next => contradiction
 
 #print axioms roots_complete
 end
