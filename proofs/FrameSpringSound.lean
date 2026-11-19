@@ -20,18 +20,36 @@ theorem unit_rotation (l : Layout) (col : Fin l.basis.columns.size) (p : Nat) :
   · simp [InclinedFrameReal.pointMotion, h, unitMotion, InclinedFrameIntervalBasisSound.synthesizedValues]
   · simp [InclinedFrameReal.pointMotion, h, InclinedFrameIntervalBasis.pointAmplitude]
 
+theorem sumRational_cast {n : Nat} (term : Fin n → Rat) :
+    (sumRational term : ℝ) = ∑ i, (term i : ℝ) := by
+  induction n with
+  | zero => simp [sumRational]
+  | succ n ih => simp [sumRational, Fin.sum_univ_succ, ih]
+
 /-- In physical coordinates the entry is the Hessian of the same quadratic
 spring potential whose derivative gives the two equal and opposite actions. -/
 theorem coupling_physical (l : Layout) (ks : Array Rat) (r c : Fin l.basis.columns.size) :
     (coupling l ks r c : ℝ) =
       ∑ i : Fin l.sides.size, (ks[l.sides[i.val]!]! : ℝ) *
         gap l (unitMotion l r) l.sides[i.val]! * gap l (unitMotion l c) l.sides[i.val]! := by
-  simp [coupling, relativeColumn, gap, unit_rotation]
+  simp [coupling, sumRational_cast, relativeColumn, gap, unit_rotation]
 
 theorem spring_energy_law (k memberRotation referenceRotation : ℝ) :
     HasDerivAt (FrameTransform.relativePotential k 0 0) (k * (memberRotation - referenceRotation))
       (memberRotation - referenceRotation) := by
   simpa using FrameTransform.potential_derivative k 0 0 (memberRotation - referenceRotation)
+
+/-- Restoring couples on the two physical ends are the negatives of the two
+energy derivatives; their sum vanishes even when a joint carries other loads. -/
+theorem spring_action_pair (k own reference : ℝ) :
+    HasDerivAt (fun x => FrameTransform.relativePotential k 0 0 (x - reference))
+      (k * (own - reference)) own ∧
+    HasDerivAt (fun x => FrameTransform.relativePotential k 0 0 (own - x))
+      (-(k * (own - reference))) reference := by
+  have h := spring_energy_law k own reference
+  constructor
+  · simpa [Function.comp_def] using h.comp own ((hasDerivAt_id own).sub_const reference)
+  · simpa [Function.comp_def] using h.comp reference ((hasDerivAt_id reference).const_sub own)
 
 theorem equilibrium {l : Layout} {ks : Array Rat} {bits : Nat} {c : Certificate l.expanded l.basis}
     (accepted : FrameSpring.verified l ks bits c = true) :
@@ -152,6 +170,6 @@ theorem accepted_readouts {input output : String} (accepted : FrameSpring.Wire.c
 
 #print axioms accepted_readouts
 #print axioms coupling_physical
-#print axioms spring_energy_law
+#print axioms spring_action_pair
 end
 end FrameSpring.Sound

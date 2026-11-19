@@ -150,7 +150,10 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
             }
             if (starting.supportsInclinedReleases)
                 host.querySelector('#portal-scope')!.textContent = 'Inclined members and roller directions use interval arithmetic. A release preserves the joint translations and gives the member end its own rotation. An inconclusive calculation leaves stability undetermined.';
-            if (starting.supportsSprings) host.querySelector('#portal-scope')!.textContent = 'The checker uses the rotational stiffness specified at each connected end. Translations are shared at the joint. A failed interval check leaves stability undetermined.';
+            if (starting.supportsSprings) {
+                host.querySelector('#portal-introduction')!.textContent = 'Generate a solution for the selected section and inspect the rotations and transmitted couple at each spring.';
+                host.querySelector('#portal-scope')!.textContent = 'The checker uses the rotational stiffness specified at each connected end. Translations are shared at the joint. A failed interval check leaves stability undetermined.';
+            }
             update(member, parameter);
             // A single explicit Generate survives only the activation reload of
             // the same saved drawing. Subsequent edits revoke generation intent.

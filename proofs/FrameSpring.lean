@@ -41,10 +41,15 @@ def relativeColumn (l : Layout) (side : Nat) (col : Fin l.basis.columns.size) : 
   let rotation := fun point => InclinedFrameIntervalBasis.pointAmplitude l.expanded l.basis col point 2
   rotation (Wire.facePoint l side) - rotation (Wire.faceNode l side)
 
+/-- Sum a bounded source-owned collection without importing non-executable real algebra. -/
+def sumRational : {n : Nat} → (Fin n → Rat) → Rat
+  | 0, _ => 0
+  | n+1, term => term 0 + sumRational (fun i : Fin n => term i.succ)
+
 /-- The Hessian of the physical rotational spring energy contributes k bᵀb.
 Fixed rotations have zero amplitude. No penalty stiffness is introduced. -/
 def coupling (l : Layout) (ks : Array Rat) (r c : Fin l.basis.columns.size) : Rat :=
-  ∑ i : Fin l.sides.size,
+  sumRational fun i : Fin l.sides.size =>
     let side := l.sides[i.val]!
     ks[side]! * relativeColumn l side r * relativeColumn l side c
 
