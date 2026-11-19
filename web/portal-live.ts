@@ -152,14 +152,14 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                 }
             }
             if (starting.supportsHingeFrames) {
-                host.querySelector('#portal-introduction')!.textContent = 'Generate a solution for the selected section and inspect the rotations and moments at each hinge.';
-                host.querySelector('#portal-scope')!.textContent = 'This checker supports rotational releases on horizontal and vertical members with shared joint translations and cardinal roller restraints. Inclined released frames and elastic connections are outside this increment. The compiled checker verifies equilibrium, end moments and admissible mechanism motions.';
+                host.querySelector('#portal-introduction')!.textContent = 'Generate the worked solution to see the selected member’s shear and moment diagrams and the rotations at its hinges.';
+                host.querySelector('#portal-scope')!.textContent = 'This checker supports rotational releases on horizontal and vertical members with shared joint translations and cardinal roller restraints. For a stable frame, the worked solution uses each member’s own end rotations to recover its fields. The compiled checker also checks admissible mechanism motions.';
             }
             if (starting.supportsInclinedReleases)
                 host.querySelector('#portal-scope')!.textContent = 'Inclined members and roller directions use interval arithmetic. A release preserves the joint translations and gives the member end its own rotation. An inconclusive calculation leaves stability undetermined.';
             if (starting.supportsSprings) {
                 host.querySelector('#portal-introduction')!.textContent = 'Generate a solution for the selected section and inspect the rotations and transmitted couple at each spring.';
-                host.querySelector('#portal-scope')!.textContent = 'The checker uses the rotational stiffness specified at each connected end. Translations are shared at the joint. A failed interval check leaves stability undetermined.';
+                host.querySelector('#portal-scope')!.textContent = 'The checker uses the rotational stiffness specified at each connected end. Translations are shared at the joint. For stable horizontal and vertical frames with cardinal restraints, the worked solution also checks the complete selected member using exact rational spring stiffness and equilibrium. A failed interval check leaves stability undetermined.';
             }
             update(member, parameter);
         } catch (error) { if (starting === runtime) { stop(); startingNow = false; reset.hidden = false; clear(`Checking unavailable: ${String(error)}`); } }

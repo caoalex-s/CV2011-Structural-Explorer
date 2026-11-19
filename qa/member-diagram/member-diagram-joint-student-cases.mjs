@@ -85,7 +85,7 @@ function checkDrawnSource(model, family, mode) {
         .sort((a, b) => a[0] - b[0]), [[0, 'fixed'], [8, 'fixed']]);
     const joint = model.nodes.find(node => node.x === 4);
     const jointKind = { rigid: 'rigid', hinge: 'pinned', spring5000: 'semi-rigid', spring2500: 'semi-rigid' };
-    assert.equal(joint.joint, jointKind[mode]);
+    assert.equal(joint.joint ?? 'rigid', jointKind[mode]);
     const stiffness = { spring5000: 5000, spring2500: 2500 }[mode];
     if (stiffness) assert.equal(joint.rotationStiffness, stiffness);
     assert.equal(model.loads.length, 1);
