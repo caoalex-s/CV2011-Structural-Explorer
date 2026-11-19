@@ -6,7 +6,7 @@ import { endConnection, nodeLabels, referenceMember } from './engine.js';
 import { memberLabel } from './model-view.js';
 import { decodeAcceptedHingePacket } from './frame-hinge-result.js';
 import { decodeInclinedReleaseReport } from './frame-inclined-release-result.js';
-import { renderMemberDiagram } from './member-diagram.js';
+import { renderInclinedMemberDiagram, renderMemberDiagram } from './member-diagram.js';
 import { springExplanation } from './frame-spring-worked.js';
 import { PortalRuntime } from './portal-runtime.js';
 import { sha256 } from './portal-runtime.js';
@@ -182,9 +182,9 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
         const reportDigest = result.reportDigest;
         if (await sha256(packet) !== packetDigest) throw Error('Accepted packet identity changed.');
         if (!requests.isCurrent(token) || checker !== runtime) return;
-        function drawDiagram(source: Model, member: string, receipt: object, joint: boolean) {
+        function drawDiagram(source: Model, member: string, receipt: object, route: 'diagram' | 'joint-diagram' | 'inclined-diagram') {
             diagramRuntime?.dispose();
-            const extra = new PortalRuntime(new URL(joint ? '../joint-diagram/worker.mjs' : '../diagram/worker.mjs', runtimeUrl));
+            const extra = new PortalRuntime(new URL('../' + route + '/worker.mjs', runtimeUrl));
             diagramRuntime = extra;
             const progress = document.createElement('p');
             progress.textContent = 'Checking the whole-member diagrams…';
@@ -203,8 +203,11 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                     const selected = source.members.find(m => m.id === member)!;
                     const start = source.nodes.find(n => n.id === selected.a)!;
                     const end = source.nodes.find(n => n.id === selected.b)!;
-                    progress.replaceWith(renderMemberDiagram(checked.report, selected.id, memberLabel(source, selected), Math.sign(end.x - start.x)));
-                    exportText = JSON.stringify({ ...receipt, diagram: { protocol: 'CV2011_DIAGRAM_1',
+                    const label = memberLabel(source, selected);
+                    progress.replaceWith(route === 'inclined-diagram'
+                        ? renderInclinedMemberDiagram(checked.report, selected.id, label, end.x - start.x, end.y - start.y)
+                        : renderMemberDiagram(checked.report, selected.id, label, Math.sign(end.x - start.x)));
+                    exportText = JSON.stringify({ ...receipt, diagram: { protocol: route === 'inclined-diagram' ? 'CV2011_INCLINED_DIAGRAM_1' : 'CV2011_DIAGRAM_1',
                         artifact: extra.artifact, bundle: extra.bundle, packetDigest, reportDigest: checked.reportDigest,
                         report: new TextDecoder().decode(checked.report) } }, null, 2);
                     certificate.textContent = exportText;
@@ -260,8 +263,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                 const axes = document.createElement('p'); axes.textContent = direction;
                 workedOutput.prepend(axes);
                 collapse.textContent = 'Collapse solution'; collapse.setAttribute('aria-expanded', 'true');
-                if (checker.supportsSprings && !needsInclinedGeometry(drawing))
-                    drawDiagram(drawing, values.query.member, receipt, true);
+                drawDiagram(drawing, values.query.member, receipt, needsInclinedGeometry(drawing) ? 'inclined-diagram' : 'joint-diagram');
             };
             if (pendingGeneration === generationKey()) { pendingGeneration = null; acceptedGeneration(); }
             return;
@@ -309,7 +311,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                 workedOutput.replaceChildren(...paragraphs([...teaching, ...lines]));
                 workedOutput.hidden = false; collapse.hidden = false; collapse.textContent = 'Collapse solution';
                 collapse.setAttribute('aria-expanded', 'true');
-                if (frame.kind === 'solution') drawDiagram(drawing, frame.query.member, receipt, true);
+                if (frame.kind === 'solution') drawDiagram(drawing, frame.query.member, receipt, 'joint-diagram');
             };
             if (pendingGeneration === generationKey()) { pendingGeneration = null; acceptedGeneration(); }
             return;
@@ -341,6 +343,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                 } catch {
                     workedOutput.innerHTML = '<p>The separate numerical calculation could not reproduce a suitable teaching substitution. The accepted intervals and their accuracy bounds remain available below.</p>' + presentation;
                 }
+                drawDiagram(sourceRequest.model, sourceRequest.query.member, receipt, 'inclined-diagram');
                 workedOutput.hidden = false; collapse.hidden = false;
                 collapse.textContent = 'Collapse solution'; collapse.setAttribute('aria-expanded', 'true');
             };
@@ -371,7 +374,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                 exportText = JSON.stringify({ ...receipt, workedSolution: report }, null, 2);
                 certificate.textContent = exportText;
                 if (frame.kind !== 'solution') return;
-                drawDiagram(receipt.sourceRequest.model, frame.query.member, { ...receipt, workedSolution: report }, false);
+                drawDiagram(receipt.sourceRequest.model, frame.query.member, { ...receipt, workedSolution: report }, 'diagram');
             } catch (error) {
                 workedOutput.textContent = `The checked results remain available in Verification. The explanatory solution could not be generated: ${String(error)}`;
             }
