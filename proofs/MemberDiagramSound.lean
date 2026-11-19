@@ -12,7 +12,7 @@ def field (f : Cubic) (x : ℝ) : ℝ := f.f0 + x*(f.f1 + x*(f.f2 + x*f.f3))
 
 theorem sqrt_checked {d : Rat} {b : Box} (h : sqrtBox d = some b) :
     0 ≤ (d : ℝ) ∧ contains b (Real.sqrt d) := by
-  unfold sqrtBox at h
+  simp only [sqrtBox] at h
   split at h
   next ok =>
     obtain ⟨hl, lower, hu, upper⟩ := ok
@@ -20,9 +20,13 @@ theorem sqrt_checked {d : Rat} {b : Box} (h : sqrtBox d = some b) :
     have hd : 0 ≤ d := le_trans (mul_self_nonneg _) lower
     refine ⟨by exact_mod_cast hd, ?_, ?_⟩
     · apply Real.le_sqrt_of_sq_le
-      exact_mod_cast (by simpa only [pow_two] using lower)
+      rw [pow_two]
+      exact_mod_cast lower
     · apply (Real.sqrt_le_iff).2
-      exact ⟨by exact_mod_cast hu, by exact_mod_cast (by simpa only [pow_two] using upper)⟩
+      constructor
+      · exact_mod_cast hu
+      · rw [pow_two]
+        exact_mod_cast upper
   next => cases h
 
 theorem enclosure_checked {r : Radical} {b : Box} (h : enclosure r = some b) :
@@ -30,19 +34,20 @@ theorem enclosure_checked {r : Radical} {b : Box} (h : enclosure r = some b) :
   unfold enclosure at h
   obtain ⟨s, hs, rest⟩ := Option.bind_eq_some.mp h
   obtain ⟨hd, hl, hu⟩ := sqrt_checked hs
-  dsimp only at rest
+  change (if (scaledBox r s).hi - (scaledBox r s).lo ≤ _ then some (scaledBox r s) else none) = some b at rest
   split at rest
   next =>
     cases rest
+    refine ⟨hd, ?_⟩
     by_cases sign : r.b < 0
-    · simp only [if_pos sign]
-      have neg : (r.b : ℝ) ≤ 0 := by exact_mod_cast le_of_lt sign
-      exact ⟨hd, by simpa [contains,val] using And.intro (add_le_add_left (mul_le_mul_of_nonpos_left hu neg) (r.a : ℝ))
-        (add_le_add_left (mul_le_mul_of_nonpos_left hl neg) (r.a : ℝ))⟩
-    · simp only [if_neg sign]
-      have pos : 0 ≤ (r.b : ℝ) := by exact_mod_cast le_of_not_gt sign
-      exact ⟨hd, by simpa [contains,val] using And.intro (add_le_add_left (mul_le_mul_of_nonneg_left hl pos) (r.a : ℝ))
-        (add_le_add_left (mul_le_mul_of_nonneg_left hu pos) (r.a : ℝ))⟩
+    · have neg : (r.b : ℝ) ≤ 0 := by exact_mod_cast le_of_lt sign
+      simpa [contains, val, scaledBox, sign] using
+        And.intro (add_le_add_left (mul_le_mul_of_nonpos_left hu neg) (r.a : ℝ))
+          (add_le_add_left (mul_le_mul_of_nonpos_left hl neg) (r.a : ℝ))
+    · have pos : 0 ≤ (r.b : ℝ) := by exact_mod_cast le_of_not_gt sign
+      simpa [contains, val, scaledBox, sign] using
+        And.intro (add_le_add_left (mul_le_mul_of_nonneg_left hl pos) (r.a : ℝ))
+          (add_le_add_left (mul_le_mul_of_nonneg_left hu pos) (r.a : ℝ))
   next => cases rest
 
 theorem horner_checked (x y : Radical) (c : Rat) (hd : 0 ≤ (x.d : ℝ)) (same : y.d = x.d) :
@@ -53,7 +58,9 @@ theorem horner_checked (x y : Radical) (c : Rat) (hd : 0 ≤ (x.d : ℝ)) (same 
 theorem evaluation_checked (f : Cubic) (x : Radical) (hd : 0 ≤ (x.d : ℝ)) :
     val (evaluate f x) = field f (val x) := by
   unfold evaluate
-  rw [horner_checked _ _ _ hd rfl, horner_checked _ _ _ hd rfl, horner_checked _ _ _ hd rfl]
+  rw [horner_checked x (hornerStep x (hornerStep x ⟨f.f3, 0, x.d⟩ f.f2) f.f1) f.f0 hd rfl,
+      horner_checked x (hornerStep x ⟨f.f3, 0, x.d⟩ f.f2) f.f1 hd rfl,
+      horner_checked x ⟨f.f3, 0, x.d⟩ f.f2 hd rfl]
   simp [val, field]
 
 theorem equality_checked {x y : Radical} (hx : 0 ≤ (x.d : ℝ)) (hy : 0 ≤ (y.d : ℝ))

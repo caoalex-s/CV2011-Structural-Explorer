@@ -11,7 +11,6 @@ import { join } from 'node:path';
 const portal = { height: 4, length: 6, EA: 2000000, EI: 20000, w0: 6 };
 const portalShear = 3510 / 563;
 const portalStartMoment = -396 / 563;
-const portalRootOffset = Math.sqrt(1557 / 563);
 
 function piece(start, end, shear, moment) {
     return { start, end, shear, moment };
@@ -21,10 +20,18 @@ function candidate(field, side, index, x, value, minimum = false, maximum = fals
     return { field, side, index, x, value, minimum, maximum };
 }
 
-function affineReference(startShear, startMoment, offset) {
+function affineReference(startShear, startMoment, discriminant) {
     // w = 6−2x kN/m, so V' = −w and M' = V. The zero of w is
     // the shear minimum. The two zeros of V locate the moment extrema.
+    const [numerator, denominator] = discriminant;
+    const offset = Math.sqrt(numerator / denominator);
     const momentMagnitude = 2 * offset ** 3 / 3;
+    const maximum = candidate('M', 'interior', 0, 3 - offset, momentMagnitude, false, true);
+    const minimum = candidate('M', 'interior', 0, 3 + offset, -momentMagnitude, true);
+    maximum.radicals = { x: [3, -1, 1, numerator, denominator],
+        y: [0, 2 * numerator, 3 * denominator, numerator, denominator] };
+    minimum.radicals = { x: [3, 1, 1, numerator, denominator],
+        y: [0, -2 * numerator, 3 * denominator, numerator, denominator] };
     return {
         pieces: [piece(0, 6, [startShear, -6, 1], [startMoment, startShear, -3, 1 / 3])],
         candidates: [
@@ -33,15 +40,14 @@ function affineReference(startShear, startMoment, offset) {
             candidate('V', 'interior', 0, 3, startShear - 9, true),
             candidate('M', 'start', 0, 0, startMoment),
             candidate('M', 'end', 0, 6, -startMoment),
-            candidate('M', 'interior', 0, 3 - offset, momentMagnitude, false, true),
-            candidate('M', 'interior', 0, 3 + offset, -momentMagnitude, true),
+            maximum, minimum,
         ],
     };
 }
 
 export const handReferences = {
-    portal: affineReference(portalShear, portalStartMoment, portalRootOffset),
-    pinRoller: affineReference(6, 0, Math.sqrt(3)),
+    portal: affineReference(portalShear, portalStartMoment, [1557, 563]),
+    pinRoller: affineReference(6, 0, [3, 1]),
     jumps: {
         // L=8, downward 12 kN at x=2 and +6 kN m at x=4.
         // Moment balance gives B_y=(12*2−6)/8=2.25 and A_y=9.75.
@@ -84,6 +90,21 @@ function contains(lower, upper, expected) {
     return lower <= upper && lower - slack <= expected && expected <= upper + slack;
 }
 
+/** Compare a report endpoint q with a + (b/c) sqrt(d/e) exactly.
+ * First compare signs of q-a and b. Square only when signs agree.
+ */
+export function compareRationalToRadical(endpoint, radical) {
+    const [top, bottom] = endpoint.split('/').map(BigInt);
+    const [a, b, c, d, e] = radical.map(BigInt);
+    const shifted = top - a * bottom;
+    const sign = value => value < 0n ? -1 : value > 0n ? 1 : 0;
+    const leftSign = sign(shifted), rightSign = sign(b);
+    if (leftSign !== rightSign) return sign(BigInt(leftSign - rightSign));
+    if (leftSign === 0) return 0;
+    const comparison = shifted ** 2n * c ** 2n * e - b ** 2n * bottom ** 2n * d;
+    return leftSign * sign(comparison);
+}
+
 export function compareDiagram(observed, expected) {
     assert.equal(observed.pieces.length, expected.pieces.length);
     for (const [index, reference] of expected.pieces.entries()) {
@@ -111,6 +132,11 @@ export function compareDiagram(observed, expected) {
             `${ref.field} value ${ref.value} outside a narrow bound at ${ref.x}`);
         assert.equal(row.min, String(ref.minimum), `${ref.field} minimum flag at ${ref.x}`);
         assert.equal(row.max, String(ref.maximum), `${ref.field} maximum flag at ${ref.x}`);
+        if (ref.radicals) for (const [axis, radical] of Object.entries(ref.radicals)) {
+            assert.ok(compareRationalToRadical(row[axis + 'Low'], radical) < 0 &&
+                compareRationalToRadical(row[axis + 'High'], radical) > 0,
+            `Exact rational enclosure misses the irrational ${axis} at ${ref.x}`);
+        }
     }
 }
 
