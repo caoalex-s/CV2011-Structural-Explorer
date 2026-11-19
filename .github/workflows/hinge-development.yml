@@ -119,7 +119,9 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: inclined-release-checker
-          path: public/portal-checker/inclined-release
+          path: .data/rebuilt-inclined-release
+      - name: Compare the installed inclined release checker with the clean build
+        run: diff -qr public/portal-checker/inclined-release .data/rebuilt-inclined-release
       - run: pnpm build
       - run: npm install --prefix .data/student-tools --ignore-scripts --save-exact playwright@1.51.1
       - run: node .data/student-tools/node_modules/playwright/cli.js install --with-deps chromium
