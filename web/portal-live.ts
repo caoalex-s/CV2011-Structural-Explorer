@@ -98,8 +98,9 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
     let startingNow = false;
     let exportText = '';
     let acceptedGeneration: (() => void) | null = null;
-    let pendingGeneration: string | null = null;
     const generationStorage = storageKey + '/generate';
+    let pendingGeneration = sessionStorage.getItem(generationStorage);
+    sessionStorage.removeItem(generationStorage);
     const sideStorage = storageKey + '/cut-side';
     // At a member endpoint only its inward face can be selected, even while
     // a newly selected checker is still starting and the selector is updating.
@@ -158,10 +159,6 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                 host.querySelector('#portal-scope')!.textContent = 'The checker uses the rotational stiffness specified at each connected end. Translations are shared at the joint. A failed interval check leaves stability undetermined.';
             }
             update(member, parameter);
-            // A single explicit Generate survives only the activation reload of
-            // the same saved drawing. Subsequent edits revoke generation intent.
-            if (sessionStorage.getItem(generationStorage) === generationKey()) pendingGeneration = generationKey();
-            sessionStorage.removeItem(generationStorage);
         } catch (error) { if (starting === runtime) { stop(); startingNow = false; reset.hidden = false; clear(`Checking unavailable: ${String(error)}`); } }
     }
     async function displayFrame(result: CheckerResult, envelope: Awaited<ReturnType<typeof createEvidenceEnvelope>>,
@@ -423,7 +420,6 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
         if (acceptedGeneration) { acceptedGeneration(); return; }
         pendingGeneration = generationKey();
         if (!enabled) {
-            sessionStorage.setItem(generationStorage, pendingGeneration);
             if (runtime) {
                 if (!startingNow) void start();
                 return;
@@ -487,10 +483,12 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                 navigator.serviceWorker.addEventListener('controllerchange', changed);
                 changed();
             });
+            if (pendingGeneration === generationKey()) sessionStorage.setItem(generationStorage, pendingGeneration);
             location.reload();
         } catch (error) { clear(String(error)); }
     };
     deactivate.onclick = async () => {
+        pendingGeneration = null;
         stop(); clear('Disabling local checking…');
         localStorage.setItem(storageKey, JSON.stringify(modelAtPresent()));
         prepareReload();
