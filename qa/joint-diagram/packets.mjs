@@ -15,7 +15,7 @@ await mkdir(dir, { recursive: true });
 
 for (const stiffness of [0, 2500, 5000]) {
     const model = example(stiffness ? 'semi-rigid' : 'hinge');
-    model.nodes[1].rotationStiffness = stiffness;
+    if (stiffness) model.nodes[1].rotationStiffness = stiffness;
     model.supports = [model.supports[0], {id:'S2', member:'BC', t:1, kind:'fixed', angle:90}];
     for (const load of ['point','affine']) {
         model.loads = [{id:'L', member:'AB', kind:load === 'point' ? 'force' : 'distributed',
