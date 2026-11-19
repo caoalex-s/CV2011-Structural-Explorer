@@ -62,8 +62,11 @@ def withStatics (data : Partition) (system : Statics.System) (i : Fin data.piece
   let lengthColumn := system.unknowns + segment.member
   let v := Statics.reduce system (Statics.equation system.width [(k,a.y-b.y),(k+1,b.x-a.x)])
   let m := Statics.reduce system (Statics.equation system.width [(k+2,-1)])
-  return {p with scaledShear := v, initialMoment := m, lengthColumn,
-    shearStart := ((onlyCoefficient v lengthColumn).map singleton).getD p.shearStart,
+  return {p with
+    scaledShear := v
+    initialMoment := m
+    lengthColumn := lengthColumn
+    shearStart := ((onlyCoefficient v lengthColumn).map singleton).getD p.shearStart
     momentStart := ((onlyCoefficient m (system.width-1)).map singleton).getD p.momentStart}
 
 def sheet {data : Partition} {basis : GlobalBasis} (bits m : Nat) (cert : Certificate data basis)

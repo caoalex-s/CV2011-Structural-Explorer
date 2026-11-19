@@ -117,6 +117,47 @@ theorem stationary_complete {p s m roots t} (h : fits p s) (nonflat : flat p m =
           · exact ⟨_,by simp,pos⟩
         · simp [stationary,hc,← show d = discriminant p from rfl,not_lt.mpr nonneg,eq,positive] at listed
 
+theorem row_bounds {bits i p s m side r out} (h : fits p s)
+    (done : row bits i p m side r = some out) :
+    Contains out.t (stationValue p s r) ∧ Contains out.x (position p s (stationValue p s r)) ∧
+    Contains out.y (field p s m (stationValue p s r)) ∧ out.station = r ∧ out.piece = i := by
+  obtain ⟨t,ht,rest⟩ := Option.bind_eq_some.mp done
+  obtain ⟨x,hx,rest⟩ := Option.bind_eq_some.mp rest
+  obtain ⟨y,hy,rest⟩ := Option.bind_eq_some.mp rest
+  obtain ⟨_,_,eq⟩ := Option.bind_eq_some.mp rest
+  cases eq
+  have parameter := station_fits h ht
+  have fraction := shifted p.left (scaled (p.right-p.left) parameter)
+  have positionBound := FrameEnclosure.executable_multiply_contains hx h.1 fraction
+  exact ⟨parameter,by simpa [position] using positionBound,evaluate_fits h parameter hy,rfl,rfl⟩
+
+theorem constant_field {p s m} (h : fits p s) (isFlat : flat p m = true) (t : ℝ) :
+    field p s m t = field p s m 0 := by
+  cases m with
+  | false =>
+    simp [flat] at isFlat
+    simp [field,shear,isFlat.1,isFlat.2]
+  | true =>
+    simp [flat] at isFlat
+    have zero := singleton_value h.2.1 isFlat.2
+    simp [field,moment,isFlat.1.1,isFlat.1.2,zero]
+
+theorem interior_kept {bits i p s m r out} (h : fits p s)
+    (strict : stationValue p s r ∈ Ioo 0 1) (done : interior bits i p m r = some out) :
+    ∃ v, out = some v ∧ row bits i p m "interior" r = some v := by
+  obtain ⟨t,ht,rest⟩ := Option.bind_eq_some.mp done
+  obtain ⟨lo,hi⟩ := station_fits h ht
+  have a : ¬t.upper ≤ 0 := by exact_mod_cast (show ¬(t.upper:ℝ) ≤ 0 by linarith [strict.1])
+  have b : ¬1 ≤ t.lower := by exact_mod_cast (show ¬(1:ℝ) ≤ t.lower by linarith [strict.2])
+  change (if t.upper ≤ 0 ∨ 1 ≤ t.lower then some none else _) = some out at rest
+  rw [if_neg (not_or.mpr ⟨a,b⟩)] at rest
+  split at rest
+  · obtain ⟨v,hv,result⟩ := Option.bind_eq_some.mp rest
+    cases result
+    exact ⟨v,rfl,hv⟩
+  · cases rest
+
+#print axioms row_bounds
 #print axioms stationary_complete
 end
 end InclinedDiagram.Sound
