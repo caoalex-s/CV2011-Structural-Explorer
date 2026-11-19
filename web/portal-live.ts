@@ -191,9 +191,9 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                     throw Error('Member end differs from the captured drawing.');
                 const role = face.released ? 'independent released-end rotation' :
                     referenceMember(drawing, face.node) === m.id ? 'reference rotation at the joint' : 'shares the reference rotation';
-                const couple = drawing.loads.filter(load => load.kind === 'moment' && load.member === m.id && load.t === face.end)
-                    .reduce((total, load) => total + load.mz, 0);
-                return `Node ${labels.get(face.node)}, member ${memberLabel(drawing, m)} (${role}). Shared displacement ux ≈ ${roundedDecimal(face.ux.midpoint, 6)} m, uy ≈ ${roundedDecimal(face.uy.midpoint, 6)} m. Rotation ≈ ${roundedDecimal(face.rotation.midpoint, 6)} rad. Applied end couple ${couple} kN m (counterclockwise positive). Section moment ≈ ${roundedDecimal(face.moment.midpoint, 6)} kN m.`;
+                const couples = drawing.loads.filter(load => load.kind === 'moment' && load.member === m.id && load.t === face.end);
+                const actions = couples.length ? `Applied ${couples.length === 1 ? 'couple' : 'couples'} on this end as drawn, ${couples.map(load => `${load.mz} kN m`).join(', ')} (counterclockwise positive).` : 'No couple is applied to this end.';
+                return `Node ${labels.get(face.node)}, member ${memberLabel(drawing, m)} (${role}). Shared displacement ux ≈ ${roundedDecimal(face.ux.midpoint, 6)} m, uy ≈ ${roundedDecimal(face.uy.midpoint, 6)} m. Rotation ≈ ${roundedDecimal(face.rotation.midpoint, 6)} rad. ${actions} Section moment ≈ ${roundedDecimal(face.moment.midpoint, 6)} kN m.`;
             });
             const presentation = renderIntervalValues(values, drawing);
             const render = (element: HTMLElement) => {

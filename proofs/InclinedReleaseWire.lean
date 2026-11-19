@@ -109,43 +109,94 @@ def groupReaction (l : Layout) (bits : Nat) (point : Nat) (d : Fin 3)
   FrameIntervalAssembly.sumTerms bits fun i : Fin l.expanded.points.size =>
     if l.parent[i.val]! == point then some (raw i d) else some ⟨0,0⟩
 
-/-- Sum residuals on all ends sharing a joint. Relative hinge forces cancel
-    and the total is the ground reaction at the original source point. -/
-def resultFields (l : Layout) (bits : Nat) (cert : InclinedFrameIntervalAssembly.Certificate l.expanded l.basis)
-    (q : Query) : Option (List String) := do
-  let fields ← tabulate 6 fun component => InclinedFrameIntervalRecovery.field bits cert q component
-  let raw ← tabulate l.expanded.points.size fun i =>
-    tabulate 3 fun d => InclinedFrameIntervalReactions.reaction bits cert i d
+/-- Retain the checked calculation alongside its result. Proof fields erase
+    during compilation and let the report theorem refer to each emitted value. -/
+structure Evaluated {α : Type} (op : Option α) where
+  value : α
+  computed : op = some value
+
+def evaluate {α : Type} (op : Option α) : Option (Evaluated op) :=
+  match h : op with
+  | none => none
+  | some value => some ⟨value, h⟩
+
+structure Accurate (quantity : Fin 9) (op : Option Bounds) extends Evaluated op where
+  accuracy : FrameIntervalAccuracy.check quantity value = true
+
+def measure (quantity : Fin 9) (op : Option Bounds) : Option (Accurate quantity op) := do
+  let result ← evaluate op
+  if h : FrameIntervalAccuracy.check quantity result.value = true then return ⟨result, h⟩ else none
+
+def gather : (n : Nat) → (V : Fin n → Type) → ((i : Fin n) → Option (V i)) → Option ((i : Fin n) → V i)
+  | 0, _, _ => some (fun i => Fin.elim0 i)
+  | n+1, V, entry => do
+    let head ← entry 0
+    let tail ← gather n (fun i => V i.succ) (fun i => entry i.succ)
+    return Fin.cases head tail
+
+def expandedPoint (l : Layout) (i : Fin l.original.points.size) : Nat :=
+  let p := l.original.points[i.val]!
+  if p.owner.isSome then InclinedFrameSource.locate l.expanded p.index p.t else p.index
+
+def faceNode (l : Layout) (side : Nat) := endpoint l.original.source.members[side/2]! side
+
+def faceSides (l : Layout) : Array Nat :=
+  ((List.range (2*l.original.source.members.size)).filter fun side =>
+    l.sides.any fun released => faceNode l released == faceNode l side).toArray
+
+def facePoint (l : Layout) (side : Nat) := InclinedFrameSource.locate l.expanded (side/2) (HingeFrame.faceQuery side).t
+
+abbrev Cert (l : Layout) := InclinedFrameIntervalAssembly.Certificate l.expanded l.basis
+
+structure Face (l : Layout) (bits : Nat) (c : Cert l) (side : Nat) where
+  motion : Evaluated (InclinedFrameIntervalRecovery.nodalMotion bits c (facePoint l side))
+  ux : FrameIntervalAccuracy.check 4 (motion.value 0) = true
+  uy : FrameIntervalAccuracy.check 5 (motion.value 1) = true
+  rotation : FrameIntervalAccuracy.check 3 (motion.value 2) = true
+  moment : Accurate 2 (InclinedFrameIntervalRecovery.field bits c (HingeFrame.faceQuery side) 2)
+
+def readFace (l : Layout) (bits : Nat) (c : Cert l) (side : Nat) : Option (Face l bits c side) := do
+  let motion ← evaluate (InclinedFrameIntervalRecovery.nodalMotion bits c (facePoint l side))
+  let moment ← measure 2 (InclinedFrameIntervalRecovery.field bits c (HingeFrame.faceQuery side) 2)
+  if h : FrameIntervalAccuracy.check 4 (motion.value 0) = true ∧
+      FrameIntervalAccuracy.check 5 (motion.value 1) = true ∧ FrameIntervalAccuracy.check 3 (motion.value 2) = true
+    then return ⟨motion, h.1, h.2.1, h.2.2, moment⟩ else none
+
+structure Values (l : Layout) (bits : Nat) (c : Cert l) (q : Query) where
+  fields : (d : Fin 6) → Accurate (InclinedFrameIntervalOutputs.fieldQuantity d) (InclinedFrameIntervalRecovery.field bits c q d)
+  raw : (p : Fin l.expanded.points.size) → (d : Fin 3) → Evaluated (InclinedFrameIntervalReactions.reaction bits c p d)
+  reactions : (p : Fin l.original.points.size) → (d : Fin 3) → Accurate (InclinedFrameIntervalOutputs.reactionQuantity d)
+    (groupReaction l bits (expandedPoint l p) d fun i k => (raw i k).value)
+  faces : (i : Fin (faceSides l).size) → Face l bits c (faceSides l)[i.val]!
+
+def readValues (l : Layout) (bits : Nat) (c : Cert l) (q : Query) : Option (Values l bits c q) := do
+  let fields ← gather 6 _ fun d => measure (InclinedFrameIntervalOutputs.fieldQuantity d) (InclinedFrameIntervalRecovery.field bits c q d)
+  let raw ← gather l.expanded.points.size _ fun p => gather 3 _ fun d => evaluate (InclinedFrameIntervalReactions.reaction bits c p d)
+  let reactions ← gather l.original.points.size _ fun p => gather 3 _ fun d =>
+    measure (InclinedFrameIntervalOutputs.reactionQuantity d) (groupReaction l bits (expandedPoint l p) d fun i k => (raw i k).value)
+  let faces ← gather (faceSides l).size _ fun i => readFace l bits c (faceSides l)[i.val]!
+  return ⟨fields, raw, reactions, faces⟩
+
+def encode {l : Layout} {bits : Nat} {c : Cert l} {q : Query} (v : Values l bits c q) : String := Id.run do
   let mut out := ["CV2011_RELEASE_RESULT_1", l.original.source.members[q.member]!.id] ++
     rationalFields q.t ++ [if q.right then "1" else "0", "1", toString l.original.points.size]
-  for i in List.finRange 6 do
-    guard (FrameIntervalAccuracy.check (InclinedFrameIntervalOutputs.fieldQuantity i) (fields i))
-    out := out ++ intervalFields (fields i)
-  for p in l.original.points do
+  for i in List.finRange 6 do out := out ++ intervalFields (v.fields i).value
+  for i in List.finRange l.original.points.size do
+    let p := l.original.points[i.val]!
     let member := p.owner.isSome
-    let point := if member then InclinedFrameSource.locate l.expanded p.index p.t else p.index
     let id := if member then l.original.source.members[p.index]!.id else l.original.source.nodes[p.index]!.id
     out := out ++ [if member then "1" else "0", toString p.index, id] ++ rationalFields p.t
-    for d in List.finRange 3 do
-      let reaction ← groupReaction l bits point d raw
-      guard (FrameIntervalAccuracy.check (InclinedFrameIntervalOutputs.reactionQuantity d) reaction)
-      out := out ++ intervalFields reaction
-  let sideNode := fun side => endpoint l.original.source.members[side/2]! side
-  let faces := (List.range (2*l.original.source.members.size)).filter fun side =>
-    l.sides.any fun released => sideNode released == sideNode side
-  out := out ++ [toString faces.length]
-  for side in faces do
-    let member := side/2
-    let face := HingeFrame.faceQuery side
-    let point := InclinedFrameSource.locate l.expanded member face.t
-    let motion ← InclinedFrameIntervalRecovery.nodalMotion bits cert point
-    let moment ← InclinedFrameIntervalRecovery.field bits cert face 2
-    guard (FrameIntervalAccuracy.check 2 moment && FrameIntervalAccuracy.check 3 (motion 2))
-    guard (FrameIntervalAccuracy.check 4 (motion 0) && FrameIntervalAccuracy.check 5 (motion 1))
-    out := out ++ [l.original.source.nodes[sideNode side]!.id, l.original.source.members[member]!.id,
+    for d in List.finRange 3 do out := out ++ intervalFields (v.reactions i d).value
+  out := out ++ [toString (faceSides l).size]
+  for i in List.finRange (faceSides l).size do
+    let side := (faceSides l)[i.val]!
+    let f := v.faces i
+    out := out ++ [l.original.source.nodes[faceNode l side]!.id, l.original.source.members[side/2]!.id,
       toString (side%2), if l.sides.contains side then "1" else "0"] ++
-      intervalFields (motion 0) ++ intervalFields (motion 1) ++ intervalFields (motion 2) ++ intervalFields moment
-  return out
+      intervalFields (f.motion.value 0) ++ intervalFields (f.motion.value 1) ++
+      intervalFields (f.motion.value 2) ++ intervalFields f.moment.value
+  return String.intercalate "\n" out
+
 
 def proposalFor (l : Layout) (value : Packet) : Option (InclinedFrameIntervalBuild.Proposal l.expanded l.basis) := do
   let n := l.basis.columns.size
@@ -160,8 +211,8 @@ def report (value : Packet) : Option String := do
   let proposal ← proposalFor l value
   let cert ← build l value.bits proposal
   if verified l value.bits cert then
-    let fields ← resultFields l value.bits cert value.query
-    let result := String.intercalate "\n" fields
+    let fields ← readValues l value.bits cert value.query
+    let result := encode fields
     if result.utf8ByteSize ≤ 262144 then some result else none
   else none
 
