@@ -58,7 +58,7 @@ jobs:
             done
             lean --run ../qa/inclined-diagram/Native.lean ../.data/inclined-diagram/*.packet ../.data/inclined-diagram/*.reject
           '
-      - run: cat .data/inclined-diagram/h2-forward.packet.report
+      - run: node qa/inclined-diagram/check-reports.mjs
       - name: Build browser checker
         env:
           GH_TOKEN: ${{ github.token }}
@@ -113,7 +113,7 @@ jobs:
             set -o pipefail
             export LEAN_PATH="$PWD:$LEAN_PATH"
             test -s InclinedDiagramSound.lean
-            python3 ../qa/inclined-release/compile.py InclinedDiagramSound | tee release-axioms.log
+            python3 ../qa/inclined-release/compile.py InclinedDiagramExtrema | tee release-axioms.log
             grep -F "InclinedDiagram.Sound.evaluate_fits" release-axioms.log
             ! grep -E "sorryAx|declaration uses .sorry." release-axioms.log
           '

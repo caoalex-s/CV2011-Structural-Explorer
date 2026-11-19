@@ -3,6 +3,7 @@ import MemberDiagramSound
 import FrameIntervalExpressionSound
 import FrameSpringSound
 import InclinedReleaseFields
+import InclinedDiagramStaticsSound
 
 namespace InclinedDiagram.Sound
 open FrameIntervalOps FrameEnclosure Set
