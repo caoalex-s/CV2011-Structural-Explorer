@@ -70,8 +70,8 @@ theorem element_terms_zero {data : Partition} (valid : PartitionValid data)
   let ell := pieceLength data seg
   let L := memberLength data seg.member
   let fraction := (seg.right:ℝ)-seg.left
-  let dx := data.source.nodes[member.b]!.x-data.source.nodes[member.a]!.x
-  let dy := data.source.nodes[member.b]!.y-data.source.nodes[member.a]!.y
+  let dx := (data.source.nodes[member.b]!.x:ℝ)-data.source.nodes[member.a]!.x
+  let dy := (data.source.nodes[member.b]!.y:ℝ)-data.source.nodes[member.a]!.y
   have positive := piece_properties data valid i
   rcases valid with ⟨source,_,_,_,_,_,_,pieces,_,_,_,_⟩
   let owner : Fin data.source.members.size := ⟨seg.member,(pieces i).1.1⟩
@@ -166,6 +166,71 @@ theorem released_work (l : Layout) (z : Fin l.basis.columns.size → ℝ)
   unfold externalWork
   ring
 
+def endVariation (data : Partition) (v : Motion data) (i : Fin data.pieces.size) (d : Fin 6) :=
+  pointMotion data v (endPoint data.pieces[i.val]! d) (globalSlot d)
+
+theorem element_virtual (data : Partition) (motion variation : Motion data) (i : Fin data.pieces.size) :
+    (∑ d, endVariation data variation i d * globalActions data motion i d) =
+      InclinedFrameIntervalReactionsSound.actualPieceWork data motion variation i := by
+  dsimp only [InclinedFrameIntervalReactionsSound.actualPieceWork,pieceMotion]
+  rw [rotate_work]
+  simp [Fin.sum_univ_succ,endVariation,endPoint,globalSlot,globalActions,FrameTransform.toGlobal6,
+    forceX,forceY]
+  ring
+
+theorem load_component_real (data : Partition) (i : Fin data.source.loads.size) (d : Fin 3) :
+    (loadComponent data.source.loads[i.val]! d.val : ℝ) = InclinedFrameAssemblySound.sourceAction data i d := by
+  fin_cases d <;> unfold loadComponent InclinedFrameAssemblySound.sourceAction <;> split_ifs <;> simp_all
+
+def UnitContains {data : Partition} {basis : GlobalBasis} (cert : Certificate data basis)
+    (col : Fin basis.columns.size) (v : Motion data) :=
+  ∀ p d, FrameEnclosure.Contains (pointColumnAt cert p col d) (pointMotion data v p d)
+
+theorem terms_append {n} (state : Fin n → ℝ) (a b : List (Nat × Rat)) :
+    termsValue state (a++b) = termsValue state a+termsValue state b := by
+  simp [termsValue]
+
+theorem terms_flatMap {n} {α : Type} (state : Fin n → ℝ) (source : List α)
+    (f : α → List (Nat × Rat)) :
+    termsValue state (source.flatMap f) = (source.map fun i => termsValue state (f i)).sum := by
+  induction source with
+  | nil => simp [termsValue]
+  | cons a tail ih => simp [terms_append,ih]
+
+theorem fin_sum {n} (f : Fin n → ℝ) : ((List.finRange n).map f).sum = ∑ i, f i := by
+  simp [List.finRange,List.map_ofFn]
+/-- Each accepted column has pointwise rational amplitudes. Its linear
+equation is the physical virtual-work identity including the spring terms. -/
+theorem column_terms_zero {data : Partition} {basis : GlobalBasis} (cert : Certificate data basis)
+    (motion v : Motion data) (col : Fin basis.columns.size) (enclosed : UnitContains cert col v)
+    (springs : Array (Fin basis.columns.size → Rat)) (torque : Fin springs.size → ℝ)
+    (work : (∑ i, InclinedFrameIntervalReactionsSound.actualPieceWork data motion v i) +
+      (∑ j : Fin springs.size, (springs[j.val]! col : ℝ)*torque j) = ∑ i, pointLoadWork data i v)
+    {terms} (accepted : columnTerms cert springs col = some terms) :
+    termsValue (frameState motion torque) terms = 0 := by
+  unfold columnTerms at accepted
+  split at accepted
+  next exactColumns =>
+    cases accepted
+    have amp (p : Nat) (d : Fin 3) : ((pointColumnAt cert p col d).lower : ℝ) = pointMotion data v p d := by
+      obtain ⟨lo,hi⟩ := enclosed p d
+      by_cases hp : p < data.points.size
+      · rw [← exactColumns ⟨p,hp⟩ d] at hi
+        exact le_antisymm lo hi
+      · simp [pointColumnAt,pointMotion,hp]
+    have element (i : Fin data.pieces.size) :=
+      element_virtual data motion v i
+    have applied (i : Fin data.source.loads.size) := point_work data i v
+    simp only [terms_append,terms_flatMap,fin_sum]
+    simp only [termsValue,List.map_map,Function.comp_apply,fin_sum,List.map_cons,List.map_nil,List.sum_cons,
+      List.sum_nil,add_zero,FrameSpring.Sound.sumRational_cast,Rat.cast_neg,Rat.cast_mul,amp,
+      end_slot,torque_slot,constant_slot,mul_one,load_component_real]
+    change (∑ i, ∑ d, endVariation data v i d * globalActions data motion i d) + _ + _ = 0
+    simp_rw [element,← applied]
+    linarith
+  next => cases accepted
+
+#print axioms column_terms_zero
 #print axioms released_work
 #print axioms element_terms_zero
 end

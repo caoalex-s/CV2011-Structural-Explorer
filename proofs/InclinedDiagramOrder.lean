@@ -70,30 +70,33 @@ theorem flags_mean {a : Candidate} {all : List Candidate} (value : Candidate →
     (comparison : ∀ b ∈ all, orderMeans (value a) (value b) (compareValues a b))
     {maximum flag : Bool} (reported : isExtreme maximum a all = some flag) :
     flag = true ↔ ∀ b ∈ all, if maximum then value b ≤ value a else value a ≤ value b := by
-  cases maximum <;> unfold isExtreme at reported <;> dsimp only at reported
-  all_goals split at reported
-  all_goals first
-    | next bad =>
-      cases reported
-      simp only [Bool.false_eq_true,false_iff]
-      intro hypothesis
-      obtain ⟨b,mem,order⟩ := List.mem_map.mp (List.contains_iff_mem.mp bad)
+  let bad := if maximum then OrderEvidence.less else OrderEvidence.greater
+  let comparisons := all.map (compareValues a)
+  change (if comparisons.contains bad then some false else if comparisons.contains .unresolved then none else some true)
+    = some flag at reported
+  by_cases worse : comparisons.contains bad = true
+  · rw [if_pos worse] at reported
+    cases reported
+    constructor
+    · intro impossible; cases impossible
+    · intro bound
+      obtain ⟨b,mem,order⟩ := List.mem_map.mp (List.contains_iff_mem.mp worse)
       have actual := comparison b mem
       rw [order] at actual
-      exact (not_lt_of_ge (hypothesis b mem)) actual
-    | next nobad =>
-      split at reported
-      · cases reported
-      next resolved =>
-        cases reported
-        simp only [true_iff]
-        intro b mem
-        have actual := comparison b mem
-        have present := List.mem_map_of_mem (compareValues a) mem
-        cases eq : compareValues a b <;> rw [eq] at actual present <;>
-          first | exact le_of_lt actual | exact le_of_eq actual | exact le_of_eq actual.symm |
-            exact False.elim (nobad (List.contains_iff_mem.mpr present)) |
-            exact False.elim (resolved (List.contains_iff_mem.mpr present))
+      have relation := bound b mem
+      cases maximum <;> simp_all [bad,orderMeans]
+  · rw [if_neg worse] at reported
+    by_cases unknown : comparisons.contains .unresolved = true
+    · rw [if_pos unknown] at reported
+      cases reported
+    · rw [if_neg unknown] at reported
+      cases reported
+      refine ⟨fun _ b mem => ?_,fun _ => rfl⟩
+      have actual := comparison b mem
+      have member : compareValues a b ∈ comparisons := List.mem_map_of_mem (compareValues a) mem
+      have good : compareValues a b ≠ bad := fun eq => worse (List.contains_iff_mem.mpr (eq ▸ member))
+      have known : compareValues a b ≠ .unresolved := fun eq => unknown (List.contains_iff_mem.mpr (eq ▸ member))
+      cases maximum <;> cases eq : compareValues a b <;> simp_all [bad,orderMeans] <;> linarith
 
 #print axioms flags_mean
 end
