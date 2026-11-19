@@ -175,7 +175,7 @@ theorem element_virtual (data : Partition) (motion variation : Motion data) (i :
   dsimp only [InclinedFrameIntervalReactionsSound.actualPieceWork,pieceMotion]
   rw [rotate_work]
   simp [Fin.sum_univ_succ,endVariation,endPoint,globalSlot,globalActions,FrameTransform.toGlobal6,
-    forceX,forceY]
+    forceX,forceY,pieceMotion]
   ring
 
 theorem load_component_real (data : Partition) (i : Fin data.source.loads.size) (d : Fin 3) :
@@ -198,7 +198,11 @@ theorem terms_flatMap {n} {α : Type} (state : Fin n → ℝ) (source : List α)
   | cons a tail ih => simp [terms_append,ih]
 
 theorem fin_sum {n} (f : Fin n → ℝ) : ((List.finRange n).map f).sum = ∑ i, f i := by
-  simp [List.finRange,List.map_ofFn]
+  have sums {k} (g : Fin k → ℝ) : (List.ofFn g).sum = ∑ i, g i := by
+    induction k with
+    | zero => simp
+    | succ k ih => simp [List.ofFn_succ,Fin.sum_univ_succ,ih]
+  simpa [List.finRange,List.map_ofFn,Function.comp_def] using sums f
 /-- Each accepted column has pointwise rational amplitudes. Its linear
 equation is the physical virtual-work identity including the spring terms. -/
 theorem column_terms_zero {data : Partition} {basis : GlobalBasis} (cert : Certificate data basis)
@@ -209,6 +213,7 @@ theorem column_terms_zero {data : Partition} {basis : GlobalBasis} (cert : Certi
     {terms} (accepted : columnTerms cert springs col = some terms) :
     termsValue (frameState motion torque) terms = 0 := by
   unfold columnTerms at accepted
+  dsimp only at accepted
   split at accepted
   next exactColumns =>
     cases accepted

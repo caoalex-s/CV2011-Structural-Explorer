@@ -4,6 +4,10 @@ namespace InclinedDiagram.Sound
 open FrameEnclosure (Contains)
 noncomputable section
 
+local instance : LawfulBEq OrderEvidence where
+  eq_of_beq := by intro a b h; cases a <;> cases b <;> first | rfl | contradiction
+  rfl := by intro a; cases a <;> rfl
+
 def orderMeans (a b : ℝ) : OrderEvidence → Prop
   | .less => a < b
   | .equal => a = b
@@ -84,7 +88,7 @@ theorem flags_mean {a : Candidate} {all : List Candidate} (value : Candidate →
       have actual := comparison b mem
       rw [order] at actual
       have relation := bound b mem
-      cases maximum <;> simp_all [bad,orderMeans]
+      cases maximum <;> simp_all [bad,orderMeans] <;> linarith
   · rw [if_neg worse] at reported
     by_cases unknown : comparisons.contains .unresolved = true
     · rw [if_pos unknown] at reported
@@ -93,7 +97,7 @@ theorem flags_mean {a : Candidate} {all : List Candidate} (value : Candidate →
       cases reported
       refine ⟨fun _ b mem => ?_,fun _ => rfl⟩
       have actual := comparison b mem
-      have member : compareValues a b ∈ comparisons := List.mem_map_of_mem (compareValues a) mem
+      have member : compareValues a b ∈ comparisons := List.mem_map.mpr ⟨b,mem,rfl⟩
       have good : compareValues a b ≠ bad := fun eq => worse (List.contains_iff_mem.mpr (eq ▸ member))
       have known : compareValues a b ≠ .unresolved := fun eq => unknown (List.contains_iff_mem.mpr (eq ▸ member))
       cases maximum <;> cases eq : compareValues a b <;> simp_all [bad,orderMeans] <;> linarith
