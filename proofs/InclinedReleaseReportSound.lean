@@ -44,6 +44,15 @@ theorem shared_translation (l : Layout) (z : Fin l.basis.columns.size → ℝ)
     (d : Fin 3) (translation : d.val ≠ 2) : motion l z a d = motion l z b d := by
   simp [motion, unitMotion, translation, same]
 
+/-- Each active support-compatible slot of the constructed basis receives
+    exactly one column, including the independent rotation at a released end. -/
+theorem unique_slot (l : Layout) (p : Fin l.expanded.points.size) (d : Fin 3)
+    (active : InclinedFrameBasis.Active l.basis.points[p.val]! d) :
+    ∃! j : Fin l.basis.columns.size, l.basis.columns[j.val]!.point = p.val ∧
+      InclinedFrameBasis.columnSlot l.basis.columns[j.val]! = d := by
+  obtain ⟨j, point, slot⟩ := l.allocation.2.2 p d active
+  exact ⟨j, ⟨point, slot⟩, fun k h => l.allocation.2.1 k j (h.1.trans point.symm) (h.2.trans slot.symm)⟩
+
 /-- Component-wise end residuals add to the reaction at the physical joint.
     Internal forces between its coincident end points cancel in this sum. -/
 theorem grouped_reaction {l : Layout} {bits : Nat} {c : Certificate l.expanded l.basis}
@@ -124,12 +133,13 @@ theorem accepted_readouts {input output : String} (accepted : Wire.checkReport i
   · intro i
     let f := values.faces i
     have contained := nodes f.motion.computed
-    exact ⟨reported f.ux (contained 0), reported f.uy (contained 1), reported f.rotation (contained 2), field f.moment⟩
+    exact ⟨reported f.ux (contained 0), reported f.uy (contained 1), reported f.rotation (contained 2), field (query := HingeFrame.faceQuery (Wire.faceSides l)[i.val]!) (d := 2) f.moment⟩
 
 #print axioms accepted_readouts
 
 #print axioms accepted_bytes
 #print axioms shared_translation
+#print axioms unique_slot
 #print axioms grouped_reaction
 #print axioms InclinedRelease.Fields.field_contains
 #print axioms InclinedRelease.Fields.reaction_contains

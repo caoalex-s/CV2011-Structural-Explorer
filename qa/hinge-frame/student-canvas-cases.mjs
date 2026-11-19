@@ -321,6 +321,16 @@ export async function runStudentCanvasCases({ page, base, output, target = 'publ
                 { ...onIncline, sectionNVM: [inclinedAxial, inclinedShear, -10 * orientation] });
             await checkInclinedRelease(`${direction}-couple-incline-quarter`, 1, quarterParameter, inclinedName,
                 { ...onIncline, sectionNVM: [inclinedAxial, inclinedShear, -2.5 * orientation] });
+            if (!reversed) {
+                await put('moment', 4);
+                await attachment.selectOption({ index: 1 });
+                await setNumber('t', 0);
+                await setNumber('mz', -4);
+                await checkInclinedRelease('two-couples-on-inclined-end', 1, 0, inclinedName,
+                    { reactionA: [-7, 3, 12], reactionC: [7, 7, 0], sectionNVM: [11/Math.sqrt(5), 13/Math.sqrt(5), -6] });
+                const output = await page.locator('#frame-worked-output').innerText();
+                assert.ok(output.includes('10 kN m, -4 kN m'), 'Individual applied couples missing from the worked solution');
+            }
         });
     }
 
