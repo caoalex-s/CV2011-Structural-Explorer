@@ -15,8 +15,10 @@ def EndReport (p : Segment) (h : PhysicalPiece) (i : Nat) (line : String) :=
       InclinedDiagram.boxText u ++ InclinedDiagram.boxText v) ∧
     Contains a (h.dofs 2) ∧ Contains b (h.dofs 5) ∧ Contains u (h.dofs 1) ∧ Contains v (h.dofs 4)
 
+set_option maxHeartbeats 2000000 in
 theorem end_sound {bits p i line} (h : PhysicalPiece) (positive : h.positive)
     (fits : Fits p (h.inputs 0) h.length) (made : endRow bits p i = some line) : EndReport p h i line := by
+  unfold endRow at made
   obtain ⟨a,ha,rest⟩ := Option.bind_eq_some.mp made
   obtain ⟨b,hb,rest⟩ := Option.bind_eq_some.mp rest
   obtain ⟨u,hu,rest⟩ := Option.bind_eq_some.mp rest
