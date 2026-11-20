@@ -177,7 +177,9 @@ def make_handler(store, instructor_token, origins, local_demo=None):
                 elif path == "/api/attempts":
                     if payload.get("courseId") != identity:
                         raise ValueError("Course ID does not correspond to the authenticated account.")
-                    if payload.get("event") == "submit":
+                    if payload.get("step") == "portal_absolute_moment" and payload.get("event") in ("first_prediction", "retry", "reveal"):
+                        result = {"status": "not_graded", "category": payload["event"], "message": "Portal event recorded. The browser checks predictions against the current member diagram.", "verifier": VERSION}
+                    elif payload.get("event") == "submit":
                         result = check_concept(payload) if str(payload.get("step", "")).startswith("concept_") else check(payload)
                     elif payload.get("event") in ("hint", "reveal"):
                         result = {"status": "not_graded", "category": payload["event"], "message": "Learning event recorded.", "verifier": VERSION}

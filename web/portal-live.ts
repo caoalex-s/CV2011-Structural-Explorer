@@ -56,7 +56,8 @@ function ownsRegistration(registration: ServiceWorkerRegistration): boolean {
 }
 
 export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad: (value: number) => void,
-    changeSectionParameter: (value: number) => void, storageKey = portalStorageKey, prepareReload: () => void = () => {}) {
+    changeSectionParameter: (value: number) => void, storageKey = portalStorageKey, prepareReload: () => void = () => {},
+    onDiagram?: (source:Model, member:string, rows:HTMLElement)=>void) {
     if (!isCheckedWorkspace) return { update(_member: string, _parameter: number) {} };
     const host = document.createElement('section');
     host.className = 'portal-certificate';
@@ -272,9 +273,11 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                     const start = source.nodes.find(n => n.id === selected.a)!;
                     const end = source.nodes.find(n => n.id === selected.b)!;
                     const label = memberLabel(source, selected);
-                    progress.replaceWith(route === 'inclined-diagram'
+                    const diagram = route === 'inclined-diagram'
                         ? renderInclinedMemberDiagram(checked.report, selected.id, label, end.x - start.x, end.y - start.y)
-                        : renderMemberDiagram(checked.report, selected.id, label, Math.sign(end.x - start.x)));
+                        : renderMemberDiagram(checked.report, selected.id, label, Math.sign(end.x - start.x));
+                    progress.replaceWith(diagram);
+                    onDiagram?.(source,member,diagram);
                     record({ diagram: { protocol: route === 'inclined-diagram' ? 'CV2011_INCLINED_DIAGRAM_1' : 'CV2011_DIAGRAM_1',
                         artifact: extra.artifact, bundle: extra.bundle, packetDigest, reportDigest: checked.reportDigest,
                         report: new TextDecoder().decode(checked.report) } });

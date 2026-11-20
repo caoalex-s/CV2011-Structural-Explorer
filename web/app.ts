@@ -21,16 +21,19 @@ import { createEvidenceEnvelope, EvidenceRequests, parseEvidenceModel } from './
 import type { Attempt } from './learning-session.js';
 import { lessonContext } from './lesson-beam.js';
 import { createPortalPanel, isPortalWorkspace, isCheckedWorkspace, portalStorageKey } from './portal-live.js';
+import { boundaryStation, stationLabel } from './load-stations.js';
+import { createMomentExercise, portalExercise, exerciseStorage, exerciseStep } from './portal-exercise.js';
+let momentExercise: ReturnType<typeof createMomentExercise> | undefined;
 const clone = <T>(value: T): T => structuredClone(value);
 const id = (prefix: string) => `${prefix}${crypto.randomUUID().slice(0, 6)}`;
 renderCourseConventions();
 const lesson = lessonContext(location.search);
-const modelStorageKey = isPortalWorkspace ? portalStorageKey : lesson?.storageKey || 'cv2011-model';
+const modelStorageKey = portalExercise ? exerciseStorage : isPortalWorkspace ? portalStorageKey : lesson?.storageKey || 'cv2011-model';
 if (lesson) {
     $('workspace').insertAdjacentHTML('afterbegin', '<p class="lesson-banner"><a href="learn/beam-basics/">← Back to the beam lesson</a> · Lesson workspace · <a href="./#sandbox">Return to your saved sandbox</a> · <button id="restart-lesson" class="quiet">Restart lesson example</button></p>');
     $('restart-lesson').onclick = () => { commit(() => { model = clone(lesson.model); }); fit(); render(); };
 }
-let model: Model = isPortalWorkspace ? example('frame') : lesson?.model || example();
+let model: Model = portalExercise ? { nodes:[], members:[], supports:[], loads:[] } : isPortalWorkspace ? example('frame') : lesson?.model || example();
 try {
     const saved = localStorage.getItem(modelStorageKey);
     if (saved) {
@@ -136,6 +139,7 @@ function updateEvidenceBinding() {
     const signature = JSON.stringify([model, currentMember, sectionT]);
     if (signature !== portalSignature) {
         portalSignature = signature;
+        momentExercise?.bind(signature);
         portalPanel?.update(currentMember, sectionT);
     }
 }
@@ -219,17 +223,28 @@ function ensureNode(point: Snap): string {
     model.nodes.push({ id: nodeId, x: point.x, y: point.y });
     return nodeId;
 }
+function loadProjection(point:{x:number;y:number}) {
+    const first = start;
+    if (!first?.member) return nearestMember(point);
+    const owner = model.members.find(m => m.id === first.member)!;
+    // At a shared joint the second boundary determines which span is loaded.
+    const joint = first.t === 0 ? owner.a : first.t === 1 ? owner.b : undefined;
+    const eligible = joint ? model.members.filter(m => m.a === joint || m.b === joint) : [owner];
+    return eligible.map(m => ({...projection(point,m),member:m.id})).sort((a,b)=>a.distance-b.distance)[0];
+}
 function attach(point: {
     x: number;
     y: number;
 }) {
-    const closest = nearestMember(point);
+    const closest = tool === 'distributed' ? loadProjection(point) : nearestMember(point);
     if (!closest || closest.distance > 30 / view.scale) {
         toast('Place this object on a member.');
         return null;
     }
     let t = closest.t;
-    if ($<HTMLInputElement>('snap').checked) {
+    if (tool === 'distributed') {
+        t = boundaryStation(t,closest.length*view.scale,$<HTMLInputElement>('snap').checked);
+    } else if ($<HTMLInputElement>('snap').checked) {
         const grid = Number($<HTMLInputElement>('grid-spacing').value) || 0.5;
         t = Math.max(0, Math.min(1, Math.round(t * closest.length / grid) * grid / closest.length));
     }
@@ -326,7 +341,7 @@ function renderCanvas() {
     const origin = screen({ x: 0, y: 0 });
     let drawing = `<defs><pattern id="grid" width="${spacing}" height="${spacing}" patternUnits="userSpaceOnUse" x="${origin.x % spacing}" y="${origin.y % spacing}"><circle cx="0" cy="0" r="1" fill="#dce5df"/></pattern></defs><rect width="1000" height="400" fill="url(#grid)"/>`;
     const all = analysis.elements.flatMap(e => e.samples);
-    if (analysis.status === 'stable' && layer !== 'none' && (mode !== 'practice' || practiceResultsVisible)) {
+    if (analysis.status === 'stable' && layer !== 'none' && ((mode !== 'practice' || practiceResultsVisible) && (!portalExercise || momentExercise?.visible === true))) {
         if (layer === 'displacement') {
             const maximum = Math.max(...all.map(p => Math.hypot(p.ux, p.uy)), 1e-12), magnification = 55 / (view.scale * maximum);
             for (const element of analysis.elements) {
@@ -359,7 +374,7 @@ function renderCanvas() {
     for (const load of model.loads)
         drawing += loadDrawing(load);
     for (const node of model.nodes) drawing += jointDrawing(node);
-    if ($<HTMLInputElement>('show-reactions').checked && (mode !== 'practice' || practiceResultsVisible))
+    if ($<HTMLInputElement>('show-reactions').checked && ((mode !== 'practice' || practiceResultsVisible) && (!portalExercise || momentExercise?.visible === true)))
         for (const reaction of analysis.reactions) {
             const p = screen(reaction);
             const node = model.nodes.find(node => Math.hypot(node.x - reaction.x, node.y - reaction.y) < 1e-7);
@@ -418,7 +433,7 @@ void document.fonts.ready.then(renderCanvas);
 function inspector(): void {
     renderInspector({
         container: $('inspector'), model, analysis, selected,
-        resultsVisible: mode !== 'practice' || practiceResultsVisible,
+        resultsVisible: (mode !== 'practice' || practiceResultsVisible) && (!portalExercise || momentExercise?.visible === true),
         commit, clearSelection: () => { selected = null; inspector(); },
         removeSelected, projectToMember: projection, notify: toast,
     });
@@ -454,7 +469,7 @@ function render() {
         currentMember = model.members[0]?.id || '';
     updateEvidenceBinding();
     renderResponses({ model, analysis, currentMember, sectionT, layer,
-        resultsVisible: mode !== 'practice' || practiceResultsVisible });
+        resultsVisible: (mode !== 'practice' || practiceResultsVisible) && (!portalExercise || momentExercise?.visible === true) });
     controls.setHistory(history.length > 0, future.length > 0);
     inspector();
     $('edit-selection').hidden = !selected;
@@ -548,14 +563,20 @@ svg.addEventListener('pointerdown', event => {
             return;
         }
         if (start.member !== attachment.member) {
-            toast('Choose both distributed-load boundaries on the same member.');
-            return;
+            const owner = model.members.find(m=>m.id===attachment.member)!;
+            const first = projection(start,owner);
+            if (first.distance > 1e-9) { toast('Choose both load boundaries on the same member.'); return; }
+            start = {...position(model,owner.id,first.t),member:owner.id,t:first.t};
+
         }
         if (Math.abs(start.t! - attachment.t) < 1e-5) {
             toast('Choose a nonzero load interval.');
             return;
         }
-        commit(() => model.loads.push({ id: id('q'), member: attachment.member, kind: 'distributed', t: Math.min(start!.t!, attachment.t), end: Math.max(start!.t!, attachment.t), fx: 0, fy: -5, mz: 0, qEnd: -5 }));
+        const loadId = id('q');
+        commit(() => model.loads.push({ id: loadId, member: attachment.member, kind: 'distributed', t: Math.min(start!.t!, attachment.t), end: Math.max(start!.t!, attachment.t), fx: 0, fy: -5, mz: 0, qEnd: -5 }));
+        const placed = model.loads.find(l => l.id === loadId)!;
+        toast('Load stations ' + stationLabel(placed.t) + ' to ' + stationLabel(placed.end) + '. Select the load to edit either boundary.');
         start = null;
         renderCanvas();
         return;
@@ -610,7 +631,7 @@ svg.addEventListener('pointermove', event => {
             t = Math.max(0, Math.min(1, t));
             if ('kind' in item && item.kind === 'distributed') {
                 const load = item as Load, width = load.end - load.t;
-                t = Math.min(t, 1 - width);
+                t = Math.min(boundaryStation(projected.t, projected.length*view.scale, $('snap').matches(':checked')), 1 - width);
                 load.end = t + width;
             }
             item.t = t;
@@ -620,6 +641,15 @@ svg.addEventListener('pointermove', event => {
         return;
     }
     hover = snap(p);
+    if (tool === 'distributed') {
+        const near = loadProjection(p);
+        if (near && near.distance * view.scale < 30) {
+            const t = boundaryStation(near.t,near.length*view.scale,$<HTMLInputElement>('snap').checked);
+            hover = { ...position(model, near.member,t), member:near.member,t };
+            $('tool-hint').textContent = (start ? 'Second' : 'First') + ' boundary · station ' + stationLabel(t) + ' of the span (' +
+                number(t*near.length) + ' m from the drawn start).';
+        }
+    }
     if (start || tool !== 'select')
         renderCanvas();
 });
@@ -821,10 +851,20 @@ const controls = createWorkspaceControls({
     selectMode: setMode,
 });
 const session = createLearningSession({ notify: toast, onConnectionChange: render });
+if (portalExercise) {
+    $('portal-exercise-link').hidden = true;
+    $('portal-exercise').hidden = false;
+    momentExercise = createMomentExercise(() => model, member => {
+        currentMember = member; sectionT = 0.5; render();
+    }, render, (event, answer, assisted) => {
+        void session.record({model, section:sectionT, step:exerciseStep, side:'BC', hintUsed:false,
+            solutionRevealed:assisted},event,answer,'m');
+    });
+}
 restoreCheckerControls?.();
 portalPanel = createPortalPanel(() => model, value => commit(() => {
     if (model.loads.length === 1) { model.loads[0].fy = value; model.loads[0].qEnd = value; }
-}), value => { sectionT = value; updateEvidenceBinding(); render(); }, modelStorageKey, preserveCheckerView);
+}), value => { sectionT = value; updateEvidenceBinding(); render(); }, modelStorageKey, preserveCheckerView, (drawing, member, rows) => momentExercise?.checked(drawing,member,rows));
 if (!restoredPortalView) fit();
 controls.showLayer(layer);
 setMode(restoredPortalView ? mode : location.hash.slice(1) || 'sandbox');

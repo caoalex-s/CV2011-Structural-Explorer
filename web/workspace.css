@@ -1336,3 +1336,8 @@ dialog::backdrop {
 #frame-worked-output summary { cursor: pointer; }
 #frame-worked-output small { color: var(--muted, #526072); }
 .frame-overview-note { margin: .5rem 1rem; color: var(--muted, #526072); }
+
+.moment-locked #worked-panel, .moment-locked .support-reactions, .moment-locked #section-results { display:none; }
+#portal-exercise { margin:1rem 0; padding:1rem; }
+#portal-exercise label { display:block; margin-bottom:.6rem; }
+#portal-exercise input { max-width:12rem; }

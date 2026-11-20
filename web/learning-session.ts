@@ -59,6 +59,11 @@ export function createLearningSession({ notify: toast, onConnectionChange }: Ses
         attempts = [];
     }
 
+    function canSend(attempt: Attempt) {
+        if (attempt.step !== 'portal_absolute_moment') return true;
+        try { return loopback && ['localhost','127.0.0.1'].includes(new URL(config.url).hostname); }
+        catch { return false; }
+    }
     function saveAttempts(): void {
         localStorage.setItem('cv2011-attempts', JSON.stringify(attempts));
         updateSession();
@@ -106,7 +111,7 @@ export function createLearningSession({ notify: toast, onConnectionChange }: Ses
         // retains the submission and its exposure history while the service waits.
         attempts.push(attempt);
         saveAttempts();
-        if (online)
+        if (online && canSend(attempt))
             try {
                 const response = await api('/api/attempts', attempt);
                 attempt.result = response.result;
@@ -201,6 +206,7 @@ export function createLearningSession({ notify: toast, onConnectionChange }: Ses
             <div class="panel"><div class="insight-number">${checked.length ? Math.round(100 * (checked.length - wrong.length) / checked.length) + '%' : '—'}</div><p>Correct among ${checked.length} checked submissions in this view</p></div>
             <div class="panel"><div class="insight-number">${new Set(submissions.map(a => a.courseId)).size}</div><p>Pseudonymous IDs in this view</p></div></div>
             <h2>Observed answer patterns</h2>${Object.keys(categories).length ? `<table class="data-table"><thead><tr><th>Pattern</th><th>Occurrences</th></tr></thead><tbody>${Object.entries(categories).map(([name, count]) => `<tr><td>${escape(name.replaceAll('_', ' '))}</td><td>${count}</td></tr>`).join('')}</tbody></table>` : '<p class="small">No checked incorrect submissions in this view.</p>'}
+            <h2>Portal exercise predictions</h2><table class="data-table"><thead><tr><th>Pseudonymous ID</th><th>Event</th><th>Prediction (m)</th><th>Prior exposure</th></tr></thead><tbody>${records.filter(a=>a.step === 'portal_absolute_moment').slice(-30).map(a=>`<tr><td>${escape(a.courseId)}</td><td>${escape(a.event.replaceAll('_',' '))}</td><td>${escape(a.answer)}</td><td>${a.solutionRevealed?'Worked solution shown':'No reveal recorded'}</td></tr>`).join('')}</tbody></table>
             <h2>Recent attempts</h2><div style="overflow:auto"><table class="data-table"><thead><tr><th>Course ID</th><th>Step</th><th>Attempt</th><th>Answer</th><th>Result</th><th>Recorded aid</th></tr></thead><tbody>${rows.slice(-30).reverse().map(({attempt: a, ordinal, assisted}) => `<tr><td>${escape(a.courseId)}</td><td>${escape(a.step.replaceAll('_', ' '))}</td><td>${ordinal === 1 ? 'First' : `Retry ${ordinal - 1}`}</td><td>${escape(a.answer)} ${escape(a.units)}</td><td>${escape(a.result?.status || 'unresolved')}</td><td>${assisted ? 'Hint / explanation shown' : 'None recorded'}</td></tr>`).join('')}</tbody></table></div>
             <p class="small">First and retry counts use the records available in this view. Concepts are grouped by question; numerical steps are grouped by model and section. Error categories describe answer patterns and require instructor interpretation.</p>
             <div class="dialog-buttons"><button id="refresh-insights">Refresh</button><button id="export-attempts">Export all available records</button></div>`;
@@ -218,7 +224,7 @@ export function createLearningSession({ notify: toast, onConnectionChange }: Ses
                 return;
             }
             let count = 0;
-            for (const attempt of attempts.filter(a => !a.synced && (a.courseId === config.courseId || a.courseId === 'local-unassigned'))) {
+            for (const attempt of attempts.filter(a => !a.synced && canSend(a) && (a.courseId === config.courseId || a.courseId === 'local-unassigned'))) {
                 try {
                     const response = await api('/api/attempts', { ...attempt, courseId: config.courseId, section: attempt.section ?? 0.5 });
                     attempt.courseId = config.courseId;
