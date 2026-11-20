@@ -23,6 +23,10 @@ import { validateIntervalFrame } from './frame-interval-model.js';
 import { inclinedDeadlineMilliseconds } from './portal-runtime.js';
 import { createIntervalExplanation, renderIntervalExplanation } from './frame-interval-worked.js';
 
+import { renderKinematics } from './member-kinematics.js';
+import { proposeInclinedPacket } from './frame-interval-packet.js';
+import { proposeInclinedReleasePacket } from './frame-inclined-release-packet.js';
+
 export const isPortalWorkspace = location.pathname.replace(/index\.html$/, '').endsWith('/portal-checker/');
 // The same controller serves the main workspace and the compatible scoped URL.
 export const isCheckedWorkspace = location.pathname.replace(/index\.html$/, '') === new URL('./', import.meta.url).pathname;
@@ -115,8 +119,10 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
         JSON.stringify({ model: JSON.stringify(modelAtPresent()), side: cutSide.value })));
 
     let diagramRuntime: PortalRuntime | null = null;
+    let kinematicsRuntime: PortalRuntime | null = null;
     function clear(message: string) {
         diagramRuntime?.dispose(); diagramRuntime = null;
+        kinematicsRuntime?.dispose(); kinematicsRuntime = null;
         status.textContent = message; readouts.replaceChildren(); certificate.textContent = '';
         exportText = ''; exportButton.hidden = true;
         acceptedGeneration = null; workedOutput.replaceChildren(); collapse.hidden = true;
@@ -190,6 +196,47 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
             progress.textContent = 'Checking the whole-member diagrams…';
             workedOutput.append(progress);
             const current = () => requests.isCurrent(token) && checker === runtime && diagramRuntime === extra;
+            let combined = { ...receipt };
+            function record(part: object) {
+                combined = { ...combined, ...part };
+                exportText = JSON.stringify(combined, null, 2);
+                certificate.textContent = exportText;
+            }
+            kinematicsRuntime?.dispose();
+            const kinematics = new PortalRuntime(new URL('../member-kinematics/worker.mjs', runtimeUrl));
+            kinematicsRuntime = kinematics;
+            const kinematicsProgress = document.createElement('p');
+            kinematicsProgress.textContent = 'Checking member slope and transverse displacement…';
+            workedOutput.append(kinematicsProgress);
+            const active = () => current() && kinematicsRuntime === kinematics;
+            void (async () => {
+                try {
+                    await kinematics.ready;
+                    if (!active()) return;
+                    const captured = JSON.parse(new TextDecoder().decode(sourceBytes));
+                    let witness = packet;
+                    if (!checker.supportsSprings && !checker.supportsInclinedReleases && result.frameProtocol !== 'inclined') {
+                        const propose = usesRelease(source) ? proposeInclinedReleasePacket : proposeInclinedPacket;
+                        witness = new Uint8Array(propose(captured.model, captured.query, 96).packet);
+                    }
+                    const digest = await sha256(witness);
+                    if (!active()) return;
+                    const checked = await kinematics.checkDiagram(witness);
+                    if (!active()) return;
+                    if (checked.state !== 'accepted' || checked.inputDigest !== digest || checked.frameProtocol !== 'diagram'
+                        || !(checked.report instanceof Uint8Array) || await sha256(checked.report) !== checked.reportDigest)
+                        throw Error('The source or extrema could not be enclosed.');
+                    const sourceDigest = await sha256(sourceBytes);
+                    if (!active()) return;
+                    const selected = source.members.find(m => m.id === member)!;
+                    kinematicsProgress.replaceWith(renderKinematics(checked.report, member, memberLabel(source, selected)));
+                    record({ kinematics: { protocol: 'CV2011_MEMBER_KINEMATICS_1', sourceDigest, basePacketDigest: packetDigest,
+                        packetDigest: digest, packet: new TextDecoder().decode(witness), artifact: kinematics.artifact,
+                        bundle: kinematics.bundle, reportDigest: checked.reportDigest, report: new TextDecoder().decode(checked.report) } });
+                } catch (error) {
+                    if (active()) kinematicsProgress.textContent = 'Slope and displacement check inconclusive. ' + String(error);
+                } finally { kinematics.dispose(); }
+            })();
             void (async () => {
                 try {
                     await extra.ready;
@@ -207,9 +254,9 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                     progress.replaceWith(route === 'inclined-diagram'
                         ? renderInclinedMemberDiagram(checked.report, selected.id, label, end.x - start.x, end.y - start.y)
                         : renderMemberDiagram(checked.report, selected.id, label, Math.sign(end.x - start.x)));
-                    exportText = JSON.stringify({ ...receipt, diagram: { protocol: route === 'inclined-diagram' ? 'CV2011_INCLINED_DIAGRAM_1' : 'CV2011_DIAGRAM_1',
+                    record({ diagram: { protocol: route === 'inclined-diagram' ? 'CV2011_INCLINED_DIAGRAM_1' : 'CV2011_DIAGRAM_1',
                         artifact: extra.artifact, bundle: extra.bundle, packetDigest, reportDigest: checked.reportDigest,
-                        report: new TextDecoder().decode(checked.report) } }, null, 2);
+                        report: new TextDecoder().decode(checked.report) } });
                     certificate.textContent = exportText;
                 } catch (error) {
                     if (current()) progress.textContent = 'Whole-member check inconclusive. ' + String(error);
