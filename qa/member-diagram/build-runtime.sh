@@ -28,6 +28,12 @@ if [[ "${1:-}" == inclined-diagram ]]; then
     sources=(proofs/HingeFrameChecker.c proofs/InclinedRelease{,Wire}.c proofs/FrameSpring{,Wire}.c
         proofs/MemberDiagram.c proofs/InclinedDiagramStatics.c proofs/InclinedDiagram{,Wire}.c qa/inclined-diagram/abi.c)
 fi
+if [[ "${1:-}" == member-kinematics ]]; then
+    folder=member-kinematics-assets
+    sources=(proofs/HingeFrameChecker.c proofs/InclinedRelease{,Wire}.c proofs/FrameSpring{,Wire}.c
+        proofs/MemberDiagram.c proofs/InclinedDiagramStatics.c proofs/InclinedDiagram{,Wire}.c
+        proofs/MemberKinematics{,Wire}.c qa/member-kinematics/abi.c)
+fi
 mkdir -p "$stage/$folder"
 objects=()
 for source in "${sources[@]}"; do
