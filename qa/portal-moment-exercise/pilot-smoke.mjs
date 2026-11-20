@@ -33,7 +33,21 @@ try {
             expected,{timeout:180000});
         report.cases.push({answer,feedback:await page.locator('#moment-feedback').innerText()});
     }
+    // A one-ulp base offset breaks reflection even though both subtractions round to 4.
+    for (const node of model.nodes) node.y -= 2;
+    const rightBase = model.nodes.find(node => node.id === 'D');
+    rightBase.y = -1.9999999999999998;
+    assert.equal(2 - rightBase.y, 4);
     await loadDrawing();
+    await page.waitForFunction(() => JSON.parse(localStorage.getItem('cv2011-portal-absolute-moment/v1') || '{}')
+        .nodes?.find(node => node.id === 'D')?.y === -1.9999999999999998);
+    await submit('1.337,4.663','Check the beam direction');
+    assert.equal(await page.locator('#moment-reveal').isEnabled(),false);
+    assert.equal(await page.locator('#moment-explanation').textContent(),'');
+    rightBase.y = -2;
+    await loadDrawing();
+    await page.waitForFunction(() => JSON.parse(localStorage.getItem('cv2011-portal-absolute-moment/v1'))
+        .nodes.find(node => node.id === 'D').y === -2);
     await submit('1.337','Check the number');
     assert.equal(await page.locator('#checked-member-diagram').isVisible(),false);
     await submit('1.337,4.663','Correct for this drawing');

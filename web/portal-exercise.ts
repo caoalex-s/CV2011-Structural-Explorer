@@ -1,7 +1,7 @@
 /** Predictions belong to the drawn portal and the checked whole-member report. */
-import { endConnection, position } from './engine.js';
+import { endConnection } from './engine.js';
 import type { Model } from './engine.js';
-import { absolute, add, binary64, compare, equal, one } from './frame-rational.js';
+import { absolute, add, binary64, compare, equal, integer, one, sub } from './frame-rational.js';
 import type { Fraction } from './frame-rational.js';
 import { element as $ } from './ui.js';
 
@@ -9,23 +9,34 @@ export const portalExercise = new URLSearchParams(location.search).get('exercise
 export const exerciseStep = 'portal_absolute_moment';
 export const exerciseStorage = 'cv2011-portal-absolute-moment/v1';
 
+// The checker interprets each raw coordinate as its exact binary64 value.
+// Subtracting in JavaScript can make two unequal column heights look equal.
+function hasExactSpan(start: number, end: number, metres: number): boolean {
+    try {
+        return equal(sub(binary64(end), binary64(start)), integer(metres));
+    } catch {
+        return false; // Coordinates outside the rational budget cannot establish symmetry.
+    }
+}
+
 function portalBeam(model: Model) {
     if (model.nodes.length !== 4 || model.members.length !== 3 || model.supports.length !== 2 || model.loads.length !== 1) return;
     const load = model.loads[0];
     const beam = model.members.find(m => m.id === load.member);
     if (!beam || load.kind !== 'distributed' || load.fx !== 0 || load.mz !== 0 || !(load.fy * load.qEnd < 0) ||
         !(0 <= load.t && load.t < load.end && load.end <= 1)) return;
-    const b = position(model, beam.id, 0), c = position(model, beam.id, 1);
-    if (c.x - b.x !== 6 || b.y !== c.y) return;
+    const nodes = new Map(model.nodes.map(node => [node.id, node]));
+    const b = nodes.get(beam.a), c = nodes.get(beam.b);
+    if (!b || !c || b.y !== c.y || !hasExactSpan(b.x, c.x, 6)) return;
     if (model.members.some(m => m.EA !== 2000000 || m.EI !== 20000 || (['a', 'b'] as const).some(end =>
         Object.values(endConnection(model, m, end)).some(rule => rule !== 'rigid')))) return;
     for (const top of [beam.a, beam.b]) {
         const column = model.members.find(m => m !== beam && (m.a === top || m.b === top));
         if (!column) return;
         const bottom = column.a === top ? 1 : 0;
-        const foot = position(model, column.id, bottom);
-        const head = position(model, column.id, 1 - bottom);
-        if (foot.x !== head.x || head.y - foot.y !== 4 ||
+        const foot = nodes.get(bottom === 1 ? column.b : column.a);
+        const head = nodes.get(top);
+        if (!foot || !head || foot.x !== head.x || !hasExactSpan(foot.y, head.y, 4) ||
             !model.supports.some(s => s.kind === 'fixed' && s.member === column.id && s.t === bottom)) return;
     }
     return beam;
