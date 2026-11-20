@@ -52,8 +52,8 @@ theorem physical_recovery (h : PhysicalPiece) (pos : h.positive) (f : Field) (t 
   rw [input_shift]
   cases f with
   | displacement => exact local_transverse _ _ _ _ _ _ _ _ _ _ _ pos.1.ne' pos.2.1.ne' pos.2.2.ne'
-  | slope => exact FrameIntervalRecoverySound.expression_fields _ _ _ _ _ _ _ _ _ _ _
-      pos.1.ne' pos.2.1.ne' pos.2.2.ne' 3
+  | slope =>
+    exact FrameIntervalRecoverySound.expression_fields _ _ _ _ _ _ _ _ _ _ _ pos.1.ne' pos.2.1.ne' pos.2.2.ne' 3
 
 theorem physical_derivative (h : PhysicalPiece) (pos : h.positive) (f : Field) (t : ℝ) :
     HasDerivAt (fun r : ℝ => (h.field f).eval (h.length*r))
@@ -69,13 +69,17 @@ theorem physical_derivative (h : PhysicalPiece) (pos : h.positive) (f : Field) (
       h.q h.qEnd x h.cosine h.sine pos.1.ne' pos.2.1.ne' pos.2.2.ne' 3
     change FrameIntervalExpressionSound.evaluate (h.inputs x) _ =
       (LocalFrameFields.rotation h.dofs h.length h.flexural h.q h.qEnd).eval x at eq
-    simpa [Function.comp_def,id,PhysicalPiece.field,derivativeSign,x,eq,mul_comm,LocalFrameFields.rotation] using chain
+    change HasDerivAt _ (h.length * FrameIntervalExpressionSound.evaluate (h.inputs x) (FrameIntervalRecovery.expressions 3)) t
+    rw [eq]
+    convert chain using 1 <;> simp [PhysicalPiece.field,LocalFrameFields.rotation] <;> ring
   | slope =>
     have eq := FrameIntervalRecoverySound.expression_fields h.dofs h.length h.axial h.flexural h.p h.pEnd
       h.q h.qEnd x h.cosine h.sine pos.1.ne' pos.2.1.ne' pos.2.2.ne' 2
     change FrameIntervalExpressionSound.evaluate (h.inputs x) _ =
       (LocalFrameFields.moment h.dofs h.length h.flexural h.q h.qEnd).eval x at eq
-    simp only [derivativeSign,if_true,eq,LocalFrameFields.moment,Polynomial.eval_mul,Polynomial.eval_C]
+    change HasDerivAt _ ((h.length/h.flexural) * FrameIntervalExpressionSound.evaluate (h.inputs x) (FrameIntervalRecovery.expressions 2)) t
+    rw [eq]
+    simp only [LocalFrameFields.moment,Polynomial.eval_mul,Polynomial.eval_C]
     convert chain using 1 <;> simp [Function.comp_def,id,PhysicalPiece.field,x] <;> field_simp [pos.2.2.ne'] <;> ring
 
 theorem physical_extreme_covered {bits p f rows} (h : PhysicalPiece) (pos : h.positive)

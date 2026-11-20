@@ -25,8 +25,6 @@ import { createIntervalExplanation, renderIntervalExplanation } from './frame-in
 
 import { renderKinematics } from './member-kinematics.js';
 
-
-
 export const isPortalWorkspace = location.pathname.replace(/index\.html$/, '').endsWith('/portal-checker/');
 // The same controller serves the main workspace and the compatible scoped URL.
 export const isCheckedWorkspace = location.pathname.replace(/index\.html$/, '') === new URL('./', import.meta.url).pathname;
@@ -239,8 +237,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                     if (!active()) return;
                     const captured = JSON.parse(new TextDecoder().decode(sourceBytes));
                     let witness = packet;
-                    if (!checker.supportsSprings && !checker.supportsInclinedReleases && result.frameProtocol !== 'inclined') {
-
+                    if (result.frameProtocol !== 'inclined' && result.frameProtocol !== 'inclined-release' && result.frameProtocol !== 'spring') {
                         witness = await intervalProposal(captured.model, captured.query);
                     }
                     const digest = await sha256(witness);
@@ -281,7 +278,6 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                     record({ diagram: { protocol: route === 'inclined-diagram' ? 'CV2011_INCLINED_DIAGRAM_1' : 'CV2011_DIAGRAM_1',
                         artifact: extra.artifact, bundle: extra.bundle, packetDigest, reportDigest: checked.reportDigest,
                         report: new TextDecoder().decode(checked.report) } });
-                    certificate.textContent = exportText;
                 } catch (error) {
                     if (current()) progress.textContent = 'Whole-member check inconclusive. ' + String(error);
                 } finally { extra.dispose(); }
