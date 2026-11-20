@@ -100,9 +100,9 @@ export class PortalRuntime {
             mode === 'hinge' && !this.supportsHingeFrames) {
             this.invalidate(); return { state: 'unsupported-runtime' };
         }
-        return this.submit(bytes, 'frame', mode !== 'exact');
+        return this.submit(bytes, 'frame', mode !== 'exact', mode === 'inclined');
     }
-    private async submit(bytes: Uint8Array, protocol: 'portal' | 'frame', inclined = false): Promise<CheckerResult> {
+    private async submit(bytes: Uint8Array, protocol: 'portal' | 'frame', inclined = false, intervalProposal = false): Promise<CheckerResult> {
         this.invalidate();
         const id = this.sequence;
         if (this.stopped) return { state: 'reset-required' };
@@ -115,7 +115,7 @@ export class PortalRuntime {
                 this.onFailure('Checker timed out. Reset to continue.'); resolve({ state: 'timeout' });
             }, inclined ? inclinedDeadlineMilliseconds : 1000);
             this.current = { id, inputDigest, cancelOnEdit: inclined, resolve, timer };
-            this.worker.postMessage({ id, artifact: this.artifact, bytes: captured, protocol });
+            this.worker.postMessage({ id, artifact: this.artifact, bytes: captured, protocol, intervalProposal });
         });
     }
     dispose(): void { this.invalidate(); this.stopped = true; this.worker.terminate(); }

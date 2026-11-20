@@ -55,7 +55,10 @@ self.onmessage = async ({ data }) => {
                 Object.keys(source).some(key => key !== 'model' && key !== 'query') || !source.model || !source.query)
                 throw Error('Malformed frame request.');
             let frame;
-            try { frame = frameCode.compileFrame(source.model, source.query); }
+            try {
+                inclined = data.intervalProposal === true;
+                if (!inclined) frame = frameCode.compileFrame(source.model, source.query);
+            }
             catch (error) {
                 if (!(error instanceof Error) || !error.message.startsWith('Unsupported:')) throw error;
                 inclined = true;

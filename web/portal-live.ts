@@ -496,7 +496,13 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                 cutSide.options[1].disabled = parameter === 0;
                 query = { member, parameter, cutSide: cutSide.value as 'left' | 'right', ...frameQueryConvention };
                 if (hinge) frameMode = 'hinge';
-                else try { validateFrame(snapshot, query); }
+                else try {
+                    validateFrame(snapshot, query);
+                    // Long binary fractions can exhaust exact elimination. Keep every
+                    // source byte and ask the same ABI to check an interval proposal.
+                    if (runtime?.supportsInclinedFrames && snapshot.loads.some(load => load.kind === 'distributed' &&
+                        [load.t, load.end].some(t => !Number.isInteger(t * 1024)))) frameMode = 'inclined';
+                }
                 catch (error) {
                     if (runtime && !runtime.supportsInclinedFrames || !(error instanceof Error) || !error.message.startsWith('Unsupported:')) throw error;
                     validateIntervalFrame(snapshot, query);
