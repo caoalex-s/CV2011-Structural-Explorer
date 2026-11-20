@@ -60,6 +60,7 @@ theorem candidate_fits {bits p f t row inputs length}
   cases rest
   exact ⟨rfl, fun _ loc => enclosure fits loc computed⟩
 
+set_option maxHeartbeats 2400000 in
 theorem centered_identity (values : Fin 15 → ℝ) (length middle station : ℝ) (f : Field) :
     FrameIntervalExpressionSound.evaluate
       (centeredInputs values (length*middle) (length*(station-middle))) (centered f) =
@@ -102,7 +103,7 @@ theorem classify_excluded {bits p f t inputs length} (fits : Fits p inputs lengt
     · exact ne_of_lt (lt_of_le_of_lt h.2 (by exact_mod_cast neg))
     · exact ne_of_gt (lt_of_lt_of_le (by exact_mod_cast pos) h.1)
   next =>
-    dsimp only at rest
+    try dsimp only at rest
     split at rest
     next =>
       obtain ⟨row,_,rest⟩ := Option.bind_eq_some.mp rest
@@ -116,7 +117,7 @@ theorem classified_enclosure {bits p f t row} (made : classify bits p f t = some
   split at rest
   next => cases rest
   next =>
-    dsimp only at rest
+    try dsimp only at rest
     split at rest
     next =>
       obtain ⟨r,hr,rest⟩ := Option.bind_eq_some.mp rest
@@ -153,9 +154,9 @@ theorem stationary_covered {bits p f inputs length} (fits : Fits p inputs length
         cases rest
         let mid := (t.lower+t.upper)/2
         by_cases before : s ≤ (mid:ℝ)
-        · obtain ⟨r,mem,loc,val⟩ := ih (inside := ⟨inside.1,before⟩) hl
+        · obtain ⟨r,mem,loc,val⟩ := ih (t := ⟨t.lower,mid⟩) (inside := ⟨inside.1,before⟩) hl
           exact ⟨r,List.mem_append_left _ mem,loc,val⟩
-        · obtain ⟨r,mem,loc,val⟩ := ih (inside := ⟨(le_of_not_ge before),inside.2⟩) hr
+        · obtain ⟨r,mem,loc,val⟩ := ih (t := ⟨mid,t.upper⟩) (inside := ⟨(le_of_not_ge before),inside.2⟩) hr
           exact ⟨r,List.mem_append_right _ mem,loc,val⟩
 
 #print axioms local_transverse

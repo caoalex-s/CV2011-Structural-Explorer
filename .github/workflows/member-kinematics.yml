@@ -128,7 +128,7 @@ jobs:
           lake env bash -euc '
             set -o pipefail
             export LEAN_PATH="$PWD:$LEAN_PATH"
-            python3 ../qa/inclined-release/compile.py MemberKinematicsPhysical | tee kinematics-axioms.log
+            python3 ../qa/inclined-release/compile.py MemberKinematicsTable | tee kinematics-axioms.log
             ! grep -E "sorryAx|declaration uses .sorry." kinematics-axioms.log
           '
 

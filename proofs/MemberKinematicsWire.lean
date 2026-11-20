@@ -42,17 +42,16 @@ def summarize (rows : List Located) : Option Extremes := do
   if soundLimits rows result && InclinedDiagram.narrow minBox && InclinedDiagram.narrow maxBox
     then some result else none
 
-def fieldRows (bits : Nat) (pieces : List Segment) (whole : Bounds) (field : Field) :
-    Option (List String) := do
+def collectedRows (bits : Nat) (pieces : List Segment) (whole : Bounds) (field : Field) :
+    Option (List Located) := do
   let groups ← pieces.zipIdx.mapM fun (p, i) => do
     let rows ← candidates bits p field
     rows.mapM (locate bits p i whole)
-  let rows := groups.flatten
-  let bounds ← summarize rows
+  return groups.flatten
+
+def renderRows (field : Field) (rows : List Located) (bounds : Extremes) : List String :=
   let minBox := bounds.minimum
   let maxBox := bounds.maximum
-
-
   let label := if field == .slope then "S" else "D"
   let extrema := String.intercalate " " ([label, "bounds"] ++ boxText minBox ++ boxText maxBox)
   let locations := rows.filterMap fun row =>
@@ -60,20 +59,28 @@ def fieldRows (bits : Nat) (pieces : List Segment) (whole : Bounds) (field : Fie
     let high := maxBox.lower ≤ row.value.upper
     if low || high then some (String.intercalate " " ([label, "location", toString row.piece,
       if low then "1" else "0", if high then "1" else "0"] ++ boxText row.station)) else none
-  return extrema :: locations
+  extrema :: locations
+
+def fieldRows (bits : Nat) (pieces : List Segment) (whole : Bounds) (field : Field) :
+    Option (List String) := do
+  let rows ← collectedRows bits pieces whole field
+  let bounds ← summarize rows
+  return renderRows field rows bounds
+
+def endRow (bits : Nat) (p : Segment) (i : Nat) : Option String := do
+  let a ← evaluate bits p (quantity .slope) ⟨0,0⟩
+  let b ← evaluate bits p (quantity .slope) ⟨1,1⟩
+  let u ← evaluate bits p transverse ⟨0,0⟩
+  let v ← evaluate bits p transverse ⟨1,1⟩
+  return String.intercalate " " (["P", toString i, MemberDiagram.number p.left, MemberDiagram.number p.right]
+    ++ boxText a ++ boxText b ++ boxText u ++ boxText v)
 
 def sheet {data : Partition} {basis : GlobalBasis} (bits member : Nat)
     (cert : Certificate data basis) : Option String := do
   let indices := InclinedDiagram.selected data member
   let pieces ← indices.mapM (recover bits cert)
   let geometry ← InclinedFrameIntervalGeometry.member bits data member (rootAt cert member)
-  let ends ← pieces.zipIdx.mapM fun (p,i) => do
-    let a ← evaluate bits p (quantity .slope) ⟨0,0⟩
-    let b ← evaluate bits p (quantity .slope) ⟨1,1⟩
-    let u ← evaluate bits p transverse ⟨0,0⟩
-    let v ← evaluate bits p transverse ⟨1,1⟩
-    return String.intercalate " " (["P", toString i, MemberDiagram.number p.left, MemberDiagram.number p.right]
-      ++ boxText a ++ boxText b ++ boxText u ++ boxText v)
+  let ends ← pieces.zipIdx.mapM fun (p,i) => endRow bits p i
   let slopes ← fieldRows bits pieces geometry.length .slope
   let displacements ← fieldRows bits pieces geometry.length .displacement
   let report := String.intercalate "\n" (["CV2011_MEMBER_KINEMATICS_1", data.source.members[member]!.id]

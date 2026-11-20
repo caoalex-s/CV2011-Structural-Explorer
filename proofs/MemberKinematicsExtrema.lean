@@ -40,9 +40,9 @@ theorem stationary_witness {bits p f inputs length} (fits : Fits p inputs length
         have first : t.lower ≤ mid := by dsimp [mid]; linarith
         have last : mid ≤ t.upper := by dsimp [mid]; linarith
         rcases List.mem_append.mp member with a | a
-        · obtain ⟨x,hx,hv⟩ := ih first hl a
+        · obtain ⟨x,hx,hv⟩ := ih (t := ⟨t.lower,mid⟩) first hl a
           exact ⟨x,⟨hx.1,hx.2.trans (by exact_mod_cast last)⟩,hv⟩
-        · obtain ⟨x,hx,hv⟩ := ih last hr a
+        · obtain ⟨x,hx,hv⟩ := ih (t := ⟨mid,t.upper⟩) last hr a
           exact ⟨x,⟨le_trans (by exact_mod_cast first) hx.1,hx.2⟩,hv⟩
 
 theorem candidates_cover {bits p f inputs length rows} (fits : Fits p inputs length)
