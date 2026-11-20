@@ -88,7 +88,7 @@ theorem flags_mean {a : Candidate} {all : List Candidate} (value : Candidate →
       have actual := comparison b mem
       rw [order] at actual
       have relation := bound b mem
-      cases maximum <;> simp_all [bad,orderMeans] <;> linarith
+      cases maximum <;> exact False.elim ((not_lt_of_ge relation) actual)
   · rw [if_neg worse] at reported
     by_cases unknown : comparisons.contains .unresolved = true
     · rw [if_pos unknown] at reported

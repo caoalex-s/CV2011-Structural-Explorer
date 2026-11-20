@@ -117,7 +117,7 @@ jobs:
             export LEAN_PATH="$PWD:$LEAN_PATH"
             test -s InclinedDiagramSound.lean
             status=0
-            for module in InclinedDiagramFormsSound InclinedDiagramOrder InclinedDiagramReportSound; do
+            for module in InclinedDiagramFormsSound InclinedDiagramOrder InclinedDiagramWireSound; do
               python3 ../qa/inclined-release/compile.py "$module" 2>&1 | tee -a release-axioms.log || status=1
             done
             test "$status" -eq 0

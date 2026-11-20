@@ -284,7 +284,9 @@ theorem rigid_columns {data : Partition} {basis : GlobalBasis} {bits} {cert : Ce
   refine ⟨variation,?_,?_⟩
   · exact fun p d => InclinedFrameIntervalAssemblySound.pointColumnAt_contains allocation columns p col d
   · have allowed := (range_equals_source_kernel valid allocation variation).mpr ⟨coords,rfl⟩
-    rw [empty_work,add_zero]; exact rigid_work valid equilibrium variation allowed
+    rw [←rigid_work valid equilibrium variation allowed]
+    apply add_eq_left.mpr
+    exact Finset.sum_eq_zero fun j _ => Fin.elim0 j
 
 theorem release_columns (l : Layout) {bits} {cert : Certificate l.expanded l.basis}
     (columns : InclinedRelease.Projections l bits cert) (z : Fin l.basis.columns.size → ℝ)
@@ -292,7 +294,10 @@ theorem release_columns (l : Layout) {bits} {cert : Certificate l.expanded l.bas
     WorkColumns cert (InclinedRelease.Sound.motion l z) #[] (fun i => Fin.elim0 i) := by
   intro col
   exact ⟨unitMotion l col, fun p d => InclinedRelease.Sound.point_contains columns p col d,
-    by rw [empty_work,add_zero]; exact released_work l z equilibrium col⟩
+    by
+      rw [←released_work l z equilibrium col]
+      apply add_eq_left.mpr
+      exact Finset.sum_eq_zero fun j _ => Fin.elim0 j⟩
 
 theorem array_sum {α} [Inhabited α] (xs : Array α) (f : α → ℝ) :
     (∑ i : Fin xs.size, f xs[i.val]!) = (xs.toList.map f).sum := by
@@ -331,18 +336,23 @@ theorem coupling_action (l : Layout) (ks : Array Rat) (z : Fin l.basis.columns.s
   have reduced :
       (∑ j : Fin (springColumns l ks).size, ((springColumns l ks)[j.val]! row : ℝ)*physicalTorques l ks z j) =
       ∑ j : Fin (springSides l ks).size, ((ks[(springSides l ks)[j.val]!]! : Rat) : ℝ)*f (springSides l ks)[j.val]! := by
-    simp only [springColumns,Array.size_map]
-    apply Finset.sum_congr rfl
-    intro i _
-    simp [getElem!_pos,i.isLt,physicalTorques,f]
+    let e := finCongr (show (springColumns l ks).size = (springSides l ks).size by simp [springColumns])
+    apply Fintype.sum_equiv e
+    intro i
+    have hi : i.val < (springSides l ks).size := by simpa [springColumns] using i.isLt
+    simp [e,finCongr,getElem!_pos,hi,i.isLt,springColumns,physicalTorques,f]
     ring
-  rw [reduced,array_sum]
-  simp only [springSides,Array.toList_filter,omit_zero,←array_sum]
+  let term := fun side : Nat => ((ks[side]! : Rat) : ℝ)*f side
+  rw [reduced,array_sum (springSides l ks) term]
+  change (((l.sides.filter (fun side => ks[side]! != 0)).toList.map term).sum) = _
+  rw [Array.toList_filter]
+  rw [show ((l.sides.toList.filter (fun side => ks[side]! != 0)).map term).sum =
+    (l.sides.toList.map term).sum from omit_zero _ ks f,←array_sum l.sides term]
   simp only [FrameSpring.coupling,FrameSpring.Sound.sumRational_cast,Rat.cast_mul,Finset.sum_mul]
   rw [Finset.sum_comm]
   apply Finset.sum_congr rfl
   intro i _
-  simp [f,unitGap,Finset.mul_sum,mul_assoc]
+  simp [term,f,unitGap,Finset.mul_sum,mul_assoc]
 
 theorem spring_columns (l : Layout) (ks : Array Rat) {bits} {cert : Certificate l.expanded l.basis}
     (columns : InclinedRelease.Projections l bits cert) (z : Fin l.basis.columns.size → ℝ)
