@@ -34,7 +34,7 @@ private theorem memberIndex {α : Type} {xs : List α} {x : α} (mem : x ∈ xs)
   obtain ⟨i,hi,eq⟩ := List.mem_iff_getElem.mp mem
   exact ⟨⟨i,hi⟩,eq⟩
 
-theorem collection_sound {bits : Nat} {pieces : List Segment} {whole : Bounds} {L : ℝ} {f : Field} {rows : List Located} (physical : Fin pieces.length → PhysicalPiece)
+theorem collection_sound {bits : Nat} {pieces : List Segment} {whole : FrameIntervalOps.Bounds} {L : ℝ} {f : Field} {rows : List Located} (physical : Fin pieces.length → PhysicalPiece)
     (length : Contains whole L) (fits : ∀ i, Fits (pieces.get i) ((physical i).inputs 0) (physical i).length)
     (positive : ∀ i, (physical i).positive) (checked : collectedRows bits pieces whole f = some rows) :
     PhysicalTable pieces physical L f rows := by
