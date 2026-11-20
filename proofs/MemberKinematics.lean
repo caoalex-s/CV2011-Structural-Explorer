@@ -56,22 +56,33 @@ structure Candidate where
 def candidate (bits : Nat) (p : Segment) (field : Field) (t : Bounds) : Option Candidate := do
   return ⟨t, ← evaluate bits p (quantity field) t⟩
 
-/-- Enclose every interior stationary point. Cells with a strictly signed
-derivative can contain no interior extremum. Stop at an exact plateau or a
-small physical interval; bounds on the field itself must also be narrow. -/
+inductive Cell where
+  | excluded
+  | enclosing (row : Candidate)
+  | subdivide
+
+/-- Discard cells only after excluding zero from the derivative. A cell
+with a small field range may be retained in full for near-flat data. -/
+def classify (bits : Nat) (p : Segment) (field : Field) (t : Bounds) : Option Cell := do
+  let derivative ← evaluate bits p (derivativeSign field) t
+  if derivative.upper < 0 || 0 < derivative.lower then return .excluded
+  let nearlyFlat := derivative.upper-derivative.lower ≤ (1:Rat)/1000000000000000
+  if nearlyFlat || (t.upper-t.lower)*p.length.upper ≤ (1:Rat)/1000000 then
+    let row ← candidate bits p field t
+    if row.value.upper-row.value.lower ≤ (1:Rat)/100000000 then return .enclosing row
+  return .subdivide
+
+/-- The two closed children share the midpoint, so a stationary point at the
+split is retained. Each visited cell consumes one unit of the shared budget. -/
 def stationary (bits : Nat) (p : Segment) (field : Field) (t : Bounds) :
     Nat → Nat → Option (List Candidate × Nat)
   | 0, _ => none
   | _+1, 0 => none
   | fuel+1, budget+1 => do
-    let derivative ← evaluate bits p (derivativeSign field) t
-    if derivative.upper < 0 || 0 < derivative.lower then return ([], budget)
-    let exactPlateau := derivative.lower == 0 && derivative.upper == 0
-    let unresolvedFlat := derivative.upper-derivative.lower ≤ (1:Rat)/1000000000000000
-    if exactPlateau || unresolvedFlat || (t.upper-t.lower)*p.length.upper ≤ (1:Rat)/1000000 then
-      let row ← candidate bits p field t
-      if row.value.upper-row.value.lower ≤ (1:Rat)/100000000 then return ([row], budget)
-    if fuel = 0 then none else
+    match ← classify bits p field t with
+    | .excluded => return ([], budget)
+    | .enclosing row => return ([row], budget)
+    | .subdivide =>
       let mid := (t.lower+t.upper)/2
       let (left, remaining) ← stationary bits p field ⟨t.lower, mid⟩ fuel budget
       let (right, remaining) ← stationary bits p field ⟨mid, t.upper⟩ fuel remaining

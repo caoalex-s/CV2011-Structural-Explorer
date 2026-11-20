@@ -1,0 +1,136 @@
+import MemberKinematicsWire
+import InclinedReleaseFields
+
+namespace MemberKinematics.Sound
+open FrameEnclosure (Contains executable_multiply_contains)
+open FrameIntervalOps FrameIntervalExpression
+noncomputable section
+
+/-- Evaluate the same physical piece at any real fraction, using its original
+checked coefficients and replacing only the longitudinal position. -/
+def atStation (inputs : Fin 15 → ℝ) (length t : ℝ) (i : Fin 15) :=
+  if i.val = 10 then length*t else inputs i
+
+def Fits (p : Segment) (inputs : Fin 15 → ℝ) (length : ℝ) :=
+  Contains p.length length ∧ ∀ i, Contains (p.inputs i) (inputs i)
+
+theorem enclosure {bits p expr t box inputs length station}
+    (fits : Fits p inputs length) (whereAt : Contains t station)
+    (done : MemberKinematics.evaluate bits p expr t = some box) :
+    Contains box (FrameIntervalExpressionSound.evaluate (atStation inputs length station) expr) := by
+  obtain ⟨x,hx,rest⟩ := Option.bind_eq_some.mp done
+  apply FrameIntervalExpressionSound.enclose_contains expr rest
+  intro i
+  by_cases pos : i.val = 10
+  · simpa [atStation,pos] using executable_multiply_contains hx fits.1 whereAt
+  · simpa [atStation,pos] using fits.2 i
+
+theorem source_fits {data : InclinedFrameSource.Partition} {basis : InclinedFrameBasis.GlobalBasis}
+    {bits} {cert : InclinedFrameIntervalAssembly.Certificate data basis}
+    (partition : InclinedFrameSource.PartitionValid data) (motion : InclinedFrameReal.Motion data)
+    (geo : InclinedFrameIntervalAssembly.GeometryChecks bits cert)
+    (loads : InclinedFrameIntervalAssembly.LoadChecks bits cert)
+    (nodes : InclinedRelease.Fields.NodeEnclosures bits cert motion)
+    {i p} (checked : recover bits cert i = some p) :
+    let seg := data.pieces[i.val]!
+    Fits p (InclinedRelease.Fields.sourceInputs data motion i seg.left)
+      (InclinedFrameReal.pieceLength data seg) := by
+  obtain ⟨u,hu,rest⟩ := Option.bind_eq_some.mp checked
+  cases rest
+  exact ⟨(InclinedFrameIntervalGeometrySound.piece_contains (geo i)).1,
+    InclinedRelease.Fields.fieldInputs_contains partition motion geo nodes loads hu⟩
+
+theorem local_transverse (d : FrameInterfaces.LocalDofs) (L EA EI p pEnd q qEnd x c s : ℝ)
+    (hL : L ≠ 0) (hEA : EA ≠ 0) (hEI : EI ≠ 0) :
+    FrameIntervalExpressionSound.evaluate (FrameIntervalRecoverySound.inputs d L EA EI p pEnd q qEnd x c s)
+      transverse = (LocalFrameFields.transverseDisplacement d L EI q qEnd).eval x := by
+  rw [(RationalFrame.Fields.affine_recovery d L EA EI p pEnd q qEnd x hL hEA hEI).2.2.2.2.2]
+  simp [transverse,FrameIntervalExpressionSound.evaluate,FrameIntervalRecoverySound.inputs]
+  ring
+
+/-- A candidate encloses the field throughout its entire station cell. -/
+def RowFits (field : ℝ → ℝ) (r : Candidate) :=
+  ∀ t, Contains r.t t → Contains r.value (field t)
+
+theorem candidate_fits {bits p f t row inputs length}
+    (fits : Fits p inputs length) (made : candidate bits p f t = some row) :
+    row.t = t ∧ RowFits (fun s => FrameIntervalExpressionSound.evaluate
+      (atStation inputs length s) (quantity f)) row := by
+  obtain ⟨value,computed,rest⟩ := Option.bind_eq_some.mp made
+  cases rest
+  exact ⟨rfl, fun _ loc => enclosure fits loc computed⟩
+
+theorem classify_excluded {bits p f t inputs length} (fits : Fits p inputs length)
+    (excluded : classify bits p f t = some .excluded) {s : ℝ} (inside : Contains t s) :
+    FrameIntervalExpressionSound.evaluate (atStation inputs length s) (derivativeSign f) ≠ 0 := by
+  obtain ⟨bound,computed,rest⟩ := Option.bind_eq_some.mp excluded
+  have h := enclosure fits inside computed
+  dsimp only at rest
+  split at rest
+  next sign =>
+    simp only [Bool.or_eq_true,decide_eq_true_eq] at sign
+    rcases sign with neg | pos
+    · exact ne_of_lt (lt_of_le_of_lt h.2 (by exact_mod_cast neg))
+    · exact ne_of_gt (lt_of_lt_of_le (by exact_mod_cast pos) h.1)
+  next =>
+    dsimp only at rest
+    split at rest
+    next =>
+      obtain ⟨row,_,rest⟩ := Option.bind_eq_some.mp rest
+      split at rest <;> cases rest
+    next => cases rest
+
+theorem classified_enclosure {bits p f t row} (made : classify bits p f t = some (.enclosing row)) :
+    candidate bits p f t = some row := by
+  obtain ⟨_,_,rest⟩ := Option.bind_eq_some.mp made
+  dsimp only at rest
+  split at rest
+  next => cases rest
+  next =>
+    dsimp only at rest
+    split at rest
+    next =>
+      obtain ⟨r,hr,rest⟩ := Option.bind_eq_some.mp rest
+      split at rest
+      next => cases rest; exact hr
+      next => cases rest
+    next => cases rest
+
+/-- Every derivative zero is retained, even if the derivative touches zero
+without changing sign or vanishes over an interval. -/
+theorem stationary_covered {bits p f inputs length} (fits : Fits p inputs length)
+    (fuel : Nat) {budget t result s} (inside : Contains t s)
+    (zero : FrameIntervalExpressionSound.evaluate (atStation inputs length s) (derivativeSign f) = 0)
+    (done : stationary bits p f t fuel budget = some result) :
+    ∃ r ∈ result.1, Contains r.t s ∧ Contains r.value
+      (FrameIntervalExpressionSound.evaluate (atStation inputs length s) (quantity f)) := by
+  induction fuel generalizing budget t result with
+  | zero => cases done
+  | succ n ih =>
+    cases budget with
+    | zero => cases done
+    | succ b =>
+      obtain ⟨cell,classified,rest⟩ := Option.bind_eq_some.mp done
+      cases cell with
+      | excluded => exact (classify_excluded fits classified inside zero).elim
+      | enclosing row =>
+        cases rest
+        have h := candidate_fits fits (classified_enclosure classified)
+        have hr : Contains row.t s := h.1 ▸ inside
+        exact ⟨row,by simp,hr,h.2 s hr⟩
+      | subdivide =>
+        obtain ⟨⟨left,remaining⟩,hl,rest⟩ := Option.bind_eq_some.mp rest
+        obtain ⟨⟨right,_⟩,hr,rest⟩ := Option.bind_eq_some.mp rest
+        cases rest
+        let mid := (t.lower+t.upper)/2
+        by_cases before : s ≤ (mid:ℝ)
+        · obtain ⟨r,mem,loc,val⟩ := ih (inside := ⟨inside.1,before⟩) hl
+          exact ⟨r,List.mem_append_left _ mem,loc,val⟩
+        · obtain ⟨r,mem,loc,val⟩ := ih (inside := ⟨(le_of_not_ge before),inside.2⟩) hr
+          exact ⟨r,List.mem_append_right _ mem,loc,val⟩
+
+#print axioms local_transverse
+#print axioms source_fits
+#print axioms stationary_covered
+end
+end MemberKinematics.Sound
