@@ -45,9 +45,20 @@ try {
     assert.equal(await page.locator('#moment-reveal').isEnabled(),false);
     assert.equal(await page.locator('#moment-explanation').textContent(),'');
     rightBase.y = -2;
+    const rightColumn = model.members.find(member => member.id === 'CD');
+    rightColumn.EI = 20000.000000000004;
     await loadDrawing();
-    await page.waitForFunction(() => JSON.parse(localStorage.getItem('cv2011-portal-absolute-moment/v1'))
-        .nodes.find(node => node.id === 'D').y === -2);
+    async function waitForRightStiffness(stiffness) {
+        await page.waitForFunction(expected => JSON.parse(localStorage.getItem('cv2011-portal-absolute-moment/v1'))
+            .members.find(member => member.id === 'CD').EI === expected, stiffness);
+    }
+    await waitForRightStiffness(rightColumn.EI);
+    await submit('1.337,4.663','Check the beam direction');
+    assert.equal(await page.locator('#moment-reveal').isEnabled(),false);
+    assert.equal(await page.locator('#moment-explanation').textContent(),'');
+    rightColumn.EI = 20000;
+    await loadDrawing();
+    await waitForRightStiffness(rightColumn.EI);
     await submit('1.337','Check the number');
     assert.equal(await page.locator('#checked-member-diagram').isVisible(),false);
     await submit('1.337,4.663','Correct for this drawing');
@@ -78,6 +89,8 @@ try {
     await page.locator('[data-mode="insights"]').click();
     const events = page.locator('#insights-panel table').filter({has:page.getByText('Pseudonymous ID',{exact:true})});
     await events.getByText('DEMO-001').first().waitFor();
+    await events.getByRole('columnheader',{name:'Worked solution for this drawing'}).waitFor();
+    await page.getByText('Each edited drawing has its own first prediction.',{exact:false}).waitFor();
     report.events=await events.innerText();
     for (const label of ['first prediction','retry','reveal']) assert.ok(report.events.includes(label));
     assert.deepEqual(errors,[]);
