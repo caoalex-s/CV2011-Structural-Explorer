@@ -17,7 +17,7 @@ theorem located {bits p piece whole row out} (made : locate bits p piece whole r
   cases rest
   refine ⟨rfl,rfl,fun L t len loc => ?_⟩
   apply executable_multiply_contains hd len
-  simpa [station] using InclinedDiagram.Sound.shifted p.left (InclinedDiagram.Sound.scaled (p.right-p.left) loc)
+  simpa [station,Rat.cast_sub] using InclinedDiagram.Sound.shifted p.left (InclinedDiagram.Sound.scaled (p.right-p.left) loc)
 
 structure PhysicalTable (pieces : List Segment) (physical : Fin pieces.length → PhysicalPiece)
     (L : ℝ) (f : Field) (rows : List Located) : Prop where
@@ -29,7 +29,12 @@ structure PhysicalTable (pieces : List Segment) (physical : Fin pieces.length �
     (IsMaxOn value (Icc 0 1) t ∨ IsMinOn value (Icc 0 1) t) →
     ∃ r ∈ rows, r.piece = i.val ∧ Contains r.station (station (pieces.get i) L t) ∧ Contains r.value (value t)
 
-theorem collection_sound {bits pieces whole L f rows} (physical : Fin pieces.length → PhysicalPiece)
+private theorem memberIndex {α : Type} {xs : List α} {x : α} (mem : x ∈ xs) :
+    ∃ i : Fin xs.length, xs.get i = x := by
+  obtain ⟨i,hi,eq⟩ := List.mem_iff_getElem.mp mem
+  exact ⟨⟨i,hi⟩,eq⟩
+
+theorem collection_sound {bits : Nat} {pieces : List Segment} {whole : Bounds} {L : ℝ} {f : Field} {rows : List Located} (physical : Fin pieces.length → PhysicalPiece)
     (length : Contains whole L) (fits : ∀ i, Fits (pieces.get i) ((physical i).inputs 0) (physical i).length)
     (positive : ∀ i, (physical i).positive) (checked : collectedRows bits pieces whole f = some rows) :
     PhysicalTable pieces physical L f rows := by
@@ -45,13 +50,13 @@ theorem collection_sound {bits pieces whole L f rows} (physical : Fin pieces.len
   constructor
   · intro r mem
     obtain ⟨g,hg,hr⟩ := List.mem_flatten.mp mem
-    obtain ⟨j,ej⟩ := List.get_of_mem hg
+    obtain ⟨j,ej⟩ := memberIndex hg
     let i := j.cast count.symm
     obtain ⟨cs,hc,hl⟩ := perPiece i
     have groupEq : groups.get (i.cast count) = g := ej
     rw [groupEq] at hl
     obtain ⟨n,locations⟩ := mapM_index _ hl
-    obtain ⟨k,ek⟩ := List.get_of_mem hr
+    obtain ⟨k,ek⟩ := memberIndex hr
     have loc := locations (k.cast n.symm)
     have here : g.get ((k.cast n.symm).cast n) = r := ek
     rw [here] at loc
@@ -63,7 +68,7 @@ theorem collection_sound {bits pieces whole L f rows} (physical : Fin pieces.len
   · intro i t dom ext
     obtain ⟨cs,hc,hl⟩ := perPiece i
     obtain ⟨r,hr,loc,val⟩ := physical_extreme_covered _ (positive i) (fits i) hc dom ext
-    obtain ⟨k,hk⟩ := List.get_of_mem hr
+    obtain ⟨k,hk⟩ := memberIndex hr
     obtain ⟨n,locations⟩ := mapM_index _ hl
     have binding := locations k
     rw [hk] at binding

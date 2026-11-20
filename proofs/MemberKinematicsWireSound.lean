@@ -45,7 +45,7 @@ def FieldReport (pieces : List Segment) (physical : Fin pieces.length → Physic
       ∃ r ∈ rows, r.piece = i.val ∧ Contains r.station (station (pieces.get i) L t) ∧
         (if maximum then e.maximum.lower ≤ r.value.upper else r.value.lower ≤ e.minimum.upper)
 
-theorem field_report {bits pieces whole L f lines} (physical : Fin pieces.length → PhysicalPiece)
+theorem field_report {bits : Nat} {pieces : List Segment} {whole : FrameIntervalOps.Bounds} {L : ℝ} {f : Field} {lines : List String} (physical : Fin pieces.length → PhysicalPiece)
     (len : Contains whole L) (fits : ∀ i, Fits (pieces.get i) ((physical i).inputs 0) (physical i).length)
     (positive : ∀ i, (physical i).positive) (made : fieldRows bits pieces whole f = some lines) :
     FieldReport pieces physical L f lines := by

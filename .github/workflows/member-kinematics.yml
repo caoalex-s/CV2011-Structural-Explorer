@@ -7,8 +7,6 @@ permissions:
   actions: read
 jobs:
   diagrams:
-    outputs:
-      installed: ${{ steps.installation.outputs.installed }}
     if: "${{ !startsWith(github.event.head_commit.message, 'Proof iteration:') }}"
     runs-on: ubuntu-22.04
     timeout-minutes: 45
@@ -73,12 +71,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: bash qa/member-diagram/build-runtime.sh member-kinematics
       - name: Compare installed checker with clean build
-        id: installation
-        run: |
-          if test -d public/portal-checker/member-kinematics; then
-            diff -qr public/portal-checker/member-kinematics .data/hinge-build/member-kinematics-assets
-            echo "installed=true" >> "$GITHUB_OUTPUT"
-          fi
+        run: diff -qr public/portal-checker/member-kinematics .data/hinge-build/member-kinematics-assets
       - uses: actions/upload-artifact@v4
         with:
           name: member-kinematics-checker
@@ -136,8 +129,7 @@ jobs:
           '
 
   student-drawings:
-    needs: diagrams
-    if: needs.diagrams.outputs.installed == 'true'
+    if: "${{ !startsWith(github.event.head_commit.message, 'Proof iteration:') }}"
     runs-on: ubuntu-22.04
     timeout-minutes: 20
     steps:
