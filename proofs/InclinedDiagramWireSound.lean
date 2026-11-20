@@ -99,13 +99,18 @@ theorem sheet_sound {data : Partition} {basis : GlobalBasis} {bits member}
   have info (i : Fin pieces.length) : fits (pieces.get i) (physical i) ∧
       sourceShape data (source i) (pieces.get i) ∧ Forms state (pieces.get i) (physical i) := by
     have op := each (i.cast length.symm)
-    obtain ⟨raw,derived,eq⟩ := Option.map_eq_some_iff.mp op
-    have base := fromSource_fits motion partition geometry loads nodes derived
-    have refined := refined_forms partition work _ raw base
-    have shape := fromSource_shape derived
-    simp only [Fin.cast_cast,Fin.cast_refl] at eq
-    rw [←eq]
-    exact ⟨refined.1,shape,refined.2⟩
+    let system := Statics.assemble cert springs
+    change (fromSource bits cert (source i)).map (withStatics data system (source i)) = some (pieces.get i) at op
+    cases derived : fromSource bits cert (source i) with
+    | none => rw [derived] at op; cases op
+    | some raw =>
+      rw [derived] at op
+      have base := fromSource_fits motion partition geometry loads nodes derived
+      have refined := refined_forms partition work _ raw base
+      have shape := fromSource_shape derived
+      have eq : withStatics data system (source i) raw = pieces.get i := Option.some.inj op
+      rw [←eq]
+      exact ⟨refined.1,shape,refined.2⟩
   have same (i : Fin pieces.length) : (physical i).L = InclinedFrameReal.memberLength data member := by
     have mem : source i ∈ selected data member := List.get_mem _ _
     have selectedMember := (List.mem_filter.mp mem).2
