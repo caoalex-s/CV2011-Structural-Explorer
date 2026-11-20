@@ -28,6 +28,10 @@ const clone = <T>(value: T): T => structuredClone(value);
 const id = (prefix: string) => `${prefix}${crypto.randomUUID().slice(0, 6)}`;
 renderCourseConventions();
 const lesson = lessonContext(location.search);
+if (isPortalWorkspace) {
+    const exerciseLink = $('portal-exercise-link').querySelector('a')!;
+    exerciseLink.href = '../?exercise=portal-absolute-moment#sandbox';
+}
 const modelStorageKey = portalExercise ? exerciseStorage : isPortalWorkspace ? portalStorageKey : lesson?.storageKey || 'cv2011-model';
 if (lesson) {
     $('workspace').insertAdjacentHTML('afterbegin', '<p class="lesson-banner"><a href="learn/beam-basics/">← Back to the beam lesson</a> · Lesson workspace · <a href="./#sandbox">Return to your saved sandbox</a> · <button id="restart-lesson" class="quiet">Restart lesson example</button></p>');
@@ -139,7 +143,7 @@ function updateEvidenceBinding() {
     const signature = JSON.stringify([model, currentMember, sectionT]);
     if (signature !== portalSignature) {
         portalSignature = signature;
-        momentExercise?.bind(signature);
+        momentExercise?.bind(signature + ($<HTMLSelectElement>('frame-side')?.value || ''));
         portalPanel?.update(currentMember, sectionT);
     }
 }
@@ -223,6 +227,9 @@ function ensureNode(point: Snap): string {
     model.nodes.push({ id: nodeId, x: point.x, y: point.y });
     return nodeId;
 }
+function spanPixels(length:number) {
+    return length * view.scale * (svg.getScreenCTM()?.a || 1);
+}
 function loadProjection(point:{x:number;y:number}) {
     const first = start;
     if (!first?.member) return nearestMember(point);
@@ -243,7 +250,7 @@ function attach(point: {
     }
     let t = closest.t;
     if (tool === 'distributed') {
-        t = boundaryStation(t,closest.length*view.scale,$<HTMLInputElement>('snap').checked);
+        t = boundaryStation(t,spanPixels(closest.length),$<HTMLInputElement>('snap').checked);
     } else if ($<HTMLInputElement>('snap').checked) {
         const grid = Number($<HTMLInputElement>('grid-spacing').value) || 0.5;
         t = Math.max(0, Math.min(1, Math.round(t * closest.length / grid) * grid / closest.length));
@@ -631,7 +638,7 @@ svg.addEventListener('pointermove', event => {
             t = Math.max(0, Math.min(1, t));
             if ('kind' in item && item.kind === 'distributed') {
                 const load = item as Load, width = load.end - load.t;
-                t = Math.min(boundaryStation(projected.t, projected.length*view.scale, $('snap').matches(':checked')), 1 - width);
+                t = Math.min(boundaryStation(projected.t, spanPixels(projected.length), $('snap').matches(':checked')), 1 - width);
                 load.end = t + width;
             }
             item.t = t;
@@ -644,7 +651,7 @@ svg.addEventListener('pointermove', event => {
     if (tool === 'distributed') {
         const near = loadProjection(p);
         if (near && near.distance * view.scale < 30) {
-            const t = boundaryStation(near.t,near.length*view.scale,$<HTMLInputElement>('snap').checked);
+            const t = boundaryStation(near.t,spanPixels(near.length),$<HTMLInputElement>('snap').checked);
             hover = { ...position(model, near.member,t), member:near.member,t };
             $('tool-hint').textContent = (start ? 'Second' : 'First') + ' boundary · station ' + stationLabel(t) + ' of the span (' +
                 number(t*near.length) + ' m from the drawn start).';
@@ -857,7 +864,7 @@ if (portalExercise) {
     $('portal-exercise').hidden = false;
     momentExercise = createMomentExercise(() => model, member => {
         currentMember = member; sectionT = 0.5; render();
-    }, render, boundaries => commit(() => {
+    }, render, () => session.portalHistory(model), boundaries => commit(() => {
         Object.assign(model.loads[0],boundaries);
     }), (event, answer, assisted) => {
         void session.record({model, section:sectionT, step:exerciseStep, side:'BC', hintUsed:false,
@@ -868,6 +875,10 @@ restoreCheckerControls?.();
 portalPanel = createPortalPanel(() => model, value => commit(() => {
     if (model.loads.length === 1) { model.loads[0].fy = value; model.loads[0].qEnd = value; }
 }), value => { sectionT = value; updateEvidenceBinding(); render(); }, modelStorageKey, preserveCheckerView, (drawing, member, rows) => momentExercise?.checked(drawing,member,rows), message => momentExercise?.status(message));
+if (portalExercise) $('frame-side').addEventListener('change', () => {
+    momentExercise?.bind(portalSignature + $<HTMLSelectElement>('frame-side').value);
+    render();
+});
 if (!restoredPortalView) fit();
 controls.showLayer(layer);
 setMode(restoredPortalView ? mode : location.hash.slice(1) || 'sandbox');

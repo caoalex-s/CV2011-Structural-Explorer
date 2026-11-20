@@ -247,6 +247,14 @@ export function createLearningSession({ notify: toast, onConnectionChange }: Ses
         get connected() { return online; },
         request: api,
         record,
+        portalHistory(model:Model) {
+            const source = JSON.stringify(model);
+            const courseId = config.courseId || 'local-unassigned';
+            const events = attempts.filter(a => a.step === 'portal_absolute_moment' &&
+                a.courseId === courseId && JSON.stringify(a.model) === source);
+            return { predictions:events.filter(a=>a.event === 'first_prediction' || a.event === 'retry').length,
+                revealed:events.some(a=>a.event === 'reveal') };
+        },
         conceptWasAssisted: (step: string) => conceptWasAssisted(attempts, config.courseId || 'local-unassigned', step),
         connect,
         updateStatus: updateSession,

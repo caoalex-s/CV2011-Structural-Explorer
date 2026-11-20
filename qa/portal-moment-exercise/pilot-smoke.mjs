@@ -50,6 +50,17 @@ try {
     await submit('1.337,4.663','Check the number');
     await page.locator('#moment-reveal').click();
     assert.match(await page.locator('#moment-explanation').innerText(),/largest magnitude occurs at/);
+    model.loads[0].t = 1e-200;
+    await loadDrawing();
+    await submit('1.337','ungraded');
+    const adjustment = page.locator('#moment-adjustment');
+    assert.match(await adjustment.innerText(),/start fraction 1e-200 exceeds/);
+    const savedLoad = () => page.evaluate(()=>JSON.parse(localStorage.getItem('cv2011-portal-absolute-moment/v1')).loads[0]);
+    assert.equal((await savedLoad()).t,1e-200);
+    await adjustment.getByRole('button').click();
+    assert.equal((await savedLoad()).t,0);
+    await page.locator('#undo').click();
+    assert.equal((await savedLoad()).t,1e-200);
     await page.locator('[data-mode="insights"]').click();
     const events = page.locator('#insights-panel table').filter({has:page.getByText('Pseudonymous ID',{exact:true})});
     await events.getByText('DEMO-001').first().waitFor();

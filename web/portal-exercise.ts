@@ -35,7 +35,7 @@ const rational = (value: string): Fraction => {
     const [n,d] = value.split('/').map(BigInt);
     return { n,d };
 };
-const metres = (v: Fraction) => Number(v.n * 1000000000000n / v.d) / 1e12;
+const decimalValue = (v: Fraction) => Number(v.n * 1000000000000n / v.d) / 1e12;
 
 function peaks(rows: HTMLElement, model: Model) {
     const candidates = Array.from(rows.querySelectorAll<HTMLElement>('[data-field="M"][data-candidate]'))
@@ -45,19 +45,61 @@ function peaks(rows: HTMLElement, model: Model) {
             const y0 = rational(data.yLow!), y1 = rational(data.yHigh!);
             const magnitudes = [absolute(y0),absolute(y1)].sort(compare);
             const low = y0.n <= 0n && y1.n >= 0n ? { n:0n,d:1n } : magnitudes[0];
-            return { low, high:magnitudes[1], x0:metres(rational(data.xLow!)), x1:metres(rational(data.xHigh!)),
-                moment:(metres(y0)+metres(y1))/2, flat:data.side === 'flat' };
+            const xLow = rational(data.xLow!), xHigh = rational(data.xHigh!);
+            return { low, high:magnitudes[1], xLow, xHigh, x0:decimalValue(xLow), x1:decimalValue(xHigh),
+                moment:(decimalValue(y0)+decimalValue(y1))/2, flat:data.side === 'flat' };
         });
     const possible = candidates.filter(a => !candidates.some(b => compare(b.low,a.high)>0)).sort((a,b)=>a.x0-b.x0);
-    const distinct = possible.filter((p,i) => !i || p.x0 !== possible[i-1].x0 || p.x1 !== possible[i-1].x1);
+    // Adjacent pieces may report the same boundary. Only equal singleton
+    // rationals establish identity; overlapping location boxes can be distinct.
+    const distinct = possible.filter((p,i) => !equal(p.xLow,p.xHigh) ||
+        !possible.slice(0,i).some(q=>equal(q.xLow,q.xHigh) && equal(q.xLow,p.xLow)));
     const load = model.loads[0];
     const symmetric = equal(add(binary64(load.t),binary64(load.end)),one) && load.fy === -load.qEnd;
     const resolved = distinct.length === 1 || (distinct.length === 2 && symmetric && distinct[0].moment * distinct[1].moment < 0);
     return { distinct, resolved:resolved && distinct.every(p=>!p.flat && p.x1-p.x0<0.001) };
 }
 
+/** Show rounded substitutions while keeping the exact piece coefficients in
+ * the checked table. Both report formats use distance measured from B. */
+function substitutions(diagram:HTMLElement, model:Model):string[] {
+    const load = model.loads[0];
+    const lines:string[] = [];
+    const display = (n:number) => String(Number(n.toPrecision(6))).replace('-', '−');
+    function polynomial(values:number[]) {
+        const terms:string[] = [];
+        const powers = ['', 'ξ', 'ξ²', 'ξ³'];
+        values.forEach((value, index) => {
+            if (value === 0) return;
+            const sign = value < 0 ? '−' : '+';
+            const magnitude = Math.abs(value);
+            const term = (index > 0 && magnitude === 1 ? '' : display(magnitude)) + powers[index];
+            terms.push(terms.length ? ' '+sign+' '+term : (value < 0 ? '−' : '')+term);
+        });
+        return terms.join('') || '0';
+    }
+    function value(text:string) { return decimalValue(rational(text)); }
+    for (const piece of diagram.querySelectorAll<HTMLElement>('[data-piece]')) {
+        const d=piece.dataset;
+        const a=d.start ? value(d.start) : 6*value(d.left!);
+        const b=d.end ? value(d.end) : 6*value(d.right!);
+        const shear=d.shear?.split(',').map(value);
+        const moment=d.moment?.split(',').map(value);
+        const v0=shear ? shear[0] : (value(d.vLow!)+value(d.vHigh!))/2;
+        const m0=moment ? moment[0] : (value(d.mLow!)+value(d.mHigh!))/2;
+        const centre=(a+b)/12;
+        const loaded=centre>load.t && centre<load.end;
+        const gradient=loaded ? (load.fy-load.qEnd)/(6*(load.end-load.t)) : 0;
+        const w0=loaded ? -load.fy+gradient*(a-6*load.t) : 0;
+        lines.push('For '+display(a)+' ≤ x ≤ '+display(b)+' m, take ξ = x − '+display(a)+' m. '+
+            'w(ξ) ≈ '+polynomial([w0,gradient])+' kN/m, V(ξ) ≈ '+polynomial([v0,-w0,-gradient/2])+
+            ' kN and M(ξ) ≈ '+polynomial([m0,v0,-w0/2,-gradient/6])+' kN·m.');
+    }
+    return lines;
+}
+
 export function createMomentExercise(getModel:()=>Model, selectBeam:(id:string)=>void, refresh:()=>void,
-    adjust:(boundaries:{t:number;end:number})=>void, record:(event:string, answer:string, assisted:boolean)=>void) {
+    history:()=>{predictions:number;revealed:boolean}, adjust:(boundaries:{t:number;end:number})=>void, record:(event:string, answer:string, assisted:boolean)=>void) {
     const panel = $('portal-exercise');
     panel.innerHTML = `<h2>Where does the largest |M| occur on BC?</h2>
     <p>Draw AB upwards 4 m, BC to the right 6 m, and CD downwards 4 m. For example, start at A (0, −2) m. Fix both bases and keep the joints rigid. Use EA = 2,000,000 kN and EI = 20,000 kN·m² for all three members.</p>
@@ -65,13 +107,14 @@ export function createMomentExercise(getModel:()=>Model, selectBeam:(id:string)=
     <label>Predict every location of the largest bending-moment magnitude, in metres from B. Separate multiple locations with commas (tolerance 0.02 m).
     <input id="moment-prediction" autocomplete="off"></label>
     <button id="moment-check">Check prediction</button> <button id="moment-reveal" disabled>Reveal worked solution</button>
-    <p id="moment-feedback" role="status"></p><p id="moment-explanation"></p><div id="moment-adjustment"></div><p id="moment-progress"></p>
+    <p id="moment-feedback" role="status"></p><div id="moment-explanation"></div><div id="moment-adjustment"></div><p id="moment-progress"></p>
     <p>After checking the full-span load, change the intensities to +8 and −8 kN/m. Predict again. Then move the start to one-sixth of BC, keep the end at C, and recheck the peak locations.</p>`;
     const input = $<HTMLInputElement>('moment-prediction'), reveal = $<HTMLButtonElement>('moment-reveal');
     const feedback = $('moment-feedback'), explanation = $('moment-explanation');
     const key = exerciseStorage+'/prediction';
     let source = '', prediction = '', count = 0, revealed = false, exposed = false;
     let outcome: ReturnType<typeof peaks> | undefined;
+    let working:string[] = [];
     function save() {
         sessionStorage.setItem(key,JSON.stringify({source,prediction,count,exposed}));
     }
@@ -107,20 +150,30 @@ export function createMomentExercise(getModel:()=>Model, selectBeam:(id:string)=
             feedback.textContent='Enter one or more distances between 0 and 6 m.'; return;
         }
         selectBeam(beam.id);
-        prediction=value; input.value=value; count++; save();
+        const prior = history();
+        count = Math.max(count,prior.predictions)+1; exposed ||= prior.revealed;
+        prediction=value; input.value=value; save();
         record(count===1?'first_prediction':'retry',value,exposed);
         if (outcome) grade();
         else { feedback.textContent='Checking the whole-member extrema for this drawing…'; $('frame-generate').click(); }
     };
     reveal.onclick = () => {
         if (!outcome || !prediction) return;
+        const revealedOnThisCheck = revealed;
         revealed = true;
-        if (!exposed) record('reveal',prediction,true);
+        if (!revealedOnThisCheck) record('reveal',prediction,true);
         exposed=true; save(); document.body.classList.remove('moment-locked'); refresh();
-        const load=getModel().loads[0], a=6*load.t,b=6*load.end;
+
         const locations=outcome.distinct.map(p=>'x ≈ '+((p.x0+p.x1)/2).toFixed(4)+' m (M ≈ '+p.moment.toFixed(4)+' kN·m)').join(' and ');
-        explanation.textContent='Taking downward w as positive, w(x) = '+(-load.fy)+' + ('+(load.fy-load.qEnd)+')(x − '+a+')/('+b+' − '+a+') kN/m over the loaded interval, and zero elsewhere. Integrate dV/dx = −w and dM/dx = V using the starting values in the checked intervals below. Compare |M| at the ends, load boundaries and interior zeros of V. '+
-            (outcome.resolved ? (outcome.distinct.length===2?'Reflection about midspan reverses the load and moment signs, so the two extrema have equal magnitude at ':'The largest magnitude occurs at ') : 'The checked bounds leave these possible locations: ')+locations+'.';
+        const heading=document.createElement('strong');
+        heading.textContent=(outcome.resolved ? (outcome.distinct.length===2 ?
+            'Reflection about midspan reverses the load and moment signs. The two extrema have equal magnitude at ' :
+            'The largest magnitude occurs at ') : 'The checked bounds leave these possible locations: ')+locations+'.';
+        explanation.replaceChildren(heading);
+        for (const line of ['Take downward w as positive. On each interval w = w₀ + gξ. Integrating dV/dx = −w gives V = V₀ − w₀ξ − gξ²/2. Integrating dM/dx = V gives M = M₀ + V₀ξ − w₀ξ²/2 − gξ³/6.',
+            ...working, 'Set V = 0 to locate the interior moment extrema. Compare their absolute moments with those at the member ends and load boundaries in the checked table.']) {
+            const paragraph=document.createElement('p'); paragraph.textContent=line; explanation.append(paragraph);
+        }
     };
     function status(message:string) {
         if (!prediction || !/limit|timed out|inconclusive|failed|unavailable/i.test(message)) return;
@@ -130,14 +183,20 @@ export function createMomentExercise(getModel:()=>Model, selectBeam:(id:string)=
         if (!load || !/limit|timed out/i.test(message)) return;
         const proposed={t:Math.round(load.t*8)/8,end:Math.round(load.end*8)/8};
         if (proposed.t>=proposed.end || proposed.t===load.t && proposed.end===load.end) return;
+        const outOfRange = (['t','end'] as const).filter(key => {
+            try { binary64(load[key]); return false; }
+            catch { return true; }
+        });
+        const detail = outOfRange.map(key => 'The '+(key==='t'?'start':'end')+' fraction '+load[key]+
+            ' exceeds the exact input conversion budget. ').join('');
         const note=document.createElement('p'), button=document.createElement('button');
-        note.textContent='The checker reached its resource limit. You can try a different load extent. Start fraction '+load.t+' → '+proposed.t+', end fraction '+load.end+' → '+proposed.end+'. Undo restores the original extent.';
+        note.textContent=detail+'The checker reached its resource limit. You can try a different load extent. Start fraction '+load.t+' → '+proposed.t+', end fraction '+load.end+' → '+proposed.end+'. Undo restores the original extent.';
         button.textContent='Apply these load boundaries'; button.onclick=()=>adjust(proposed);
         host.append(note,button);
     }
     return {bind,status, get visible(){return revealed;}, checked(model:Model, member:string, rows:HTMLElement) {
         if (prediction && JSON.stringify(model)===JSON.stringify(getModel()) && portalBeam(model)?.id===member) {
-            outcome=peaks(rows,model); grade();
+            outcome=peaks(rows,model); working=substitutions(rows,model); grade();
             if (outcome.resolved) {
                 const load = model.loads[0];
                 const stages = JSON.parse(sessionStorage.getItem(exerciseStorage+'/stages') || '{}');
@@ -145,7 +204,8 @@ export function createMomentExercise(getModel:()=>Model, selectBeam:(id:string)=
                 if (stages.reference && load.fy === -8 && load.qEnd === 8 && load.t === 0 && load.end === 1) stages.magnitude = true;
                 if (stages.magnitude && load.fy === -8 && load.qEnd === 8 && (load.t !== 0 || load.end !== 1)) stages.extent = true;
                 sessionStorage.setItem(exerciseStorage+'/stages', JSON.stringify(stages));
-                $('moment-progress').textContent = 'Drawings checked: '+['reference','magnitude','extent'].filter(stage=>stages[stage]).join(', ')+'.';
+                const finished = ['reference','magnitude','extent'].filter(stage=>stages[stage]);
+                $('moment-progress').textContent = finished.length ? 'Drawings checked: '+finished.join(', ')+'.' : '';
             }
         }
     }};
