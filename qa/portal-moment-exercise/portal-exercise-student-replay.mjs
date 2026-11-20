@@ -19,7 +19,7 @@ const browser = await chromium.launch({ headless: true, ...(process.env.PORTAL_R
     { channel: process.env.PORTAL_REPLAY_BROWSER } : {}) });
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
 const page = await context.newPage();
-const errors = [], outgoingAttempts = [], records = [];
+const errors = [], outgoingAttempts = [], records = [], safeguards = [];
 const hash = value => createHash('sha256').update(value).digest('hex');
 const momentPanel = page.locator('#portal-exercise');
 const prediction = page.locator('#moment-prediction');
@@ -80,7 +80,7 @@ async function selectLoad() {
     await inspector.getByRole('heading', { name: 'Load properties' }).waitFor();
 }
 
-async function setLoad(property, value) {
+async function setNumber(property, value) {
     const input = loadInput(property);
     await input.fill(String(value));
     await input.press('Tab');
@@ -195,8 +195,8 @@ async function collect(name, expectedLoad) {
 
 async function editBoundaries(start, end) {
     await selectLoad();
-    await setLoad('t', start);
-    await setLoad('end', end);
+    await setNumber('t', start);
+    await setNumber('end', end);
     await locked();
     assert.equal(await prediction.inputValue(), '', 'An edited drawing retained a stale prediction');
 }
@@ -240,8 +240,8 @@ try {
     await selectLoad();
     assert.equal(Number(await loadInput('t').inputValue()), 0);
     assert.equal(Number(await loadInput('end').inputValue()), 1);
-    await setLoad('fy', 6);
-    await setLoad('qEnd', -6);
+    await setNumber('fy', 6);
+    await setNumber('qEnd', -6);
 
     // 2. Require both tied peaks, preserve the reveal boundary, and retry.
     assert.ok(await reveal.isDisabled());
@@ -255,8 +255,8 @@ try {
 
     // 3. Check an independent magnitude edit, then two different extents.
     await selectLoad();
-    await setLoad('fy', 8);
-    await setLoad('qEnd', -8);
+    await setNumber('fy', 8);
+    await setNumber('qEnd', -8);
     await locked();
     assert.equal(await prediction.inputValue(), '');
     await check('1.337, 4.663', /correct for this drawing/i);
@@ -278,8 +278,8 @@ try {
     await selectLoad();
     assert.equal(Number(await loadInput('t').inputValue()), 1/6);
     assert.equal(Number(await loadInput('end').inputValue()), 5/6);
-    await setLoad('fy', 8);
-    await setLoad('qEnd', -8);
+    await setNumber('fy', 8);
+    await setNumber('qEnd', -8);
     await check('1.553, 4.447', /unresolved|number and locations|try again/i);
     await collect('non-dyadic', [1/6, 5/6, 8, -8]);
 
@@ -312,8 +312,8 @@ try {
     assert.ok(Math.abs(6 * arbitraryStart - 1.24) < 0.03, 'Arbitrary start was rounded away');
     assert.ok(Math.abs(6 * arbitraryEnd - 4.26) < 0.03, 'Arbitrary end was rounded away');
     const arbitrary = [arbitraryStart, arbitraryEnd, 8, -8];
-    await setLoad('fy', 8);
-    await setLoad('qEnd', -8);
+    await setNumber('fy', 8);
+    await setNumber('qEnd', -8);
     const absoluteExtrema = referenceForLoad(arbitrary).candidates.map(({ m, x }) =>
         ({ magnitude: Math.abs(rationalNumber(m[0])), position: rationalNumber(x[0]) }))
         .sort((a, b) => b.magnitude - a.magnitude);
@@ -321,7 +321,39 @@ try {
     await check(absoluteExtrema[0].position.toFixed(4), /correct for this drawing/i);
     await collect('arbitrary-pointer', arbitrary);
 
-    // 6. Distinguish first prediction, retry, reveal and assisted retry.
+    // 6. Check near-symmetric source changes through the visible inspector.
+    await editBoundaries(0, 1);
+    await setNumber('fy', 6);
+    await setNumber('qEnd', -6);
+    await closeProperties.click();
+    await tool('select');
+    await canvas.locator('[data-object="node"] text').filter({ hasText: /^D$/ }).click();
+    await inspector.getByRole('heading', { name: 'Node properties' }).waitFor();
+    const elevatedFoot = -1.9999999999999998;
+    assert.equal(2 - elevatedFoot, 4, 'Control must be indistinguishable under floating subtraction');
+    await setNumber('y', elevatedFoot);
+    await check('1.337, 4.663', /check the beam direction|unresolved/i);
+    await locked();
+    safeguards.push({ changed: 'right base elevation', value: elevatedFoot, feedback: await feedback.innerText() });
+    await setNumber('y', -2);
+    await closeProperties.click();
+    await point(6, 0);
+    await inspector.getByRole('heading', { name: 'Member properties' }).waitFor();
+    const stifferColumn = 20000.000000000004;
+    assert.notEqual(stifferColumn, 20000);
+    await setNumber('EI', stifferColumn);
+    await check('1.337, 4.663', /check the beam direction|unresolved/i);
+    await locked();
+    safeguards.push({ changed: 'right column EI', value: stifferColumn, feedback: await feedback.innerText() });
+    await setNumber('EI', 20000);
+    await selectLoad();
+    const unequalIntensity = -5.999999999999999;
+    await setNumber('qEnd', unequalIntensity);
+    await check('1.337, 4.663', /magnitudes unresolved/i);
+    await locked();
+    safeguards.push({ changed: 'load intensity at C', value: unequalIntensity, feedback: await feedback.innerText() });
+
+    // 7. Distinguish first prediction, retry, reveal and assisted retry.
     await page.getByRole('button', { name: 'Learning insights' }).click();
     const table = page.locator('#insights-panel h2').filter({ hasText: 'Portal exercise predictions' }).locator('xpath=following-sibling::table[1]');
     await table.waitFor();
@@ -349,7 +381,7 @@ try {
     if (mode === 'offline') assert.ok(stored.every(event => !event.synced));
     assert.deepEqual(errors, []);
     await page.screenshot({ path: join(output, 'instructor-or-local-insights.png'), fullPage: true });
-    await writeFile(join(output, 'portal-exercise-replay.json'), JSON.stringify({ mode, records, insight, stored, errors }, null, 2));
+    await writeFile(join(output, 'portal-exercise-replay.json'), JSON.stringify({ mode, records, safeguards, insight, stored, errors }, null, 2));
 } catch (error) {
     await page.screenshot({ path: join(output, 'failure.png'), fullPage: true });
     await writeFile(join(output, 'failure.json'), JSON.stringify({ error: String(error.stack ?? error), records, errors }, null, 2));
