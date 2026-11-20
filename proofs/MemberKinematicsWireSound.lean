@@ -15,29 +15,46 @@ def EndReport (p : Segment) (h : PhysicalPiece) (i : Nat) (line : String) :=
       InclinedDiagram.boxText u ++ InclinedDiagram.boxText v) ∧
     Contains a (h.dofs 2) ∧ Contains b (h.dofs 5) ∧ Contains u (h.dofs 1) ∧ Contains v (h.dofs 4)
 
-set_option maxHeartbeats 2000000 in
-theorem end_sound {bits p i line} (h : PhysicalPiece) (positive : h.positive)
-    (fits : Fits p (h.inputs 0) h.length) (made : endRow bits p i = some line) : EndReport p h i line := by
+private theorem end_parts {bits : Nat} {p : Segment} {i : Nat} {line : String}
+    (made : endRow bits p i = some line) :
+    ∃ a b u v, MemberKinematics.evaluate bits p (quantity .slope) ⟨0,0⟩ = some a ∧
+      MemberKinematics.evaluate bits p (quantity .slope) ⟨1,1⟩ = some b ∧
+      MemberKinematics.evaluate bits p transverse ⟨0,0⟩ = some u ∧
+      MemberKinematics.evaluate bits p transverse ⟨1,1⟩ = some v ∧
+      line = String.intercalate " " (["P", toString i, MemberDiagram.number p.left, MemberDiagram.number p.right] ++
+        InclinedDiagram.boxText a ++ InclinedDiagram.boxText b ++ InclinedDiagram.boxText u ++ InclinedDiagram.boxText v) := by
   unfold endRow at made
-  obtain ⟨a,ha,rest⟩ := Option.bind_eq_some.mp made
-  obtain ⟨b,hb,rest⟩ := Option.bind_eq_some.mp rest
-  obtain ⟨u,hu,rest⟩ := Option.bind_eq_some.mp rest
-  obtain ⟨v,hv,rest⟩ := Option.bind_eq_some.mp rest
-  cases rest
-  have ends (f : Field) (s : ℝ) (box value) (hval : Contains box s)
-      (calculated : MemberKinematics.evaluate bits p (quantity f) box = some value) :
-      Contains value ((h.field f).eval (h.length*s)) := by
-    rw [← physical_recovery _ positive]
-    exact enclosure fits hval calculated
-  have first : Contains ⟨0,0⟩ (0:ℝ) := by norm_num [FrameEnclosure.Contains]
-  have last : Contains ⟨1,1⟩ (1:ℝ) := by norm_num [FrameEnclosure.Contains]
-  have rotations := LocalFrameFields.rotation_end_kinematics h.dofs h.length h.flexural h.q h.qEnd positive.1.ne' positive.2.2.ne'
-  have translations := LocalFrameFields.transverse_end_kinematics h.dofs h.length h.flexural h.q h.qEnd positive.1.ne' positive.2.2.ne'
-  refine ⟨a,b,u,v,rfl,?_,?_,?_,?_⟩
-  · simpa [PhysicalPiece.field,rotations.1] using ends .slope 0 _ _ first ha
-  · simpa [PhysicalPiece.field,rotations.2] using ends .slope 1 _ _ last hb
-  · simpa [PhysicalPiece.field,translations.1] using ends .displacement 0 _ _ first hu
-  · simpa [PhysicalPiece.field,translations.2] using ends .displacement 1 _ _ last hv
+  simp only [Option.bind_eq_bind, Option.bind_eq_some, Option.some.injEq] at made
+  obtain ⟨a,ha,b,hb,u,hu,v,hv,eq⟩ := made
+  exact ⟨a,b,u,v,ha,hb,hu,hv,eq.symm⟩
+
+private theorem physical_value {bits : Nat} {p : Segment} (h : PhysicalPiece)
+    (positive : h.positive) (fits : Fits p (h.inputs 0) h.length) (f : Field)
+    (t : ℝ) {box value : FrameIntervalOps.Bounds} (whereAt : Contains box t)
+    (checked : MemberKinematics.evaluate bits p (quantity f) box = some value) :
+    Contains value ((h.field f).eval (h.length*t)) := by
+  have enclosed := enclosure (expr := quantity f) fits whereAt checked
+  change Contains value (functionAt (h.inputs 0) h.length (quantity f) t) at enclosed
+  rw [physical_recovery h positive f t] at enclosed
+  exact enclosed
+
+theorem end_sound {bits : Nat} {p : Segment} {i : Nat} {line : String} (h : PhysicalPiece)
+    (positive : h.positive) (fits : Fits p (h.inputs 0) h.length) (made : endRow bits p i = some line) :
+    EndReport p h i line := by
+  obtain ⟨a,b,u,v,ha,hb,hu,hv,printed⟩ := end_parts made
+  have start : Contains ⟨0,0⟩ (0:ℝ) := by norm_num [FrameEnclosure.Contains]
+  have finish : Contains ⟨1,1⟩ (1:ℝ) := by norm_num [FrameEnclosure.Contains]
+  have ra := physical_value h positive fits .slope 0 start ha
+  have rb := physical_value h positive fits .slope 1 finish hb
+  have ua := physical_value h positive fits .displacement 0 start hu
+  have ub := physical_value h positive fits .displacement 1 finish hv
+  have rot := LocalFrameFields.rotation_end_kinematics h.dofs h.length h.flexural h.q h.qEnd positive.1.ne' positive.2.2.ne'
+  have disp := LocalFrameFields.transverse_end_kinematics h.dofs h.length h.flexural h.q h.qEnd positive.1.ne' positive.2.2.ne'
+  simp only [PhysicalPiece.field, mul_zero, rot.1] at ra
+  simp only [PhysicalPiece.field, mul_one, rot.2] at rb
+  simp only [PhysicalPiece.field, mul_zero, disp.1] at ua
+  simp only [PhysicalPiece.field, mul_one, disp.2] at ub
+  exact ⟨a,b,u,v,printed,ra,rb,ua,ub⟩
 
 def FieldReport (pieces : List Segment) (physical : Fin pieces.length → PhysicalPiece)
     (L : ℝ) (f : Field) (lines : List String) :=
