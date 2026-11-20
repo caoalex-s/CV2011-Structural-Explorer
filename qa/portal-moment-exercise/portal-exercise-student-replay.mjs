@@ -48,8 +48,11 @@ await mkdir(output, { recursive: true });
 
 async function waitForFeedback(expected) {
     await page.waitForFunction(({ text, flags }) =>
-        new RegExp(text, flags).test(document.querySelector('#moment-feedback')?.textContent ?? ''),
+        new RegExp(text, flags).test(document.querySelector('#moment-feedback')?.textContent ?? '') ||
+        /correct for|number and locations|ungraded|check the beam direction|enter one or more/i
+            .test(document.querySelector('#moment-feedback')?.textContent ?? ''),
     { text: expected.source, flags: expected.flags }, { timeout: 330000 });
+    assert.match(await feedback.innerText(), expected);
 }
 
 async function point(x, y, click = true) {
@@ -187,6 +190,7 @@ async function collect(name, expectedLoad) {
         reportDigest: certificate.reportDigest, artifact: certificate.artifact,
         bundle: certificate.bundle, reference });
     await page.screenshot({ path: join(output, `${name}.png`), fullPage: true });
+    console.log(`Verified ${name}`);
 }
 
 async function editBoundaries(start, end) {

@@ -23,6 +23,7 @@ import { validateIntervalFrame } from './frame-interval-model.js';
 import { inclinedDeadlineMilliseconds } from './portal-runtime.js';
 import { createIntervalExplanation, renderIntervalExplanation } from './frame-interval-worked.js';
 
+import { portalExercise } from './portal-exercise.js';
 import { renderKinematics } from './member-kinematics.js';
 
 export const isPortalWorkspace = location.pathname.replace(/index\.html$/, '').endsWith('/portal-checker/');
@@ -230,39 +231,41 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
             }
             cancelProposal?.();
             kinematicsRuntime?.dispose();
-            const kinematics = new PortalRuntime(new URL('../member-kinematics/worker.mjs', runtimeUrl));
-            kinematicsRuntime = kinematics;
-            const kinematicsProgress = document.createElement('p');
-            kinematicsProgress.textContent = 'Checking member slope and transverse displacement…';
-            workedOutput.append(kinematicsProgress);
-            const active = () => current() && kinematicsRuntime === kinematics;
-            void (async () => {
-                try {
-                    await kinematics.ready;
-                    if (!active()) return;
-                    const captured = JSON.parse(new TextDecoder().decode(sourceBytes));
-                    let witness = packet;
-                    if (result.frameProtocol !== 'inclined' && result.frameProtocol !== 'inclined-release' && result.frameProtocol !== 'spring') {
-                        witness = await intervalProposal(captured.model, captured.query);
-                    }
-                    const digest = await sha256(witness);
-                    if (!active()) return;
-                    const checked = await kinematics.checkDiagram(witness);
-                    if (!active()) return;
-                    if (checked.state !== 'accepted' || checked.inputDigest !== digest || checked.frameProtocol !== 'diagram'
-                        || !(checked.report instanceof Uint8Array) || await sha256(checked.report) !== checked.reportDigest)
-                        throw Error('The source or extrema could not be enclosed.');
-                    const sourceDigest = await sha256(sourceBytes);
-                    if (!active()) return;
-                    const selected = source.members.find(m => m.id === member)!;
-                    kinematicsProgress.replaceWith(renderKinematics(checked.report, member, memberLabel(source, selected)));
-                    record({ kinematics: { protocol: 'CV2011_MEMBER_KINEMATICS_1', sourceDigest, basePacketDigest: packetDigest,
-                        packetDigest: digest, packet: new TextDecoder().decode(witness), artifact: kinematics.artifact,
-                        bundle: kinematics.bundle, reportDigest: checked.reportDigest, report: new TextDecoder().decode(checked.report) } });
-                } catch (error) {
-                    if (active()) kinematicsProgress.textContent = 'Slope and displacement check inconclusive. ' + String(error);
-                } finally { kinematics.dispose(); }
-            })();
+            if (!portalExercise) {
+                const kinematics = new PortalRuntime(new URL('../member-kinematics/worker.mjs', runtimeUrl));
+                kinematicsRuntime = kinematics;
+                const kinematicsProgress = document.createElement('p');
+                kinematicsProgress.textContent = 'Checking member slope and transverse displacement…';
+                workedOutput.append(kinematicsProgress);
+                const active = () => current() && kinematicsRuntime === kinematics;
+                void (async () => {
+                    try {
+                        await kinematics.ready;
+                        if (!active()) return;
+                        const captured = JSON.parse(new TextDecoder().decode(sourceBytes));
+                        let witness = packet;
+                        if (result.frameProtocol !== 'inclined' && result.frameProtocol !== 'inclined-release' && result.frameProtocol !== 'spring') {
+                            witness = await intervalProposal(captured.model, captured.query);
+                        }
+                        const digest = await sha256(witness);
+                        if (!active()) return;
+                        const checked = await kinematics.checkDiagram(witness);
+                        if (!active()) return;
+                        if (checked.state !== 'accepted' || checked.inputDigest !== digest || checked.frameProtocol !== 'diagram'
+                            || !(checked.report instanceof Uint8Array) || await sha256(checked.report) !== checked.reportDigest)
+                            throw Error('The source or extrema could not be enclosed.');
+                        const sourceDigest = await sha256(sourceBytes);
+                        if (!active()) return;
+                        const selected = source.members.find(m => m.id === member)!;
+                        kinematicsProgress.replaceWith(renderKinematics(checked.report, member, memberLabel(source, selected)));
+                        record({ kinematics: { protocol: 'CV2011_MEMBER_KINEMATICS_1', sourceDigest, basePacketDigest: packetDigest,
+                            packetDigest: digest, packet: new TextDecoder().decode(witness), artifact: kinematics.artifact,
+                            bundle: kinematics.bundle, reportDigest: checked.reportDigest, report: new TextDecoder().decode(checked.report) } });
+                    } catch (error) {
+                        if (active()) kinematicsProgress.textContent = 'Slope and displacement check inconclusive. ' + String(error);
+                    } finally { kinematics.dispose(); }
+                })();
+            }
             void (async () => {
                 try {
                     await extra.ready;
@@ -529,6 +532,9 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
         // An edit cancels synchronous inclined arithmetic by terminating its
         // worker. Recreate the checker before submitting the captured revision.
         if (runtime.needsReset) { void start(); return; }
+        // The exercise checks a submitted prediction. While drawing, an edit
+        // invalidates old evidence without launching another worker calculation.
+        if (portalExercise && pendingGeneration !== generationKey()) return;
         const checker = runtime, token = requests.begin();
         debounce = setTimeout(async () => {
             try {
@@ -556,7 +562,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
             }
             activate.click(); return;
         }
-        if (checkFailed) update(member, parameter);
+        if (portalExercise || checkFailed) update(member, parameter);
     };
     collapse.onclick = () => {
         workedOutput.hidden = !workedOutput.hidden;

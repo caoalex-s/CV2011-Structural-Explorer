@@ -600,6 +600,9 @@ svg.addEventListener('pointerdown', event => {
                 model.supports.push(support);
                 selected = { type: 'support', id: support.id };
             }
+            // Students place both fixed bases consecutively. Keep the drawing
+            // surface available until they select an object for editing.
+            if (portalExercise && tool === 'fixed') selected = null;
         }
         else {
             const load: Load = { id: id('L'), ...attachment, kind: tool as Load['kind'], end: 1, fx: 0, fy: -20, mz: 20, qEnd: -5 };
