@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { compareDeformationReport, deformationProtocol, parseDeformationReport }
+import { compareDeformationReport, compareDeformationTables, deformationProtocol, parseDeformationReport }
     from './member-diagram-deformation-audit.mjs';
 import {
     portalDeformation, pinnedUniformDeformation, repeatedDisplacementRoot,
@@ -133,10 +133,13 @@ export async function runMemberDeformationStudentCases({ page, base, output, rec
         }
         const observed = parseDeformationReport(kinematics.report, chosen);
         compareDeformationReport(observed, reference);
+        const visibleTables = await panel.locator('tbody').evaluateAll(bodies =>
+            bodies.map(body => [...body.rows].map(row => [...row.cells].map(cell => cell.textContent))));
+        compareDeformationTables(visibleTables, observed);
         const { artifact, bundle, packetDigest, basePacketDigest, sourceDigest, reportDigest } = kinematics;
         for (const digest of [artifact, bundle, packetDigest, basePacketDigest, sourceDigest, reportDigest])
             assert.match(digest, /^[0-9a-f]{64}$/);
-        const entry = { name, status, text, observed, report: kinematics.report, member: chosen, route: receipt.protocol,
+        const entry = { name, status, text, observed, visibleTables, report: kinematics.report, member: chosen, route: receipt.protocol,
             receipt: { artifact, bundle, packetDigest, basePacketDigest, sourceDigest, reportDigest } };
         records.push(entry);
         await page.screenshot({ path: join(output, name + '.png'), fullPage: true });

@@ -124,3 +124,52 @@ export function compareDeformationReport(observed, reference) {
         }
     }
 }
+
+function displayedBox(text) {
+    const parts = text.trim().replace(/^\[|\]$/g, '').split(/,\s*/);
+    if (parts.length === 1) parts.push(parts[0]);
+    assert.equal(parts.length, 2);
+    return parts.map(value => {
+        const decimal = value.replace(/−/g, '-');
+        assert.match(decimal, /^-?\d+(\.\d+)?$/);
+        const digits = decimal.split('.')[1]?.length ?? 0;
+        return `${BigInt(decimal.replace('.', ''))}/${10n ** BigInt(digits)}`;
+    });
+}
+
+/** Check that the rendered decimal tables preserve the wire enclosures.
+ * The display may merge touching or overlapping locations on the same piece.
+ */
+export function compareDeformationTables(tables, report) {
+    const [ends, extremes] = tables;
+    assert.equal(ends.length, report.pieces.length);
+    assert.equal(extremes.length, 4);
+    for (const [index, [pieceOrdinal, , theta0, theta1, v0, v1]] of ends.entries()) {
+        assert.equal(Number(pieceOrdinal), index + 1);
+        const piece = report.pieces[index];
+        for (const [value, raw] of [[theta0, piece.theta.start], [theta1, piece.theta.end],
+            [v0, piece.v.start], [v1, piece.v.end]]) {
+            assert.ok(enclosesReference(displayedBox(value), raw), 'Rendered member-face value lost its enclosure');
+        }
+    }
+    const displayed = new Set();
+    for (const [label, name, value, locations] of extremes) {
+        assert.match(label, /slope.*rad|displacement.*\(m\)/i);
+        assert.match(name, /^(minimum|maximum)$/i);
+        const field = /slope/i.test(label) ? 'theta' : 'v';
+        const flag = /^minimum$/i.test(name) ? 'min' : 'max';
+        const key = field + '-' + flag;
+        assert.ok(!displayed.has(key), 'Repeated displayed extremum');
+        displayed.add(key);
+        assert.ok(enclosesReference(displayedBox(value), report.extrema[field][flag]));
+        const parsed = locations.split(';').map(text => {
+            const match = /^\s*Piece\s+(\d+)\s*·\s*(.+)$/i.exec(text);
+            assert.ok(match, 'Rendered location must identify its source piece');
+            return { index: Number(match[1]) - 1, x: displayedBox(match[2]) };
+        });
+        for (const raw of report.locations.filter(row => row.field === field && row[flag])) {
+            const onePiece = parsed.filter(row => row.index === raw.index).map(row => row.x);
+            assert.ok(union(onePiece).some(box => enclosesReference(box, raw.x)), 'Rendered distances lost a checked location');
+        }
+    }
+}

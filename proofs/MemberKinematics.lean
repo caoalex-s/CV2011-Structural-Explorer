@@ -48,6 +48,36 @@ def evaluate (bits : Nat) (p : Segment) (expr : Expression 15) (t : Bounds) : Op
   let x ← multiply bits p.length t
   enclose bits (fun i => if i.val = 10 then x else p.inputs i) expr
 
+/-- Expand the derivative about the cell midpoint. A near-double root can
+otherwise keep many cells alive because powers of x share the same x. Inputs
+10 and 15 are the physical midpoint and the signed offset from that point. -/
+def centered : Field → Expression 16 := fun f =>
+  let x := Expression.input 10
+  let d := Expression.input 15
+  let m := -(Expression.input 2 : Expression 16)
+  let v := Expression.input 1
+  let q := Expression.input 8
+  let dq := Expression.input 9
+  let ei := Expression.input 12
+  let θ := Expression.input 5
+  let intensity := q + x*dq
+  let shear := v + x*(q+x*dq/2)
+  let moment := m + x*(v+x*(q/2+x*dq/6))
+  match f with
+  | .slope => moment + d*(shear+d*(intensity/2+d*dq/6))
+  | .displacement =>
+    let rotation := θ + x*(m+x*(v/2+x*(q/6+x*dq/24)))/ei
+    rotation + d*(moment+d*(shear/2+d*(intensity/6+d*dq/24)))/ei
+
+def centeredInputs {α : Type} (original : Fin 15 → α) (middle offset : α) (i : Fin 16) : α :=
+  if i.val = 10 then middle else if h : i.val < 15 then original ⟨i.val,h⟩ else offset
+
+def derivativeBounds (bits : Nat) (p : Segment) (f : Field) (t : Bounds) : Option Bounds := do
+  let mid := (t.lower+t.upper)/2
+  let x ← multiply bits p.length ⟨mid,mid⟩
+  let dx ← multiply bits p.length ⟨t.lower-mid,t.upper-mid⟩
+  enclose bits (centeredInputs p.inputs x dx) (centered f)
+
 structure Candidate where
   t : Bounds
   value : Bounds
@@ -64,7 +94,7 @@ inductive Cell where
 /-- Discard cells only after excluding zero from the derivative. A cell
 with a small field range may be retained in full for near-flat data. -/
 def classify (bits : Nat) (p : Segment) (field : Field) (t : Bounds) : Option Cell := do
-  let derivative ← evaluate bits p (derivativeSign field) t
+  let derivative ← derivativeBounds bits p field t
   if derivative.upper < 0 || 0 < derivative.lower then return .excluded
   let nearlyFlat := derivative.upper-derivative.lower ≤ (1:Rat)/1000000000000000
   if nearlyFlat || (t.upper-t.lower)*p.length.upper ≤ (1:Rat)/1000000 then

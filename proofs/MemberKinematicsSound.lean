@@ -60,11 +60,40 @@ theorem candidate_fits {bits p f t row inputs length}
   cases rest
   exact ⟨rfl, fun _ loc => enclosure fits loc computed⟩
 
+theorem centered_identity (values : Fin 15 → ℝ) (length middle station : ℝ) (f : Field) :
+    FrameIntervalExpressionSound.evaluate
+      (centeredInputs values (length*middle) (length*(station-middle))) (centered f) =
+    FrameIntervalExpressionSound.evaluate (atStation values length station) (derivativeSign f) := by
+  cases f <;>
+    simp [centered,centeredInputs,atStation,derivativeSign,FrameIntervalRecovery.expressions,
+      FrameIntervalExpressionSound.evaluate] <;> ring
+
+theorem derivative_contains {bits p f t box inputs length station}
+    (fits : Fits p inputs length) (whereAt : Contains t station)
+    (done : derivativeBounds bits p f t = some box) :
+    Contains box (FrameIntervalExpressionSound.evaluate (atStation inputs length station) (derivativeSign f)) := by
+  let mid := (t.lower+t.upper)/2
+  rw [← centered_identity inputs length (mid:ℝ) station f]
+  obtain ⟨x,hx,rest⟩ := Option.bind_eq_some.mp done
+  obtain ⟨dx,hd,rest⟩ := Option.bind_eq_some.mp rest
+  apply FrameIntervalExpressionSound.enclose_contains _ rest
+  have hm : Contains x (length*(mid:ℝ)) := executable_multiply_contains hx fits.1 ⟨le_rfl,le_rfl⟩
+  have shift : Contains ⟨t.lower-mid,t.upper-mid⟩ (station-(mid:ℝ)) := by
+    simpa only [Contains,Rat.cast_sub] using
+      And.intro (sub_le_sub_right whereAt.1 (mid:ℝ)) (sub_le_sub_right whereAt.2 (mid:ℝ))
+  have hoff := executable_multiply_contains hd fits.1 shift
+  intro i
+  by_cases middle : i.val = 10
+  · simpa [centeredInputs,middle] using hm
+  · by_cases original : i.val < 15
+    · simpa [centeredInputs,middle,original] using fits.2 ⟨i.val,original⟩
+    · simpa [centeredInputs,middle,original] using hoff
+
 theorem classify_excluded {bits p f t inputs length} (fits : Fits p inputs length)
     (excluded : classify bits p f t = some .excluded) {s : ℝ} (inside : Contains t s) :
     FrameIntervalExpressionSound.evaluate (atStation inputs length s) (derivativeSign f) ≠ 0 := by
   obtain ⟨bound,computed,rest⟩ := Option.bind_eq_some.mp excluded
-  have h := enclosure fits inside computed
+  have h := derivative_contains fits inside computed
   dsimp only at rest
   split at rest
   next sign =>
