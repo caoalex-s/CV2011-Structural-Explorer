@@ -26,6 +26,14 @@ jobs:
       - run: pnpm build
       - run: npm install --prefix .data/student-tools --ignore-scripts --save-exact playwright@1.51.1
       - run: node .data/student-tools/node_modules/playwright/cli.js install --with-deps chromium
+      - run: python3 -m pip install -r requirements.txt
+      - name: Check exercise predictions and local instructor events
+        run: |
+          EXPLORER_DATA="$RUNNER_TEMP/portal-pilot" python3 -m server.app --port 8766 > "$RUNNER_TEMP/portal-pilot.log" 2>&1 &
+          server=$!
+          trap 'kill "$server"' EXIT
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8766/ -o /dev/null && break; sleep 1; done
+          node qa/portal-moment-exercise/pilot-smoke.mjs http://127.0.0.1:8766/
       - name: Exercise ordinary drawing controls on the development site
         run: |
           python3 -m http.server 8765 --bind 127.0.0.1 --directory dist > "$RUNNER_TEMP/hinge-server.log" 2>&1 &
