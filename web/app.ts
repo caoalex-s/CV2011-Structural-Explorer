@@ -339,6 +339,9 @@ function jointDrawing(node: Point) {
     const title = pinned ? 'Pinned joint' : semiRigid ? 'Semi-rigid joint' : others.some(item => Object.values(item.rule).some(value => value !== 'rigid')) ? 'Joint with member-specific constraints' : 'Rigid joint';
     return `<g class="clickable" data-object="node" data-id="${escape(node.id)}" data-joint-symbol="${pinned ? 'pinned' : semiRigid ? 'semi-rigid' : title === 'Rigid joint' ? 'rigid' : 'custom'}"><title>${title} ${nodeLabels(model).get(node.id)}</title><circle cx="${p.x}" cy="${p.y}" r="13" class="node-hit"/>${shape}${selected?.id === node.id ? `<circle cx="${p.x}" cy="${p.y}" r="15" stroke="${courseColors.force}" fill="none" stroke-dasharray="3 3"/>` : ''}<text x="${p.x + offset.x}" y="${p.y + offset.y}" text-anchor="middle" class="node-label">${nodeLabels(model).get(node.id)}</text></g>`;
 }
+function responsesVisible() {
+    return (mode !== 'practice' || practiceResultsVisible) && (!portalExercise || momentExercise?.visible === true);
+}
 function renderCanvas() {
     const signsExpanded = $('workspace-conventions').querySelector('details')?.open ?? false;
     $('workspace-conventions').innerHTML = workspaceConventions(model, currentMember);
@@ -348,7 +351,7 @@ function renderCanvas() {
     const origin = screen({ x: 0, y: 0 });
     let drawing = `<defs><pattern id="grid" width="${spacing}" height="${spacing}" patternUnits="userSpaceOnUse" x="${origin.x % spacing}" y="${origin.y % spacing}"><circle cx="0" cy="0" r="1" fill="#dce5df"/></pattern></defs><rect width="1000" height="400" fill="url(#grid)"/>`;
     const all = analysis.elements.flatMap(e => e.samples);
-    if (analysis.status === 'stable' && layer !== 'none' && ((mode !== 'practice' || practiceResultsVisible) && (!portalExercise || momentExercise?.visible === true))) {
+    if (analysis.status === 'stable' && layer !== 'none' && responsesVisible()) {
         if (layer === 'displacement') {
             const maximum = Math.max(...all.map(p => Math.hypot(p.ux, p.uy)), 1e-12), magnification = 55 / (view.scale * maximum);
             for (const element of analysis.elements) {
@@ -381,7 +384,7 @@ function renderCanvas() {
     for (const load of model.loads)
         drawing += loadDrawing(load);
     for (const node of model.nodes) drawing += jointDrawing(node);
-    if ($<HTMLInputElement>('show-reactions').checked && ((mode !== 'practice' || practiceResultsVisible) && (!portalExercise || momentExercise?.visible === true)))
+    if ($<HTMLInputElement>('show-reactions').checked && responsesVisible())
         for (const reaction of analysis.reactions) {
             const p = screen(reaction);
             const node = model.nodes.find(node => Math.hypot(node.x - reaction.x, node.y - reaction.y) < 1e-7);
@@ -440,7 +443,7 @@ void document.fonts.ready.then(renderCanvas);
 function inspector(): void {
     renderInspector({
         container: $('inspector'), model, analysis, selected,
-        resultsVisible: (mode !== 'practice' || practiceResultsVisible) && (!portalExercise || momentExercise?.visible === true),
+        resultsVisible: responsesVisible(),
         commit, clearSelection: () => { selected = null; inspector(); },
         removeSelected, projectToMember: projection, notify: toast,
     });
@@ -476,7 +479,7 @@ function render() {
         currentMember = model.members[0]?.id || '';
     updateEvidenceBinding();
     renderResponses({ model, analysis, currentMember, sectionT, layer,
-        resultsVisible: (mode !== 'practice' || practiceResultsVisible) && (!portalExercise || momentExercise?.visible === true) });
+        resultsVisible: responsesVisible() });
     controls.setHistory(history.length > 0, future.length > 0);
     inspector();
     $('edit-selection').hidden = !selected;
