@@ -26,10 +26,13 @@ try {
                 Object.assign(model.loads[0],{t:a,end:b,fy:-8,qEnd:8});
                 const query = {...frameQueryConvention,member:'BC',parameter:0.5,cutSide:'left'};
                 const source = new TextEncoder().encode(JSON.stringify({model,query}));
+                const started = performance.now();
                 const base = await checker.checkFrame(source,'partial');
+                const baseMilliseconds = Math.round(performance.now()-started);
                 const diagram = base.state === 'accepted' ? await diagrams.checkDiagram(base.packet,true) : null;
-                records.push({a,b,state:base.state,message:base.message,diagram:diagram?.state,
+                records.push({a,b,baseMilliseconds,totalMilliseconds:Math.round(performance.now()-started),state:base.state,message:base.message,diagram:diagram?.state,
                     sourceBound:base.inputDigest === await sha256(source),packetBound:!!diagram && diagram.inputDigest===base.packetDigest,
+                    reportBound:!!diagram?.report && diagram.reportDigest===await sha256(diagram.report),
                     report:diagram?.report && new TextDecoder().decode(diagram.report)});
             }
         } finally { checker.dispose(); diagrams.dispose(); }
@@ -37,5 +40,5 @@ try {
     });
     await mkdir('.data/student-results',{recursive:true});
     await writeFile('.data/student-results/partial-stations.json',JSON.stringify(results,null,2));
-    for(const r of results) { console.log(r.a,r.b,r.state,r.message,r.diagram); assert.equal(r.state,'accepted'); assert.equal(r.diagram,'accepted'); assert.ok(r.sourceBound && r.packetBound); }
+    for(const r of results) { console.log(r.a,r.b,r.state,r.message,r.diagram); assert.equal(r.state,'accepted'); assert.equal(r.diagram,'accepted'); assert.ok(r.sourceBound && r.packetBound && r.reportBound); }
 } finally { await browser.close(); }

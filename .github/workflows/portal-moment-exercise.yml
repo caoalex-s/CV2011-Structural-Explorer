@@ -7,6 +7,10 @@ permissions:
   actions: read
 jobs:
   student-drawings:
+    strategy:
+      fail-fast: false
+      matrix:
+        replay: [development, pilot, offline]
     runs-on: ubuntu-22.04
     timeout-minutes: 20
     steps:
@@ -27,7 +31,20 @@ jobs:
       - run: npm install --prefix .data/student-tools --ignore-scripts --save-exact playwright@1.51.1
       - run: node .data/student-tools/node_modules/playwright/cli.js install --with-deps chromium
       - run: python3 -m pip install -r requirements.txt
+      - name: Replay the independent blank-canvas exercise
+        if: matrix.replay != 'development'
+        env:
+          REPLAY_MODE: ${{ matrix.replay }}
+        run: |
+          mkdir -p .data/independent
+          cp qa/portal-moment-exercise/portal-exercise-*.mjs qa/inclined-diagram/member-diagram-inclined-reference.mjs .data/independent/
+          EXPLORER_DATA="$RUNNER_TEMP/independent-pilot" python3 -m server.app --port 8766 > "$RUNNER_TEMP/independent.log" 2>&1 &
+          server=$!
+          trap 'kill "$server"' EXIT
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8766/ -o /dev/null && break; sleep 1; done
+          node .data/independent/portal-exercise-student-replay.mjs "file://$PWD/.data/student-tools/node_modules/playwright/index.mjs" http://127.0.0.1:8766/ ".data/student-results/$REPLAY_MODE" "$REPLAY_MODE"
       - name: Check exercise predictions and local instructor events
+        if: matrix.replay == 'development'
         run: |
           EXPLORER_DATA="$RUNNER_TEMP/portal-pilot" python3 -m server.app --port 8766 > "$RUNNER_TEMP/portal-pilot.log" 2>&1 &
           server=$!
@@ -35,6 +52,7 @@ jobs:
           for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8766/ -o /dev/null && break; sleep 1; done
           node qa/portal-moment-exercise/pilot-smoke.mjs http://127.0.0.1:8766/
       - name: Exercise ordinary drawing controls on the development site
+        if: matrix.replay == 'development'
         run: |
           python3 -m http.server 8765 --bind 127.0.0.1 --directory dist > "$RUNNER_TEMP/hinge-server.log" 2>&1 &
           server=$!
@@ -43,6 +61,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: portal-exercise-development
+          name: portal-exercise-${{ matrix.replay }}
           path: .data/student-results/
           include-hidden-files: true

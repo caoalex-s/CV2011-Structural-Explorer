@@ -102,6 +102,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
     let enabled = false;
     let startingNow = false;
     let exportText = '';
+    let checkFailed = false;
     let acceptedGeneration: (() => void) | null = null;
     const generationStorage = storageKey + '/generate';
     let pendingGeneration = sessionStorage.getItem(generationStorage);
@@ -143,6 +144,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
         });
     }
     function clear(message: string) {
+        checkFailed = /limit|timed out|inconclusive|failed|unavailable/i.test(message);
         onStatus?.(message);
         cancelProposal?.();
         diagramRuntime?.dispose(); diagramRuntime = null;
@@ -554,7 +556,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
             }
             activate.click(); return;
         }
-
+        if (checkFailed) update(member, parameter);
     };
     collapse.onclick = () => {
         workedOutput.hidden = !workedOutput.hidden;
