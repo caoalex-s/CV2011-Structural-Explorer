@@ -95,15 +95,15 @@ inductive Cell where
 with a small field range may be retained in full for near-flat data. -/
 def classify (bits : Nat) (p : Segment) (field : Field) (t : Bounds) : Option Cell := do
   let derivative ← derivativeBounds bits p field t
-  if derivative.upper < 0 || 0 < derivative.lower then return .excluded
-  -- Convert the derivative uncertainty into field units. On a flat segment
-  -- small residual uncertainty in an end moment is divided by EI for slope.
   let divisor := if field == .slope then (p.inputs 12).lower else 1
+  -- Convert derivative uncertainty into field units. For the slope use M/EI.
   let nearlyFlat := (derivative.upper-derivative.lower)*p.length.upper ≤ divisor/10000000000
-  if nearlyFlat || (t.upper-t.lower)*p.length.upper ≤ (1:Rat)/1000000 then
+  if derivative.upper < 0 || 0 < derivative.lower then some .excluded
+  else if nearlyFlat || (t.upper-t.lower)*p.length.upper ≤ (1:Rat)/1000000 then do
     let row ← candidate bits p field t
-    if row.value.upper-row.value.lower ≤ (1:Rat)/100000000 then return .enclosing row
-  return .subdivide
+    if row.value.upper-row.value.lower ≤ (1:Rat)/100000000 then some (.enclosing row)
+    else some .subdivide
+  else some .subdivide
 
 /-- The two closed children share the midpoint, so a stationary point at the
 split is retained. Each visited cell consumes one unit of the shared budget. -/

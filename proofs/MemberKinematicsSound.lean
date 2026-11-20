@@ -60,13 +60,29 @@ theorem candidate_fits {bits p f t row inputs length}
   cases rest
   exact ⟨rfl, fun _ loc => enclosure fits loc computed⟩
 
+@[local simp] theorem centeredInput1 (v : Fin 15 → ℝ) (m d : ℝ) : centeredInputs v m d 1 = v 1 := rfl
+@[local simp] theorem stationInput1 (v : Fin 15 → ℝ) (L t : ℝ) : atStation v L t 1 = v 1 := rfl
+@[local simp] theorem centeredInput2 (v : Fin 15 → ℝ) (m d : ℝ) : centeredInputs v m d 2 = v 2 := rfl
+@[local simp] theorem stationInput2 (v : Fin 15 → ℝ) (L t : ℝ) : atStation v L t 2 = v 2 := rfl
+@[local simp] theorem centeredInput5 (v : Fin 15 → ℝ) (m d : ℝ) : centeredInputs v m d 5 = v 5 := rfl
+@[local simp] theorem stationInput5 (v : Fin 15 → ℝ) (L t : ℝ) : atStation v L t 5 = v 5 := rfl
+@[local simp] theorem centeredInput8 (v : Fin 15 → ℝ) (m d : ℝ) : centeredInputs v m d 8 = v 8 := rfl
+@[local simp] theorem stationInput8 (v : Fin 15 → ℝ) (L t : ℝ) : atStation v L t 8 = v 8 := rfl
+@[local simp] theorem centeredInput9 (v : Fin 15 → ℝ) (m d : ℝ) : centeredInputs v m d 9 = v 9 := rfl
+@[local simp] theorem stationInput9 (v : Fin 15 → ℝ) (L t : ℝ) : atStation v L t 9 = v 9 := rfl
+@[local simp] theorem centeredInput10 (v : Fin 15 → ℝ) (m d : ℝ) : centeredInputs v m d 10 = m := rfl
+@[local simp] theorem stationInput10 (v : Fin 15 → ℝ) (L t : ℝ) : atStation v L t 10 = L*t := rfl
+@[local simp] theorem centeredInput12 (v : Fin 15 → ℝ) (m d : ℝ) : centeredInputs v m d 12 = v 12 := rfl
+@[local simp] theorem stationInput12 (v : Fin 15 → ℝ) (L t : ℝ) : atStation v L t 12 = v 12 := rfl
+@[local simp] theorem centeredInput15 (v : Fin 15 → ℝ) (m d : ℝ) : centeredInputs v m d 15 = d := rfl
+
 set_option maxHeartbeats 2400000 in
 theorem centered_identity (values : Fin 15 → ℝ) (length middle station : ℝ) (f : Field) :
     FrameIntervalExpressionSound.evaluate
       (centeredInputs values (length*middle) (length*(station-middle))) (centered f) =
     FrameIntervalExpressionSound.evaluate (atStation values length station) (derivativeSign f) := by
   cases f <;>
-    simp [centered,centeredInputs,atStation,derivativeSign,FrameIntervalRecovery.expressions,
+    simp [centered,derivativeSign,FrameIntervalRecovery.expressions,
       FrameIntervalExpressionSound.evaluate] <;> ring
 
 theorem derivative_contains {bits p f t box inputs length station}
