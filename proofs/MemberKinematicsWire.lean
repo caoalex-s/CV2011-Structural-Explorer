@@ -17,26 +17,50 @@ def locate (bits : Nat) (p : Segment) (piece : Nat) (whole : Bounds)
   let fraction := InclinedDiagram.shift p.left (InclinedDiagram.scale (p.right-p.left) row.t)
   return ⟨piece, ← multiply bits whole fraction, row.value⟩
 
+structure Extremes where
+  minimum : Bounds
+  maximum : Bounds
+
+/-- The explicit checks state both halves of each enclosure. Every candidate
+is bounded on the outer side, and an attained candidate bounds the other side. -/
+def soundLimits (rows : List Located) (e : Extremes) : Prop :=
+  (∀ r ∈ rows, e.minimum.lower ≤ r.value.lower ∧ r.value.upper ≤ e.maximum.upper) ∧
+  (∃ r ∈ rows, r.value.upper ≤ e.minimum.upper) ∧
+  (∃ r ∈ rows, e.maximum.lower ≤ r.value.lower)
+
+instance (rows : List Located) (e : Extremes) : Decidable (soundLimits rows e) := by
+  unfold soundLimits
+  infer_instance
+
+def summarize (rows : List Located) : Option Extremes := do
+  let first :: _ := rows | none
+  let minBox := rows.foldl (fun (b : Bounds) r =>
+    ⟨lowerOf b.lower r.value.lower, lowerOf b.upper r.value.upper⟩) first.value
+  let maxBox := rows.foldl (fun (b : Bounds) r =>
+    ⟨upperOf b.lower r.value.lower, upperOf b.upper r.value.upper⟩) first.value
+  let result := Extremes.mk minBox maxBox
+  if soundLimits rows result && InclinedDiagram.narrow minBox && InclinedDiagram.narrow maxBox
+    then some result else none
+
 def fieldRows (bits : Nat) (pieces : List Segment) (whole : Bounds) (field : Field) :
     Option (List String) := do
   let groups ← pieces.zipIdx.mapM fun (p, i) => do
     let rows ← candidates bits p field
     rows.mapM (locate bits p i whole)
   let rows := groups.flatten
-  let first :: _ := rows | none
-  let minBox := rows.foldl (fun (b : Bounds) r =>
-    ⟨lowerOf b.lower r.value.lower, lowerOf b.upper r.value.upper⟩) first.value
-  let maxBox := rows.foldl (fun (b : Bounds) r =>
-    ⟨upperOf b.lower r.value.lower, upperOf b.upper r.value.upper⟩) first.value
-  if !InclinedDiagram.narrow minBox || !InclinedDiagram.narrow maxBox then none else
-    let label := if field == .slope then "S" else "D"
-    let extrema := String.intercalate " " ([label, "bounds"] ++ boxText minBox ++ boxText maxBox)
-    let locations := rows.filterMap fun row =>
-      let low := row.value.lower ≤ minBox.upper
-      let high := maxBox.lower ≤ row.value.upper
-      if low || high then some (String.intercalate " " ([label, "location", toString row.piece,
-        if low then "1" else "0", if high then "1" else "0"] ++ boxText row.station)) else none
-    return extrema :: locations
+  let bounds ← summarize rows
+  let minBox := bounds.minimum
+  let maxBox := bounds.maximum
+
+
+  let label := if field == .slope then "S" else "D"
+  let extrema := String.intercalate " " ([label, "bounds"] ++ boxText minBox ++ boxText maxBox)
+  let locations := rows.filterMap fun row =>
+    let low := row.value.lower ≤ minBox.upper
+    let high := maxBox.lower ≤ row.value.upper
+    if low || high then some (String.intercalate " " ([label, "location", toString row.piece,
+      if low then "1" else "0", if high then "1" else "0"] ++ boxText row.station)) else none
+  return extrema :: locations
 
 def sheet {data : Partition} {basis : GlobalBasis} (bits member : Nat)
     (cert : Certificate data basis) : Option String := do

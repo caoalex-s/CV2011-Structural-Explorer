@@ -24,8 +24,8 @@ import { inclinedDeadlineMilliseconds } from './portal-runtime.js';
 import { createIntervalExplanation, renderIntervalExplanation } from './frame-interval-worked.js';
 
 import { renderKinematics } from './member-kinematics.js';
-import { proposeInclinedPacket } from './frame-interval-packet.js';
-import { proposeInclinedReleasePacket } from './frame-inclined-release-packet.js';
+
+
 
 export const isPortalWorkspace = location.pathname.replace(/index\.html$/, '').endsWith('/portal-checker/');
 // The same controller serves the main workspace and the compatible scoped URL.
@@ -120,7 +120,30 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
 
     let diagramRuntime: PortalRuntime | null = null;
     let kinematicsRuntime: PortalRuntime | null = null;
+    let cancelProposal: (() => void) | undefined;
+    function intervalProposal(model: Model, query: EvidenceQuery): Promise<Uint8Array<ArrayBuffer>> {
+        cancelProposal?.();
+        return new Promise((resolve, reject) => {
+            const worker = new Worker(new URL('./member-kinematics-proposal.js', import.meta.url), { type: 'module' });
+            const cancel = () => { finish(); reject(Error('The drawing or request changed.')); };
+            function finish() {
+                window.clearTimeout(timer);
+                worker.terminate();
+                if (cancelProposal === cancel) cancelProposal = undefined;
+            }
+            const timer = window.setTimeout(() => { finish(); reject(Error('Proposal time limit reached.')); }, 30000);
+            cancelProposal = cancel;
+            worker.onerror = () => { finish(); reject(Error('Could not prepare the source packet.')); };
+            worker.onmessage = ({ data }) => {
+                finish();
+                if (data instanceof Uint8Array && data.buffer instanceof ArrayBuffer) resolve(new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
+                else reject(Error(String(data)));
+            };
+            worker.postMessage({ model, query, released: usesRelease(model) });
+        });
+    }
     function clear(message: string) {
+        cancelProposal?.();
         diagramRuntime?.dispose(); diagramRuntime = null;
         kinematicsRuntime?.dispose(); kinematicsRuntime = null;
         status.textContent = message; readouts.replaceChildren(); certificate.textContent = '';
@@ -202,6 +225,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                 exportText = JSON.stringify(combined, null, 2);
                 certificate.textContent = exportText;
             }
+            cancelProposal?.();
             kinematicsRuntime?.dispose();
             const kinematics = new PortalRuntime(new URL('../member-kinematics/worker.mjs', runtimeUrl));
             kinematicsRuntime = kinematics;
@@ -216,8 +240,8 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                     const captured = JSON.parse(new TextDecoder().decode(sourceBytes));
                     let witness = packet;
                     if (!checker.supportsSprings && !checker.supportsInclinedReleases && result.frameProtocol !== 'inclined') {
-                        const propose = usesRelease(source) ? proposeInclinedReleasePacket : proposeInclinedPacket;
-                        witness = new Uint8Array(propose(captured.model, captured.query, 96).packet);
+
+                        witness = await intervalProposal(captured.model, captured.query);
                     }
                     const digest = await sha256(witness);
                     if (!active()) return;
