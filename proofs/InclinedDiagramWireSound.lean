@@ -18,13 +18,14 @@ def printed (field : String) (all : List Candidate) (c : Candidate) (low high : 
   String.intercalate " " ([field,toString c.piece,c.side] ++ boxText c.t ++ boxText c.x ++ boxText c.y ++
     [if low then "1" else "0",if high then "1" else "0"])
 
+set_option maxHeartbeats 1600000 in
 theorem printed_flags {name all c text} (done : candidateText name all c = some text) :
     ∃ low high, isExtreme false c all = some low ∧ isExtreme true c all = some high ∧
       text = printed name all c low high := by
+  unfold candidateText at done
   obtain ⟨lo,hl,rest⟩ := Option.bind_eq_some.mp done
   obtain ⟨hi,hh,eq⟩ := Option.bind_eq_some.mp rest
-  cases eq
-  exact ⟨lo,hi,hl,hh,rfl⟩
+  exact ⟨lo,hi,hl,hh,(Option.some.inj eq).symm⟩
 
 def Ordered {α β : Type} (xs : List α) (ys : List β) (related : α → β → Prop) :=
   ∃ equal : xs.length = ys.length, ∀ i : Fin xs.length, related (xs.get i) (ys.get (i.cast equal))
@@ -83,6 +84,7 @@ def PhysicalReport (data : Partition) (member : Nat) (motion : Motion data) (tex
         (lo = true ↔ ∀ y, table.attained y → table.atRow c ≤ y) ∧
         (hi = true ↔ ∀ y, table.attained y → y ≤ table.atRow c)))
 
+set_option maxHeartbeats 1600000 in
 theorem sheet_sound {data : Partition} {basis : GlobalBasis} {bits member}
     {cert : Certificate data basis} {motion : Motion data}
     {springs : Array (Fin basis.columns.size → Rat)} {torque : Fin springs.size → ℝ}
@@ -97,10 +99,10 @@ theorem sheet_sound {data : Partition} {basis : GlobalBasis} {bits member}
   have info (i : Fin pieces.length) : fits (pieces.get i) (physical i) ∧
       sourceShape data (source i) (pieces.get i) ∧ Forms state (pieces.get i) (physical i) := by
     have op := each (i.cast length.symm)
-    obtain ⟨raw,from,eq⟩ := Option.map_eq_some_iff.mp op
-    have base := fromSource_fits motion partition geometry loads nodes from
+    obtain ⟨raw,derived,eq⟩ := Option.map_eq_some_iff.mp op
+    have base := fromSource_fits motion partition geometry loads nodes derived
     have refined := refined_forms partition work _ raw base
-    have shape := fromSource_shape from
+    have shape := fromSource_shape derived
     simp only [Fin.cast_cast,Fin.cast_refl] at eq
     rw [←eq]
     exact ⟨refined.1,shape,refined.2⟩

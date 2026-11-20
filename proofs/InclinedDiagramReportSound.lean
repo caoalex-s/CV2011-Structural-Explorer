@@ -35,7 +35,9 @@ theorem row_metadata {n bits i p s m side r c} {state : Fin n → ℝ}
         cases e : p.scaledShear.isEmpty
         · rfl
         · simp [fieldSignature,e,Id.run] at nonempty
-      cases m <;> simpa [signedValue,ordinate,stationValue,field] using signature_value forms _ t base
+      cases m
+      · simpa [signedValue,ordinate,stationValue,field] using signature_value forms false t base
+      · simpa [signedValue,ordinate,stationValue,field] using signature_value forms true t base
   | linearRoot => constructor <;> simp
   | quadraticRoot plus => constructor <;> simp
 
