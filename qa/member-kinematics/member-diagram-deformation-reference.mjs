@@ -119,6 +119,25 @@ export function repeatedDisplacementRoot() {
     ]);
 }
 
+/** A 3–4–5 tilted cantilever with downward tip force 5 kN and distributed
+ * w=6−12t kN/m downward positive. M=20t−60t²+40t³ and the fixed end has
+ * zero rotation and transverse displacement. Both slope zeros are repeated.
+ */
+export function inclinedAffineDeformation(reversed = false) {
+    const length = exact(5);
+    const theta = [zero, zero, q(1, 400), q(-1, 200), q(1, 400)];
+    const originalV = [zero, zero, zero, q(1, 240), q(-1, 160), q(1, 400)];
+    const v = reversed ? substitute(originalV, one, exact(-1)).map(negative) : originalV;
+    const piece = describePiece(length, zero, one, theta, v);
+    return report(length, [piece], [
+        row(piece, 0, 'theta', 'start', zero, true),
+        row(piece, 0, 'theta', 'interior', half, false, true, q(1, 6400)),
+        row(piece, 0, 'theta', 'end', one, true),
+        row(piece, 0, 'v', 'start', zero, true),
+        row(piece, 0, 'v', 'end', one, false, true),
+    ]);
+}
+
 /** Fixed–fixed two-span beam with 10 kN down at B and no joint couple.
  * Each 4 m span has a constant signed shear of magnitude 5 kN. AB starts
  * with M=T−20, then reaches T at B. Reflection gives BC from AB.

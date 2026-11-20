@@ -10,7 +10,8 @@ import { compareDeformationReport, compareDeformationTables, deformationProtocol
     from './member-diagram-deformation-audit.mjs';
 import {
     portalDeformation, pinnedUniformDeformation, repeatedDisplacementRoot,
-    cardinalJointDeformation, inclinedCoupleDeformation, inclinedHingeDeformation, unloadedDeformation,
+    cardinalJointDeformation, inclinedCoupleDeformation, inclinedHingeDeformation, inclinedAffineDeformation,
+    unloadedDeformation,
 } from './member-diagram-deformation-reference.mjs';
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -88,7 +89,7 @@ export async function runMemberDeformationStudentCases({ page, base, output, rec
         const grid = page.getByLabel('Grid spacing (m)');
         if (!(await grid.isVisible())) await page.getByText('Snapping', { exact: true }).click();
         await page.getByLabel('Snap to grid and geometry').check();
-        await number(grid, 0.5);
+        await number(grid, 0.25);
         scale = 85;
     }
     async function scenario(name, run) {
@@ -214,6 +215,20 @@ export async function runMemberDeformationStudentCases({ page, base, output, rec
         await distributed([1, 0], [3, 0], 2, -6, -6);
         await collect('repeated-displacement-root', 0, repeatedDisplacementRoot(), [A, B]);
     });
+    for (const reversed of [false, true]) {
+        const name = 'inclined-affine-deformation' + (reversed ? '-reversed' : '');
+        await scenario(name, async () => {
+            const fixed = [0, -1.5], tip = [4, 1.5];
+            const sides = reversed ? [tip, fixed] : [fixed, tip];
+            await member(...sides);
+            await place('fixed', fixed);
+            await load('force', tip, reversed ? 0 : 1, -5);
+            const start = reversed ? [3, 0.75] : [1, -0.75];
+            const end = reversed ? [1, -0.75] : [3, 0.75];
+            await distributed(start, end, 1, reversed ? -6 : 6, reversed ? 6 : -6);
+            await collect(name, 0, inclinedAffineDeformation(reversed), sides);
+        });
+    }
     for (const spring of [false, true]) {
         for (const reversed of [false, true]) {
             const name = `inclined-${spring ? 'spring' : 'rigid'}-couple${reversed ? '-reversed' : ''}`;
