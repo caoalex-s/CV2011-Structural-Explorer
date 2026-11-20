@@ -57,16 +57,16 @@ function peaks(rows: HTMLElement, model: Model) {
 }
 
 export function createMomentExercise(getModel:()=>Model, selectBeam:(id:string)=>void, refresh:()=>void,
-    record:(event:string, answer:string, assisted:boolean)=>void) {
+    adjust:(boundaries:{t:number;end:number})=>void, record:(event:string, answer:string, assisted:boolean)=>void) {
     const panel = $('portal-exercise');
     panel.innerHTML = `<h2>Where does the largest |M| occur on BC?</h2>
-    <p>Draw a 6 m beam BC from left to right on two 4 m columns. Fix both bases and keep the joints rigid. Use EA = 2,000,000 kN and EI = 20,000 kN·m² for all three members.</p>
-    <p>Apply a vertical distributed load over BC. In Properties set the global vertical intensities to −6 kN/m at B and +6 kN/m at C. Measure x from B towards C.</p>
+    <p>Draw AB upwards 4 m, BC to the right 6 m, and CD downwards 4 m. For example, start at A (0, −2) m. Fix both bases and keep the joints rigid. Use EA = 2,000,000 kN and EI = 20,000 kN·m² for all three members.</p>
+    <p>Apply a vertical distributed load over BC. In Properties set the downward-positive intensities to +6 kN/m at B and −6 kN/m at C. Measure x from B towards C.</p>
     <label>Predict every location of the largest bending-moment magnitude, in metres from B. Separate multiple locations with commas (tolerance 0.02 m).
     <input id="moment-prediction" autocomplete="off"></label>
     <button id="moment-check">Check prediction</button> <button id="moment-reveal" disabled>Reveal worked solution</button>
-    <p id="moment-feedback" role="status"></p><p id="moment-explanation"></p>
-    <p>After checking the full-span load, change the intensities to −8 and +8 kN/m. Predict again. Then move the start to one-sixth of BC, keep the end at C, and recheck the peak locations.</p>`;
+    <p id="moment-feedback" role="status"></p><p id="moment-explanation"></p><div id="moment-adjustment"></div><p id="moment-progress"></p>
+    <p>After checking the full-span load, change the intensities to +8 and −8 kN/m. Predict again. Then move the start to one-sixth of BC, keep the end at C, and recheck the peak locations.</p>`;
     const input = $<HTMLInputElement>('moment-prediction'), reveal = $<HTMLButtonElement>('moment-reveal');
     const feedback = $('moment-feedback'), explanation = $('moment-explanation');
     const key = exerciseStorage+'/prediction';
@@ -82,6 +82,7 @@ export function createMomentExercise(getModel:()=>Model, selectBeam:(id:string)=
             const saved = JSON.parse(sessionStorage.getItem(key) || '{}');
             if (saved.source === binding) { prediction=saved.prediction; count=saved.count; exposed=saved.exposed; }
         } catch { /* A missing prediction starts a fresh drawing. */ }
+        $('moment-adjustment').replaceChildren();
         save(); input.value = prediction; reveal.disabled = true; explanation.textContent = '';
         feedback.textContent = prediction ? 'Checking the prediction for this drawing…' : '';
         document.body.classList.add('moment-locked');
@@ -121,9 +122,31 @@ export function createMomentExercise(getModel:()=>Model, selectBeam:(id:string)=
         explanation.textContent='Taking downward w as positive, w(x) = '+(-load.fy)+' + ('+(load.fy-load.qEnd)+')(x − '+a+')/('+b+' − '+a+') kN/m over the loaded interval, and zero elsewhere. Integrate dV/dx = −w and dM/dx = V using the starting values in the checked intervals below. Compare |M| at the ends, load boundaries and interior zeros of V. '+
             (outcome.resolved ? (outcome.distinct.length===2?'Reflection about midspan reverses the load and moment signs, so the two extrema have equal magnitude at ':'The largest magnitude occurs at ') : 'The checked bounds leave these possible locations: ')+locations+'.';
     };
-    return {bind, get visible(){return revealed;}, checked(model:Model, member:string, rows:HTMLElement) {
+    function status(message:string) {
+        if (!prediction || !/limit|timed out|inconclusive|failed|unavailable/i.test(message)) return;
+        outcome=undefined; reveal.disabled=true; feedback.textContent=message+' This prediction is ungraded.';
+        const host=$('moment-adjustment'); host.replaceChildren();
+        const load=getModel().loads[0];
+        if (!load || !/limit|timed out/i.test(message)) return;
+        const proposed={t:Math.round(load.t*8)/8,end:Math.round(load.end*8)/8};
+        if (proposed.t>=proposed.end || proposed.t===load.t && proposed.end===load.end) return;
+        const note=document.createElement('p'), button=document.createElement('button');
+        note.textContent='The checker reached its resource limit. You can try a different load extent. Start fraction '+load.t+' → '+proposed.t+', end fraction '+load.end+' → '+proposed.end+'. Undo restores the original extent.';
+        button.textContent='Apply these load boundaries'; button.onclick=()=>adjust(proposed);
+        host.append(note,button);
+    }
+    return {bind,status, get visible(){return revealed;}, checked(model:Model, member:string, rows:HTMLElement) {
         if (prediction && JSON.stringify(model)===JSON.stringify(getModel()) && portalBeam(model)?.id===member) {
             outcome=peaks(rows,model); grade();
+            if (outcome.resolved) {
+                const load = model.loads[0];
+                const stages = JSON.parse(sessionStorage.getItem(exerciseStorage+'/stages') || '{}');
+                if (load.fy === -6 && load.qEnd === 6 && load.t === 0 && load.end === 1) stages.reference = true;
+                if (stages.reference && load.fy === -8 && load.qEnd === 8 && load.t === 0 && load.end === 1) stages.magnitude = true;
+                if (stages.magnitude && load.fy === -8 && load.qEnd === 8 && (load.t !== 0 || load.end !== 1)) stages.extent = true;
+                sessionStorage.setItem(exerciseStorage+'/stages', JSON.stringify(stages));
+                $('moment-progress').textContent = 'Drawings checked: '+['reference','magnitude','extent'].filter(stage=>stages[stage]).join(', ')+'.';
+            }
         }
     }};
 }

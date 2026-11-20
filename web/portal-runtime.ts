@@ -8,6 +8,9 @@ export const sha256 = async (bytes: Uint8Array): Promise<string> =>
 // Allow slower devices a bounded margin; larger/expensive models can still time
 // out inconclusively. Exact-cardinal requests retain their separate 1 s limit.
 export const inclinedDeadlineMilliseconds = 30000;
+// A partial load adds internal points to the checked stiffness system.
+// This budget applies to its original-coordinate interval and diagram checks.
+const partialLoadDeadlineMilliseconds = 150000;
 
 export class PortalRuntime {
     private worker: Worker;
@@ -86,8 +89,8 @@ export class PortalRuntime {
         if (result.inputDigest !== pending.inputDigest) return false;
         clearTimeout(pending.timer); this.current = null; pending.resolve(result); return true;
     }
-    async checkDiagram(bytes: Uint8Array): Promise<CheckerResult> {
-        return this.submit(bytes, 'frame', true);
+    async checkDiagram(bytes: Uint8Array, partialLoad = false): Promise<CheckerResult> {
+        return this.submit(bytes, 'frame', true, false, partialLoad ? partialLoadDeadlineMilliseconds : undefined);
     }
     async check(bytes: Uint8Array): Promise<CheckerResult> {
         return this.submit(bytes, 'portal');
@@ -95,12 +98,12 @@ export class PortalRuntime {
     /** Source/query JSON is captured before hashing. Candidate construction
      * and exact checking both run inside the same bounded worker request.
      */
-    async checkFrame(bytes: Uint8Array, mode: 'exact' | 'inclined' | 'hinge' = 'exact'): Promise<CheckerResult> {
-        if (!this.supportsFrames || mode === 'inclined' && !this.supportsInclinedFrames ||
+    async checkFrame(bytes: Uint8Array, mode: 'exact' | 'inclined' | 'partial' | 'hinge' = 'exact'): Promise<CheckerResult> {
+        if (!this.supportsFrames || (mode === 'inclined' || mode === 'partial') && !this.supportsInclinedFrames ||
             mode === 'hinge' && !this.supportsHingeFrames) {
             this.invalidate(); return { state: 'unsupported-runtime' };
         }
-        return this.submit(bytes, 'frame', mode !== 'exact', mode === 'inclined', mode === 'inclined' && this.supportsInclinedFrames ? 120000 : undefined);
+        return this.submit(bytes, 'frame', mode !== 'exact', mode === 'inclined' || mode === 'partial', mode === 'partial' ? partialLoadDeadlineMilliseconds : undefined);
     }
     private async submit(bytes: Uint8Array, protocol: 'portal' | 'frame', inclined = false, intervalProposal = false, deadline?:number): Promise<CheckerResult> {
         this.invalidate();

@@ -57,7 +57,8 @@ function ownsRegistration(registration: ServiceWorkerRegistration): boolean {
 
 export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad: (value: number) => void,
     changeSectionParameter: (value: number) => void, storageKey = portalStorageKey, prepareReload: () => void = () => {},
-    onDiagram?: (source:Model, member:string, rows:HTMLElement)=>void) {
+    onDiagram?: (source:Model, member:string, rows:HTMLElement)=>void,
+    onStatus?: (message:string)=>void) {
     if (!isCheckedWorkspace) return { update(_member: string, _parameter: number) {} };
     const host = document.createElement('section');
     host.className = 'portal-certificate';
@@ -142,6 +143,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
         });
     }
     function clear(message: string) {
+        onStatus?.(message);
         cancelProposal?.();
         diagramRuntime?.dispose(); diagramRuntime = null;
         kinematicsRuntime?.dispose(); kinematicsRuntime = null;
@@ -176,7 +178,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                 host.querySelector('#portal-scope')!.textContent = 'The checker covers linear Euler–Bernoulli frames with positive EA and EI, fixed or pin supports, and rollers at 0, 90, 180, or 270 degrees. Point forces, couples, and linearly varying vertical loads may act over partial or overlapping member intervals. Distributed loads may change sign. Drawing labels are downward positive; the stored global-y forces are upward positive. Up to 8 members, 16 nodes, 16 active points, 16 segments, 16 supports, and 16 loads are supported within the arithmetic and one-second limits. Inputs retain their exact parsed binary64 values. Source and certificate rationals allow 128 digits, with 256 digits for normalized candidate intermediates and 513 before reduction. The packet limit is 1 MiB. A limit or timeout is inconclusive. N is positive in tension, M is positive in sagging, dM/dx = V, global y is upward, and rotation is counterclockwise. The main canvas draws numerical curves. In the whole-member worked solution, the sketch uses the checked polynomial coefficients. The tables give the checked section values and extrema. Acceptance relies on the proved compiled checker, its compiler and runtime, and the decoder and input binding. Edits are checked locally without invoking the Lean kernel.';
                 if (starting.supportsInclinedFrames) {
                     host.querySelector('#portal-introduction')!.textContent = 'Generate a solution for the current rigid frame and selected section. For inclined members and rollers at arbitrary finite angles, the worked solution gives checked intervals for the selected section and whole-member shear and moment extrema.';
-                    host.querySelector('#portal-scope')!.textContent = `The checker covers linear Euler–Bernoulli frames with positive EA and EI and rigid joints. Supports may be fixed, pinned, or rollers at arbitrary finite degree angles. Point forces, couples, and linearly varying vertical loads may act over partial or overlapping member intervals. Original parsed binary64 coordinates, angles, and actions define the real model. Up to 8 members, 16 nodes, 16 active points, 16 segments, 16 supports, and 16 loads are admitted within the arithmetic budget and 1 MiB packet limit. The exact-cardinal route has a one-second deadline. Inclined requests have a ${inclinedDeadlineMilliseconds / 1000}-second deadline and are cancelled when the drawing or selected section changes. A timeout or failed enclosure check is inconclusive and does not establish a mechanism. N is positive in tension, M is positive in sagging with dM/dx = V, global y is upward, and rotation is counterclockwise. The main canvas draws numerical curves. Acceptance relies on the proved compiled checker, its compiler and runtime, and the decoder and input binding.`;
+                    host.querySelector('#portal-scope')!.textContent = `The checker covers linear Euler–Bernoulli frames with positive EA and EI and rigid joints. Supports may be fixed, pinned, or rollers at arbitrary finite degree angles. Point forces, couples, and linearly varying vertical loads may act over partial or overlapping member intervals. Original parsed binary64 coordinates, angles, and actions define the real model. Up to 8 members, 16 nodes, 16 active points, 16 segments, 16 supports, and 16 loads are admitted within the arithmetic budget and 1 MiB packet limit. The exact-cardinal route has a one-second deadline. Inclined requests have a ${inclinedDeadlineMilliseconds / 1000}-second deadline and original-coordinate partial-load checks allow up to 150 seconds per worker. Requests are cancelled when the drawing or selected section changes. A timeout or failed enclosure check is inconclusive and does not establish a mechanism. N is positive in tension, M is positive in sagging with dM/dx = V, global y is upward, and rotation is counterclockwise. The main canvas draws numerical curves. Acceptance relies on the proved compiled checker, its compiler and runtime, and the decoder and input binding.`;
                 }
             }
             if (starting.supportsHingeFrames) {
@@ -263,7 +265,9 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                 try {
                     await extra.ready;
                     if (!current()) return;
-                    const checked = await extra.checkDiagram(packet);
+                    const partial = route === 'inclined-diagram' && source.loads.some(load => load.kind === 'distributed' &&
+                        [load.t,load.end].some(t => !Number.isInteger(t*1024)));
+                    const checked = await extra.checkDiagram(packet,partial);
                     if (!current()) return;
                     if (checked.state !== 'accepted' || checked.frameProtocol !== 'diagram' || checked.inputDigest !== packetDigest ||
                         !(checked.report instanceof Uint8Array) || await sha256(checked.report) !== checked.reportDigest)
@@ -282,7 +286,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                         artifact: extra.artifact, bundle: extra.bundle, packetDigest, reportDigest: checked.reportDigest,
                         report: new TextDecoder().decode(checked.report) } });
                 } catch (error) {
-                    if (current()) progress.textContent = 'Whole-member check inconclusive. ' + String(error);
+                    if (current()) { progress.textContent = 'Whole-member check inconclusive. ' + String(error); onStatus?.(progress.textContent); }
                 } finally { extra.dispose(); }
             })();
         }
@@ -483,7 +487,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
         clear(enabled ? 'Checking current drawing…' : 'Generate enables local checking and reloads this workspace once.');
         let snapshot: Model;
         let query: EvidenceQuery;
-        let frameMode: 'exact' | 'inclined' | 'hinge' = 'exact';
+        let frameMode: 'exact' | 'inclined' | 'partial' | 'hinge' = 'exact';
         try {
             // Capture before any asynchronous work, including hashing and debounce.
             snapshot = structuredClone(modelAtPresent());
@@ -504,7 +508,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                     // Long binary fractions can exhaust exact elimination. Keep every
                     // source byte and ask the same ABI to check an interval proposal.
                     if (runtime?.supportsInclinedFrames && snapshot.loads.some(load => load.kind === 'distributed' &&
-                        [load.t, load.end].some(t => !Number.isInteger(t * 1024)))) frameMode = 'inclined';
+                        [load.t, load.end].some(t => !Number.isInteger(t * 1024)))) frameMode = 'partial';
                 }
                 catch (error) {
                     if (runtime && !runtime.supportsInclinedFrames || !(error instanceof Error) || !error.message.startsWith('Unsupported:')) throw error;

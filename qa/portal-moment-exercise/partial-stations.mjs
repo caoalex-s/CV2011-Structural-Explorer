@@ -26,8 +26,8 @@ try {
                 Object.assign(model.loads[0],{t:a,end:b,fy:-8,qEnd:8});
                 const query = {...frameQueryConvention,member:'BC',parameter:0.5,cutSide:'left'};
                 const source = new TextEncoder().encode(JSON.stringify({model,query}));
-                const base = await checker.checkFrame(source,'inclined');
-                const diagram = base.state === 'accepted' ? await diagrams.checkDiagram(base.packet) : null;
+                const base = await checker.checkFrame(source,'partial');
+                const diagram = base.state === 'accepted' ? await diagrams.checkDiagram(base.packet,true) : null;
                 records.push({a,b,state:base.state,message:base.message,diagram:diagram?.state,
                     sourceBound:base.inputDigest === await sha256(source),packetBound:!!diagram && diagram.inputDigest===base.packetDigest,
                     report:diagram?.report && new TextDecoder().decode(diagram.report)});

@@ -676,6 +676,7 @@ function setMode(next: string) {
     $('page-description').textContent = mode === 'sandbox' ? 'Draw a system. Change a load. Follow the response.' : mode === 'practice' ? 'Build the model, submit a step, and examine the reasoning.' : 'Review submitted steps and the evidence behind recurring errors.';
     $('practice-panel').hidden = mode !== 'practice';
     $('insights-panel').hidden = mode !== 'insights';
+    $('portal-exercise').hidden = !portalExercise || mode === 'insights';
     (document.querySelector('.work-grid') as HTMLElement).hidden = mode === 'insights';
     (document.querySelector('.modelbar') as HTMLElement).hidden = mode === 'insights';
     if (mode === 'insights') void session.renderInsights();
@@ -856,7 +857,9 @@ if (portalExercise) {
     $('portal-exercise').hidden = false;
     momentExercise = createMomentExercise(() => model, member => {
         currentMember = member; sectionT = 0.5; render();
-    }, render, (event, answer, assisted) => {
+    }, render, boundaries => commit(() => {
+        Object.assign(model.loads[0],boundaries);
+    }), (event, answer, assisted) => {
         void session.record({model, section:sectionT, step:exerciseStep, side:'BC', hintUsed:false,
             solutionRevealed:assisted},event,answer,'m');
     });
@@ -864,7 +867,7 @@ if (portalExercise) {
 restoreCheckerControls?.();
 portalPanel = createPortalPanel(() => model, value => commit(() => {
     if (model.loads.length === 1) { model.loads[0].fy = value; model.loads[0].qEnd = value; }
-}), value => { sectionT = value; updateEvidenceBinding(); render(); }, modelStorageKey, preserveCheckerView, (drawing, member, rows) => momentExercise?.checked(drawing,member,rows));
+}), value => { sectionT = value; updateEvidenceBinding(); render(); }, modelStorageKey, preserveCheckerView, (drawing, member, rows) => momentExercise?.checked(drawing,member,rows), message => momentExercise?.status(message));
 if (!restoredPortalView) fit();
 controls.showLayer(layer);
 setMode(restoredPortalView ? mode : location.hash.slice(1) || 'sandbox');
