@@ -65,6 +65,32 @@ try {
     await page.locator('#moment-reveal').click();
     assert.match(await page.locator('#moment-explanation').innerText(),/equal magnitude/);
     assert.equal(await page.locator('#checked-member-diagram').isVisible(),true);
+    // The displayed decimal moments coincide here. Compare exact enclosed magnitudes
+    // before accepting a definite grade for a load one binary64 step from symmetry.
+    model.loads[0].qEnd = 5.999999999999999;
+    await loadDrawing();
+    await page.waitForFunction(() => JSON.parse(localStorage.getItem('cv2011-portal-absolute-moment/v1'))
+        .loads[0].qEnd === 5.999999999999999);
+    await page.locator('#moment-prediction').fill('1.337,4.663');
+    await page.locator('#moment-check').click();
+    await page.waitForFunction(() => !document.querySelector('#moment-reveal').disabled);
+    const signedPeaks = await page.locator('#checked-member-diagram [data-field="M"][data-candidate]')
+        .evaluateAll(rows => rows.filter(row => row.dataset.min === 'true' || row.dataset.max === 'true')
+            .map(row => ({...row.dataset})));
+    assert.equal(signedPeaks.length,2);
+    const magnitude = text => {
+        const [n,d] = text.split('/').map(BigInt);
+        return {n:n<0n ? -n : n,d};
+    };
+    const greater = (a,b) => a.n*b.d > b.n*a.d;
+    const boxes = signedPeaks.map(row => {
+        const a = magnitude(row.yLow), b = magnitude(row.yHigh);
+        return greater(a,b) ? {low:b,high:a} : {low:a,high:b};
+    });
+    const strictlySeparated = greater(boxes[0].low,boxes[1].high) || greater(boxes[1].low,boxes[0].high);
+    const grade = await page.locator('#moment-feedback').textContent();
+    report.unequalIntensity = {qEnd:model.loads[0].qEnd, signedPeaks, strictlySeparated, grade};
+    assert.match(grade,strictlySeparated ? /Check the number/ : /unresolved/);
     Object.assign(model.loads[0],{fy:-8,qEnd:8});
     await loadDrawing();
     await submit('1.337,4.663','Correct for this drawing');
