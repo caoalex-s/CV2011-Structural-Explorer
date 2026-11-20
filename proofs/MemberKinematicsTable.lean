@@ -65,7 +65,9 @@ theorem collection_sound {bits : Nat} {pieces : List Segment} {whole : Bounds} {
     refine ⟨i,t,dom,binding.1,?_⟩
     rw [binding.2.1,←physical_recovery _ (positive i)]
     exact value
-  · intro i t dom ext
+  · intro i t dom
+    dsimp only
+    intro ext
     obtain ⟨cs,hc,hl⟩ := perPiece i
     obtain ⟨r,hr,loc,val⟩ := physical_extreme_covered _ (positive i) (fits i) hc dom ext
     obtain ⟨k,hk⟩ := memberIndex hr

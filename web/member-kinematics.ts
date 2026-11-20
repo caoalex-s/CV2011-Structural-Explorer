@@ -63,7 +63,7 @@ export function renderKinematics(bytes: Uint8Array, member: string, label: strin
     }
 
     append('h3', 'Slope and transverse displacement of ' + label);
-    append('p', 'Distance x follows the drawn member. Local transverse displacement v is positive to the left when looking from its start towards its end. Physical slope θ = dv/dx is positive counterclockwise. On each prismatic piece, EI dθ/dx = M. Integrating the moment from the start face gives the slope, and integrating the slope gives v. The calculation assumes small rotations and constant EI.');
+    append('p', 'Distance x follows the drawn member. Local transverse displacement v is positive to the left when looking from its start towards its end. For a rightward horizontal member, positive v is upward. On an incline, global vertical movement also depends on axial displacement. Physical slope θ = dv/dx is positive counterclockwise. On each prismatic piece, EI dθ/dx = M. Integrating the moment from the start face gives the slope, and integrating the slope gives v. The calculation assumes small rotations and constant EI.');
     const records = lines.map(line => line.split(' '));
     const ends = table(['Piece', 'Member fraction', 'θ at start (rad)', 'θ at end (rad)', 'v at start (m)', 'v at end (m)']);
     for (const tokens of records.filter(r => r[0] === 'P')) {
