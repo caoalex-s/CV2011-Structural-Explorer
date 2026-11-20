@@ -120,6 +120,7 @@ theorem sheet_sound {data : Partition} {basis : GlobalBasis} {bits member}
   obtain ⟨_,_,rest⟩ := Option.bind_eq_some.mp encoded
   obtain ⟨shear,hs,rest⟩ := Option.bind_eq_some.mp rest
   obtain ⟨mom,hm,rest⟩ := Option.bind_eq_some.mp rest
+  dsimp only at rest
   split at rest
   next =>
     cases rest
