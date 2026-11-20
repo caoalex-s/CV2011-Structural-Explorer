@@ -26,7 +26,7 @@ private theorem end_parts {bits : Nat} {p : Segment} {i : Nat} {line : String}
   unfold endRow at made
   simp only [Option.bind_eq_bind, Option.bind_eq_some, Option.some.injEq] at made
   obtain ⟨a,ha,b,hb,u,hu,v,hv,eq⟩ := made
-  exact ⟨a,b,u,v,ha,hb,hu,hv,eq.symm⟩
+  exact ⟨a,b,u,v,ha,hb,hu,hv,(Option.some.inj eq).symm⟩
 
 private theorem physical_value {bits : Nat} {p : Segment} (h : PhysicalPiece)
     (positive : h.positive) (fits : Fits p (h.inputs 0) h.length) (f : Field)
