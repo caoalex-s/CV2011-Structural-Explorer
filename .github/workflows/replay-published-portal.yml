@@ -16,12 +16,12 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
       - name: Verify replay source and wait for the reviewed Pages revision
         run: |
-          git fetch --depth=1 origin "$RELEASE_COMMIT"
           git diff --exit-code "$RELEASE_COMMIT" HEAD -- qa/portal-moment-exercise/portal-exercise-student-replay.mjs qa/portal-moment-exercise/portal-exercise-reference.mjs qa/inclined-diagram/member-diagram-inclined-reference.mjs public/portal-checker
           node qa/portal-moment-exercise/published-assets.mjs "$PAGES_SITE" "$RELEASE_COMMIT" "$EVIDENCE" before
       - run: npm install --prefix .data/student-tools --ignore-scripts --save-exact playwright@1.51.1
