@@ -128,7 +128,10 @@ jobs:
           lake env bash -euc '
             set -o pipefail
             export LEAN_PATH="$PWD:$LEAN_PATH"
-            python3 ../qa/inclined-release/compile.py MemberKinematicsTable | tee kinematics-axioms.log
+            python3 ../qa/inclined-release/compile.py MemberKinematicsWireSound | tee kinematics-axioms.log
+            for theorem in rigid_accepted released_accepted spring_accepted sheet_sound member_extreme physical_extreme_covered; do
+              grep -F "MemberKinematics.Sound.$theorem" kinematics-axioms.log
+            done
             ! grep -E "sorryAx|declaration uses .sorry." kinematics-axioms.log
           '
 

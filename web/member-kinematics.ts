@@ -42,6 +42,26 @@ export function renderKinematics(bytes: Uint8Array, member: string, label: strin
         return lo === hi ? lo : '[' + lo + ', ' + hi + ']';
     }
 
+    // Merge overlapping enclosures on the same face before rounding for display.
+    // A cut can have two different rotations, even at a common physical station.
+    function locationText(stations: string[][]) {
+        function compare(a: string, b: string) {
+            const [an, ad] = a.split('/').map(BigInt), [bn, bd] = b.split('/').map(BigInt);
+            const delta = an * bd - bn * ad;
+            return delta < 0n ? -1 : delta > 0n ? 1 : 0;
+        }
+        const intervals = stations.map(entry => ({ piece: Number(entry[2]), lo: entry[5], hi: entry[6] }));
+        intervals.sort((a, b) => a.piece - b.piece || compare(a.lo, b.lo));
+        const merged: typeof intervals = [];
+        for (const interval of intervals) {
+            const last = merged.at(-1);
+            if (last?.piece === interval.piece && compare(interval.lo, last.hi) <= 0) {
+                if (compare(last.hi, interval.hi) < 0) last.hi = interval.hi;
+            } else merged.push(interval);
+        }
+        return merged.map(({ piece, lo, hi }) => 'Piece ' + (piece + 1) + ' · ' + range([lo, hi], 0)).join('; ');
+    }
+
     append('h3', 'Slope and transverse displacement of ' + label);
     append('p', 'Distance x follows the drawn member. Local transverse displacement v is positive to the left when looking from its start towards its end. Physical slope θ = dv/dx is positive counterclockwise. On each prismatic piece, EI dθ/dx = M. Integrating the moment from the start face gives the slope, and integrating the slope gives v. The calculation assumes small rotations and constant EI.');
     const records = lines.map(line => line.split(' '));
@@ -60,8 +80,8 @@ export function renderKinematics(bytes: Uint8Array, member: string, label: strin
         for (const [index, kind] of ['Minimum','Maximum'].entries()) {
             const stations = records.filter(r => r[0] === code && r[1] === 'location' && r[3+index] === '1');
             if (!stations.length) throw Error('Missing extremum locations.');
-            const locations = stations.map(r => 'Piece ' + (Number(r[2])+1) + ' · ' + range(r,5));
-            row(extrema,[title,kind,range(values,2+2*index),[...new Set(locations)].join('; ')]);
+
+            row(extrema,[title,kind,range(values,2+2*index),locationText(stations)]);
         }
     }
     return section;
