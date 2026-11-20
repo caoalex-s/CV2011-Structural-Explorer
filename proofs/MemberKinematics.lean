@@ -96,7 +96,10 @@ with a small field range may be retained in full for near-flat data. -/
 def classify (bits : Nat) (p : Segment) (field : Field) (t : Bounds) : Option Cell := do
   let derivative ← derivativeBounds bits p field t
   if derivative.upper < 0 || 0 < derivative.lower then return .excluded
-  let nearlyFlat := derivative.upper-derivative.lower ≤ (1:Rat)/1000000000000000
+  -- Convert the derivative uncertainty into field units. On a flat segment
+  -- small residual uncertainty in an end moment is divided by EI for slope.
+  let divisor := if field == .slope then (p.inputs 12).lower else 1
+  let nearlyFlat := (derivative.upper-derivative.lower)*p.length.upper ≤ divisor/10000000000
   if nearlyFlat || (t.upper-t.lower)*p.length.upper ≤ (1:Rat)/1000000 then
     let row ← candidate bits p field t
     if row.value.upper-row.value.lower ≤ (1:Rat)/100000000 then return .enclosing row
