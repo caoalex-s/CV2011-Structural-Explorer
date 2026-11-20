@@ -89,7 +89,7 @@ try {
     await page.locator('[data-mode="insights"]').click();
     const events = page.locator('#insights-panel table').filter({has:page.getByText('Pseudonymous ID',{exact:true})});
     await events.getByText('DEMO-001').first().waitFor();
-    await events.getByRole('columnheader',{name:'Worked solution for this drawing'}).waitFor();
+    assert.ok((await events.locator('thead th').allTextContents()).includes('Worked solution for this drawing'));
     await page.getByText('Each edited drawing has its own first prediction.',{exact:false}).waitFor();
     report.events=await events.innerText();
     for (const label of ['first prediction','retry','reveal']) assert.ok(report.events.includes(label));
