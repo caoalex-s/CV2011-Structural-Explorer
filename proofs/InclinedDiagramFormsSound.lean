@@ -64,6 +64,7 @@ structure Forms {n} (state : Fin n → ℝ) (p : InclinedDiagram.Piece) (s : Sta
   shear_value : value state p.scaledShear = s.L*s.V
   moment_value : value state p.initialMoment = s.M
 
+set_option maxHeartbeats 1600000 in
 theorem refined_forms {data : Partition} {basis : GlobalBasis} {cert : Certificate data basis}
     {motion : Motion data} {springs : Array (Fin basis.columns.size → Rat)} {torque : Fin springs.size → ℝ}
     (partition : PartitionValid data) (work : WorkColumns cert motion springs torque)
@@ -91,7 +92,7 @@ theorem refined_forms {data : Partition} {basis : GlobalBasis} {cert : Certifica
   have reduced (xs : List (Nat × Rat)) : (reduce sys (equation sys.width xs)).size = n ∧
       value state (reduce sys (equation sys.width xs)) = termsValue state xs := by
     rw [size]
-    have represented := pivots_preserve state sys.pivots.toList valid (equation n xs) (by simp [equation])
+    have represented := pivots_preserve state sys.pivots.toList valid (equation n xs) (by simp [equation,n])
     exact ⟨represented.1,represented.2.trans (equation_value state xs)⟩
   have at0 : atSlot state k = globalActions data motion i 0 := end_slot motion torque i 0
   have at1 : atSlot state (k+1) = globalActions data motion i 1 := end_slot motion torque i 1
@@ -109,12 +110,13 @@ theorem refined_forms {data : Partition} {basis : GlobalBasis} {cert : Certifica
   let one : Fin n := ⟨n-1,by dsimp [n,Statics.width]; omega⟩
   have lengthValue : state li = physical.L := by
     have actual := length_slot motion torque (⟨seg.member,own⟩ : Fin data.source.members.size)
-    have extension : atSlot state lengthIndex = state li := by simp [atSlot,li,lenBound]
+    have extension : atSlot state lengthIndex = state li := by simp [atSlot,li,show lengthIndex < Statics.width data springs.size from lenBound]
     rw [←extension]
     simpa [lengthIndex,pivots,physical,physicalState,seg,state] using actual
   have oneValue : state one = 1 := by
     have actual := constant_slot motion torque
-    simpa [one,atSlot,n,Statics.width,state] using actual
+    have bound : Statics.width data springs.size - 1 < Statics.width data springs.size := one.isLt
+    simpa only [atSlot,dif_pos bound] using actual
   have vBound : Contains (((onlyCoefficient v lengthIndex).map singleton).getD p.shearStart) physical.V := by
     cases e : onlyCoefficient v lengthIndex with
     | none => exact base.2.1
@@ -143,9 +145,9 @@ theorem modify_value {n} (state : Fin n → ℝ) (row : Row) (index : Fin n) (k 
       row[j.val]! + (if j = index then k else 0) := by
     have hj : j.val < row.size := by simpa only [width] using j.isLt
     by_cases eq : j = index
-    · subst j; simp [Array.modify,getElem!_pos,hi]
+    · subst j; simp [Array.getElem_modify,getElem!_pos,hi]
     · have ne : j.val ≠ index.val := fun h => eq (Fin.ext h)
-      simp [Array.modify,getElem!_pos,hj,hi,ne,Ne.symm ne,eq]
+      simp [Array.getElem_modify,getElem!_pos,hj,hi,ne,Ne.symm ne,eq]
   unfold value
   simp_rw [get,Rat.cast_add,add_mul,Finset.sum_add_distrib]
   simp [apply_ite,ite_mul]
@@ -156,7 +158,9 @@ theorem signature_value {n} {state : Fin n → ℝ} {p s} (forms : Forms state p
   obtain ⟨li,hli,hL⟩ := forms.length_slot
   cases m with
   | false =>
-    simp only [fieldSignature,nonempty,Bool.false_eq_true,↓reduceIte,Id.run_pure,pure]
+    change value state (if p.scaledShear.isEmpty then #[] else
+      p.scaledShear.modify p.lengthColumn (· + t*(p.linear+t*p.quadratic))) = _
+    rw [if_neg (by simp [nonempty])]
     rw [←hli,modify_value state _ li _ forms.shear_width,forms.shear_value,hL]
     simp [shear]; ring
   | true =>
