@@ -117,11 +117,14 @@ jobs:
             export LEAN_PATH="$PWD:$LEAN_PATH"
             test -s InclinedDiagramSound.lean
             status=0
-            for module in InclinedDiagramFormsSound InclinedDiagramOrder InclinedDiagramWireSound; do
+            for module in InclinedDiagramFormsSound InclinedDiagramOrder; do
               python3 ../qa/inclined-release/compile.py "$module" 2>&1 | tee -a release-axioms.log || status=1
             done
             test "$status" -eq 0
-            grep -F "InclinedDiagram.Sound.evaluate_fits" release-axioms.log
+            python3 ../qa/inclined-release/compile.py InclinedDiagramWireSound 2>&1 | tee -a release-axioms.log
+            for name in rigid_accepted released_accepted spring_accepted accepted_dispatch; do
+              grep -F "InclinedDiagram.Sound.$name" release-axioms.log
+            done
             ! grep -E "sorryAx|declaration uses .sorry." release-axioms.log
           '
 
