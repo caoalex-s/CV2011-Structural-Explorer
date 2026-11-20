@@ -34,8 +34,8 @@ theorem row_metadata {n bits i p s m side r c} {state : Fin n → ℝ}
       have base : p.scaledShear.isEmpty = false := by
         cases e : p.scaledShear.isEmpty
         · rfl
-        · simp [fieldSignature,e] at nonempty
-      simpa [signedValue,ordinate,stationValue,field] using signature_value forms m t base
+        · simp [fieldSignature,e,Id.run] at nonempty
+      cases m <;> simpa [signedValue,ordinate,stationValue,field] using signature_value forms _ t base
   | linearRoot => constructor <;> simp
   | quadraticRoot plus => constructor <;> simp
 
@@ -50,7 +50,7 @@ theorem piece_metadata {n bits i p s m all} {state : Fin n → ℝ}
     simp only [List.mem_cons,List.not_mem_nil,or_false] at mem
     rcases mem with rfl | rfl | rfl
     · exact row_metadata forms ha
-    · exact row_metadata forms ha
+    · exact (show Metadata state p s m a from row_metadata forms ha)
     · exact row_metadata forms hb
   · simp only [flatPiece,↓reduceIte] at rest
     obtain ⟨_,_,rest⟩ := Option.bind_eq_some.mp rest
@@ -139,6 +139,7 @@ theorem comparative {r q} (hr : r ∈ table.all) (hq : q ∈ table.all) :
   · intro same u v hu hv
     have sameOwner : i = j := Fin.ext (ei.symm.trans (same.trans ej))
     subst j
+    change ordinate _ _ _ r - ordinate _ _ _ q = _
     rw [mr.1 u hu,mq.1 v hv]
     ring
   · intro notEmpty same
@@ -161,8 +162,12 @@ theorem flagged {r flag} (hr : r ∈ table.all) (maximum : Bool)
     obtain ⟨⟨lo,hlo,below⟩,⟨hi,hhi,above⟩⟩ := piece_range (table.fit i) (table.made i) t domain
     have member {c} (h : c ∈ table.output i) : c ∈ table.all := List.mem_flatMap.mpr ⟨i,by simp,h⟩
     cases maximum
-    · exact (table.row_value hlo ▸ bounds lo (member hlo)).trans below
-    · exact above.trans (table.row_value hhi ▸ bounds hi (member hhi))
+    · have lower : table.atRow r ≤ table.atRow lo := bounds lo (member hlo)
+      rw [table.row_value hlo] at lower
+      exact lower.trans below
+    · have upper : table.atRow hi ≤ table.atRow r := bounds hi (member hhi)
+      rw [table.row_value hhi] at upper
+      exact above.trans upper
   · intro bounds q hq
     obtain ⟨j,mem,_⟩ := table.owner hq
     have domain := (all_rows_attained (table.fit j) (table.made j) mem).1

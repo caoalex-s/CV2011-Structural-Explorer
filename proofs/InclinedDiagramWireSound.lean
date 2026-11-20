@@ -29,7 +29,7 @@ theorem printed_flags {name all c text} (done : candidateText name all c = some 
 def Ordered {α β : Type} (xs : List α) (ys : List β) (related : α → β → Prop) :=
   ∃ equal : xs.length = ys.length, ∀ i : Fin xs.length, related (xs.get i) (ys.get (i.cast equal))
 
-theorem each_group {dimension bits pieces m lines} (state : Fin dimension → ℝ)
+theorem each_group {dimension bits : Nat} {pieces : List InclinedDiagram.Piece} {m : Bool} {lines : List String} (state : Fin dimension → ℝ)
     (physical : Fin pieces.length → State) (L : ℝ)
     (same : ∀ i, (physical i).L = L)
     (fitsPiece : ∀ i, fits (pieces.get i) (physical i))
@@ -126,6 +126,7 @@ theorem sheet_sound {data : Partition} {basis : GlobalBasis} {bits member}
   next => cases rest
 
 open InclinedFrameGlobalBasis
+open InclinedFrameIntervalEquilibrium (liftCoordinates lift_at_column)
 
 theorem rigid_accepted {input text} (ok : rigid input = some text) :
     ∃ p : InclinedFrameIntervalWire.Packet, InclinedFrameIntervalWire.decode input = some p ∧
