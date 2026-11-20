@@ -1,0 +1,40 @@
+name: Replay published portal exercise
+on:
+  push:
+    branches: [codex/verify-published-portal-exercise]
+permissions:
+  contents: read
+jobs:
+  public-offline:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 55
+    env:
+      PAGES_SITE: https://caoalex-s.github.io/CV2011-Structural-Explorer/
+      RELEASE_COMMIT: 4b724ef9526b0c2b9ebaf6240c68d0abf8567979
+      EVIDENCE: .data/public-portal-exercise
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify replay source and wait for the reviewed Pages revision
+        run: |
+          git fetch --depth=1 origin "$RELEASE_COMMIT"
+          git diff --exit-code "$RELEASE_COMMIT" HEAD -- qa/portal-moment-exercise/portal-exercise-student-replay.mjs qa/portal-moment-exercise/portal-exercise-reference.mjs qa/inclined-diagram/member-diagram-inclined-reference.mjs public/portal-checker
+          node qa/portal-moment-exercise/published-assets.mjs "$PAGES_SITE" "$RELEASE_COMMIT" "$EVIDENCE" before
+      - run: npm install --prefix .data/student-tools --ignore-scripts --save-exact playwright@1.51.1
+      - run: node .data/student-tools/node_modules/playwright/cli.js install --with-deps chromium
+      - name: Replay synthetic offline drawing in a fresh browser
+        run: |
+          mkdir -p .data/independent
+          cp qa/portal-moment-exercise/portal-exercise-*.mjs qa/inclined-diagram/member-diagram-inclined-reference.mjs .data/independent/
+          node .data/independent/portal-exercise-student-replay.mjs "file://$PWD/.data/student-tools/node_modules/playwright/index.mjs" "$PAGES_SITE" "$EVIDENCE" offline
+          node qa/portal-moment-exercise/published-assets.mjs "$PAGES_SITE" "$RELEASE_COMMIT" "$EVIDENCE" after
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: portal-exercise-public
+          path: .data/public-portal-exercise/
+          include-hidden-files: true
