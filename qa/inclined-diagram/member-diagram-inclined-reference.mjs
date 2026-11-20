@@ -258,3 +258,6 @@ export function inclinedSpringSpan(reversed = false) {
         ],
     };
 }
+
+// The deformation benchmarks use the same independent rational arithmetic.
+export { exact, add, subtract, multiply, divide, negative, sqrt, bounds };

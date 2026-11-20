@@ -3,7 +3,7 @@
  * a cover of the extrema, including each side of every source split.
  */
 import assert from 'node:assert/strict';
-import { enclosesReference } from './member-diagram-inclined-reference.mjs';
+import { enclosesReference } from '../inclined-diagram/member-diagram-inclined-reference.mjs';
 
 export const deformationProtocol = 'CV2011_MEMBER_KINEMATICS_1';
 const rational = /^-?\d+\/[1-9]\d*$/;

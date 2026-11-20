@@ -119,12 +119,10 @@ theorem classify_excluded {bits p f t inputs length} (fits : Fits p inputs lengt
     · exact ne_of_lt (lt_of_le_of_lt h.2 (by exact_mod_cast neg))
     · exact ne_of_gt (lt_of_lt_of_le (by exact_mod_cast pos) h.1)
   next =>
-    try dsimp only at rest
-    split at rest
-    next =>
-      obtain ⟨row,_,rest⟩ := Option.bind_eq_some.mp rest
-      split at rest <;> cases rest
-    next => cases rest
+    split at rest <;> split at rest
+    all_goals first
+      | (obtain ⟨_,_,eq⟩ := Option.bind_eq_some.mp rest; split at eq <;> cases eq)
+      | cases rest
 
 theorem classified_enclosure {bits p f t row} (made : classify bits p f t = some (.enclosing row)) :
     candidate bits p f t = some row := by
@@ -133,14 +131,12 @@ theorem classified_enclosure {bits p f t row} (made : classify bits p f t = some
   split at rest
   next => cases rest
   next =>
-    try dsimp only at rest
-    split at rest
-    next =>
-      obtain ⟨r,hr,rest⟩ := Option.bind_eq_some.mp rest
-      split at rest
-      next => cases rest; exact hr
-      next => cases rest
-    next => cases rest
+    split at rest <;> split at rest
+    all_goals first
+      | (obtain ⟨r,computed,eq⟩ := Option.bind_eq_some.mp rest
+         split at eq <;> cases eq
+         exact computed)
+      | cases rest
 
 /-- Every derivative zero is retained, even if the derivative touches zero
 without changing sign or vanishes over an interval. -/

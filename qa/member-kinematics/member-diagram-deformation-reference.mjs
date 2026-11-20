@@ -3,7 +3,7 @@
  * Coefficients are in rad and m respectively. Distances are in metres.
  */
 import { exact, add, subtract, multiply, divide, negative, sqrt, bounds }
-    from './member-diagram-inclined-reference.mjs';
+    from '../inclined-diagram/member-diagram-inclined-reference.mjs';
 
 const zero = exact(0), one = exact(1), half = divide(one, exact(2));
 const EI = exact(20000);
