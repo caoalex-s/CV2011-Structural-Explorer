@@ -100,6 +100,27 @@ function rationalNumber(value) {
     return top / bottom;
 }
 
+function compareRationals(left, right) {
+    const [leftTop, leftBottom] = parseRational(left);
+    const [rightTop, rightBottom] = parseRational(right);
+    const crossDifference = leftTop * rightBottom - rightTop * leftBottom;
+    return crossDifference < 0n ? -1 : Number(crossDifference > 0n);
+}
+
+/** Two signed enclosures can overlap after taking their absolute values.
+ * Discard a candidate only when another lower bound exceeds its upper bound.
+ */
+function possibleAbsolutePeaks(rows) {
+    const enclosures = rows.map(row => {
+        const [yLow, yHigh] = row.m;
+        const absoluteEndpoints = row.m.map(value => value.replace(/^-/, '')).sort(compareRationals);
+        const containsZero = compareRationals(yLow, '0/1') <= 0 && compareRationals(yHigh, '0/1') >= 0;
+        return { ...row, magnitude: [containsZero ? '0/1' : absoluteEndpoints[0], absoluteEndpoints[1]] };
+    });
+    return enclosures.filter(candidate =>
+        !enclosures.some(other => compareRationals(other.magnitude[0], candidate.magnitude[1]) > 0));
+}
+
 function referenceForLoad([t, end, firstIntensity, lastIntensity]) {
     return portalExerciseReference({
         start: multiply(exact(6), exactBrowserNumber(t)),
@@ -164,9 +185,7 @@ async function locked() {
     assert.equal(await page.locator('#moment-explanation').textContent(), '');
 }
 
-async function collect(name, expectedLoad) {
-    await reveal.click();
-    await diagram.waitFor({ state: 'visible', timeout: 30000 });
+async function readCheckedDrawing(expectedLoad) {
     const receipt = JSON.parse(await page.locator('#portal-certificate').textContent());
     const { sourceRequest, packet, diagram: certificate } = receipt;
     assert.equal(hash(JSON.stringify(sourceRequest)), receipt.inputDigest);
@@ -175,11 +194,21 @@ async function collect(name, expectedLoad) {
     assert.equal(sourceRequest.query.member, await page.getByLabel('Inspect member').inputValue());
     const load = sourceRequest.model.loads[0];
     assert.equal(load.member, sourceRequest.query.member);
-    assert.deepEqual([load.t, load.end, -load.fy, -load.qEnd], expectedLoad, name);
+    assert.deepEqual([load.t, load.end, -load.fy, -load.qEnd], expectedLoad);
     const reference = referenceForLoad(expectedLoad);
     const datasets = locator => locator.evaluateAll(rows => rows.map(row => ({ ...row.dataset })));
     compareCoefficients(await datasets(diagram.locator('[data-piece]')), reference);
-    compareMomentRows(await datasets(diagram.locator('[data-field="M"][data-candidate]')), reference);
+    const rows = await datasets(diagram.locator('[data-field="M"][data-candidate]'));
+    compareMomentRows(rows, reference);
+    const signedExtrema = rows.filter(row => row.min === 'true' || row.max === 'true').map(row =>
+        ({ x: [row.xLow, row.xHigh], m: [row.yLow, row.yHigh], min: row.min === 'true', max: row.max === 'true' }));
+    return { receipt, certificate, reference, signedExtrema };
+}
+
+async function collect(name, expectedLoad) {
+    await reveal.click();
+    await diagram.waitFor({ state: 'visible', timeout: 30000 });
+    const { receipt, certificate, reference, signedExtrema } = await readCheckedDrawing(expectedLoad);
     const explanation = await page.locator('#moment-explanation').innerText();
     assert.match(explanation, /\bw\b/);
     assert.match(explanation, /\bV\b/);
@@ -188,7 +217,7 @@ async function collect(name, expectedLoad) {
     records.push({ name, load: expectedLoad, explanation, feedback: await feedback.innerText(),
         inputDigest: receipt.inputDigest, packetDigest: certificate.packetDigest,
         reportDigest: certificate.reportDigest, artifact: certificate.artifact,
-        bundle: certificate.bundle, reference });
+        bundle: certificate.bundle, signedExtrema, reference });
     await page.screenshot({ path: join(output, `${name}.png`), fullPage: true });
     console.log(`Verified ${name}`);
 }
@@ -280,7 +309,10 @@ try {
     assert.equal(Number(await loadInput('end').inputValue()), 5/6);
     await setNumber('fy', 8);
     await setNumber('qEnd', -8);
-    await check('1.553, 4.447', /unresolved|number and locations|try again/i);
+    await check('1.553, 4.447', /magnitudes unresolved/i);
+    const nonDyadic = await readCheckedDrawing([1/6, 5/6, 8, -8]);
+    assert.equal(possibleAbsolutePeaks(nonDyadic.signedExtrema).length, 2,
+        'The non-dyadic control must leave overlapping absolute bounds');
     await collect('non-dyadic', [1/6, 5/6, 8, -8]);
 
     // 4. Verify the opt-in arithmetic-limit response and ordinary Undo.
@@ -349,9 +381,32 @@ try {
     await selectLoad();
     const unequalIntensity = -5.999999999999999;
     await setNumber('qEnd', unequalIntensity);
-    await check('1.337, 4.663', /magnitudes unresolved/i);
+    await check('1.337, 4.663', /magnitudes unresolved|number and locations/i);
     await locked();
-    safeguards.push({ changed: 'load intensity at C', value: unequalIntensity, feedback: await feedback.innerText() });
+    const twoLocationFeedback = await feedback.innerText();
+    const unequal = await readCheckedDrawing([0, 1, 6, unequalIntensity]);
+    const possibleCertified = possibleAbsolutePeaks(unequal.signedExtrema);
+    const exactWinners = possibleAbsolutePeaks(unequal.reference.candidates);
+    assert.equal(exactWinners.length, 1, 'Independent mechanics must separate the two absolute moments');
+    const [winner] = exactWinners;
+    const evidence = {
+        changed: 'load intensity at C', value: unequalIntensity, exactValue: bounds(exactBrowserNumber(unequalIntensity))[0],
+        twoLocationFeedback, signedExtrema: unequal.signedExtrema, possibleCertified, independentWinner: winner,
+        sourceDigest: unequal.receipt.inputDigest, packetDigest: unequal.certificate.packetDigest,
+        reportDigest: unequal.certificate.reportDigest,
+    };
+    if (possibleCertified.length === 1) {
+        assert.match(twoLocationFeedback, /number and locations/i);
+        assert.ok(enclosesReference(possibleCertified[0].x, winner.x), 'The certified winner must contain the independent station');
+        const station = rationalNumber(winner.x[0]).toFixed(4);
+        await check(station, /correct for this drawing/i);
+        await locked();
+        Object.assign(evidence, { station, singleLocationFeedback: await feedback.innerText() });
+    } else {
+        assert.equal(possibleCertified.length, 2);
+        assert.match(twoLocationFeedback, /magnitudes unresolved/i);
+    }
+    safeguards.push(evidence);
 
     // 7. Distinguish first prediction, retry, reveal and assisted retry.
     await page.getByRole('button', { name: 'Learning insights' }).click();
