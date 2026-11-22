@@ -9,15 +9,15 @@ assert.equal(url.hostname, '127.0.0.1');
 const browser = await chromium.launch();
 try {
     const page = await browser.newPage();
-    // Supply the same cross-origin isolation headers as the deployed service
-    // worker. The independent student replay separately exercises activation.
-    await page.route('**/*', async route => {
-        const response = await route.fetch();
-        await route.fulfill({ response, headers: { ...response.headers(),
-            'Cross-Origin-Opener-Policy': 'same-origin',
-            'Cross-Origin-Embedder-Policy': 'require-corp' } });
-    });
+    url.searchParams.set('exercise','ideal-planar-truss');
     await page.goto(url.href);
+    await page.locator('#truss-canvas').waitFor();
+    await page.evaluate(async () => {
+        const { isolateForCheck } = await import('./truss-check.js');
+        await isolateForCheck();
+    });
+    await page.reload();
+    assert.ok(await page.evaluate(() => crossOriginIsolated));
     const cases = await page.evaluate(async () => {
         const { PortalRuntime } = await import('./portal-runtime.js');
         const { rectangle } = await import('./ideal-truss.js');
