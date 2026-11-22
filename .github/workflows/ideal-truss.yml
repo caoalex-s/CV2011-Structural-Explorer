@@ -72,6 +72,9 @@ jobs:
           trap 'kill "$server"' EXIT
           for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8765/ -o /dev/null && break; sleep 1; done
           node qa/ideal-truss/truss-exercise-student-replay.mjs "file://$PWD/.data/student-tools/node_modules/playwright/index.mjs" http://127.0.0.1:8765/ ".data/student-results/$REPLAY_MODE" "$REPLAY_MODE"
+          if [[ "$REPLAY_MODE" == offline ]]; then
+            node qa/ideal-truss/check-source.mjs http://127.0.0.1:8765/
+          fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
