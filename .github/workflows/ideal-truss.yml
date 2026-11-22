@@ -1,0 +1,21 @@
+name: Check ideal planar truss
+on:
+  push:
+    branches: [codex/ideal-planar-truss]
+permissions:
+  contents: read
+jobs:
+  equilibrium:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: leanprover/lean-action@ba3fdfe5c4476c925da13bf11a005ddb47e47aee
+        with:
+          lake-package-directory: proofs
+          build: 'false'
+          test: 'false'
+          use-mathlib-cache: 'true'
+      - run: lake env lean IdealPlanarTruss.lean
+        working-directory: proofs
