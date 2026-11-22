@@ -15,7 +15,7 @@ theorem rectangle_equilibrium (P Ax Ay By AB BC CD DA AC : ℚ) :
     Ax = -P ∧ Ay = -3*P/4 ∧ By = 3*P/4 ∧ AB = 0 ∧ BC = -3*P/4 ∧
     CD = 0 ∧ DA = 0 ∧ AC = 5*P/4 := by
   unfold balanced
-  constructor <;> rintro ⟨h1,h2,h3,h4,h5,h6,h7,h8⟩ <;> repeat' constructor <;> linarith
+  constructor <;> rintro ⟨h1,h2,h3,h4,h5,h6,h7,h8⟩ <;> exact ⟨by linarith, by linarith, by linarith, by linarith, by linarith, by linarith, by linarith, by linarith⟩
 
 /-- Horizontal joint velocities at the top of the unbraced rectangle are equal.
     Pin A and vertical restraint B have already eliminated three coordinates. -/
@@ -35,7 +35,7 @@ theorem braced_motion (Bx Cx Cy Dx Dy : ℚ) (h : perimeterMotion Bx Cx Cy Dx Dy
     (diagonal : 4*Cx + 3*Cy = 0) :
     Bx = 0 ∧ Cx = 0 ∧ Cy = 0 ∧ Dx = 0 ∧ Dy = 0 := by
   obtain ⟨h1,h2,h3,h4⟩ := h
-  repeat' constructor <;> linarith
+  exact ⟨by linarith, by linarith, by linarith, by linarith, by linarith⟩
 
 theorem horizontal_roller_motion (By Cx Cy Dx Dy : ℚ) :
     (Cy = By ∧ Cx = Dx ∧ Dy = 0 ∧ 4*Cx + 3*Cy = 0) ↔
@@ -44,7 +44,7 @@ theorem horizontal_roller_motion (By Cx Cy Dx Dy : ℚ) :
   · rintro ⟨h1,h2,h3,h4⟩
     exact ⟨By/4, by ring, by linarith, by linarith, by linarith, h3⟩
   · rintro ⟨θ,h1,h2,h3,h4,h5⟩
-    repeat' constructor <;> linarith
+    exact ⟨by linarith, by linarith, by linarith, by linarith⟩
 
 theorem unbraced_incompatible (P Ax Ay By AB BC CD DA : ℚ)
     (h : balanced P Ax Ay By AB BC CD DA 0) : P = 0 := by
@@ -60,4 +60,3 @@ theorem horizontal_roller_incompatible (P Bx Ax Ay AB BC CD DA AC : ℚ)
   linarith
 
 end IdealPlanarTruss
-
