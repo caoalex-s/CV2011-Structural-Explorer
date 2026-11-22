@@ -34,6 +34,10 @@ if [[ "${1:-}" == member-kinematics ]]; then
         proofs/MemberDiagram.c proofs/InclinedDiagramStatics.c proofs/InclinedDiagram{,Wire}.c
         proofs/MemberKinematics{,Wire}.c qa/member-kinematics/abi.c)
 fi
+if [[ "${1:-}" == ideal-truss ]]; then
+    folder=ideal-truss-assets
+    sources=(proofs/IdealTrussWire.c qa/ideal-truss/abi.c)
+fi
 mkdir -p "$stage/$folder"
 objects=()
 for source in "${sources[@]}"; do

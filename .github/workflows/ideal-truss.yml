@@ -19,3 +19,15 @@ jobs:
           use-mathlib-cache: 'true'
       - run: lake env lean IdealPlanarTruss.lean
         working-directory: proofs
+      - name: Compile source-derived truss checker
+        working-directory: proofs
+        run: lake env lean -c IdealTrussWire.c IdealTrussWire.lean
+      - name: Link browser checker
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash qa/member-diagram/build-runtime.sh ideal-truss
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ideal-truss-checker
+          path: .data/hinge-build/ideal-truss-assets/
+          include-hidden-files: true
