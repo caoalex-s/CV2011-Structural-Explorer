@@ -85,7 +85,7 @@ function arrow(x: number, y: number, dx: number, dy: number, label: string, colo
         return '';
     const ex = x + 39 * dx / length, ey = y - 39 * dy / length;
     const a = Math.atan2(ey - y, ex - x);
-    return `<g stroke="${color}" fill="${color}"><line x1="${x}" y1="${y}" x2="${ex}" y2="${ey}" stroke-width="2"/><path d="M${ex},${ey} l${-8 * Math.cos(a - .45)},${-8 * Math.sin(a - .45)} L${ex - 8 * Math.cos(a + .45)},${ey - 8 * Math.sin(a + .45)} Z"/></g><text x="${ex + 4}" y="${ey + 3}" font-size="12">${esc(label)}</text>`;
+    return `<g stroke="${color}" fill="${color}"><line x1="${x}" y1="${y}" x2="${ex}" y2="${ey}" stroke-width="2"/><path d="M${ex},${ey} l${-8 * Math.cos(a - .45)},${-8 * Math.sin(a - .45)} L${ex - 8 * Math.cos(a + .45)},${ey - 8 * Math.sin(a + .45)} Z"/></g><text x="${ex + (dx < 0 ? -4 : 4)}" y="${ey + (dy > 0 ? -4 : 5)}" text-anchor="${dx < 0 ? 'end' : 'start'}" font-size="12">${esc(label)}</text>`;
 }
 function paint() {
     el('prediction').querySelector('button')!.disabled = false;
@@ -99,7 +99,7 @@ function paint() {
         const x = c.x(j.x), y = c.y(j.y);
         const rotation = j.support === 'roller' ? Math.atan2(j.rx, j.ry) * 180 / Math.PI : 0;
         const support = j.support === 'free' ? '' : `<g transform="translate(${x} ${y}) rotate(${rotation})" stroke="#24586c" fill="#d3e5e8"><path d="M0,3 l-11,17 h22 z"/>${j.support === 'pin' ? '<path d="M-15,21h30"/>' : '<circle cx="-6" cy="24" r="3"/><circle cx="6" cy="24" r="3"/><path d="M-14,28h28"/>'}</g>`;
-        return support + arrow(x, y, j.fx, j.fy, '(' + j.fx + ', ' + j.fy + ')') + `<circle data-node="${j.id}" cx="${x}" cy="${y}" r="7" fill="${j.id === chosen ? '#a84e17' : 'white'}" stroke="#17465c" stroke-width="2"/><text x="${x - 16}" y="${y - 11}" font-size="17">${j.id}</text>`;
+        return support + arrow(x, y, j.fx, j.fy, '(' + j.fx + ', ' + j.fy + ')') + `<circle data-node="${j.id}" cx="${x}" cy="${y}" r="7" fill="${j.id === chosen ? '#a84e17' : 'white'}" stroke="#17465c" stroke-width="2"/><text x="${x - 16}" y="${y - 11}" font-size="17">${j.id} <tspan font-size="11">(${j.x}, ${j.y})</tspan></text>`;
     }).join('');
     const ac = drawing.bars.some(([a, b]) => [a, b].sort().join('') === 'AC');
     el('diagonal').textContent = ac ? 'Remove AC' : 'Add AC';
@@ -228,7 +228,7 @@ function showResponse() {
         motionRows + (compatible ? '' : '<p>The joint loads do nonzero virtual work on a permitted motion. Static equilibrium is impossible for this load.</p>') +
         (compatible && redundancy ? '<p>Joint equilibrium leaves redundant forces undetermined.</p>' : '') +
         (family === 'braced' ? `<h3>Whole-truss equilibrium</h3><p>Let P be the signed horizontal load at C. Here P = ${drawing.joints.find(v => v.id === 'C')!.fx} kN. Taking moments about A gives 4Bᵧ − 3P = 0. Horizontal and vertical equilibrium give Aₓ = −P and Aᵧ = −Bᵧ = −3P/4.</p>
-    <h3>Method of joints</h3><p>At unloaded D, the two noncollinear bars each carry zero force. Assume tension acts away from each joint. At C, horizontal equilibrium gives P − (4/5)F_AC = 0. Vertical equilibrium gives −F_BC − (3/5)F_AC = 0. Thus F_AC = 5P/4 and F_BC = −3P/4. At B, horizontal equilibrium gives F_AB = 0.</p>` : '') +
+    <h3>Method of joints</h3><p>At unloaded D, the two noncollinear bars each carry zero force. Assume tension acts away from each joint. At C, horizontal equilibrium gives P − (4/5)F<sub>AC</sub> = 0. Vertical equilibrium gives −F<sub>BC</sub> − (3/5)F<sub>AC</sub> = 0. Thus F<sub>AC</sub> = 5P/4 and F<sub>BC</sub> = −3P/4. At B, horizontal equilibrium gives F<sub>AB</sub> = 0.</p>` : '') +
         (forces ? `<table aria-label="Forces"><caption>Member forces and support reactions</caption><thead><tr><th>Quantity</th><th>Signed force (kN)</th><th>Sense</th></tr></thead><tbody>${forces.map((f, i) => `<tr><th>${f.name}</th><td>${Number(f.value.toPrecision(7))}</td><td>${i < m ? (f.coefficient.n > 0n ? 'Tension' : f.coefficient.n < 0n ? 'Compression' : 'Zero') : 'Along reaction direction (signed)'}</td></tr>`).join('')}</tbody></table>
     <h3>Joint free bodies</h3><p>The equilibrium equations assume outward tension. These arrows show the actual directions after solving. A zero-force member has no arrow.</p><div id="free-bodies" style="display:flex;flex-wrap:wrap"></div>` : '') +
         (family ? '<p id="proof-scope">Reference geometry, connectivity, supports and load pattern match the ' + family + ' rectangle theorem. The signed load P is a parameter of the proof.</p>' : '<p>The rank and equilibrium results for this edited drawing use exact rational elimination.</p>');
@@ -243,11 +243,11 @@ function showResponse() {
             { x: v.x, y: v.y, dx: v.fx, dy: v.fy, label: '(' + v.fx + ', ' + v.fy + ')', color: '#aa410f' },
             ...forces.slice(m).filter(f => f.entries[2 * i] || f.entries[2 * i + 1]).map(f => ({
                 x: v.x, y: v.y, dx: number(f.coefficient) * f.entries[2 * i], dy: number(f.coefficient) * f.entries[2 * i + 1],
-                label: f.name + ' ' + Number(f.value.toPrecision(6)), color: '#235870'
+                label: f.name + ' ' + Number(Math.abs(f.value).toPrecision(6)), color: '#235870'
             }))
         ]);
         const whole = document.createElement('div');
-        whole.innerHTML = responseFigure('Whole-truss free body · external forces in kN', external);
+        whole.innerHTML = responseFigure('Whole-truss free body · arrows show actual directions, reaction magnitudes in kN', external);
         response.querySelector('h3')?.before(whole);
     }
     if (motions.length) {
@@ -301,6 +301,16 @@ if (sessionStorage.getItem('cv2011-truss-resume-check') === JSON.stringify(drawi
         await session.connect();
     }
     if (events.some(event => event.courseId === session.courseId && event.action === 'reveal' && JSON.stringify(event.drawing) === JSON.stringify(drawing))) {
+        const lastAnswer = [...events].reverse().find(event => event.courseId === session.courseId &&
+            event.action !== 'reveal' && JSON.stringify(event.drawing) === JSON.stringify(drawing));
+        if (lastAnswer) {
+            const values = JSON.parse(lastAnswer.answer) as Record<string,string>;
+            const form = el<HTMLFormElement>('prediction');
+            for (const [name,value] of Object.entries(values)) {
+                const input = form.elements.namedItem(name);
+                if (input instanceof HTMLInputElement || input instanceof HTMLSelectElement) input.value = value;
+            }
+        }
         predicted = revealed = true;
         el<HTMLButtonElement>('reveal').disabled = false;
         showResponse();
@@ -319,7 +329,7 @@ function jointEquations(d: Drawing, result: ReturnType<typeof solve>) {
             result.columns.forEach((c, k) => {
                 const component = c.entries[2 * i + axis];
                 if (component)
-                    terms.push('(' + geometry(component, c.length) + ') ' + (k < d.bars.length ? 'F_' : 'R_') + c.name);
+                    terms.push('(' + geometry(component, c.length) + ') ' + (k < d.bars.length ? 'F' : 'R') + '<sub>' + c.name + '</sub>');
             });
             return (terms.join(' + ') || '0') + ' = 0';
         };
