@@ -17,6 +17,7 @@ self.addEventListener('fetch', event => {
     const bundle = scope.pathname + 'portal-checker/bundle/';
     const hingeWorker = scope.pathname + 'portal-checker/hinge/worker.mjs';
     const checkerResource = target.pathname.startsWith(bundle) && runtimeFiles.has(target.pathname.slice(bundle.length)) ||
+        target.pathname === scope.pathname + 'portal-checker/ideal-truss/worker.mjs' ||
         target.pathname === scope.pathname + 'member-kinematics-proposal.js' ||
         target.pathname === scope.pathname + 'portal-checker/member-kinematics/worker.mjs' ||
         target.pathname === scope.pathname + 'portal-checker/inclined-diagram/worker.mjs' ||

@@ -1,4 +1,5 @@
 /** Verifier connection and pseudonymous records. Sandbox edits never enter this queue. */
+import type { Drawing } from './ideal-truss.js';
 import type { Model } from './engine.js';
 import { element as $, escapeHtml as escape, downloadJson as download } from './ui.js';
 import { conceptWasAssisted, selectSubmissions } from './learning-progress.js';
@@ -9,7 +10,7 @@ export interface Attempt {
     timestamp: string;
     courseId: string;
     event: string;
-    model: Model;
+    model: Model | Drawing;
     section: number;
     step: string;
     answer: string;
@@ -26,7 +27,7 @@ export interface Attempt {
 }
 
 export interface AttemptContext {
-    model: Model;
+    model: Model | Drawing;
     section: number;
     step: string;
     side: string;
@@ -35,12 +36,13 @@ export interface AttemptContext {
 }
 
 interface SessionOptions {
+    trussOnly?: boolean;
     notify: (message: string) => void;
     onConnectionChange: () => void;
 }
 
 /** Initialise once. Credentials stay in browser session storage, never in model exports. */
-export function createLearningSession({ notify: toast, onConnectionChange }: SessionOptions) {
+export function createLearningSession({ notify: toast, onConnectionChange, trussOnly = false }: SessionOptions) {
     let online = false;
     let localDemo = false;
     let insightGroup: SubmissionGroup = 'first';
@@ -60,7 +62,8 @@ export function createLearningSession({ notify: toast, onConnectionChange }: Ses
     }
 
     function canSend(attempt: Attempt) {
-        if (attempt.step !== 'portal_absolute_moment') return true;
+        if (trussOnly && attempt.step !== 'ideal_planar_truss') return false;
+        if (!['portal_absolute_moment','ideal_planar_truss'].includes(attempt.step)) return true;
         try { return loopback && ['localhost','127.0.0.1'].includes(new URL(config.url).hostname); }
         catch { return false; }
     }
@@ -129,6 +132,7 @@ export function createLearningSession({ notify: toast, onConnectionChange }: Ses
     async function connect() {
         online = false;
         localDemo = false;
+        if (trussOnly && (!loopback || !/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?$/.test(config.url))) { onConnectionChange(); return; }
         if (config.url)
             try {
                 const response = await fetch(config.url.replace(/\/$/, '') + '/api/health', { signal: AbortSignal.timeout(3000) });
@@ -177,11 +181,11 @@ export function createLearningSession({ notify: toast, onConnectionChange }: Ses
     };
     async function renderInsights() {
         const panel = $('insights-panel');
-        let records: Attempt[] = attempts, scope = 'Records from this browser';
+        let records: Attempt[] = trussOnly ? attempts.filter(a => a.step === 'ideal_planar_truss' && a.courseId === (config.courseId || 'local-unassigned')) : attempts, scope = 'Records from this browser';
         if (online && config.instructor)
             try {
                 const response = await api('/api/instructor/attempts', undefined, true);
-                records = response.attempts;
+                records = trussOnly ? response.attempts.filter((a:Attempt) => a.step === 'ideal_planar_truss') : response.attempts;
                 scope = 'Instructor view · all records from the connected course service';
             }
             catch (error) {
@@ -206,6 +210,7 @@ export function createLearningSession({ notify: toast, onConnectionChange }: Ses
             <div class="panel"><div class="insight-number">${checked.length ? Math.round(100 * (checked.length - wrong.length) / checked.length) + '%' : '—'}</div><p>Correct among ${checked.length} checked submissions in this view</p></div>
             <div class="panel"><div class="insight-number">${new Set(submissions.map(a => a.courseId)).size}</div><p>Pseudonymous IDs in this view</p></div></div>
             <h2>Observed answer patterns</h2>${Object.keys(categories).length ? `<table class="data-table"><thead><tr><th>Pattern</th><th>Occurrences</th></tr></thead><tbody>${Object.entries(categories).map(([name, count]) => `<tr><td>${escape(name.replaceAll('_', ' '))}</td><td>${count}</td></tr>`).join('')}</tbody></table>` : '<p class="small">No checked incorrect submissions in this view.</p>'}
+            ${records.some(a=>a.step==='ideal_planar_truss')?'<h2>Ideal truss predictions</h2><table><thead><tr><th>Pseudonymous ID</th><th>Event</th><th>Drawing and answer</th><th>Worked solution shown</th></tr></thead><tbody>'+records.filter(a=>a.step==='ideal_planar_truss').map(a=>'<tr><td>'+escape(a.courseId)+'</td><td>'+escape(a.event)+'</td><td><details><summary>'+escape(a.answer||'View drawing')+'</summary><pre>'+escape(JSON.stringify(a.model,null,2))+'</pre></details></td><td>'+(a.solutionRevealed?'Yes':'No')+'</td></tr>').join('')+'</tbody></table>':''}
             <h2>Portal exercise predictions</h2><table class="data-table"><thead><tr><th>Pseudonymous ID</th><th>Event</th><th>Prediction (m)</th><th>Worked solution for this drawing</th></tr></thead><tbody>${records.filter(a=>a.step === 'portal_absolute_moment').slice(-30).map(a=>`<tr><td>${escape(a.courseId)}</td><td>${escape(a.event.replaceAll('_',' '))}</td><td>${escape(a.answer)}</td><td>${a.solutionRevealed?'Worked solution shown':'No reveal recorded'}</td></tr>`).join('')}</tbody></table>
             <p class="small">Each edited drawing has its own first prediction. A reveal row records when the student opened that drawing’s worked solution.</p>
             <h2>Recent attempts</h2><div style="overflow:auto"><table class="data-table"><thead><tr><th>Course ID</th><th>Step</th><th>Attempt</th><th>Answer</th><th>Result</th><th>Recorded aid</th></tr></thead><tbody>${rows.slice(-30).reverse().map(({attempt: a, ordinal, assisted}) => `<tr><td>${escape(a.courseId)}</td><td>${escape(a.step.replaceAll('_', ' '))}</td><td>${ordinal === 1 ? 'First' : `Retry ${ordinal - 1}`}</td><td>${escape(a.answer)} ${escape(a.units)}</td><td>${escape(a.result?.status || 'unresolved')}</td><td>${assisted ? 'Hint / explanation shown' : 'None recorded'}</td></tr>`).join('')}</tbody></table></div>
@@ -246,6 +251,7 @@ export function createLearningSession({ notify: toast, onConnectionChange }: Ses
 
     return {
         get connected() { return online; },
+        get courseId() { return config.courseId || 'local-unassigned'; },
         request: api,
         record,
         portalHistory(model:Model) {
