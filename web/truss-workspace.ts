@@ -7,6 +7,8 @@ import {element as el, escapeHtml as esc, downloadJson} from './ui.js';
 const storage='cv2011-ideal-truss-v1';
 type Event={courseId:string; time:string; action:string; answer:string; drawing:Drawing};
 document.body.classList.add('truss-workspace');
+let drawingRevision=0;
+let pendingRecord:Promise<unknown>=Promise.resolve();
 let drawing=rectangle(), events:Event[]=[], chosen='A', tool='edit', start='', predicted=false, revealed=false;
 try {
     const saved=JSON.parse(localStorage.getItem(storage)||'null');
@@ -27,16 +29,17 @@ el('workspace').innerHTML=`<h1>Ideal planar truss</h1>
 <section id="response" class="panel" hidden></section><section id="history" class="panel" hidden></section><section id="insights-panel" class="panel" hidden></section>`;
 const session=createLearningSession({trussOnly:true,notify:message=>{el('hint').textContent=message;},onConnectionChange:()=>session.updateStatus()});
 session.updateStatus();
-el('instructor').onclick=()=>{el('insights-panel').hidden=false;void session.renderInsights();el('insights-panel').scrollIntoView();};
+el('instructor').onclick=async()=>{await pendingRecord;el('insights-panel').hidden=false;await session.renderInsights();el('insights-panel').scrollIntoView();};
 const svg=document.querySelector<SVGSVGElement>('#truss-canvas')!;
 const persist=()=>localStorage.setItem(storage,JSON.stringify({drawing,events}));
 function record(action:string,answer:string){events.push({courseId:session.courseId,time:new Date().toISOString(),action,answer,drawing:structuredClone(drawing)});persist();
-    void session.record({model:drawing,section:0,step:'ideal_planar_truss',side:'',hintUsed:false,solutionRevealed:action==='reveal'||action==='assisted retry'},action==='first prediction'?'first_prediction':action==='assisted retry'?'retry':action,answer,'');
+    const snapshot=structuredClone(drawing);
+    pendingRecord=pendingRecord.then(()=>session.record({model:snapshot,section:0,step:'ideal_planar_truss',side:'',hintUsed:false,solutionRevealed:action==='reveal'||action==='assisted retry'},action==='first prediction'?'first_prediction':action==='assisted retry'?'retry':action,answer,'')).catch(error=>{el('hint').textContent=String(error);});
 }
 function change(edit:(copy:Drawing)=>void){
     try{
         const copy=structuredClone(drawing);edit(copy);validate(copy);
-        invalidateCheck();drawing=copy;predicted=false;revealed=false;start='';el<HTMLFormElement>('prediction').reset();
+        drawingRevision++;invalidateCheck();drawing=copy;predicted=false;revealed=false;start='';el<HTMLFormElement>('prediction').reset();
         el('response').hidden=true;el('history').hidden=true;el('feedback').textContent='';el<HTMLButtonElement>('reveal').disabled=true;
         persist();paint();
     } catch(error){el('hint').textContent=String(error);}
@@ -81,7 +84,7 @@ function paint(){
     el<HTMLSelectElement>('choose').onchange=e=>{chosen=(e.target as HTMLSelectElement).value;paint();};
     el<HTMLFormElement>('joint-edit').oninput=e=>{
         if((e.target as HTMLElement).id==='choose')return;
-        invalidateCheck();predicted=false;revealed=false;el('response').hidden=true;
+        drawingRevision++;invalidateCheck();predicted=false;revealed=false;el('response').hidden=true;
         el<HTMLButtonElement>('reveal').disabled=true;el('prediction').querySelector('button')!.disabled=true;
         el('feedback').textContent='Apply the joint edits before predicting.';
     };
@@ -169,7 +172,11 @@ function showResponse(){
     checkButton.onclick=async()=>{
         if(crossOriginIsolated){run();return;}
         try{
+            const revision=drawingRevision;
+            await pendingRecord;
             await isolateForCheck();
+            if(revision!==drawingRevision || !revealed)return;
+            if(session.connected)sessionStorage.setItem('cv2011-truss-reconnect','1');
             sessionStorage.setItem('cv2011-truss-resume-check',JSON.stringify(drawing));
             location.reload();
         }catch(error){verification.textContent=String(error);}
@@ -181,6 +188,9 @@ function showResponse(){
 
 if(sessionStorage.getItem('cv2011-truss-resume-check')===JSON.stringify(drawing)){
     sessionStorage.removeItem('cv2011-truss-resume-check');
+    if(sessionStorage.getItem('cv2011-truss-reconnect')==='1'){
+        sessionStorage.removeItem('cv2011-truss-reconnect');await session.connect();
+    }
     if(events.some(event=>event.courseId===session.courseId&&event.action==='reveal'&&JSON.stringify(event.drawing)===JSON.stringify(drawing))){
         predicted=revealed=true;el<HTMLButtonElement>('reveal').disabled=false;showResponse();
     }

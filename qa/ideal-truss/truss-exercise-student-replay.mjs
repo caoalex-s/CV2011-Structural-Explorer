@@ -3,12 +3,15 @@
  * Any predictions are synthetic, and the browser starts with empty storage.
  */
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { rectangleTrussReference } from './truss-exercise-reference.mjs';
 
-const [playwright, base, directory] = process.argv.slice(2);
+const [playwright, base, directory, mode = 'offline'] = process.argv.slice(2);
 assert.ok(playwright && base && directory, 'Provide Playwright, site and evidence directory');
+assert.ok(['pilot', 'offline'].includes(mode));
+if (mode === 'pilot') assert.ok(['localhost', '127.0.0.1'].includes(new URL(base).hostname));
 const { chromium } = await import(playwright);
 const browser = await chromium.launch({ headless: true });
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
@@ -27,6 +30,7 @@ const tool = mode => page.locator('#truss-tool').selectOption(mode);
 const control = name => page.getByRole('button', { name, exact: true });
 const jointEdit = page.locator('#joint-edit');
 const names = ['AB', 'BC', 'CD', 'DA', 'AC'];
+const hash = body => createHash('sha256').update(body).digest('hex');
 
 async function moveToSvg(x, y) {
     await canvas.scrollIntoViewIfNeeded();
@@ -85,14 +89,65 @@ function number(rational) {
     return numerator / denominator;
 }
 
+function exactDot(vector, weights) {
+    return vector.reduce(([sum, denominator], entry, index) => {
+        const [top, bottom = 1n] = entry.trim().split('/').map(BigInt);
+        return [sum * bottom + BigInt(weights[index]) * top * denominator, denominator * bottom];
+    }, [0n, 1n]);
+}
+
+function checkMotion(drawing, entries, work) {
+    const { joints, bars } = drawing;
+    assert.equal(entries.length, 2 * joints.length);
+    assert.ok(exactDot([work], [1])[1] !== 0n);
+    assert.ok(entries.some(entry => exactDot([entry], [1])[0] !== 0n));
+    for (const [start, end] of bars) {
+        const a = joints.findIndex(joint => joint.id === start);
+        const b = joints.findIndex(joint => joint.id === end);
+        const dx = joints[b].x - joints[a].x, dy = joints[b].y - joints[a].y;
+        assert.equal(exactDot([entries[2*a], entries[2*a+1], entries[2*b], entries[2*b+1]], [dx, dy, -dx, -dy])[0], 0n);
+    }
+    for (const [index, joint] of joints.entries()) {
+        const displacement = [entries[2*index], entries[2*index+1]];
+        const directions = joint.support === 'pin' ? [[1, 0], [0, 1]] :
+            joint.support === 'roller' ? [[joint.rx, joint.ry]] : [];
+        for (const direction of directions) assert.equal(exactDot(displacement, direction)[0], 0n);
+    }
+    const [numerator, denominator] = exactDot([...entries, work], [...joints.flatMap(joint => [joint.fx, joint.fy]), -1]);
+    assert.notEqual(denominator, 0n);
+    assert.equal(numerator, 0n, 'Displayed virtual work disagrees with the joint loads');
+}
+
+function sourcePacket({ joints, bars }) {
+    const fields = joints.map(joint => ['id', 'x', 'y', 'support', 'rx', 'ry', 'fx', 'fy']
+        .map(field => joint[field]).join(','));
+    return ['TRUSS1', String(joints.length), ...fields, ...bars.map(bar => bar.join(','))].join('\n');
+}
+
+async function readDrawing() {
+    return page.evaluate(() => JSON.parse(localStorage.getItem('cv2011-ideal-truss-v1')).drawing);
+}
+
+async function checkLean(drawing) {
+    const badge = response.getByRole('status').filter({ hasText: /Lean|checker|original drawing/i });
+    if (!(await badge.isVisible())) await control('Check this drawing with Lean').click();
+    const checked = response.getByText(/Drawing packet SHA-256 [a-f0-9]{64}/i);
+    await checked.waitFor({ state: 'visible', timeout: 45000 });
+    const message = await checked.innerText();
+    const digest = message.match(/Drawing packet SHA-256 ([a-f0-9]{64})/i)?.[1];
+    assert.equal(digest, hash(sourcePacket(drawing)), 'The original model fields must bind the displayed Lean report');
+    return { digest, message };
+}
+
 async function collect(name, reference) {
     await reveal.click();
     await response.waitFor({ state: 'visible' });
+    const drawing = await readDrawing();
     const explanation = await response.innerText();
     assert.match(explanation, new RegExp(`rank\\s+${reference.equilibriumRank}\\b`, 'i'));
     assert.match(explanation, new RegExp(`${reference.mechanismCount} independent permitted motion`, 'i'));
     assert.match(explanation, new RegExp(`${reference.selfStressCount} independent self-equilibrated force system`, 'i'));
-    const rows = await response.locator('table tbody tr').evaluateAll(elements =>
+    const rows = await response.locator('table[aria-label="Forces"] tbody tr').evaluateAll(elements =>
         elements.map(row => [...row.cells].map(cell => cell.textContent.trim())));
     if (Object.keys(reference.forces).length) {
         const expected = { ...reference.forces, ...reference.reactions };
@@ -115,7 +170,16 @@ async function collect(name, reference) {
     const renderedProof = response.locator('#proof-scope');
     if (reference.bars <= 5) assert.equal(await renderedProof.isVisible(), true, name);
     const proof = await renderedProof.count() ? await renderedProof.innerText() : '';
-    records.push({ name, reference, explanation, rows, proof });
+    const motions = await response.locator('[data-motion]').evaluateAll(elements =>
+        elements.map(row => ({ vector: row.dataset.motion.split(','), work: row.dataset.work })));
+    assert.equal(motions.length, reference.mechanismCount);
+    for (const { vector, work } of motions) {
+        checkMotion(drawing, vector, work);
+        if (!reference.equilibriumExists && motions.length === 1) assert.notEqual(exactDot([work], [1])[0], 0n);
+        if (reference.equilibriumExists) assert.equal(exactDot([work], [1])[0], 0n);
+    }
+    const receipt = await checkLean(drawing);
+    records.push({ name, drawing, reference, explanation, rows, proof, motions, receipt });
     await page.screenshot({ path: join(directory, name + '.png'), fullPage: true });
     console.log('Verified ' + name);
 }
@@ -125,6 +189,13 @@ try {
     await page.goto(new URL('#sandbox', base).href);
     await page.getByRole('link', { name: /Ideal planar truss/i }).click();
     await canvas.waitFor({ state: 'visible' });
+    if (mode === 'pilot') {
+        await control('Session').click();
+        const connected = page.waitForResponse(result => new URL(result.url()).pathname === '/api/me' && result.ok());
+        await page.locator('#save-settings').click();
+        await connected;
+        await page.getByText('Connected to the verifier.', { exact: true }).waitFor();
+    }
     await control('Blank drawing').click();
     await locked();
     assert.equal(await canvas.locator('[data-node]').count(), 0);
@@ -200,13 +271,27 @@ try {
     assert.match(events[1], /retry/i);
     assert.match(events[2], /reveal/i);
     assert.match(events[3], /assisted retry/i);
-    assert.deepEqual(networkPosts, []);
     await page.screenshot({ path: join(directory, 'local-replay.png'), fullPage: true });
+    await control('Learning insights').click();
+    const insights = page.locator('#insights-panel');
+    const instructorHeading = mode === 'pilot' ? /Instructor view/i : 'Records from this browser';
+    await insights.getByRole('heading', { name: instructorHeading }).waitFor();
+    const eventsTable = insights.getByRole('heading', { name: 'Ideal truss predictions' }).locator('xpath=following-sibling::table[1]');
+    const instructorRows = await eventsTable.locator('tbody tr').evaluateAll(rows =>
+        rows.map(row => Array.from(row.cells, cell => cell.textContent.trim())));
+    assert.equal(instructorRows.length, events.length);
+    const courseId = mode === 'pilot' ? 'DEMO-001' : 'local-unassigned';
+    assert.ok(instructorRows.every(row => row[0] === courseId));
+    assert.deepEqual(instructorRows.slice(0, 4).map(row => [row[1], row[3]]),
+        [['first_prediction', 'No'], ['retry', 'No'], ['reveal', 'Yes'], ['retry', 'Yes']]);
+    assert.deepEqual(networkPosts, mode === 'pilot' ? events.map(() => '/api/attempts') : []);
+    await page.screenshot({ path: join(directory, 'learning-insights.png'), fullPage: true });
     await page.getByRole('link', { name: 'Frame workspace', exact: true }).click();
     await page.getByRole('button', { name: 'Generate worked solution', exact: true }).waitFor();
     assert.equal(await canvas.count(), 0);
     assert.deepEqual(errors, []);
-    await writeFile(join(directory, 'truss-exercise-replay.json'), JSON.stringify({ records, events, networkPosts, errors }, null, 2));
+    await writeFile(join(directory, 'truss-exercise-replay.json'),
+        JSON.stringify({ mode, records, events, instructorRows, networkPosts, errors }, null, 2));
 } catch (error) {
     await page.screenshot({ path: join(directory, 'failure.png'), fullPage: true });
     await writeFile(join(directory, 'failure.json'), JSON.stringify({ error: String(error.stack ?? error), records, errors }, null, 2));

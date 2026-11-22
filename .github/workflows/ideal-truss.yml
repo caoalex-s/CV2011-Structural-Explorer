@@ -35,6 +35,10 @@ jobs:
       - name: Compare the installed browser checker with this build
         run: diff -qr public/portal-checker/ideal-truss .data/hinge-build/ideal-truss-assets
   student:
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [offline, pilot]
     runs-on: ubuntu-22.04
     timeout-minutes: 20
     steps:
@@ -53,16 +57,24 @@ jobs:
       - run: pnpm build
       - run: npm install --prefix .data/student-tools --ignore-scripts --save-exact playwright@1.51.1
       - run: node .data/student-tools/node_modules/playwright/cli.js install --with-deps chromium
+      - run: python3 -m pip install -r requirements.txt
+        if: matrix.mode == 'pilot'
       - name: Exercise a student drawing in a fresh browser
+        env:
+          REPLAY_MODE: ${{ matrix.mode }}
         run: |
-          python3 -m http.server 8765 --bind 127.0.0.1 --directory dist > "$RUNNER_TEMP/truss-server.log" 2>&1 &
+          if [[ "$REPLAY_MODE" == pilot ]]; then
+            EXPLORER_DATA="$RUNNER_TEMP/truss-synthetic" python3 -m server.app --port 8765 > "$RUNNER_TEMP/truss-server.log" 2>&1 &
+          else
+            python3 -m http.server 8765 --bind 127.0.0.1 --directory dist > "$RUNNER_TEMP/truss-server.log" 2>&1 &
+          fi
           server=$!
           trap 'kill "$server"' EXIT
           for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8765/ -o /dev/null && break; sleep 1; done
-          node qa/ideal-truss/truss-exercise-student-replay.mjs "file://$PWD/.data/student-tools/node_modules/playwright/index.mjs" http://127.0.0.1:8765/ .data/student-results/offline
+          node qa/ideal-truss/truss-exercise-student-replay.mjs "file://$PWD/.data/student-tools/node_modules/playwright/index.mjs" http://127.0.0.1:8765/ ".data/student-results/$REPLAY_MODE" "$REPLAY_MODE"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: truss-student-evidence
+          name: truss-student-${{ matrix.mode }}
           path: .data/student-results/
           include-hidden-files: true

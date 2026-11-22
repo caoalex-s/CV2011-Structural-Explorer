@@ -41,7 +41,7 @@ export async function checkDrawing(drawing:Drawing,notify:(text:string)=>void) {
         const answer=await runtime.checkDiagram(packet(drawing),true);
         if(version!==revision)return;
         if(answer.state!=='accepted'||!(answer.report instanceof Uint8Array)||!agrees(drawing,answer.report)) throw Error('The compiled checker did not confirm the displayed results.');
-        notify('Lean checked this drawing. Rank, permitted motions, load compatibility and the displayed force coefficients agree with the source-derived report. Drawing packet SHA-256 '+answer.inputDigest+'.');
+        notify('Lean checked this drawing by exact computation. The displayed rank, permitted motions, load compatibility and force coefficients agree with the compiled Lean calculation from the joint and bar data. Drawing packet SHA-256 '+answer.inputDigest+'.');
     } catch(error){if(version===revision)notify('Local check unavailable. '+String(error));}
 }
 

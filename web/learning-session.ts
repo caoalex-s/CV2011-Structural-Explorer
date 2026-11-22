@@ -77,6 +77,7 @@ export function createLearningSession({ notify: toast, onConnectionChange, truss
             throw Error('No verifier configured.');
         const response = await fetch(config.url.replace(/\/$/, '') + path, {
             method: payload === undefined ? 'GET' : 'POST',
+            redirect: trussOnly || (payload as Partial<Attempt>)?.step === 'ideal_planar_truss' ? 'error' : 'follow',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${instructor ? config.instructor : config.token}`,
@@ -151,6 +152,7 @@ export function createLearningSession({ notify: toast, onConnectionChange, truss
                     if (identity.courseId !== config.courseId && config.courseId)
                         throw Error('Course ID does not correspond to this access token.');
                     config.courseId = identity.courseId;
+                    if(trussOnly)localStorage.setItem('cv2011-id', config.courseId);
                 }
             }
             catch {
