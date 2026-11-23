@@ -26,7 +26,7 @@ export async function runMainInclinedCases({ page, context, output, origin, base
                 this.testWorkerId = lifecycle.workers.push(String(url));
                 this.addEventListener('message', ({data}) => {
                     if (data.state === 'accepted') lifecycle.replies.push({
-                        worker: this.testWorkerId, request: data.id, digest: data.inputDigest
+                        worker: this.testWorkerId, request: data.id, digest: data.inputDigest, reportDigest: data.reportDigest
                     });
                 });
             }
@@ -134,7 +134,7 @@ export async function runMainInclinedCases({ page, context, output, origin, base
     assert.ok(lifecycle.terminated.includes(interrupted.worker));
     assert.ok(!lifecycle.replies.some(reply => reply.worker === interrupted.worker && reply.request === interrupted.request));
     const replacement = lifecycle.replies.find(reply => reply.worker > interrupted.worker &&
-        reply.request === reverted.request && reply.digest === reverted.inputDigest);
+        reply.digest === reverted.inputDigest && reply.reportDigest === reverted.reportDigest);
     assert.ok(replacement, 'A newly created equilibrium worker must return the accepted receipt');
     assert.ok(lifecycle.posts.some(post => post.worker === replacement.worker &&
         post.request === replacement.request && post.member === request.query.member && post.parameter === request.query.parameter));
