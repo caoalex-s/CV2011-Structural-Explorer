@@ -104,7 +104,7 @@ async function check(logReveal: boolean, resumed = false) {
         const { Ay, By, shear: V, moment: M } = receipt.values;
         const includes = retainsPointLoad(q.parameter, beam.position, q.side);
         const count = Number(shear.value === 'drop') + Number(moment.value === 'same');
-        el('beam-answer').innerHTML = `<h2>Equilibrium at ${q.description}</h2><p>Taking moments about A gives Bᵧ = P × 4 / 8 = ${By} kN. Vertical equilibrium gives Aᵧ = P − Bᵧ = ${Ay} kN.</p>
+        el('beam-answer').innerHTML = `<h2>Equilibrium at ${q.description}</h2><p>Taking moments about A gives B<sub>y</sub> = P × 4 / 8 = ${By} kN. Vertical equilibrium gives A<sub>y</sub> = P − B<sub>y</sub> = ${Ay} kN.</p>
         <h3>Retained left free body</h3><svg id="beam-fbd" role="img" viewBox="0 0 760 235">${cutDrawing(beam,q.parameter,q.side)}</svg>
         <p>The arrows at the cut show the assumed positive directions.</p>${cutEquations(beam,q.parameter,q.side)}
         <p>V = ${Ay} kN${includes ? ' − ' + beam.load + ' kN' : ''} = <strong>${signed(V)} kN</strong></p>

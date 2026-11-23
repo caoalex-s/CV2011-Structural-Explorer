@@ -70,8 +70,10 @@ async function collect(name, settings) {
     assert.equal(model.loads[0].t, 0.5);
     assert.equal(query.parameter, expected.cut / 8);
     assert.equal(query.member, model.members[0].id);
+    assert.equal(query.cutSide, expected.limit);
     assert.equal(checked.inputDigest, hash(JSON.stringify(checked.sourceRequest)));
     assert.equal(checked.packetDigest, hash(checked.packet));
+    assert.match(checked.packet, /^CV2011_FRAME_1\n/);
     assert.match(checked.artifact, /^[a-f0-9]{64}$/);
     assert.deepEqual(checked.values, {
         normal:expected.forces.N, shear:expected.forces.V, moment:expected.forces.M,
@@ -81,9 +83,33 @@ async function collect(name, settings) {
     if (compact) {
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);
     }
+    const stationDescription = expected.cut + ' m' + (expected.relevantLimit ? ' (' + expected.limit + ' limit)' : '');
+    assert.equal(await cut.getAttribute('aria-valuetext'), stationDescription);
+    const fbd = page.locator('#beam-fbd');
+    const loadArrow = fbd.locator('[data-cut-load="P"] [data-vector="force"]');
+    const containsLoad = expected.actions.left.some(action => action.name === 'P');
+    assert.equal(await loadArrow.count(), Number(containsLoad));
+    if (containsLoad) {
+        const originX = Number(await loadArrow.getAttribute('data-origin-x'));
+        assert.ok(Math.abs(originX - (100 + 520 * expected.loadAt / expected.cut)) < 1e-7);
+        assert.equal(Number(await loadArrow.getAttribute('data-origin-y')), 100);
+    }
+    const shearArrow = fbd.locator('[data-cut-action="V"]');
+    const momentArrow = fbd.locator('[data-vector="moment"]');
+    assert.equal(await shearArrow.getAttribute('data-origin-x'), '620');
+    assert.equal(await momentArrow.getAttribute('data-origin-x'), '620');
+    assert.equal(await shearArrow.getAttribute('data-origin-y'), '100');
+    assert.equal(await momentArrow.getAttribute('data-origin-y'), '100');
+    assert.match(await shearArrow.locator('path').getAttribute('d'), /^M620 100v65/);
+    assert.match(await momentArrow.locator('path.hit').getAttribute('d'), / A 30 30 0 1 0 /);
     const plotted = await page.locator('#beam-fbd').innerHTML();
     const explanation = (await answer.innerText()).replaceAll('−','-');
-    assert.match(explanation,/kN/i);
+    const showSign = value => value > 0 ? '+' + value : String(value);
+    const readouts = await answer.locator('strong').allTextContents();
+    assert.deepEqual(readouts.map(text => text.replaceAll('−','-')), [
+        showSign(expected.forces.V) + ' kN',
+        showSign(expected.forces.M) + ' kN·m'
+    ]);
     cases.push({name,settings,checked,plotted,explanation});
     await page.screenshot({path:join(directory,name+'.png'),fullPage:true});
 }
@@ -160,6 +186,8 @@ try {
         elements.map(row=>Array.from(row.cells,cell=>cell.textContent.trim())));
     assert.equal(rows.length,events.length);
     assert.ok(rows.every(row=>row[0]===(mode==='pilot' ? 'DEMO-001':'local-unassigned')));
+    assert.deepEqual(rows.map(row=>[row[1],row[3]]),
+        [['first_prediction','No'],['retry','No'],['reveal','Yes'],['first_prediction','No'],['reveal','Yes']]);
     assert.deepEqual(posts,mode==='pilot' ? events.map(()=>'/api/attempts') : []);
     assert.deepEqual(errors,[]);
     await page.screenshot({path:join(directory,'learning-insights.png'),fullPage:true});

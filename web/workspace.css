@@ -1514,3 +1514,7 @@ dialog { background:var(--paper); color:var(--ink); border:1px solid var(--line)
     .simple-beams .svg-label { font-size: 25px; }
     .simple-beams .section-controls { grid-template-columns: 1fr; }
 }
+.simple-beams .section-prediction label { grid-template-columns: minmax(7rem, auto) minmax(0, 1fr); }
+@media (max-width: 600px) {
+    .simple-beams #beam-answer .katex-display { font-size: .82rem; }
+}

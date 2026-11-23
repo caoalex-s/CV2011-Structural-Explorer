@@ -13,7 +13,7 @@ export async function checkBeam(inputs: BeamInputs, parameter: number, cutSide: 
     const query = { member: 'AB', parameter, cutSide, ...frameQueryConvention };
     const sourceRequest = { model: lessonBeam(inputs), query };
     const bytes = new TextEncoder().encode(JSON.stringify(sourceRequest));
-    runtime ??= new PortalRuntime(new URL('./portal-checker/bundle/worker.mjs', location.href));
+    if (!runtime || runtime.needsReset) runtime = new PortalRuntime(new URL('./portal-checker/bundle/worker.mjs', location.href));
     await runtime.ready;
     if (current !== revision) return;
     const result = await runtime.checkFrame(bytes);
