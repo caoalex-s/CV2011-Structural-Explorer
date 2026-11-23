@@ -11,6 +11,10 @@ try {
     const page = await browser.newPage({viewport:{width:390,height:844}, hasTouch:true, isMobile:true});
     const errors = [];
     page.on('pageerror', error => errors.push(String(error)));
+    await page.goto(new URL('learn/#beams', base).href);
+    await page.getByRole('link', {name:'Beam basics · internal forces and diagrams'}).click();
+    assert.equal(new URL(page.url()).hash, '#sections');
+    assert.ok(await page.locator('section:target h2').isVisible());
     await page.goto(base);
     await page.waitForFunction(() => !document.querySelector('#workspace').inert);
     const beam = await page.locator('#canvas [data-object="member"]').first().boundingBox();
