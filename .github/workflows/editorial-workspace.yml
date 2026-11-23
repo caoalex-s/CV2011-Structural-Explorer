@@ -4,6 +4,7 @@ on:
     branches: [codex/editorial-workspace]
 permissions:
   contents: read
+  actions: read
 jobs:
   browser:
     runs-on: ubuntu-22.04
@@ -24,13 +25,26 @@ jobs:
       - run: pnpm build
       - run: npm install --prefix .data/student-tools --ignore-scripts --save-exact playwright@1.51.1
       - run: node .data/student-tools/node_modules/playwright/cli.js install --with-deps chromium
-      - name: Exercise delayed startup, file reads and the actual inclined checker
+      - uses: actions/download-artifact@v4
+        with:
+          name: github-pages
+          run-id: '45151143153'
+          github-token: ${{ github.token }}
+          path: .data/live-release
+      - name: Serve the exact deployed baseline and development candidate
         run: |
-          python3 -m http.server 8765 --bind 127.0.0.1 --directory dist > "$RUNNER_TEMP/import-server.log" 2>&1 &
-          server=$!
-          trap 'kill "$server"' EXIT
+          baseline=.data/baseline/CV2011-Structural-Explorer
+          mkdir -p "$baseline"
+          tar -xf .data/live-release/artifact.tar -C "$baseline"
+          jq -e '.commit == "6a09e2012abc4c8ede01291f43e7dacadaaa7e32"' "$baseline/verification.json"
+          python3 -m http.server 8764 --bind 127.0.0.1 --directory .data/baseline > "$RUNNER_TEMP/baseline.log" 2>&1 &
+          python3 -m http.server 8765 --bind 127.0.0.1 --directory dist > "$RUNNER_TEMP/candidate.log" 2>&1 &
           for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8765/ -o /dev/null && break; sleep 1; done
-          node qa/editorial/replay.mjs "file://$PWD/.data/student-tools/node_modules/playwright/index.mjs" https://caoalex-s.github.io/CV2011-Structural-Explorer/ http://127.0.0.1:8765/ .data/editorial-evidence/comparison
+      - name: Compare seven routes, desktop and mobile
+        run: node qa/editorial/replay.mjs "file://$PWD/.data/student-tools/node_modules/playwright/index.mjs" http://127.0.0.1:8764/CV2011-Structural-Explorer/ http://127.0.0.1:8765/ .data/editorial-evidence/comparison
+      - name: Check file imports and offline mechanics
+        if: success() || failure()
+        run: |
           node qa/frame-import/readiness.mjs
           playwright="file://$PWD/.data/student-tools/node_modules/playwright/index.mjs"
           fixture=qa/inclined-frame/published-fixtures/cantilever-interior

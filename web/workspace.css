@@ -1451,3 +1451,18 @@ dialog { background:var(--paper); color:var(--ink); border:1px solid var(--line)
 .insights-cards .panel { background:transparent; border:0; border-radius:0; padding:1rem; }
 .insights-cards .insight-number { font-family:var(--font-heading); color:var(--ink); }
 #insights-panel > p { max-width:76ch; }
+/* Keep the selected exercise alongside the drawing while room permits. */
+@media(min-width:1200px) {
+    .canvas-column:has(> :is(#portal-exercise,#practice-panel):not([hidden])) {
+        display:grid;
+        grid-template-columns:minmax(0,1fr) minmax(16rem,22rem);
+        align-items:start;
+        gap:0 1.5rem;
+    }
+    .canvas-column:has(> :is(#portal-exercise,#practice-panel):not([hidden])) > * { grid-column:1; min-width:0; }
+    .canvas-column:has(> :is(#portal-exercise,#practice-panel):not([hidden])) > :is(#portal-exercise,#practice-panel):not([hidden]) {
+        grid-column:2; grid-row:1 / span 3; margin:0; padding:1rem;
+        background:var(--paper-deep); border-top:2px solid var(--ink);
+    }
+    .canvas-column:has(> :is(#portal-exercise,#practice-panel):not([hidden])) > #worked-panel { grid-column:1 / -1; }
+}
