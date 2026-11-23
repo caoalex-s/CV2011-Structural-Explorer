@@ -1,0 +1,40 @@
+name: Replay published Week 04 sections
+on:
+  push:
+    branches: [codex/verify-published-week04-sections]
+permissions:
+  contents: read
+jobs:
+  public-offline:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 55
+    env:
+      PAGES_SITE: https://caoalex-s.github.io/CV2011-Structural-Explorer/
+      RELEASE_COMMIT: 6a09e2012abc4c8ede01291f43e7dacadaaa7e32
+      EVIDENCE: .data/public-week04-sections
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify replay source and wait for the reviewed Pages revision
+        run: |
+          git diff --exit-code "$RELEASE_COMMIT" HEAD -- qa/week04-sections/section-truss-*.mjs qa/week04-sections/course-examples public/portal-checker
+          node qa/week04-sections/published-assets.mjs "$PAGES_SITE" "$RELEASE_COMMIT" "$EVIDENCE" before
+      - run: npm install --prefix .data/student-tools --ignore-scripts --save-exact playwright@1.51.1
+      - run: node .data/student-tools/node_modules/playwright/cli.js install --with-deps chromium
+      - name: Replay synthetic offline drawing in a fresh browser
+        run: |
+
+
+          node qa/week04-sections/section-truss-student-replay.mjs "file://$PWD/.data/student-tools/node_modules/playwright/index.mjs" "$PAGES_SITE" "$EVIDENCE" offline
+          node qa/week04-sections/published-assets.mjs "$PAGES_SITE" "$RELEASE_COMMIT" "$EVIDENCE" after
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: week04-sections-public
+          path: .data/public-week04-sections/
+          include-hidden-files: true
