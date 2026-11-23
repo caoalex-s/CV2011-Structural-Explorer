@@ -15,7 +15,7 @@ export function createDrawingWorkspace(select: (object: Selection | null) => voi
     const rail = document.createElement('aside');
     rail.className = 'drawing-rail';
     rail.setAttribute('aria-label', 'Drawing inspection');
-    rail.innerHTML = '<h2>Inspect drawing</h2><label class="object-choice">Object properties<select id="drawing-object"><option value="">Select an object</option></select></label>';
+    rail.innerHTML = '<h2>Drawing properties</h2><label class="object-choice">Object<select id="drawing-object"><option value="">Select an object</option></select></label>';
     const choice = rail.querySelector('label')!;
     const picker = choice.querySelector('select')!;
     let objects: Selection[] = [];
@@ -100,11 +100,14 @@ export function createDrawingWorkspace(select: (object: Selection | null) => voi
         move(find('.left-panel'), panel, title.nextSibling);
         find('.work-grid').append(rail);
         move(find('.right-panel'), rail);
+        const nav = find('.topbar nav');
+        for (const mode of ['practice','insights']) move(nav.querySelector('[data-mode="' + mode + '"]')!, actions);
         const response = find('.section-response');
         move(response, rail);
         response.prepend(sectionTitle);
         const note = document.getElementById('frame-overview-convention');
         if (note) move(note, response);
+        move(element('section-free-body'), panel);
         move(find('.support-reactions'), rail);
         arrangeInspector();
         directory.open = files.open = false;
@@ -112,7 +115,7 @@ export function createDrawingWorkspace(select: (object: Selection | null) => voi
         for (const button of toolbox.querySelectorAll('button[data-tool]'))
             button.setAttribute('title', button.textContent!.trim());
     }
-    function update(model: Model, selected: Selection | null, sample: Sample | undefined, station: string) {
+    function update(model: Model, selected: Selection | null, sample: Sample | undefined, station: string, face: string) {
         if (!active) return;
         rail.querySelector('h2')!.hidden = compact.matches;
         title.querySelector('h2')!.textContent = element('response-title').textContent;
@@ -120,7 +123,7 @@ export function createDrawingWorkspace(select: (object: Selection | null) => voi
         cutReadout.hidden = !sample;
         if (sample) {
             const sign = (value: number) => (value > 1e-7 ? '+' : '') + formatNumber(value);
-            cutReadout.textContent = station + '   ·   V = ' + sign(sample.V) + ' kN   ·   M = ' + sign(sample.M) + ' kN·m';
+            cutReadout.textContent = station + (face ? ' · ' + face : '') + '   ·   V = ' + sign(sample.V) + ' kN   ·   M = ' + sign(sample.M) + ' kN·m';
         }
         const nodes = nodeLabels(model), loads = loadLabels(model);
         const entries = [

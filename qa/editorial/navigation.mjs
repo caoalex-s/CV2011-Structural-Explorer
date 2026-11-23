@@ -31,6 +31,7 @@ try {
     await page.locator('#settings-button').click();
     await page.screenshot({path:output+'/mobile-settings.png'});
     await page.keyboard.press('Escape');
+    if (await menu.count()) await menu.click();
     await page.locator('[data-mode="insights"]').click();
     await page.locator('#insights-panel h2').first().waitFor();
     await page.screenshot({path:output+'/mobile-insights.png',fullPage:true});

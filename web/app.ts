@@ -16,6 +16,7 @@ import { jointConnections } from './model-view.js';
 import type { Selection } from './model-view.js';
 import { renderInspector } from './inspector.js';
 import { renderResponses, sampleSection } from './responses.js';
+import { sectionFreeBody } from './section-free-body.js';
 import { createDrawingWorkspace } from './drawing-workspace.js';
 import { createWorkspaceControls } from './workspace-controls.js';
 import { createLearningSession } from './learning-session.js';
@@ -149,14 +150,16 @@ let portalPanel: ReturnType<typeof createPortalPanel> | undefined;
 let portalSignature = '';
 const evidenceRequests = new EvidenceRequests();
 let evidenceRawSource: string | undefined;
-const evidenceQuery = () => ({ member: currentMember, parameter: sectionT, cutSide: 'unspecified' as const, quantity: 'section-response', units: 'kN, kN m, m, rad', signConvention: 'global y upward; rotation counterclockwise; tension N positive; sagging M positive; dM/dx = V' });
+const cutSide = (): 'left' | 'right' => sectionT === 0 ? 'right' : sectionT === 1 ? 'left'
+    : document.querySelector<HTMLSelectElement>('#frame-side')?.value === 'left' ? 'left' : 'right';
+const evidenceQuery = () => ({ member: currentMember, parameter: sectionT, cutSide: cutSide(), quantity: 'section-response', units: 'kN, kN m, m, rad', signConvention: 'global y upward; rotation counterclockwise; tension N positive; sagging M positive; dM/dx = V' });
 function updateEvidenceBinding() {
     if (isCheckedWorkspace) $<HTMLInputElement>('section-position').value = String(sectionT * 1000);
     try { evidenceRequests.update(model, evidenceQuery()); }
     catch { evidenceRequests.invalidate(); }
     // Render-only changes do not repeatedly launch checks. Mechanical/query
     // changes, including a revert, synchronously remove the previous result.
-    const signature = JSON.stringify([model, currentMember, sectionT]);
+    const signature = JSON.stringify([model, currentMember, sectionT, cutSide()]);
     if (signature !== portalSignature) {
         portalSignature = signature;
         momentExercise?.bind(signature + ($<HTMLSelectElement>('frame-side')?.value || ''));
@@ -437,6 +440,10 @@ function renderCanvas() {
         const length = Math.hypot(b.x - a.x, b.y - a.y), nx = -(b.y - a.y) / length, ny = -(b.x - a.x) / length;
         drawing += `<path d="M ${p.x - nx * 40} ${p.y - ny * 40} L ${p.x + nx * 40} ${p.y + ny * 40}" stroke="#bf7650" stroke-width="1.5" stroke-dasharray="4 4" pointer-events="none"/><circle cx="${p.x}" cy="${p.y}" r="3" fill="#bf7650"/>`;
     }
+    if (currentMember && analysis.status === 'stable' && document.body.classList.contains('drawing-workspace')) {
+        const p = screen(position(model, currentMember, sectionT));
+        drawing += '<text class="cut-face-label" x="' + p.x + '" y="' + (p.y + 58) + '" text-anchor="middle">Cut · ' + cutSide() + '</text>';
+    }
     if (start && hover) {
         const a = screen(start), b = screen(hover);
         drawing += `<path d="M ${a.x} ${a.y} L ${b.x} ${b.y}" stroke="#087f78" stroke-width="3" stroke-dasharray="6 5"/><circle cx="${a.x}" cy="${a.y}" r="5" fill="#087f78"/>`;
@@ -513,15 +520,21 @@ function removeSelected() {
     });
 }
 function sectionSample(): Sample | undefined {
-    return sampleSection(analysis, currentMember, sectionT);
+    return sampleSection(analysis, currentMember, sectionT, cutSide(), model);
 }
 function render() {
     if (!model.members.some(m => m.id === currentMember))
         currentMember = model.members[0]?.id || '';
     updateEvidenceBinding();
-    const section = renderResponses({ model, analysis, currentMember, sectionT, layer,
+    const section = renderResponses({ model, analysis, currentMember, sectionT, layer, cutSide: cutSide(),
         resultsVisible: responsesVisible() });
-    drawingWorkspace.update(model, selected, section.sample, section.station);
+    drawingWorkspace.update(model, selected, section.sample, section.station, section.face);
+    const fbd = $('section-free-body');
+    fbd.hidden = mode !== 'sandbox' || !section.sample;
+    $('section-free-body-content').innerHTML = !fbd.hidden && section.sample
+        ? sectionFreeBody(model, analysis, currentMember, sectionT, cutSide(), section.sample) : '';
+    const checkedScope = document.getElementById('checked-section');
+    if (checkedScope) checkedScope.textContent = currentMember ? currentMember + ' · ' + section.station + ' · just ' + cutSide() : 'Choose a member.';
     controls.setHistory(history.length > 0, future.length > 0);
     inspector();
     $('edit-selection').hidden = !selected;
@@ -956,11 +969,8 @@ if (portalExercise) {
 restoreCheckerControls?.();
 portalPanel = createPortalPanel(() => model, value => commit(() => {
     if (model.loads.length === 1) { model.loads[0].fy = value; model.loads[0].qEnd = value; }
-}), value => { sectionT = value; updateEvidenceBinding(); render(); }, modelStorageKey, preserveCheckerView, (drawing, member, rows) => momentExercise?.checked(drawing,member,rows), message => momentExercise?.status(message));
-if (portalExercise) $('frame-side').addEventListener('change', () => {
-    momentExercise?.bind(portalSignature + $<HTMLSelectElement>('frame-side').value);
-    render();
-});
+}), value => { sectionT = value; render(); }, modelStorageKey, preserveCheckerView, (drawing, member, rows) => momentExercise?.checked(drawing,member,rows), message => momentExercise?.status(message));
+
 if (!restoredPortalView) fit();
 controls.showLayer(layer);
 setMode(restoredPortalView ? mode : location.hash.slice(1) || 'sandbox');

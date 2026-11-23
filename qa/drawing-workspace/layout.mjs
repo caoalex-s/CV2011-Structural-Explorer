@@ -30,6 +30,7 @@ try {
         await page.keyboard.press('Tab');
         await page.waitForFunction(() => document.querySelector('#section-results .is-current strong')?.textContent.includes('60'));
         await page.waitForFunction(() => document.activeElement !== document.body);
+        await page.locator('.drawing-utilities > summary').click();
         await page.locator('[data-mode="practice"]').click();
         assert.equal(await page.locator('#drawing-object').count(), 0);
         await page.locator('[data-mode="sandbox"]').click();

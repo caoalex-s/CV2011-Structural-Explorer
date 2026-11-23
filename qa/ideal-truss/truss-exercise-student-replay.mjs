@@ -286,8 +286,8 @@ try {
         [['first_prediction', 'No'], ['retry', 'No'], ['reveal', 'Yes'], ['retry', 'Yes']]);
     assert.deepEqual(networkPosts, mode === 'pilot' ? events.map(() => '/api/attempts') : []);
     await page.screenshot({ path: join(directory, 'learning-insights.png'), fullPage: true });
-    await page.getByRole('link', { name: 'Frame workspace', exact: true }).click();
-    await page.getByRole('button', { name: 'Generate worked solution', exact: true }).waitFor();
+    await page.getByRole('link', { name: 'Sandbox', exact: true }).click();
+    await page.getByRole('button', { name: 'Show worked solution', exact: true }).waitFor();
     assert.equal(await canvas.count(), 0);
     assert.deepEqual(errors, []);
     await writeFile(join(directory, 'truss-exercise-replay.json'),

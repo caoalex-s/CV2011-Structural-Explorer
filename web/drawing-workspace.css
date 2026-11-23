@@ -148,3 +148,34 @@
 }
 .drawing-workspace .canvas-panel>.object-choice { display:flex; align-items:center; gap:.7rem; padding:.35rem .65rem; background:var(--paper); border-bottom:1px solid var(--line); }
 .drawing-workspace .canvas-panel>.object-choice select { flex:1; width:auto; min-width:0; }
+
+/* Section position and the face of the cut govern every local readout. */
+.cut-controls { display:flex; flex-wrap:wrap; gap:.45rem 1rem; align-items:end; margin:.3rem 0 .6rem; }
+.cut-controls label { flex:1 1 7rem; display:grid; gap:.15rem; font-size:.85rem; color:var(--muted); }
+.cut-controls input,.cut-controls select { min-width:0; width:100%; min-height:40px; }
+#section-free-body { margin:.65rem 0; }
+#section-free-body summary { cursor:pointer; padding:.4rem 0; font-weight:600; }
+#section-free-body figure { margin:.45rem 0; }
+#section-free-body figcaption { font:normal 1rem var(--font-heading); }
+#section-free-body svg { width:100%; display:block; }
+#section-free-body svg text { font:20px var(--font-heading); }
+#section-free-body ul { padding-left:1rem; font-size:.87rem; }
+#checked-section { font:normal 1.1rem var(--font-math-roman); }
+.drawing-workspace #portal-introduction,.drawing-workspace .inspector-heading>span { display:none; }
+.drawing-workspace .inspector-heading { float:right; }
+.drawing-workspace .inspector h3 { margin-top:0; }
+.cut-face-label { font:15px var(--font-ui); fill:var(--accent-hover); paint-order:stroke; stroke:var(--paper); stroke-width:3; pointer-events:none; }
+.drawing-workspace .left-panel { background:var(--paper-deep); color:var(--ink); }
+.drawing-workspace .tools button { color:var(--ink); }
+.drawing-workspace .tools button:not(.active) .load-tool-icon { color:#376365; }
+.drawing-workspace .tools button:not(.active):hover,.drawing-workspace .tools button:focus-visible { color:var(--ink); background:#dfdfd6; border-color:var(--muted); }
+.drawing-workspace .drawing-settings[open] { background:var(--paper-deep); color:var(--ink); }
+.drawing-workspace .drawing-title { border-radius:5px 5px 0 0; }
+.drawing-workspace .portal-certificate:has(#frame-collapse:not([hidden])) #frame-generate { display:none; }
+@media(max-width:750px) {
+    .drawing-workspace .cut-readout { line-height:1.45; }
+    .cut-face-label { font-size:20px; }
+}
+.drawing-workspace .canvas-panel>#section-free-body { padding:.4rem 1rem; border-top:1px solid var(--line); }
+.drawing-workspace #section-free-body figure { max-width:45rem; margin:.4rem auto; }
+.drawing-workspace #section-free-body figcaption { text-align:center; }
