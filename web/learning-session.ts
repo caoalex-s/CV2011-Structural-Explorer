@@ -91,7 +91,7 @@ export function createLearningSession({ notify: toast, onConnectionChange, exerc
         return result;
     }
     /** Capture before awaiting the server: later model edits belong to a different attempt. */
-    async function record(context: AttemptContext, event: string, answer: string, units: string): Promise<Attempt> {
+    async function record(context: AttemptContext, event: string, answer: string, units: string, sendAfter?: Promise<unknown>): Promise<Attempt> {
         const attempt: Attempt = {
             id: crypto.randomUUID(),
             timestamp: new Date().toISOString(),
@@ -115,7 +115,8 @@ export function createLearningSession({ notify: toast, onConnectionChange, exerc
         // retains the submission and its exposure history while the service waits.
         attempts.push(attempt);
         saveAttempts();
-        if (online && canSend(attempt))
+        if (sendAfter) await sendAfter;
+        if (online && canSend(attempt) && (!sendAfter || attempt.courseId === config.courseId))
             try {
                 const response = await api('/api/attempts', attempt);
                 attempt.result = response.result;

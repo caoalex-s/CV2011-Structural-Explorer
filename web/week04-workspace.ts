@@ -66,9 +66,12 @@ for (const m of members)
 const history = () => session.sectionEvents().filter(a => JSON.stringify(a.model) === JSON.stringify(drawing) && a.section === query().cut && a.side === query().side && JSON.parse(a.answer).centre === query().centre);
 function log(event: string, assisted: boolean, elapsedMs: number) {
     const q = query();
-    pending = session.record({ model: drawing, section: q.cut, side: q.side, step: 'week04_sections', hintUsed: false, solutionRevealed: assisted }, event, JSON.stringify({ ...q, prediction: prediction(), elapsedMs }), 'kN');
+    const context = { model: drawing, section: q.cut, side: q.side, step: 'week04_sections', hintUsed: false, solutionRevealed: assisted };
+    const answer = JSON.stringify({ ...q, prediction: prediction(), elapsedMs });
+    pending = session.record(context, event, answer, 'kN', pending);
 }
 button('record-section').onclick = () => {
+    clearResult();
     const previous = history();
     log(previous.length ? 'retry' : 'first_prediction', previous.some(a => a.event === 'reveal'), clock() - started);
     recorded = true;
@@ -89,7 +92,7 @@ async function reveal(began = clock(), resumed = false) {
             await Promise.all([isolateForCheck(), pending]);
             if (revision !== current)
                 return;
-            sessionStorage.setItem(resumeKey, JSON.stringify({ q: query(), p: field('section-load').value, prediction: prediction(), connected: session.connected, courseId: session.courseId, began }));
+            sessionStorage.setItem(resumeKey, JSON.stringify({ q: query(), p: field('section-load').value, prediction: prediction(), connected: session.connected, courseId: session.courseId, began, started }));
             location.reload();
             return;
         }
@@ -117,28 +120,46 @@ async function reveal(began = clock(), resumed = false) {
     }
 }
 button('reveal-section').onclick = () => void reveal();
-el('replay').onclick = () => {
+el('replay').onclick = async () => {
+    await pending;
     el('history').innerHTML = '<h2>Local replay</h2>' + session.sectionEvents().map(a => '<details><summary>' + escapeHtml(a.event.replaceAll('_', ' ')) + ' · ' + escapeHtml(a.timestamp) + '</summary><pre>' + escapeHtml(a.answer) + '</pre></details>').join('');
     el('history').hidden = false;
     el('history').scrollIntoView();
 };
 el('instructor').onclick = async () => { await pending; el('insights-panel').hidden = false; await session.renderInsights(); el('insights-panel').scrollIntoView(); };
 refresh();
-const saved = sessionStorage.getItem(resumeKey);
-if (saved) {
+type PendingReveal = {
+    q: Query; p: string; prediction: Record<string,string>;
+    connected: boolean; courseId: string; began: number; started: number;
+};
+function takePendingReveal(): PendingReveal | undefined {
+    const saved = sessionStorage.getItem(resumeKey);
     sessionStorage.removeItem(resumeKey);
-    const state = JSON.parse(saved);
+    if (!saved) return;
+    try {
+        const state = JSON.parse(saved) as PendingReveal;
+        if ([1,3,5].includes(state.q.cut) && ['left','right'].includes(state.q.side) &&
+            fixture.joints.some(j => j.id === state.q.centre) && typeof state.p === 'string' &&
+            Number.isFinite(state.began) && Number.isFinite(state.started) &&
+            members.every(m => ['T','C','zero'].includes(state.prediction[m]))) return state;
+    } catch { /* A damaged session entry opens the original exercise. */ }
+}
+const state = takePendingReveal();
+if (state) {
     field('section-cut').value = String(state.q.cut);
     field('section-centre').value = state.q.centre;
     field('section-side').value = state.q.side;
     field('section-load').value = state.p;
     refresh();
+    started = state.started;
     for (const m of members)
         field('predict-' + m).value = state.prediction[m];
     predictionChanged();
-    if (state.connected)
-        await session.connect();
-    if (session.courseId === state.courseId && history().length && !button('record-section').disabled) {
+    if (state.connected) await session.connect();
+    const prior = history().at(-1);
+    if (session.courseId === state.courseId && prior &&
+        JSON.stringify(JSON.parse(prior.answer).prediction) === JSON.stringify(prediction()) &&
+        !button('record-section').disabled) {
         recorded = true;
         void reveal(state.began, true);
     }

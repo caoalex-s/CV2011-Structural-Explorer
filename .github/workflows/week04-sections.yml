@@ -34,10 +34,8 @@ jobs:
           path: .data/hinge-build/week04-section-assets/
           include-hidden-files: true
       - name: Compare the installed browser checker with this build
-        if: hashFiles('public/portal-checker/week04-section/manifest.json') != ''
         run: diff -qr public/portal-checker/week04-section .data/hinge-build/week04-section-assets
   student:
-    needs: equilibrium
     strategy:
       fail-fast: false
       matrix:
@@ -57,10 +55,6 @@ jobs:
       - run: pnpm install --frozen-lockfile --ignore-scripts
       - run: pnpm run check
       - run: pnpm test
-      - uses: actions/download-artifact@v4
-        with:
-          name: week04-section-checker
-          path: public/portal-checker/week04-section
       - run: pnpm build
       - run: npm install --prefix .data/student-tools --ignore-scripts --save-exact playwright@1.51.1
       - run: node .data/student-tools/node_modules/playwright/cli.js install --with-deps chromium
