@@ -1,0 +1,35 @@
+name: Check Week 04 sections
+on:
+  push:
+    branches: [codex/week04-truss-sections]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  equilibrium:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: leanprover/lean-action@ba3fdfe5c4476c925da13bf11a005ddb47e47aee
+        with:
+          lake-package-directory: proofs
+          build: 'false'
+          test: 'false'
+          use-mathlib-cache: 'true'
+      - run: lake env lean Week04Sections.lean
+        working-directory: proofs
+      - name: Compile source-derived truss checker
+        working-directory: proofs
+        run: |
+          lake env bash -euc 'export LEAN_PATH="$PWD:$LEAN_PATH"; lean -o IdealTrussWire.olean -c IdealTrussWire.c IdealTrussWire.lean; lean -c Week04SectionWire.c Week04SectionWire.lean'
+      - name: Link browser checker
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash qa/member-diagram/build-runtime.sh week04-section
+      - uses: actions/upload-artifact@v4
+        with:
+          name: week04-section-checker
+          path: .data/hinge-build/week04-section-assets/
+          include-hidden-files: true

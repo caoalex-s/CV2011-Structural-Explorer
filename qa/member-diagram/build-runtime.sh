@@ -38,6 +38,10 @@ if [[ "${1:-}" == ideal-truss ]]; then
     folder=ideal-truss-assets
     sources=(proofs/IdealTrussWire.c qa/ideal-truss/abi.c)
 fi
+if [[ "${1:-}" == week04-section ]]; then
+    folder=week04-section-assets
+    sources=(proofs/IdealTrussWire.c proofs/Week04SectionWire.c qa/week04-sections/abi.c)
+fi
 mkdir -p "$stage/$folder"
 objects=()
 for source in "${sources[@]}"; do
