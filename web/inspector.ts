@@ -134,6 +134,11 @@ export function renderInspector(options: InspectorOptions): void {
                 primaryField.after(settings);
             }
         }
+        container.onkeydown = event => {
+            const target = event.target as HTMLElement;
+            if (target.matches('[data-property]') && (event.key === 'Tab' || event.key === 'Enter'))
+                target.dataset.focusStep = String(event.key === 'Enter' ? 0 : event.shiftKey ? -1 : 1);
+        };
         container.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-property]').forEach(input => input.addEventListener('change', () => {
             let key = input.dataset.property!;
             let value = input.type === 'checkbox' ? (input as HTMLInputElement).checked : ['kind', 'joint', 'referenceMember', 'member', 'label'].includes(key) ? input.value.trim() : Number(input.value) * Number(input.dataset.direction || 1);
@@ -155,7 +160,8 @@ export function renderInspector(options: InspectorOptions): void {
                 inspector();
                 return;
             }
-            const restoreKeyboardFocus = input.matches(':focus-visible') && document.body.classList.contains('drawing-workspace');
+            const focusStep = Number(input.dataset.focusStep || 0);
+            const restoreKeyboardFocus = (input.dataset.focusStep !== undefined || input.matches(':focus-visible')) && document.body.classList.contains('drawing-workspace');
             commit(() => {
                 const previousConnections = selected?.type === 'node' && key === 'joint' ? jointConnections(model, model.nodes.find(node => node.id === selected!.id)!) : [];
                 if (key === 'member') {
@@ -180,8 +186,13 @@ export function renderInspector(options: InspectorOptions): void {
             // A commit rebuilds the fields. Preserve native Tab navigation when it
             // succeeded, and restore the edited control when focus fell to the body.
             if (restoreKeyboardFocus) requestAnimationFrame(() => {
-                if (document.activeElement === document.body)
-                    container.querySelector<HTMLElement>('[data-property="' + CSS.escape(key) + '"]')?.focus({preventScroll:true});
+                if (document.activeElement !== document.body) return;
+                const edited = container.querySelector<HTMLElement>('[data-property="' + CSS.escape(key) + '"]');
+                if (!edited) return;
+                const visible = [...container.querySelectorAll<HTMLElement>('input, select, button, summary')]
+                    .filter(control => control.checkVisibility() && !control.matches(':disabled'));
+                const next = visible[visible.indexOf(edited) + focusStep] ?? edited;
+                next.focus({preventScroll:true});
             });
         }));
         bindConnectionEditors(container);
