@@ -41,6 +41,33 @@ async function layout(page, route) {
         };
         const heading = [...document.querySelectorAll('h1')].find(h => h.offsetWidth > 50 && h.offsetHeight > 10);
         const root = getComputedStyle(document.documentElement);
+        const rgba = color => color.match(/[0-9.]+/g)?.map(Number);
+        const luminance = color => {
+            const channels = color.slice(0, 3).map(channel => {
+                const value = channel / 255;
+                return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+            });
+            return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+        };
+        const background = element => {
+            if (!element) return [255, 255, 255];
+            const color = rgba(getComputedStyle(element).backgroundColor);
+            const opacity = color[3] ?? 1;
+            if (opacity === 1) return color;
+            const parent = background(element.parentElement);
+            return parent.slice(0, 3).map((channel, i) => opacity * color[i] + (1 - opacity) * channel);
+        };
+        const controlIds = ['load-preset','import-model','settings-button','section-cut','section-side',
+            'section-centre','section-load','predict-BC','record-section','reveal-section',
+            'support-case','moment-prediction','rectangle','truss-tool'];
+        const controls = controlIds.flatMap(id => {
+            const element = document.getElementById(id);
+            if (!element || element.matches(':disabled') || !element.getClientRects().length) return [];
+            const foreground = rgba(getComputedStyle(element).color);
+            const surface = background(element);
+            const light = [luminance(foreground), luminance(surface)].sort((a,b) => b-a);
+            return [{ id, contrast:(light[0] + 0.05) / (light[1] + 0.05), bounds:rect('#' + id) }];
+        });
         return {
             viewport: window.innerWidth,
             scrollWidth: document.documentElement.scrollWidth,
@@ -48,6 +75,7 @@ async function layout(page, route) {
             heading: heading && { text:heading.textContent, font:getComputedStyle(heading).fontFamily },
             paper: root.getPropertyValue('--paper').trim(),
             ink: root.getPropertyValue('--ink').trim(),
+            controls,
             wideElements: [...document.querySelectorAll('main *')].filter(node => {
                 const bounds = node.getBoundingClientRect();
                 if (!bounds.width || bounds.right <= window.innerWidth + 2) return false;
@@ -130,6 +158,13 @@ try {
                     const item = { phase,size,route:route.name,state,errors };
                     evidence.push(item);
                     if (route.name==='sandbox' && phase==='after') await keyboardAndTouch(page,mobile);
+                    if (route.name==='practice' && phase==='after') {
+                        const skip = page.getByRole('link', {name:'Skip to workspace'});
+                        await skip.focus();
+                        await page.keyboard.press('Enter');
+                        assert.equal(new URL(page.url()).hash, '#practice', 'The skip link changed the active practice mode');
+                        assert.ok(await page.evaluate(() => document.activeElement.id === 'workspace'));
+                    }
                     if (route.name==='beam-lesson' && phase==='after') {
                         await page.locator('#support-case').selectOption('three-rollers');
                         assert.match(await page.locator('#support-result').innerText(), /horizontal|unstable/i);

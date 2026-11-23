@@ -687,8 +687,9 @@ function setMode(next: string) {
     mode = ['sandbox', 'practice', 'insights'].includes(next) ? next : 'sandbox';
     location.hash = mode;
     controls.showMode(mode);
-    $('page-title').textContent = mode === 'sandbox' ? portalExercise ? 'Portal frame exercise' : isPortalWorkspace ? 'Checked portal workspace' : 'Structural sandbox' : mode === 'practice' ? 'Practice problems' : 'Review learning progress';
-    $('page-description').textContent = mode === 'sandbox' ? 'Draw a structure or open a model to inspect its response.' : mode === 'practice' ? 'Build the model, submit a step, and examine the reasoning.' : 'Review submitted steps and the evidence behind recurring errors.';
+    const sandboxTitle = portalExercise ? 'Portal frame exercise' : isPortalWorkspace ? 'Checked portal workspace' : 'Structural sandbox';
+    $('page-title').textContent = mode === 'sandbox' ? sandboxTitle : mode === 'practice' ? 'Practice problems' : 'Review learning progress';
+    $('page-description').textContent = mode === 'sandbox' && portalExercise ? 'Draw the three-member portal, then predict the location of the maximum bending moment on BC.' : mode === 'sandbox' ? 'Draw a structure or open a model to inspect its response.' : mode === 'practice' ? 'Build the model, submit a step, and examine the reasoning.' : 'Review submitted steps and the evidence behind recurring errors.';
     $('practice-panel').hidden = mode !== 'practice';
     $('insights-panel').hidden = mode !== 'insights';
     $('portal-exercise').hidden = !portalExercise || mode === 'insights';

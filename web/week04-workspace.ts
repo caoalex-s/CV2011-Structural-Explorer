@@ -1,3 +1,4 @@
+import { showTrussNavigation } from './truss-navigation.js';
 import type { Drawing } from './ideal-truss.js';
 import { createLearningSession } from './learning-session.js';
 import { isolateForCheck } from './truss-check.js';
@@ -5,9 +6,8 @@ import { element as el, escapeHtml } from './ui.js';
 import { diagram } from './week04-figures.js';
 import { solution } from './week04-solution.js';
 import { checkedSection, crossed, invalidateSection, members, type Query } from './week04-section.js';
+showTrussNavigation('week04-truss-sections');
 document.body.classList.add('truss-workspace', 'section-workspace');
-document.querySelector('.topbar nav')!.innerHTML = '<a href="./">Frame workspace</a> <a href="?exercise=ideal-planar-truss">Ideal planar truss</a> <a href="learn/">Learn</a>';
-document.querySelector('.header-actions')!.innerHTML = '<button id="replay">Local replay</button> <button id="settings-button">Session</button> <button id="instructor">Learning insights</button>';
 const fixture: Drawing = await (await fetch('./week04-section-truss.json')).json();
 el('workspace').innerHTML = `<header class="exercise-heading"><p class="course-reference">Week 04 · Example 1</p><h1>Truss forces by the method of sections</h1></header>
 <p class="exercise-intro">Find the axial forces in BC, GC and GF. The lecture load of 1000 N acts downwards at A (P = 1 kN).</p>

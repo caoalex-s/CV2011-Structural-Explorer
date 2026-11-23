@@ -1,3 +1,4 @@
+import { showTrussNavigation } from './truss-navigation.js';
 import { createLearningSession } from './learning-session.js';
 import { checkDrawing, invalidateCheck, isolateForCheck } from './truss-check.js';
 import { rectangle, rectangleCase, joint, solve, validate, exact, number } from './ideal-truss.js';
@@ -11,6 +12,7 @@ type Event = {
     answer: string;
     drawing: Drawing;
 };
+showTrussNavigation('ideal-planar-truss');
 document.body.classList.add('truss-workspace');
 let drawingRevision = 0;
 let pendingRecord: Promise<unknown> = Promise.resolve();
@@ -24,8 +26,6 @@ try {
     }
 }
 catch { /* An invalid saved drawing opens the example. */ }
-document.querySelector('.topbar nav')!.innerHTML = '<a href="./">Frame workspace</a> <a href="?exercise=week04-truss-sections">Method of sections</a> <a href="learn/">Learn</a>';
-document.querySelector('.header-actions')!.innerHTML = '<button id="replay">Local replay</button> <button id="settings-button">Session</button> <button id="instructor">Learning insights</button>';
 el('workspace').innerHTML = `<header class="exercise-heading"><p class="course-reference">Week 03 · Method of joints</p><h1>Ideal planar truss</h1></header>
 <p class="exercise-intro">What holds a rectangular panel in shape? Compare the braced panel with the same panel after removing AC or rotating the roller at B. Can you construct the braced panel by adding one joint and two bars to a triangle?</p>
 <div class="modelbar"><button id="rectangle">Reset rectangle</button><button id="blank">Blank drawing</button><button id="diagonal">Remove AC</button><button id="rotate">Rotate roller B</button></div>

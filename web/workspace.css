@@ -554,7 +554,7 @@ footer {
     gap: var(--space-4);
     font-size: 13px;
     padding: 10px 18px;
-    background: #fafbf8;
+    background: var(--paper);
 }
 
 #coordinates {
@@ -715,7 +715,7 @@ footer {
 }
 
 .metric.is-current {
-    background: #edf5ef;
+    background: var(--paper-deep);
 }
 
 .worked-panel {
@@ -737,7 +737,7 @@ footer {
 
 #toggle-worked {
     color: var(--teal);
-    border-color: #cbded0;
+    border-color: var(--line);
     background: var(--surface);
 }
 
@@ -787,12 +787,12 @@ footer {
 .quantity-trace > summary {
     padding: 16px 18px;
     gap: 8px 16px;
-    background: #f8faf6;
+    background: var(--paper);
     font-size: 16px;
 }
 
 .quantity-trace[open] > summary {
-    background: #edf5ef;
+    background: var(--paper-deep);
     border-bottom: 1px solid var(--line);
 }
 
@@ -1446,4 +1446,8 @@ dialog { background:var(--paper); color:var(--ink); border:1px solid var(--line)
     #drawing-toolbox>summary { padding:.45rem 0; margin:0; }
     .truss-workspace #insights-panel { overflow-x:auto; }
 }
-
+.topbar nav a[aria-current] { color:var(--accent-hover); text-decoration:underline; text-underline-offset:.38em; }
+.insights-cards { gap:0; padding-block:.75rem; border-block:1px solid var(--line); }
+.insights-cards .panel { background:transparent; border:0; border-radius:0; padding:1rem; }
+.insights-cards .insight-number { font-family:var(--font-heading); color:var(--ink); }
+#insights-panel > p { max-width:76ch; }
