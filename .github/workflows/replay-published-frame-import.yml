@@ -1,0 +1,54 @@
+name: Replay published frame import
+on:
+  push:
+    branches: [codex/verify-published-frame-import]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  public-offline:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 55
+    env:
+      PAGES_SITE: https://caoalex-s.github.io/CV2011-Structural-Explorer/
+      RELEASE_COMMIT: 1c03ebd4e7ac30d65c055a6206909a59993da4a9
+      RELEASE_RUN: '45092546737'
+      EVIDENCE: .data/public-frame-import
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Check the independent replay source and wait for the live revision
+        run: |
+          git diff --exit-code "$RELEASE_COMMIT" HEAD -- qa/frame-import/frame-import-review-replay.mjs qa/inclined-frame/published-fixtures public/portal-checker
+          for i in $(seq 1 90); do
+            if curl -fsS --max-time 15 "${PAGES_SITE}verification.json?verify=${GITHUB_RUN_ID}-$i" | jq -e --arg sha "$RELEASE_COMMIT" '.commit == $sha' >/dev/null; then exit 0; fi
+            sleep 20
+          done
+          exit 1
+      - uses: actions/download-artifact@v4
+        with:
+          name: github-pages
+          path: .data/pages-artifact
+          run-id: ${{ env.RELEASE_RUN }}
+          github-token: ${{ github.token }}
+      - run: python3 qa/frame-import/public-binding.py before
+      - run: npm install --prefix .data/student-tools --ignore-scripts --save-exact playwright@1.51.1
+      - run: node .data/student-tools/node_modules/playwright/cli.js install --with-deps chromium
+      - name: Replay the held public module response and overlapping file reads
+        run: |
+          fixture=qa/inclined-frame/published-fixtures/cantilever-interior
+          node qa/frame-import/frame-import-review-replay.mjs "file://$PWD/.data/student-tools/node_modules/playwright/index.mjs" "$PAGES_SITE" "$fixture.request.json" "$fixture.report" "$EVIDENCE"
+      - name: Verify the same deployment after replay
+        if: always() && hashFiles('.data/public-frame-import/live-binding-before.json') != ''
+        run: python3 qa/frame-import/public-binding.py after
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: public-frame-import-evidence
+          path: .data/public-frame-import/
+          include-hidden-files: true
