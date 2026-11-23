@@ -16,7 +16,7 @@ interface ResponseOptions {
     resultsVisible: boolean;
 }
 
-/** Interpolate the displayed sample, retaining the right-hand convention at jumps. */
+/** Select the adjoining segment first, then interpolate its numerical response. */
 export function sampleSection(analysis: Analysis, currentMember: string, sectionT: number, side: 'left' | 'right' = 'right', model?: Model): Sample | undefined {
     const elements = analysis.elements.filter(e => e.member === currentMember);
     // At a point action use the right-hand section, except at the member end.
@@ -32,7 +32,7 @@ export function sampleSection(analysis: Analysis, currentMember: string, section
     const original = (t: number) => source.get(t) ?? t;
     const element = elements.find(e => {
         const a = original(e.t0), b = original(e.t1);
-        return side === 'left' && sectionT > 0 || sectionT === 1
+        return (side === 'left' && sectionT > 0) || sectionT === 1
             ? a < sectionT && sectionT <= b : a <= sectionT && sectionT < b;
     });
     if (!element)

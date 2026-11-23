@@ -398,6 +398,17 @@ function renderCanvas() {
                 const path = `M ${a.x} ${a.y} ` + points.map(p => `L ${p.x} ${p.y}`).join(' ') + ` L ${b.x} ${b.y} Z`;
                 drawing += `<path d="${path}" fill="#087f781c" stroke="#087f78" stroke-width="1.3" pointer-events="none"/>`;
             }
+            const section = sectionSample();
+            if (section && document.body.classList.contains('drawing-workspace')) {
+                const member = model.members.find(item => item.id === currentMember)!;
+                const a = position(model, member.id, 0), b = position(model, member.id, 1);
+                const length = Math.hypot(b.x - a.x, b.y - a.y);
+                const sense = field === 'M' && side === 'tension' ? -1 : 1;
+                const offset = section[field] * scale * sense / view.scale;
+                const station = position(model, member.id, sectionT);
+                const dot = screen({x: station.x - (b.y-a.y)/length*offset, y: station.y + (b.x-a.x)/length*offset});
+                drawing += `<circle class="cut-ordinate" data-side="${cutSide()}" cx="${dot.x}" cy="${dot.y}" r="5"><title>Selected ${field} = ${number(section[field])} ${field === 'M' ? 'kN·m' : 'kN'}</title></circle>`;
+            }
             if (maximum > 1e-8) {
                 const peak = all.reduce((a, b) => Math.abs(a[field]) > Math.abs(b[field]) ? a : b);
                 drawing += `<text x="22" y="375" class="svg-value">${symbolLabel(`Peak |${field}| = ${number(Math.abs(peak[field]))} ${field === 'M' ? 'kN m' : 'kN'} · diagrams scaled to fit`)}</text>`;

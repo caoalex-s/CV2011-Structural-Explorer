@@ -102,7 +102,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
     sectionControls.append(sectionParameter.closest('label')!, cutSide.closest('label')!);
     const proofDetails = certificate.closest('details')!;
     proofDetails.append(reset, deactivate);
-    activate.hidden = true;
+    activate.hidden = !isPortalWorkspace;
     const requests = new EvidenceRequests();
     let runtime: PortalRuntime | null = null;
     let debounce: ReturnType<typeof setTimeout> | undefined;

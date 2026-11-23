@@ -116,11 +116,13 @@ async function review(size, viewport) {
     async function importDrawing(drawing) {
         const payload=Buffer.from(JSON.stringify({version:2,model:drawing}));
         await page.locator('#model-file').setInputFiles({name:'shared-cut-test.json',mimeType:'application/json',buffer:payload});
-        await page.waitForFunction(length => {
+        await page.waitForFunction(expected => {
             const workspace=document.querySelector('#workspace');
             const data=JSON.parse(localStorage.getItem('cv2011-model') ?? '{}');
-            return !workspace.inert && data.members?.length===length;
-        },drawing.members.length);
+            const actions=loads=>loads?.map(({id, member, kind, t, fx, fy, mz})=>[id, member, kind, t, fx, fy, mz]);
+            return !workspace.inert && JSON.stringify(data.members)===JSON.stringify(expected.members) &&
+                JSON.stringify(actions(data.loads))===JSON.stringify(actions(expected.loads));
+        },drawing);
     }
 
     try {
@@ -187,6 +189,7 @@ async function review(size, viewport) {
         await noStale(digest);
         await check('next-member-start',{...right,member:'BC',parameter:0,loads:[]});
 
+        await page.locator('.drawing-utilities > summary').click();
         await page.getByRole('button',{name:'Learning insights',exact:true}).click();
         await page.locator('#insights-panel').waitFor({state:'visible'});
         assert.equal(new URL(page.url()).hash,'#insights');

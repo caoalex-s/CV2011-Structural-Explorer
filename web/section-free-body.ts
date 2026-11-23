@@ -24,11 +24,15 @@ export function sectionFreeBody(model: Model, analysis: Analysis, memberId: stri
     const labels = loadLabels(model);
     const rows: string[] = [];
     const unitForce = (v: number) => Math.abs(v) < 1e-7 ? 0 : v;
-    function action(station: number, fx: number, fy: number, moment: number, name: string, color: string) {
+    function action(station: number, fx: number, fy: number, moment: number, name: string, color: string, symbol = '', cutFace = false) {
         const X = unitForce(fx), Y = unitForce(fy), C = unitForce(moment);
         rows.push(`<li>${escapeHtml(name)} · x = ${formatNumber(station * length)} m · (${formatNumber(X)}, ${formatNumber(Y)}) kN · ${formatNumber(C)} kN·m</li>`);
-        return forceSymbol(x(station), y, X, Y, color, '', 32, 0)
-            + momentSymbol(x(station), y, C, color, '', 19);
+        // Concentric arcs distinguish an applied couple from the cut moment.
+        const force = cutFace
+            ? forceSymbol(x(station), y, X, 0, color, 'N', 27, 0)
+                + forceSymbol(x(station), y, 0, Y, color, 'V', 27, 0)
+            : forceSymbol(x(station), y, X, Y, color, symbol, 43, 0);
+        return force + momentSymbol(x(station), y, C, color, cutFace ? 'M' : symbol, cutFace ? 17 : 31, 0, !cutFace);
     }
     const opposite = retainRight ? 1 : 0;
     const endValues = sampleSection(analysis, memberId, opposite, retainRight ? 'left' : 'right', model)!;
@@ -53,7 +57,7 @@ export function sectionFreeBody(model: Model, analysis: Analysis, memberId: stri
             rows.push(`<li>${escapeHtml(label)} · x = ${formatNumber(load.t*length)} to ${formatNumber(stop*length)} m · global vertical intensity ${formatNumber(intensity(load.t))} to ${formatNumber(intensity(stop))} kN/m</li>`);
         } else if (includes(load.t)) {
             drawing = action(load.t, load.kind === 'force' ? c*load.fx+s*load.fy : 0,
-                load.kind === 'force' ? -s*load.fx+c*load.fy : 0, load.kind === 'moment' ? load.mz : 0, label, courseColors.force);
+                load.kind === 'force' ? -s*load.fx+c*load.fy : 0, load.kind === 'moment' ? load.mz : 0, label, courseColors.force, label);
         } else continue;
         arrows += `<g data-load-id="${escapeHtml(load.id)}">${drawing}</g>`;
     }
@@ -62,16 +66,17 @@ export function sectionFreeBody(model: Model, analysis: Analysis, memberId: stri
         if (support) arrows += action(support.t, c*reaction.fx+s*reaction.fy, -s*reaction.fx+c*reaction.fy,
             reaction.mz, 'Support reaction', courseColors.reaction);
     }
-    arrows += action(t, -sign*cut.N, sign*cut.V, -sign*cut.M, 'Cut action', courseColors.member);
+    arrows += action(t, -sign*cut.N, sign*cut.V, -sign*cut.M, 'Cut action', courseColors.member, '', true);
     const station = formatNumber(t*length);
     const caption = `Member ${memberLabel(model,member)} · x = ${station} m · just ${side}`;
-    return `<figure><figcaption>${caption}</figcaption><svg id="section-fbd" viewBox="0 0 580 154" role="img"
+    return `<figure><figcaption>${caption}</figcaption><svg id="section-fbd" viewBox="0 0 580 185" role="img"
         data-member="${escapeHtml(memberId)}" data-parameter="${t}" data-side="${side}" aria-label="${caption}">
         <title>${caption}. Retained ${retainRight ? 'end' : 'start'} portion in member axes.</title>
         <path d="M76 ${y}H496" stroke="${courseColors.member}" stroke-width="4"/>
         <path d="M${x(t)} 44v90" stroke="#96513b" stroke-dasharray="4 4"/>
-        ${arrows}<text x="${x(opposite)}" y="142" text-anchor="middle">Member end</text>
-        <text x="${x(t)}" y="142" text-anchor="middle">Cut</text></svg></figure>
+        ${arrows}<text x="${x(opposite)}" y="172" text-anchor="middle">Member end</text>
+        <text x="${x(t)}" y="172" text-anchor="middle">Cut</text></svg></figure>
+        <p class="fbd-values">N = ${formatNumber(cut.N)} kN · V = ${formatNumber(cut.V)} kN · M = ${formatNumber(cut.M)} kN·m</p>
         <p class="small">The free body retains the ${retainRight ? 'end' : 'start'} portion. Local x runs from the first joint to the second. Arrows show the resultant actions on this portion.</p>
         <details><summary>Forces and couples on the free body</summary><p>Force components are in member axes. Couples are positive counterclockwise.</p><ul>${rows.join('')}</ul></details>`;
 }

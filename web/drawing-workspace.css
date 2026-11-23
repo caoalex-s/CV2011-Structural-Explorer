@@ -164,6 +164,8 @@
 .drawing-workspace #portal-introduction,.drawing-workspace .inspector-heading>span { display:none; }
 .drawing-workspace .inspector-heading { float:right; }
 .drawing-workspace .inspector h3 { margin-top:0; }
+.cut-ordinate { fill:var(--accent); stroke:white; stroke-width:2; pointer-events:none; }
+.fbd-values { font:normal 1rem var(--font-math-roman); text-align:center; }
 .cut-face-label { font:15px var(--font-ui); fill:var(--accent-hover); paint-order:stroke; stroke:var(--paper); stroke-width:3; pointer-events:none; }
 .drawing-workspace .left-panel { background:var(--paper-deep); color:var(--ink); }
 .drawing-workspace .tools button { color:var(--ink); }
