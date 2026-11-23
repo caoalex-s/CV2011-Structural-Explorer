@@ -28,6 +28,7 @@ let momentExercise: ReturnType<typeof createMomentExercise> | undefined;
 const clone = <T>(value: T): T => structuredClone(value);
 const id = (prefix: string) => `${prefix}${crypto.randomUUID().slice(0, 6)}`;
 renderCourseConventions();
+if (matchMedia('(max-width: 750px)').matches) document.querySelector<HTMLDetailsElement>('#drawing-toolbox')!.open = false;
 const lesson = lessonContext(location.search);
 if (isPortalWorkspace) {
     const exerciseLink = $('portal-exercise-link').querySelector('a')!;
@@ -686,8 +687,8 @@ function setMode(next: string) {
     mode = ['sandbox', 'practice', 'insights'].includes(next) ? next : 'sandbox';
     location.hash = mode;
     controls.showMode(mode);
-    $('page-title').textContent = mode === 'sandbox' ? 'Explore a structure' : mode === 'practice' ? 'Work through a problem' : 'Review learning progress';
-    $('page-description').textContent = mode === 'sandbox' ? 'Draw a system. Change a load. Follow the response.' : mode === 'practice' ? 'Build the model, submit a step, and examine the reasoning.' : 'Review submitted steps and the evidence behind recurring errors.';
+    $('page-title').textContent = mode === 'sandbox' ? portalExercise ? 'Portal frame exercise' : isPortalWorkspace ? 'Checked portal workspace' : 'Structural sandbox' : mode === 'practice' ? 'Practice problems' : 'Review learning progress';
+    $('page-description').textContent = mode === 'sandbox' ? 'Draw a structure or open a model to inspect its response.' : mode === 'practice' ? 'Build the model, submit a step, and examine the reasoning.' : 'Review submitted steps and the evidence behind recurring errors.';
     $('practice-panel').hidden = mode !== 'practice';
     $('insights-panel').hidden = mode !== 'insights';
     $('portal-exercise').hidden = !portalExercise || mode === 'insights';

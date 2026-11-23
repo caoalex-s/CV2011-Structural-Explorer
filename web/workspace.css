@@ -1363,3 +1363,87 @@ dialog::backdrop {
 #section-response pre { white-space:pre-wrap; overflow-wrap:anywhere; }
 #workspace:has(#section-cut) { max-width:68rem; }
 #workspace:has(#section-cut) .panel { margin:1rem 0; }
+/* Keep the drawing and course notation independent of the interface palette. */
+.skip-workspace { position:absolute; left:1rem; top:-5rem; z-index:10; padding:.7rem; background:white; }
+.skip-workspace:focus { top:.5rem; }
+:where(a,summary):focus-visible { outline:2px solid var(--focus); outline-offset:3px; }
+a { text-underline-offset:.21em; }
+a:hover { color:var(--accent-hover); }
+.topbar { height:auto; min-height:4.5rem; padding:.7rem clamp(1rem,3vw,3rem); gap:1.25rem; flex-wrap:wrap; }
+.brand-mark { border-radius:var(--radius-control); }
+.brand-mark svg { stroke:var(--paper); }
+.brand b, .truss-workspace h1, .workspace-heading h1, #workspace h2, dialog h2 { font-family:var(--font-heading); font-weight:400; }
+.brand b { font-size:1.32rem; }
+.topbar nav { background:transparent; align-items:center; flex-wrap:wrap; border-radius:0; gap:.2rem; }
+.topbar nav a, .topbar nav button { color:var(--ink); text-decoration:none; }
+.topbar nav button.active, .topbar nav a:hover, .topbar nav button:hover { text-decoration:underline; text-underline-offset:.38rem; color:var(--accent-hover)!important; background:transparent!important; box-shadow:none; }
+.header-actions { align-items:center; flex-wrap:wrap; }
+.header-actions a { margin-inline:.4rem; }
+.header-actions button { background:transparent; }
+#workspace { max-width:92rem; margin-inline:auto; padding:clamp(1rem,2.5vw,2.4rem); }
+.workspace-heading { display:block; margin:0 0 1.1rem; }
+.workspace-heading h1, .exercise-heading h1 { font-size:clamp(2rem,3.5vw,3.35rem); line-height:1.12; letter-spacing:-.035em; margin:0 0 .45rem; }
+#workspace h2, dialog h2 { font-size:clamp(1.28rem,1.65vw,1.7rem); line-height:1.2; }
+.exercise-links { background:transparent; border-block:1px solid var(--line); border-radius:0; margin:0 0 1rem; padding:.55rem 0; align-items:baseline; flex-wrap:wrap; gap:.25rem 1.3rem; }
+.exercise-links strong,.course-reference { color:var(--muted); font-size:.76rem; font-weight:600; text-transform:uppercase; letter-spacing:.1em; }
+.exercise-links a { font-size:.98rem; }
+.modelbar { padding:.35rem 0 .75rem; background:transparent; border:0; border-bottom:1px solid var(--line); border-radius:0; }
+button:hover,.tools button:not(.active):hover { background:var(--paper-deep); border-color:var(--muted); }
+.tools button { min-height:3.4rem; background:transparent; border-radius:var(--radius-control); }
+.tools button.active { box-shadow:none; }
+.layer-buttons button.active { background:var(--paper-deep)!important; color:var(--ink)!important; border-color:var(--muted)!important; }
+.primary, #load-preset, #record-section, #prediction button, #reveal-section:not(:disabled), #reveal:not(:disabled) { background:var(--ink)!important; border-color:var(--ink)!important; color:white!important; }
+#record-section:has(+ #reveal-section:not(:disabled)) { background:transparent!important; color:var(--ink)!important; }
+.canvas-panel { border:1px solid var(--line); }
+.support-reactions,.section-response,.worked-panel,.practice-panel,#portal-exercise,.portal-certificate,
+.truss-workspace #response,.truss-workspace #section-response,#insights-panel,#history { border:0; border-top:1px solid var(--line); border-radius:0; background:transparent; }
+.exercise-intro { max-width:72ch; color:var(--muted); margin:.65rem 0 1.35rem; }
+.course-reference { margin:0 0 .6rem; }
+.truss-workspace .work-grid>.panel { background:transparent; border:0; border-top:1px solid var(--line); border-radius:0; padding:.85rem 0; }
+.truss-workspace #truss-canvas, #section-figure, #section-fbd { background:white; border:1px solid var(--line); border-radius:var(--radius-control); }
+#workspace:has(#section-cut) { max-width:82rem; }
+.section-task { display:grid; grid-template-columns:minmax(0,2.2fr) minmax(16rem,1fr); gap:clamp(1.25rem,4vw,4rem); align-items:start; border-top:1px solid var(--line); padding-top:1.1rem; }
+.section-task .section-controls { gap:.4rem .85rem; }
+.section-model .section-controls { margin-top:.9rem; grid-template-columns:repeat(4,minmax(0,1fr)); }
+.section-prediction { background:var(--paper-deep); padding:clamp(1rem,2vw,1.7rem); border-top:2px solid var(--ink); }
+.section-prediction h2 { margin-top:0; }
+.section-prediction .section-controls { grid-template-columns:1fr; }
+.section-prediction label { grid-template-columns:2rem 1fr; align-items:center; color:var(--ink); }
+.section-prediction button { margin-top:.5rem; }
+.section-prediction p:empty { display:none; }
+#section-response { padding:1rem 0; }
+#section-response > p,#section-response > div[data-equation] { max-width:76ch; }
+#section-response h3 { margin-top:1.5rem; font:400 1.35rem var(--font-heading); }
+#section-response [data-equation] { border-left:2px solid var(--line); padding:.1rem 1rem; margin:.85rem 0; }
+#section-response [data-equation] p { margin:.3rem 0; font-size:1.04rem; }
+#section-response [data-equation] p:first-child { font-family:var(--font-heading); }
+#section-response table { width:100%; }
+#section-response details { margin-block:1rem; overflow-x:auto; }
+#section-response td,#section-response th { font-size:.95rem; }
+dialog { background:var(--paper); color:var(--ink); border:1px solid var(--line); border-radius:var(--radius-control); }
+#drawing-toolbox>summary { color:var(--ink); font-weight:600; margin:.3rem 0 .7rem; }
+@media(min-width:751px) {
+    #section-response:not([hidden]) { display:flow-root; }
+    #section-fbd { float:right; width:45%; margin:0 0 1rem 2rem; }
+    #section-response table { clear:both; }
+}
+@media(max-width:750px) {
+    .topbar { gap:.4rem 1rem; padding:.6rem 1rem; }
+    .topbar nav { justify-content:flex-start; flex-wrap:wrap; }
+    .header-actions { margin-left:auto; }
+    .topbar nav a,.topbar nav button { font-size:.88rem; }
+    .exercise-links { gap:.35rem .85rem; }
+    .exercise-links strong { width:100%; }
+    .workspace-heading { margin-bottom:.7rem; }
+    .workspace-heading p { font-size:.95rem; }
+    .modelbar { row-gap:.4rem; }
+    .section-task { grid-template-columns:minmax(0,1fr); }
+    .section-model .section-controls { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .section-prediction .section-controls { grid-template-columns:repeat(3,minmax(0,1fr)); }
+    .section-prediction label { display:grid; grid-template-columns:1fr; }
+    .truss-workspace #workspace,#workspace { padding:1rem; }
+    #drawing-toolbox { border-block:1px solid var(--line); }
+    #drawing-toolbox>summary { padding:.45rem 0; margin:0; }
+    .truss-workspace #insights-panel { overflow-x:auto; }
+}
+

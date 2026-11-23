@@ -24,10 +24,10 @@ try {
     }
 }
 catch { /* An invalid saved drawing opens the example. */ }
-document.querySelector('.topbar nav')!.innerHTML = '<a href="./">Frame workspace</a> <a href="learn/">Learn</a>';
+document.querySelector('.topbar nav')!.innerHTML = '<a href="./">Frame workspace</a> <a href="?exercise=week04-truss-sections">Method of sections</a> <a href="learn/">Learn</a>';
 document.querySelector('.header-actions')!.innerHTML = '<button id="replay">Local replay</button> <button id="settings-button">Session</button> <button id="instructor">Learning insights</button>';
-el('workspace').innerHTML = `<h1>Ideal planar truss</h1>
-<p>What holds a rectangular panel in shape? Compare the braced panel with the same panel after removing AC or rotating the roller at B. Can you construct the braced panel by adding one joint and two bars to a triangle?</p>
+el('workspace').innerHTML = `<header class="exercise-heading"><p class="course-reference">Week 03 · Method of joints</p><h1>Ideal planar truss</h1></header>
+<p class="exercise-intro">What holds a rectangular panel in shape? Compare the braced panel with the same panel after removing AC or rotating the roller at B. Can you construct the braced panel by adding one joint and two bars to a triangle?</p>
 <div class="modelbar"><button id="rectangle">Reset rectangle</button><button id="blank">Blank drawing</button><button id="diagonal">Remove AC</button><button id="rotate">Rotate roller B</button></div>
 <div class="work-grid"><aside class="panel"><h2>Drawing tools</h2><p>Choose a tool, then click the drawing. New joints snap to whole metres.</p>
 <select id="truss-tool" aria-label="Drawing tool"><option value="edit">Edit joint</option><option value="joint">Add joint</option><option value="bar">Connect two joints</option><option value="remove">Remove bar</option></select><p id="hint" role="status"></p><div id="inspector"></div></aside>

@@ -5,19 +5,19 @@ import { element as el, escapeHtml } from './ui.js';
 import { diagram } from './week04-figures.js';
 import { solution } from './week04-solution.js';
 import { checkedSection, crossed, invalidateSection, members, type Query } from './week04-section.js';
-document.body.classList.add('truss-workspace');
-document.querySelector('.topbar nav')!.innerHTML = '<a href="./">Frame workspace</a> <a href="?exercise=ideal-planar-truss">Ideal planar truss</a>';
+document.body.classList.add('truss-workspace', 'section-workspace');
+document.querySelector('.topbar nav')!.innerHTML = '<a href="./">Frame workspace</a> <a href="?exercise=ideal-planar-truss">Ideal planar truss</a> <a href="learn/">Learn</a>';
 document.querySelector('.header-actions')!.innerHTML = '<button id="replay">Local replay</button> <button id="settings-button">Session</button> <button id="instructor">Learning insights</button>';
 const fixture: Drawing = await (await fetch('./week04-section-truss.json')).json();
-el('workspace').innerHTML = `<h1>Truss forces by the method of sections</h1>
-<p>Week 04 · Example 1. Find the axial forces in BC, GC and GF. The lecture load of 1000 N acts downwards at A (P = 1 kN).</p>
-<section class="panel"><div id="section-figure"></div><div class="section-controls">
+el('workspace').innerHTML = `<header class="exercise-heading"><p class="course-reference">Week 04 · Example 1</p><h1>Truss forces by the method of sections</h1></header>
+<p class="exercise-intro">Find the axial forces in BC, GC and GF. The lecture load of 1000 N acts downwards at A (P = 1 kN).</p>
+<div class="section-task"><section class="section-model"><div id="section-figure"></div><div class="section-controls">
 <label>Vertical cut at x (m) <select id="section-cut"><option>1</option><option selected>3</option><option>5</option></select></label>
 <label>Retained side <select id="section-side"><option value="left">Left</option><option value="right">Right</option></select></label>
 <label>Moment centre <select id="section-centre">${fixture.joints.map(j => '<option' + (j.id === 'G' ? ' selected' : '') + '>' + j.id + '</option>').join('')}</select></label>
 <label>P at A (kN, positive downwards) <input id="section-load" type="number" min="-1000" max="1000" step="1" value="1"></label></div><p id="section-selection"></p></section>
-<section class="panel"><h2>Predict the force in each cut member</h2><div class="section-controls">${members.map(m => `<label>${m} <select id="predict-${m}"><option value="">Choose</option><option value="T">Tension</option><option value="C">Compression</option><option value="zero">Zero force</option></select></label>`).join('')}</div>
-<button id="record-section">Record prediction</button> <button id="reveal-section" disabled>Reveal worked solution</button><p id="section-check" role="status"></p></section>
+<section class="section-prediction"><h2>Predict the force in each cut member</h2><div class="section-controls">${members.map(m => `<label>${m} <select id="predict-${m}"><option value="">Choose</option><option value="T">Tension</option><option value="C">Compression</option><option value="zero">Zero force</option></select></label>`).join('')}</div>
+<button id="record-section">Record prediction</button> <button id="reveal-section" disabled>Reveal worked solution</button><p id="section-check" role="status"></p></section></div>
 <section class="panel" id="section-response" hidden></section><section class="panel" id="history" hidden></section><section class="panel" id="insights-panel" hidden></section>`;
 const field = (id: string) => el<HTMLInputElement | HTMLSelectElement>(id);
 const button = (id: string) => el<HTMLButtonElement>(id);
