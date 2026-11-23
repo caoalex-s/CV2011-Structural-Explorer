@@ -179,5 +179,7 @@
     .cut-face-label { font-size:20px; }
 }
 .drawing-workspace .canvas-panel>#section-free-body { padding:.4rem 1rem; border-top:1px solid var(--line); }
+.drawing-workspace #section-free-body #section-fbd { float:none; width:100%; margin:auto; }
+.drawing-workspace .canvas-panel>.section-response { padding:.5rem .75rem; margin:0; }
 .drawing-workspace #section-free-body figure { max-width:45rem; margin:.4rem auto; }
 .drawing-workspace #section-free-body figcaption { text-align:center; }

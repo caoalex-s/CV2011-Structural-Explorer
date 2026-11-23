@@ -72,7 +72,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
       <button id="portal-deactivate" hidden>Disable local checking</button>
       <label id="frame-side-label">Cut face <select id="frame-side"><option value="right">Just right</option><option value="left">Just left</option></select></label>
       <label id="frame-parameter-label">Member parameter t <input id="frame-parameter" type="number" min="0" max="1" step="any" value="0.5"></label>
-      <p id="portal-status" role="status">Local checking is off. Generate enables checking and reloads this workspace once.</p>
+      <p id="portal-status" role="status">Show worked solution enables local checking and reloads this workspace once.</p>
       <div id="frame-worked-output"></div>
       <details><summary>Verification, scope, and exact certificate</summary><div id="portal-readouts"></div>
       <button id="frame-export" hidden>Export exact certificate</button>
@@ -606,6 +606,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
     };
     activate.onclick = async () => {
         const original = generationKey();
+        const requested = pendingGeneration === original;
         stop(); clear('Enabling local checking…');
         try {
             localStorage.setItem(storageKey, JSON.stringify(modelAtPresent()));
@@ -633,7 +634,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                 navigator.serviceWorker.addEventListener('controllerchange', changed);
                 changed();
             });
-            if (original !== generationKey()) {
+            if (original !== generationKey() || (requested && pendingGeneration !== original)) {
                 clear('Section changed. Show the worked solution for the current section.');
                 return;
             }

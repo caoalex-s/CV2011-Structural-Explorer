@@ -52,10 +52,11 @@ export function createDrawingWorkspace(select: (object: Selection | null) => voi
         const tools = find('.left-panel');
         if (compact.matches) {
             canvas.before(tools);
-            canvas.after(cutReadout, choice, properties);
+            canvas.after(cutReadout, choice, properties, find('.section-response'));
         } else {
             canvas.after(tools, find('.response-toolbar'), find('.canvas-header'));
             cutReadout.remove();
+            rail.insertBefore(find('.section-response'), rail.querySelector('.support-reactions'));
             rail.insertBefore(choice, rail.querySelector('.section-response'));
             choice.after(properties);
         }

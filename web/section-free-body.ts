@@ -35,7 +35,8 @@ export function sectionFreeBody(model: Model, analysis: Analysis, memberId: stri
         return force + momentSymbol(x(station), y, C, color, cutFace ? 'M' : symbol, cutFace ? 17 : 31, 0, !cutFace);
     }
     const opposite = retainRight ? 1 : 0;
-    const endValues = sampleSection(analysis, memberId, opposite, retainRight ? 'left' : 'right', model)!;
+    const endValues = sampleSection(analysis, memberId, opposite, retainRight ? 'left' : 'right', model);
+    if (!endValues) return '<p>The numerical mesh combines actions near the member end. Its end resultant cannot be separated for this free body.</p>';
     const sign = retainRight ? 1 : -1;
     let arrows = action(opposite, sign * endValues.N, -sign * endValues.V, sign * endValues.M,
         'Net member-end action', courseColors.reaction);

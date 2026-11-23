@@ -105,3 +105,21 @@ test('the two limits at a point load retain different forces at the same station
         assert.equal(cutDrawing(beam, 0.5, side).includes('data-cut-load="P"'), side === 'right');
     }
 });
+
+test('merged mesh stations expose only their exterior numerical faces', async () => {
+    const { sampleSection } = await import('../web/responses.ts');
+    const model = lessonBeam();
+    model.loads.push({ ...model.loads[0], id: 'second', t: 0.500000001 });
+    const result = analyse(model);
+    const sample = (t, side) => sampleSection(result, 'AB', t, side, model);
+    near(sample(0.5, 'left').V, 20);
+    near(sample(0.500000001, 'right').V, -20);
+    assert.equal(sample(0.5, 'right'), undefined);
+    assert.equal(sample(0.500000001, 'left'), undefined);
+    for (const [end, inward, load] of [[0, 'right', 1e-9], [1, 'left', 1-1e-9]]) {
+        model.loads[1].t = load;
+        const analysis = analyse(model);
+        assert.equal(sampleSection(analysis, 'AB', end, inward, model), undefined);
+        assert.ok(sampleSection(analysis, 'AB', load, inward, model));
+    }
+});

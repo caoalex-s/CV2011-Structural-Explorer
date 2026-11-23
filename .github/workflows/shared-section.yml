@@ -38,6 +38,11 @@ jobs:
           node qa/simple-beams/simple-beam-student-replay.mjs "$playwright" http://127.0.0.1:8765/ .data/shared-evidence/simple-beams offline
           fixture=qa/inclined-frame/published-fixtures/cantilever-interior
           node qa/frame-import/frame-import-review-replay.mjs "$playwright" http://127.0.0.1:8765/ "$fixture.request.json" "$fixture.report" .data/shared-evidence/import
+          mkdir -p .data/independent-portal
+          cp qa/portal-moment-exercise/portal-exercise-*.mjs qa/inclined-diagram/member-diagram-inclined-reference.mjs .data/independent-portal/
+          node .data/independent-portal/portal-exercise-student-replay.mjs "$playwright" http://127.0.0.1:8765/ .data/shared-evidence/portal offline
+          node qa/ideal-truss/truss-exercise-student-replay.mjs "file://$PWD/.data/student-tools/node_modules/playwright/index.mjs" http://127.0.0.1:8765/ .data/shared-evidence/truss offline
+          node qa/week04-sections/section-truss-student-replay.mjs "$playwright" http://127.0.0.1:8765/ .data/shared-evidence/sections offline
       - uses: actions/upload-artifact@v4
         if: always()
         with:

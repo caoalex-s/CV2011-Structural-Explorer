@@ -806,7 +806,12 @@ document.addEventListener('keydown', event => { if ($('workspace').inert || (eve
 } });
 $('load-preset').onclick = () => commit(() => { const preset = $<HTMLSelectElement>('preset').value; model = preset === 'empty' ? { nodes: [], members: [], supports: [], loads: [] } : example(preset); selected = null; start = null; currentMember = model.members[0]?.id || ''; fit(); });
 $<HTMLSelectElement>('section-member').onchange = () => { currentMember = $<HTMLSelectElement>('section-member').value; updateEvidenceBinding(); render(); };
-$<HTMLInputElement>('section-position').oninput = () => { sectionT = Number($<HTMLInputElement>('section-position').value) / 1000; updateEvidenceBinding(); render(); };
+const stationSlider = $<HTMLInputElement>('section-position');
+// Pointer movement uses 1000 steps. An exact typed station can lie between them.
+stationSlider.oninput = () => {
+    sectionT = Math.round(stationSlider.valueAsNumber) / 1000;
+    render();
+};
 $('export-model').onclick = () => download('cv2011-model.json', { version: 2, model });
 $('export-evidence').onclick = async () => {
     try {

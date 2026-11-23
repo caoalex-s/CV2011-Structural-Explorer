@@ -68,6 +68,12 @@ async function review(size, viewport) {
             const names=await fbd.locator('[data-load-id]').evaluateAll(elements=>elements.map(el=>el.dataset.loadId));
             assert.deepEqual(names.sort(),expected.loads.toSorted());
         }
+        const ordinate=page.locator('#canvas .cut-ordinate');
+        if (await ordinate.count()) {
+            assert.equal(await ordinate.getAttribute('data-side'),expected.cutSide);
+            assert.match(normalize(await ordinate.locator('title').textContent()),
+                new RegExp('Selected M = ' + expected.moment + ' kN'));
+        }
     }
     async function verifyReadouts(expected) {
         const readouts=normalize(await page.locator('#section-results').innerText());
@@ -102,11 +108,13 @@ async function review(size, viewport) {
         },expected,{timeout:150000});
         const value=JSON.parse(await receipt.textContent());
         assert.equal(value.protocol,'CV2011_FRAME_1');
+        assert.equal(value.theorem,'RationalFrameSoundness.acceptance_actual_frame');
         assert.equal(value.inputDigest,hash(JSON.stringify(value.sourceRequest)));
         assert.equal(value.packetDigest,hash(value.packet));
         assert.deepEqual(value.values.readouts.slice(0,3).map(asNumber),[0,expected.shear,expected.moment]);
         assert.equal(await page.evaluate(()=>crossOriginIsolated),true);
         await page.locator('#frame-worked-output').waitFor({state:'visible'});
+        assert.match(await page.locator('#portal-scope').textContent(),/compiled checker/i);
         await matchesFigure(expected);
         const record={name,expected,readouts,inputDigest:value.inputDigest,packetDigest:value.packetDigest};
         records.push(record);

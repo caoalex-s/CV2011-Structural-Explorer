@@ -19,25 +19,31 @@ interface ResponseOptions {
 /** Select the adjoining segment first, then interpolate its numerical response. */
 export function sampleSection(analysis: Analysis, currentMember: string, sectionT: number, side: 'left' | 'right' = 'right', model?: Model): Sample | undefined {
     const elements = analysis.elements.filter(e => e.member === currentMember);
-    // At a point action use the right-hand section, except at the member end.
-    // Mesh boundaries use eight decimal places. Locate the chosen face using
-    // the original model station before interpolating the segment samples.
-    const source = new Map<number, number>([[0,0],[1,1]]);
+    // Several distinct source stations can fall on one rounded mesh node.
+    // Only the exterior faces of that group have numerical samples.
+    const bounds = new Map<number, { first: number, last: number }>();
+    function include(station: number) {
+        const key = Number(station.toFixed(8));
+        const group = bounds.get(key);
+        bounds.set(key, { first: Math.min(group?.first ?? station, station),
+            last: Math.max(group?.last ?? station, station) });
+    }
+    include(0);
+    include(1);
     if (model) for (const action of [...model.loads, ...model.supports]) {
         if (action.member !== currentMember) continue;
-        source.set(Number(action.t.toFixed(8)), action.t);
-        if ('end' in action && action.kind === 'distributed')
-            source.set(Number(action.end.toFixed(8)), action.end);
+        include(action.t);
+        if ('end' in action && action.kind === 'distributed') include(action.end);
     }
-    const original = (t: number) => source.get(t) ?? t;
-    const element = elements.find(e => {
-        const a = original(e.t0), b = original(e.t1);
-        return (side === 'left' && sectionT > 0) || sectionT === 1
-            ? a < sectionT && sectionT <= b : a <= sectionT && sectionT < b;
-    });
-    if (!element)
-        return;
-    const u = Math.max(0, Math.min(40, (sectionT - original(element.t0)) / (original(element.t1) - original(element.t0)) * 40));
+    const start = (t: number) => bounds.get(t)?.last ?? t;
+    const end = (t: number) => bounds.get(t)?.first ?? t;
+    const useLeft = sectionT === 1 || (sectionT !== 0 && side === 'left');
+    const element = elements.find(e => useLeft
+        ? start(e.t0) < sectionT && sectionT <= end(e.t1)
+        : start(e.t0) <= sectionT && sectionT < end(e.t1));
+    if (!element) return;
+    const a = start(element.t0), b = end(element.t1);
+    const u = Math.max(0, Math.min(40, (sectionT - a) / (b - a) * 40));
     const left = element.samples[Math.floor(u)], right = element.samples[Math.min(40, Math.ceil(u))], fraction = u - Math.floor(u);
     const sample = { ...left };
     for (const key of ['N', 'V', 'M', 'ux', 'uy', 'rotation'] as const)
@@ -54,9 +60,14 @@ export function renderResponses(options: ResponseOptions) {
     const station = member ? `x = ${number(sectionT * length)} m · L = ${number(length)} m` : '—';
     $('section-distance').textContent = station;
     const sample = sampleSection(analysis, currentMember, sectionT, cutSide, model);
+    const note = document.getElementById('frame-overview-convention');
+    if (note) note.textContent = !sample && member && analysis.status === 'stable'
+        ? 'The numerical mesh combines nearby stations here. Show the worked solution to check the selected face on the original drawing.'
+        : 'Numerical section values are interpolated between diagram samples. Show the worked solution to check this member, station and cut face.';
     const atBoundary = sectionT === 0 || sectionT === 1 || model.loads.some(l => l.member === currentMember && l.kind !== 'distributed' && l.t === sectionT)
         || model.supports.some(s => s.member === currentMember && s.t === sectionT);
     const face = atBoundary ? 'Just ' + cutSide : '';
+    $('section-position').setAttribute('aria-valuetext', station + (face ? ' · ' + face : ''));
     const responseFields = ['N', 'V', 'M', 'rotation', 'displacement'];
     $('section-results').innerHTML = [['Normal force N', sample?.N, 'kN'], ['Shear force V', sample?.V, 'kN'], ['Bending moment M', sample?.M, 'kN m'], ['Physical rotation θ (CCW +)', sample ? sample.rotation * 1000 : undefined, 'mrad'], ['Vertical displacement v (upward +)', sample ? sample.uy * 1000 : undefined, 'mm']].map(([label, value, unit], index) => `<div class="metric ${responseFields[index] === layer ? 'is-current' : ''}"><small>${label}${face && index < 3 ? ' · ' + face : ''}</small><strong>${value === undefined ? '—' : number(Number(value), 4)} <em>${unit}</em></strong></div>`).join('');
     // Classification stays visible; solver diagnostics are available on demand.
