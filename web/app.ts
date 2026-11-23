@@ -28,7 +28,20 @@ let momentExercise: ReturnType<typeof createMomentExercise> | undefined;
 const clone = <T>(value: T): T => structuredClone(value);
 const id = (prefix: string) => `${prefix}${crypto.randomUUID().slice(0, 6)}`;
 renderCourseConventions();
-if (matchMedia('(max-width: 750px)').matches) document.querySelector<HTMLDetailsElement>('#drawing-toolbox')!.open = false;
+// On a phone the model comes first. Keep the DOM order and keyboard order together.
+const narrowWorkspace = matchMedia('(max-width: 750px)');
+function arrangeWorkspace() {
+    for (const disclosure of document.querySelectorAll<HTMLDetailsElement>('#drawing-toolbox, .exercise-directory, .model-files')) {
+        disclosure.open = !narrowWorkspace.matches;
+    }
+    const canvas = document.getElementById('canvas')!;
+    const toolbar = document.querySelector('.response-toolbar')!;
+    const canvasHeader = document.querySelector('.canvas-header')!;
+    if (narrowWorkspace.matches) canvas.after(toolbar, canvasHeader);
+    else canvas.before(toolbar, canvasHeader);
+}
+arrangeWorkspace();
+narrowWorkspace.addEventListener('change', arrangeWorkspace);
 const lesson = lessonContext(location.search);
 if (isPortalWorkspace) {
     const exerciseLink = $('portal-exercise-link').querySelector('a')!;
@@ -689,7 +702,8 @@ function setMode(next: string) {
     controls.showMode(mode);
     const sandboxTitle = portalExercise ? 'Portal frame exercise' : isPortalWorkspace ? 'Checked portal workspace' : 'Structural sandbox';
     $('page-title').textContent = mode === 'sandbox' ? sandboxTitle : mode === 'practice' ? 'Practice problems' : 'Review learning progress';
-    $('page-description').textContent = mode === 'sandbox' && portalExercise ? 'Draw the three-member portal, then predict the location of the maximum bending moment on BC.' : mode === 'sandbox' ? 'Draw a structure or open a model to inspect its response.' : mode === 'practice' ? 'Build the model, submit a step, and examine the reasoning.' : 'Review submitted steps and the evidence behind recurring errors.';
+    $('page-description').textContent = mode === 'sandbox' && portalExercise ? 'Draw the three-member portal, then predict every location where |M| is greatest on BC.' : mode === 'sandbox' ? 'Draw a structure or open a model to inspect its response.' : mode === 'practice' ? 'Build the model, submit a step, and examine the reasoning.' : 'Review submitted steps and the evidence behind recurring errors.';
+    $('page-description').hidden = mode === 'sandbox' && !portalExercise;
     $('practice-panel').hidden = mode !== 'practice';
     $('insights-panel').hidden = mode !== 'insights';
     $('portal-exercise').hidden = !portalExercise || mode === 'insights';

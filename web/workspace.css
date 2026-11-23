@@ -1453,16 +1453,48 @@ dialog { background:var(--paper); color:var(--ink); border:1px solid var(--line)
 #insights-panel > p { max-width:76ch; }
 /* Keep the selected exercise alongside the drawing while room permits. */
 @media(min-width:1200px) {
-    .canvas-column:has(> :is(#portal-exercise,#practice-panel):not([hidden])) {
+    .canvas-column:has(> #practice-panel:not([hidden])) {
         display:grid;
         grid-template-columns:minmax(0,1fr) minmax(16rem,22rem);
         align-items:start;
         gap:0 1.5rem;
     }
-    .canvas-column:has(> :is(#portal-exercise,#practice-panel):not([hidden])) > * { grid-column:1; min-width:0; }
-    .canvas-column:has(> :is(#portal-exercise,#practice-panel):not([hidden])) > :is(#portal-exercise,#practice-panel):not([hidden]) {
+    .canvas-column:has(> #practice-panel:not([hidden])) > * { grid-column:1; min-width:0; }
+    .canvas-column:has(> #practice-panel:not([hidden])) > #practice-panel:not([hidden]) {
         grid-column:2; grid-row:1 / span 3; margin:0; padding:1rem;
         background:var(--paper-deep); border-top:2px solid var(--ink);
     }
-    .canvas-column:has(> :is(#portal-exercise,#practice-panel):not([hidden])) > #worked-panel { grid-column:1 / -1; }
+    .canvas-column:has(> #practice-panel:not([hidden])) > #worked-panel { grid-column:1 / -1; }
+}
+.exercise-directory>summary,.model-files>summary { display:none; }
+.file-actions { display:flex; gap:.4rem; flex-wrap:wrap; }
+@media(max-width:750px) {
+    .topbar .brand { flex:1 0 100%; }
+    .topbar .brand small { white-space:normal; }
+    .topbar .header-actions { margin-left:0; gap:.45rem; }
+    .topbar .header-actions a { margin-left:0; }
+    .topbar .header-actions button { padding:.2rem .4rem; }
+    .topbar nav { margin:0; padding:0; justify-content:flex-start; column-gap:.4rem; }
+    .topbar nav button,.topbar nav .learn-link { flex:0 1 auto; }
+    .exercise-directory>summary,.model-files>summary { display:list-item; color:var(--accent-hover); padding:.4rem 0; font-weight:600; }
+    .exercise-directory { margin-bottom:.5rem; border-block:1px solid var(--line); }
+    .exercise-directory .exercise-links { margin:0; border:0; justify-content:flex-start; }
+    .exercise-directory .exercise-links strong { display:none; }
+    .model-files { flex:1; }
+    .modelbar .spacer { display:none; }
+    .modelbar label { flex:1 1 calc(100% - 7rem); }
+    .workspace-heading { margin:.25rem 0 .6rem; }
+    .topbar .brand b { white-space:nowrap; }
+    .section-workspace .topbar nav a { padding-block:.4rem; }
+    .canvas-panel #canvas { display:block; }
+}
+@media(min-width:1000px) {
+    .workspace-intro { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:end; gap:.5rem 2rem; border-bottom:1px solid var(--line); margin-bottom:.8rem; }
+    .workspace-intro .exercise-links { border:0; margin:0 0 1rem; }
+}
+@media(max-width:750px) {
+    .section-prediction .section-controls { grid-template-columns:1fr; }
+    .section-prediction label { grid-template-columns:2.5rem minmax(0,1fr); }
+    #section-fbd text { font-size:16px; }
+    .exercise-links a,.topbar nav a,.exercise-directory>summary,.model-files>summary { min-height:32px; }
 }
