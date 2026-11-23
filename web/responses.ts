@@ -31,12 +31,13 @@ export function sampleSection(analysis: Analysis, currentMember: string, section
 }
 
 /** Present the current analysis without recalculating or modifying the model. */
-export function renderResponses(options: ResponseOptions): void {
+export function renderResponses(options: ResponseOptions) {
     const { model, analysis, currentMember, sectionT, layer, resultsVisible } = options;
     $<HTMLSelectElement>('section-member').innerHTML = model.members.map(m => `<option value="${escape(m.id)}" ${m.id === currentMember ? 'selected' : ''}>${memberLabel(model, m)}</option>`).join('');
     const member = model.members.find(m => m.id === currentMember);
     const length = member ? Math.hypot(position(model, member.id, 1).x - position(model, member.id, 0).x, position(model, member.id, 1).y - position(model, member.id, 0).y) : 0;
-    $('section-distance').textContent = `x = ${number(sectionT * length)} / ${number(length)} m`;
+    const station = member ? `x = ${number(sectionT * length)} m · L = ${number(length)} m` : '—';
+    $('section-distance').textContent = station;
     const sample = sampleSection(analysis, currentMember, sectionT);
     const responseFields = ['N', 'V', 'M', 'rotation', 'displacement'];
     $('section-results').innerHTML = [['Normal force N', sample?.N, 'kN'], ['Shear force V', sample?.V, 'kN'], ['Bending moment M', sample?.M, 'kN m'], ['Physical rotation θ (CCW +)', sample ? sample.rotation * 1000 : undefined, 'mrad'], ['Vertical displacement v (upward +)', sample ? sample.uy * 1000 : undefined, 'mm']].map(([label, value, unit], index) => `<div class="metric ${responseFields[index] === layer ? 'is-current' : ''}"><small>${label}</small><strong>${value === undefined ? '—' : number(Number(value), 4)} <em>${unit}</em></strong></div>`).join('');
@@ -63,4 +64,5 @@ export function renderResponses(options: ResponseOptions): void {
     $('response-title').textContent = descriptions[layer][0];
     $('response-description').textContent = descriptions[layer][1];
     $('legend').innerHTML = `<div class="legend-item"><span class="swatch" style="background:${courseColors.force}"></span>Applied forces and moments</div><div class="legend-item"><span class="swatch" style="background:${courseColors.reaction}"></span>Reactions and displaced shape</div><p class="small">● Rigid continuity · ○ Pin / hinge<br>Spiral: rotational spring<br>Circle between rails: sliding joint<br>◇ Member-specific constraints</p><p class="small">Forces stay on their lines of action. Moment arcs are centred at their application points. A ground pin does not create an internal hinge.</p><p class="small">At a point action the section readout uses the right-hand limit, except at the member end. Values between plotted samples are interpolated.</p>`;
+    return { sample, station };
 }

@@ -11,6 +11,13 @@ try {
         const beam = await page.locator('#canvas [data-object="member"]').first().boundingBox();
         assert.ok(beam && beam.y > 0 && beam.y + beam.height < (width > 750 ? 1000 : 844), 'Beam must fit on opening at ' + width);
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), width);
+        const station = 'x = 4 m · L = 8 m';
+        assert.equal(await page.locator('#section-distance').textContent(), station);
+        if (width <= 750) {
+            const strip = page.locator('.cut-readout');
+            assert.ok((await strip.innerText()).startsWith(station));
+            assert.ok(await strip.evaluate(e => e.scrollWidth <= e.clientWidth));
+        }
         const picker = page.locator('#drawing-object');
         await picker.focus();
         await page.keyboard.press('Home');

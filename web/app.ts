@@ -519,9 +519,9 @@ function render() {
     if (!model.members.some(m => m.id === currentMember))
         currentMember = model.members[0]?.id || '';
     updateEvidenceBinding();
-    renderResponses({ model, analysis, currentMember, sectionT, layer,
+    const section = renderResponses({ model, analysis, currentMember, sectionT, layer,
         resultsVisible: responsesVisible() });
-    drawingWorkspace.update(model, selected, sectionSample());
+    drawingWorkspace.update(model, selected, section.sample, section.station);
     controls.setHistory(history.length > 0, future.length > 0);
     inspector();
     $('edit-selection').hidden = !selected;

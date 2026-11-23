@@ -3,6 +3,12 @@ import { memberLabel, type Selection } from './model-view.js';
 import { loadLabels } from './load-labels.js';
 import { element, formatNumber } from './ui.js';
 
+// Native option text cannot contain typeset subscripts.
+function displayLoadLabel(label: string) {
+    return label.replace(/_(\d+)$/, (_, digits: string) =>
+        Array.from(digits, digit => '₀₁₂₃₄₅₆₇₈₉'[Number(digit)]).join(''));
+}
+
 // Move the existing controls with their listeners intact. Mark their original
 // places so the practice and instructor views keep their normal document order.
 export function createDrawingWorkspace(select: (object: Selection | null) => void) {
@@ -106,7 +112,7 @@ export function createDrawingWorkspace(select: (object: Selection | null) => voi
         for (const button of toolbox.querySelectorAll('button[data-tool]'))
             button.setAttribute('title', button.textContent!.trim());
     }
-    function update(model: Model, selected: Selection | null, sample: Sample | undefined) {
+    function update(model: Model, selected: Selection | null, sample: Sample | undefined, station: string) {
         if (!active) return;
         rail.querySelector('h2')!.hidden = compact.matches;
         title.querySelector('h2')!.textContent = element('response-title').textContent;
@@ -114,11 +120,11 @@ export function createDrawingWorkspace(select: (object: Selection | null) => voi
         cutReadout.hidden = !sample;
         if (sample) {
             const sign = (value: number) => (value > 1e-7 ? '+' : '') + formatNumber(value);
-            cutReadout.textContent = element('section-distance').textContent + '   ·   V = ' + sign(sample.V) + ' kN   ·   M = ' + sign(sample.M) + ' kN·m';
+            cutReadout.textContent = station + '   ·   V = ' + sign(sample.V) + ' kN   ·   M = ' + sign(sample.M) + ' kN·m';
         }
         const nodes = nodeLabels(model), loads = loadLabels(model);
         const entries = [
-            ...model.loads.map(l => ({type:'load', id:l.id, name:`${loads.get(l.id)} · ${l.kind === 'force' ? 'Point force' : l.kind === 'moment' ? 'Applied moment' : 'Distributed load'}`})),
+            ...model.loads.map(l => ({type:'load', id:l.id, name:`${displayLoadLabel(loads.get(l.id)!)} · ${l.kind === 'force' ? 'Point force' : l.kind === 'moment' ? 'Applied moment' : 'Distributed load'}`})),
             ...model.members.map(m => ({type:'member', id:m.id, name:`Member ${memberLabel(model,m)}`})),
             ...model.nodes.map(n => ({type:'node', id:n.id, name:`Joint ${nodes.get(n.id)}`})),
             ...model.supports.map(s => ({type:'support', id:s.id, name:`${s.kind} support · ${memberLabel(model,model.members.find(m => m.id === s.member)!)} at t = ${formatNumber(s.t)}`}))
