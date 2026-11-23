@@ -1,7 +1,7 @@
-import { nodeLabels, type Model } from './engine.js';
+import { nodeLabels, type Model, type Sample } from './engine.js';
 import { memberLabel, type Selection } from './model-view.js';
 import { loadLabels } from './load-labels.js';
-import { element } from './ui.js';
+import { element, formatNumber } from './ui.js';
 
 // Move the existing controls with their listeners intact. Mark their original
 // places so the practice and instructor views keep their normal document order.
@@ -20,10 +20,10 @@ export function createDrawingWorkspace(select: (object: Selection | null) => voi
     const title = document.createElement('header');
     title.className = 'drawing-title';
     title.innerHTML = '<h2></h2><span></span>';
+    const cutReadout = document.createElement('div');
+    cutReadout.className = 'cut-readout';
+    cutReadout.setAttribute('aria-live','polite');
     const sectionTitle = document.createElement('h3');
-    const limitNote = document.createElement('p');
-    limitNote.className = 'small';
-    limitNote.textContent = 'At a point load, values use the right-hand limit. At the member end they use the left-hand limit.';
     sectionTitle.textContent = 'Section response';
     const origins = new Map<Element, Comment>();
     const find = (selector: string) => document.querySelector<HTMLElement>(selector)!;
@@ -41,8 +41,11 @@ export function createDrawingWorkspace(select: (object: Selection | null) => voi
     function arrangeInspector() {
         if (!active) return;
         const properties = find('.right-panel');
-        if (compact.matches) element('canvas').after(properties);
-        else rail.insertBefore(properties, rail.querySelector('.section-response'));
+        if (compact.matches) element('canvas').after(cutReadout, properties);
+        else {
+            cutReadout.remove();
+            rail.insertBefore(properties, rail.querySelector('.section-response'));
+        }
     }
     compact.addEventListener('change', arrangeInspector);
     function activate(enabled: boolean) {
@@ -52,7 +55,7 @@ export function createDrawingWorkspace(select: (object: Selection | null) => voi
         if (!active) {
             for (const [node, marker] of origins) marker.replaceWith(node);
             origins.clear();
-            rail.remove(); title.remove(); sectionTitle.remove(); limitNote.remove(); utilities.remove();
+            rail.remove(); cutReadout.remove(); title.remove(); sectionTitle.remove(); utilities.remove();
             for (const disclosure of [directory, files, toolbox]) disclosure.open = !matchMedia('(max-width:750px)').matches;
             return;
         }
@@ -67,7 +70,8 @@ export function createDrawingWorkspace(select: (object: Selection | null) => voi
         const response = find('.section-response');
         move(response, rail);
         response.prepend(sectionTitle);
-        response.append(limitNote);
+        const note = document.getElementById('frame-overview-convention');
+        if (note) move(note, response);
         move(find('.support-reactions'), rail);
         arrangeInspector();
         directory.open = files.open = false;
@@ -75,10 +79,15 @@ export function createDrawingWorkspace(select: (object: Selection | null) => voi
         for (const button of toolbox.querySelectorAll('button[data-tool]'))
             button.setAttribute('title', button.textContent!.trim());
     }
-    function update(model: Model, selected: Selection | null) {
+    function update(model: Model, selected: Selection | null, sample: Sample | undefined) {
         if (!active) return;
         title.querySelector('h2')!.textContent = element('response-title').textContent;
         title.querySelector('span')!.textContent = `${model.nodes.length} joints · ${model.members.length} ${model.members.length === 1 ? 'member' : 'members'}`;
+        cutReadout.hidden = !sample;
+        if (sample) {
+            const sign = (value: number) => (value > 1e-7 ? '+' : '') + formatNumber(value);
+            cutReadout.textContent = element('section-distance').textContent + '   ·   V = ' + sign(sample.V) + ' kN   ·   M = ' + sign(sample.M) + ' kN·m';
+        }
         const nodes = nodeLabels(model), loads = loadLabels(model);
         const entries = [
             ...model.loads.map(l => ({type:'load', id:l.id, name:`${loads.get(l.id)} · ${l.kind === 'force' ? 'Point force' : l.kind === 'moment' ? 'Applied moment' : 'Distributed load'}`})),

@@ -167,7 +167,16 @@ let solutionStep = 'reaction_left', solutionRevealed = false, hintUsed = false, 
 let proofStatus = { lean: 'pending', scope: 'Scaled reaction equilibrium identities and plotting-side inversion.' };
 const svg = $('canvas') as unknown as SVGSVGElement;
 // Shared drawing dimensions keep pointer mapping, fitting and annotations aligned.
-const canvasWidth = 1000, canvasHeight = 400;
+let canvasWidth = 1000;
+const canvasHeight = 400;
+function sizeDrawing() {
+    const width = narrowWorkspace.matches && document.body.classList.contains('drawing-workspace') ? 640 : 1000;
+    if (width === canvasWidth) return;
+    // Preserve the visible span and pan centre when the drawing sheet changes width.
+    view.scale *= width / canvasWidth;
+    canvasWidth = width;
+    svg.setAttribute('viewBox', `0 0 ${width} ${canvasHeight}`);
+}
 svg.setAttribute('viewBox', `0 0 ${canvasWidth} ${canvasHeight}`);
 interface Snap {
     x: number;
@@ -359,13 +368,14 @@ function responsesVisible() {
     return (mode !== 'practice' || practiceResultsVisible) && (!portalExercise || momentExercise?.visible === true);
 }
 function renderCanvas() {
+    sizeDrawing();
     const signsExpanded = $('workspace-conventions').querySelector('details')?.open ?? false;
     $('workspace-conventions').innerHTML = workspaceConventions(model, currentMember);
     $('workspace-conventions').querySelector('details')!.open = signsExpanded;
     const grid = Math.max(0.05, Number($<HTMLInputElement>('grid-spacing').value) || 0.5);
     const spacing = grid * view.scale;
     const origin = screen({ x: 0, y: 0 });
-    let drawing = `<defs><pattern id="grid" width="${spacing}" height="${spacing}" patternUnits="userSpaceOnUse" x="${origin.x % spacing}" y="${origin.y % spacing}"><circle cx="0" cy="0" r="1" fill="#dce5df"/></pattern></defs><rect width="1000" height="400" fill="url(#grid)"/>`;
+    let drawing = `<defs><pattern id="grid" width="${spacing}" height="${spacing}" patternUnits="userSpaceOnUse" x="${origin.x % spacing}" y="${origin.y % spacing}"><circle cx="0" cy="0" r="1" fill="#dce5df"/></pattern></defs><rect width="${canvasWidth}" height="${canvasHeight}" fill="url(#grid)"/>`;
     const all = analysis.elements.flatMap(e => e.samples);
     if (analysis.status === 'stable' && layer !== 'none' && responsesVisible()) {
         if (layer === 'displacement') {
@@ -397,14 +407,13 @@ function renderCanvas() {
     }
     for (const support of model.supports)
         drawing += supportDrawing(support);
-    for (const load of model.loads)
-        {
-            if (selected?.type === 'load' && selected.id === load.id && document.body.classList.contains('drawing-workspace')) {
-                const attachment = screen(position(model, load.member, load.t));
-                drawing += `<circle class="attachment-ring" cx="${attachment.x}" cy="${attachment.y}" r="11" pointer-events="none"/>`;
-            }
-            drawing += loadDrawing(load);
+    for (const load of model.loads) {
+        if (selected?.type === 'load' && selected.id === load.id && document.body.classList.contains('drawing-workspace')) {
+            const attachment = screen(position(model, load.member, load.t));
+            drawing += `<circle class="attachment-ring" cx="${attachment.x}" cy="${attachment.y}" r="11" pointer-events="none"/>`;
         }
+        drawing += loadDrawing(load);
+    }
     for (const node of model.nodes) drawing += jointDrawing(node);
     if ($<HTMLInputElement>('show-reactions').checked && responsesVisible())
         for (const reaction of analysis.reactions) {
@@ -437,7 +446,13 @@ function renderCanvas() {
         drawing += `<circle cx="${p.x}" cy="${p.y}" r="8" fill="none" stroke="#087f78" stroke-width="1.5"/>`;
     }
     if (!model.members.length)
-        drawing += `<text x="500" y="180" text-anchor="middle" class="svg-label" style="font-size:23px">Your structure starts here.</text><text x="500" y="215" text-anchor="middle" class="svg-value">Choose Draw member. Click a start point and an end point.</text>`;
+        drawing += `<text x="${canvasWidth / 2}" y="180" text-anchor="middle" class="svg-label" style="font-size:23px">Your structure starts here.</text><text x="${canvasWidth / 2}" y="215" text-anchor="middle" class="svg-value">Choose Draw member. Click a start point and an end point.</text>`;
+    if (model.members.length && document.body.classList.contains('drawing-workspace')) {
+        // The scale bar measures undeformed model length, independently of diagram magnification.
+        const metres = 2 ** Math.floor(Math.log2(90 / view.scale));
+        const end = canvasWidth - 25, begin = end - metres * view.scale;
+        drawing += `<g class="drawing-scale" aria-label="Drawing scale"><path d="M${begin} 366v6H${end}v-6"/><text x="${(begin + end) / 2}" y="361" text-anchor="middle">${number(metres)} m</text></g>`;
+    }
     svg.innerHTML = drawing;
     if (selected && document.body.classList.contains('drawing-workspace')) {
         const target = svg.querySelector('[data-object="' + CSS.escape(selected.type) + '"][data-id="' + CSS.escape(selected.id) + '"]');
@@ -506,7 +521,7 @@ function render() {
     updateEvidenceBinding();
     renderResponses({ model, analysis, currentMember, sectionT, layer,
         resultsVisible: responsesVisible() });
-    drawingWorkspace.update(model, selected);
+    drawingWorkspace.update(model, selected, sectionSample());
     controls.setHistory(history.length > 0, future.length > 0);
     inspector();
     $('edit-selection').hidden = !selected;
@@ -713,6 +728,7 @@ function setMode(next: string) {
     location.hash = mode;
     drawingWorkspace.activate(mode === 'sandbox' && !isPortalWorkspace && !portalExercise);
     controls.showMode(mode);
+    sizeDrawing();
     const sandboxTitle = portalExercise ? 'Portal frame exercise' : isPortalWorkspace ? 'Checked portal workspace' : 'Structural sandbox';
     $('page-title').textContent = mode === 'sandbox' ? sandboxTitle : mode === 'practice' ? 'Practice problems' : 'Review learning progress';
     $('page-description').textContent = mode === 'sandbox' && portalExercise ? 'Draw the three-member portal, then predict every location where |M| is greatest on BC.' : mode === 'sandbox' ? 'Draw a structure or open a model to inspect its response.' : mode === 'practice' ? 'Build the model, submit a step, and examine the reasoning.' : 'Review submitted steps and the evidence behind recurring errors.';
@@ -734,7 +750,11 @@ $('zoom-in').onclick = () => { view.scale = Math.min(500, view.scale * 1.25); re
 $('zoom-out').onclick = () => { view.scale = Math.max(10, view.scale / 1.25); renderCanvas(); };
 $('fit').onclick = () => { fit(); renderCanvas(); };
 $('focus-workspace').onclick = () => controls.setFocus($('focus-workspace').getAttribute('aria-pressed') !== 'true');
-$('close-inspector').onclick = () => { selected = null; render(); };
+$('close-inspector').onclick = () => {
+    selected = null;
+    render();
+    document.getElementById('drawing-object')?.focus({ preventScroll: true });
+};
 $('help-button').onclick = () => $<HTMLDialogElement>('workspace-help').showModal();
 $('edit-selection').onclick = () => {
     controls.setFocus(false);

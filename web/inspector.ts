@@ -104,13 +104,35 @@ export function renderInspector(options: InspectorOptions): void {
                 html += field('end', 'End / member length', 'any') + field('fy', 'Start intensity w, downward + (kN/m)', 'any', -1) + field('qEnd', 'End intensity w, downward + (kN/m)', 'any', -1);
             html += '<details class="inspector-help"><summary>Load notation and directions</summary><p class="small">Use P or F for a force, M for a couple, and w or q for distributed loading. An optional subscript uses an underscore, for example P_1 or M_0. Each load has its own label.</p><p class="small">The action belongs to this member side at a joint. Arrows retain their physical line of action; moment arcs retain their application centre.</p></details>';
         }
+        const editorKey = selected.type + ':' + selected.id;
+        const expanded = container.dataset.object === editorKey && container.querySelector('details.load-settings')?.hasAttribute('open');
+        container.dataset.object = editorKey;
         container.innerHTML = html + '<button id="delete-selected">Delete selected object</button>';
         if (document.body.classList.contains('drawing-workspace') && selected.type === 'load') {
             const principal = container.querySelector<HTMLInputElement>(item.kind === 'moment' ? '[data-property="mz"]' : '[data-property="fy"]');
             const heading = container.querySelector('h3')!;
-            heading.textContent = (item.kind === 'force' ? 'Point force' : item.kind === 'moment' ? 'Applied moment' : 'Distributed load') + ' · ' + loadLabels(model).get(selected.id);
+            const label = loadLabels(model).get(selected.id)!;
+            heading.textContent = (item.kind === 'force' ? 'Point force' : item.kind === 'moment' ? 'Applied moment' : 'Distributed load') + ' · ';
+            const [symbol, subscript] = label.split('_');
+            const notation = document.createElement('i');
+            notation.textContent = symbol;
+            if (subscript) {
+                const index = document.createElement('sub');
+                index.textContent = subscript;
+                notation.append(index);
+            }
+            heading.append(notation);
             const primaryField = principal?.closest('label');
-            if (primaryField) { primaryField.classList.add('principal-field'); heading.after(primaryField); }
+            if (primaryField) {
+                primaryField.classList.add('principal-field');
+                heading.after(primaryField);
+                const settings = document.createElement('details');
+                settings.className = 'load-settings';
+                settings.open = !!expanded;
+                settings.innerHTML = '<summary>Position and load settings</summary>';
+                while (primaryField.nextElementSibling) settings.append(primaryField.nextElementSibling);
+                primaryField.after(settings);
+            }
         }
         container.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-property]').forEach(input => input.addEventListener('change', () => {
             let key = input.dataset.property!;
@@ -133,6 +155,7 @@ export function renderInspector(options: InspectorOptions): void {
                 inspector();
                 return;
             }
+            const restoreKeyboardFocus = input.matches(':focus-visible') && document.body.classList.contains('drawing-workspace');
             commit(() => {
                 const previousConnections = selected?.type === 'node' && key === 'joint' ? jointConnections(model, model.nodes.find(node => node.id === selected!.id)!) : [];
                 if (key === 'member') {
@@ -153,6 +176,12 @@ export function renderInspector(options: InspectorOptions): void {
                         } else if (end === 'a') delete member.connectionA; else delete member.connectionB;
                     }
                 }
+            });
+            // A commit rebuilds the fields. Preserve native Tab navigation when it
+            // succeeded, and restore the edited control when focus fell to the body.
+            if (restoreKeyboardFocus) requestAnimationFrame(() => {
+                if (document.activeElement === document.body)
+                    container.querySelector<HTMLElement>('[data-property="' + CSS.escape(key) + '"]')?.focus({preventScroll:true});
             });
         }));
         bindConnectionEditors(container);

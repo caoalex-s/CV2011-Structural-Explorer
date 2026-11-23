@@ -26,6 +26,8 @@ try {
         await page.keyboard.press('Enter');
         assert.equal(await group.locator(control).isVisible(), false);
     }
+    const menu = page.locator('.drawing-utilities > summary');
+    if (await menu.count()) await menu.click();
     await page.locator('#settings-button').click();
     await page.screenshot({path:output+'/mobile-settings.png'});
     await page.keyboard.press('Escape');
