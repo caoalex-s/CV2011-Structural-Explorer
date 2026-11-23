@@ -37,7 +37,7 @@ el('workspace').innerHTML = `<h1>Ideal planar truss</h1>
 <label>Stability <select name="state" required><option value="">Choose</option><option>Stable and determinate</option><option>Stable and indeterminate</option><option>Mechanism</option></select></label>
 <label>Permitted joint motion <input name="motion" required></label><button>Record prediction</button></form><p id="feedback" role="status"></p><button id="reveal" disabled>Reveal equilibrium</button></section></div>
 <section id="response" class="panel" hidden></section><section id="history" class="panel" hidden></section><section id="insights-panel" class="panel" hidden></section>`;
-const session = createLearningSession({ trussOnly: true, notify: message => { el('hint').textContent = message; }, onConnectionChange: () => session.updateStatus() });
+const session = createLearningSession({ exercise: 'ideal_planar_truss', notify: message => { el('hint').textContent = message; }, onConnectionChange: () => session.updateStatus() });
 session.updateStatus();
 el('instructor').onclick = async () => { await pendingRecord; el('insights-panel').hidden = false; await session.renderInsights(); el('insights-panel').scrollIntoView(); };
 const svg = document.querySelector<SVGSVGElement>('#truss-canvas')!;

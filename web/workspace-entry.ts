@@ -2,7 +2,10 @@ import { setWorkspaceBusy } from './workspace-readiness.js';
 
 const exercise = new URLSearchParams(location.search).get('exercise');
 try {
-    if (exercise === 'ideal-planar-truss') {
+    if (exercise === 'week04-truss-sections') {
+        await import('./week04-workspace.js');
+        setWorkspaceBusy(false);
+    } else if (exercise === 'ideal-planar-truss') {
         await import('./truss-workspace.js');
         setWorkspaceBusy(false);
     } else {

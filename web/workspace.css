@@ -1358,3 +1358,8 @@ dialog::backdrop {
 
 #workspace-operation { margin: .5rem 1rem; }
 #workspace[aria-busy="true"] #worked-panel { visibility: hidden; }
+.section-controls { display: grid; grid-template-columns: repeat(auto-fit,minmax(10rem,1fr)); gap: 1rem; }
+#section-drawing, #section-fbd { display:block; width:100%; max-width:48rem; margin:auto; }
+#section-response pre { white-space:pre-wrap; overflow-wrap:anywhere; }
+#workspace:has(#section-cut) { max-width:68rem; }
+#workspace:has(#section-cut) .panel { margin:1rem 0; }

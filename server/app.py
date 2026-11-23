@@ -179,7 +179,7 @@ def make_handler(store, instructor_token, origins, local_demo=None):
                         raise ValueError("Course ID does not correspond to the authenticated account.")
                     if payload.get("step") == "portal_absolute_moment" and payload.get("event") in ("first_prediction", "retry", "reveal"):
                         result = {"status": "not_graded", "category": payload["event"], "message": "Portal event recorded. The browser checks predictions against the current member diagram.", "verifier": VERSION}
-                    elif payload.get("step") == "ideal_planar_truss" and payload.get("event") in ("first_prediction", "retry", "reveal"):
+                    elif payload.get("step") in ("ideal_planar_truss", "week04_sections") and payload.get("event") in ("first_prediction", "retry", "reveal"):
                         result = {"status": "not_graded", "category": payload["event"], "message": "Truss learning event recorded.", "verifier": VERSION}
                     elif payload.get("event") == "submit":
                         result = check_concept(payload) if str(payload.get("step", "")).startswith("concept_") else check(payload)
