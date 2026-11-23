@@ -21,6 +21,7 @@ const topics = [
       <div><span class="eyebrow">Start here · Unit 01</span><h2>A beam, from supports<br />to diagrams</h2><p>Supports → reactions → internal forces</p><span class="text-link">Open the interactive unit <span aria-hidden="true">↗</span></span></div>
       <svg viewBox="0 0 420 225" aria-hidden="true"><path d="M45 90H375" class="beam-stroke" /><g transform="translate(45 90)" class="support-stroke" set:html={supportShape('pin')} /><g transform="translate(375 90)" class="support-stroke" set:html={supportShape('roller')} /><g set:html={forceSymbol(210, 90, 0, -1, courseColors.force, 'P', 50)} /><path d="M45 150l165 60 165-60Z" class="moment-fill" /><path d="M45 150H375" class="axis-stroke" /><text x="216" y="192" class="svg-variable">M</text></svg>
     </a>
+    <p class="lesson-links"><a href={base + "?exercise=simple-beams"}>Simple beams</a> · Shear and moment across a point load</p>
     <section class="course-map" aria-labelledby="map-title">
       <div class="section-heading"><h2 id="map-title">The course at a glance</h2></div>
       <ol>{topics.map((topic) => <li><span class="eyebrow">{topic.weeks}</span><div><h3>{topic.title}</h3><p>{topic.text}</p>{topic.title === 'Planar trusses' ? <div class="lesson-links"><a href={`${base}?exercise=ideal-planar-truss`}>Method of joints</a><a href={`${base}?exercise=week04-truss-sections`}>Method of sections</a></div> : <span class="availability">{topic.status}</span>}</div></li>)}</ol>

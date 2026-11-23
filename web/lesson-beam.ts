@@ -27,13 +27,17 @@ export function lessonBeam(inputs: BeamInputs = initialBeam, supports: SupportCa
 }
 
 /** Right-hand shear at a concentrated force; moment is continuous there. */
-export function beamValues(inputs: BeamInputs, section = 0.5) {
+export type CutSide = 'left' | 'right';
+export function retainsPointLoad(section: number, position: number, side: CutSide): boolean {
+    return section > position || (section === position && side === 'right');
+}
+export function beamValues(inputs: BeamInputs, section = 0.5, side: CutSide = 'right') {
     lessonBeam(inputs);
     if (!Number.isFinite(section) || section < 0 || section > 1) throw Error('Section must lie on the span.');
     const { load: P, span: L, position } = inputs;
     const a = position * L, x = section * L;
     const left = P * (1 - position), right = P * position;
-    const pastLoad = section >= position;
+    const pastLoad = retainsPointLoad(section, position, side);
     return { a, x, left, right, normal: 0,
         shear: pastLoad ? -right : left,
         moment: left * x - (pastLoad ? P * (x - a) : 0),

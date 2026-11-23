@@ -36,7 +36,7 @@ export interface AttemptContext {
 }
 
 interface SessionOptions {
-    exercise?: 'ideal_planar_truss'|'week04_sections';
+    exercise?: 'ideal_planar_truss'|'week04_sections'|'simple_beams';
     notify: (message: string) => void;
     onConnectionChange: () => void;
 }
@@ -63,7 +63,7 @@ export function createLearningSession({ notify: toast, onConnectionChange, exerc
 
     function canSend(attempt: Attempt) {
         if (exercise && attempt.step !== exercise) return false;
-        if (!['portal_absolute_moment','ideal_planar_truss','week04_sections'].includes(attempt.step)) return true;
+        if (!['portal_absolute_moment','ideal_planar_truss','week04_sections','simple_beams'].includes(attempt.step)) return true;
         try { return loopback && ['localhost','127.0.0.1'].includes(new URL(config.url).hostname); }
         catch { return false; }
     }
@@ -77,7 +77,7 @@ export function createLearningSession({ notify: toast, onConnectionChange, exerc
             throw Error('No verifier configured.');
         const response = await fetch(config.url.replace(/\/$/, '') + path, {
             method: payload === undefined ? 'GET' : 'POST',
-            redirect: exercise || ['ideal_planar_truss','week04_sections'].includes((payload as Partial<Attempt>)?.step || '') ? 'error' : 'follow',
+            redirect: exercise || ['ideal_planar_truss','week04_sections','simple_beams'].includes((payload as Partial<Attempt>)?.step || '') ? 'error' : 'follow',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${instructor ? config.instructor : config.token}`,
@@ -213,7 +213,7 @@ export function createLearningSession({ notify: toast, onConnectionChange, exerc
             <div class="panel"><div class="insight-number">${checked.length ? Math.round(100 * (checked.length - wrong.length) / checked.length) + '%' : '—'}</div><p>Correct among ${checked.length} checked submissions in this view</p></div>
             <div class="panel"><div class="insight-number">${new Set(submissions.map(a => a.courseId)).size}</div><p>Pseudonymous IDs in this view</p></div></div>
             <h2>Observed answer patterns</h2>${Object.keys(categories).length ? `<table class="data-table"><thead><tr><th>Pattern</th><th>Occurrences</th></tr></thead><tbody>${Object.entries(categories).map(([name, count]) => `<tr><td>${escape(name.replaceAll('_', ' '))}</td><td>${count}</td></tr>`).join('')}</tbody></table>` : '<p class="small">No checked incorrect submissions in this view.</p>'}
-            ${[['ideal_planar_truss','Ideal truss predictions'],['week04_sections','Week 04 section predictions']].map(([step,heading]) => records.some(a=>a.step===step)?'<h2>'+heading+'</h2><table><thead><tr><th>Pseudonymous ID</th><th>Event</th><th>Drawing and answer</th><th>Worked solution shown</th></tr></thead><tbody>'+records.filter(a=>a.step===step).map(a=>'<tr><td>'+escape(a.courseId)+'</td><td>'+escape(a.event)+'</td><td><details><summary>'+escape(a.answer||'View drawing')+'</summary><pre>'+escape(JSON.stringify(a.model,null,2))+'</pre></details></td><td>'+(a.solutionRevealed?'Yes':'No')+'</td></tr>').join('')+'</tbody></table>':'').join('')}
+            ${[['ideal_planar_truss','Ideal truss predictions'],['week04_sections','Week 04 section predictions'],['simple_beams','Simple beam predictions']].map(([step,heading]) => records.some(a=>a.step===step)?'<h2>'+heading+'</h2><table><thead><tr><th>Pseudonymous ID</th><th>Event</th><th>Drawing and answer</th><th>Worked solution shown</th></tr></thead><tbody>'+records.filter(a=>a.step===step).map(a=>'<tr><td>'+escape(a.courseId)+'</td><td>'+escape(a.event)+'</td><td><details><summary>'+escape(a.answer||'View drawing')+'</summary><pre>'+escape(JSON.stringify(a.model,null,2))+'</pre></details></td><td>'+(a.solutionRevealed?'Yes':'No')+'</td></tr>').join('')+'</tbody></table>':'').join('')}
 
             <h2>Portal exercise predictions</h2><table class="data-table"><thead><tr><th>Pseudonymous ID</th><th>Event</th><th>Prediction (m)</th><th>Worked solution for this drawing</th></tr></thead><tbody>${records.filter(a=>a.step === 'portal_absolute_moment').slice(-30).map(a=>`<tr><td>${escape(a.courseId)}</td><td>${escape(a.event.replaceAll('_',' '))}</td><td>${escape(a.answer)}</td><td>${a.solutionRevealed?'Worked solution shown':'No reveal recorded'}</td></tr>`).join('')}</tbody></table>
             <p class="small">Each edited drawing has its own first prediction. A reveal row records when the student opened that drawing’s worked solution.</p>
@@ -258,6 +258,7 @@ export function createLearningSession({ notify: toast, onConnectionChange, exerc
         get courseId() { return config.courseId || 'local-unassigned'; },
         request: api,
         record,
+        beamEvents: () => attempts.filter(a => a.step === 'simple_beams' && a.courseId === (config.courseId || 'local-unassigned')),
         sectionEvents: () => attempts.filter(a => a.step === 'week04_sections' && a.courseId === (config.courseId || 'local-unassigned')),
         portalHistory(model:Model) {
             const source = JSON.stringify(model);

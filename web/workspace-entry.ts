@@ -7,7 +7,10 @@ document.querySelector<HTMLAnchorElement>('.skip-workspace')!.onclick = event =>
 };
 const exercise = new URLSearchParams(location.search).get('exercise');
 try {
-    if (exercise === 'week04-truss-sections') {
+    if (exercise === 'simple-beams') {
+        await import('./simple-beams.js');
+        setWorkspaceBusy(false);
+    } else if (exercise === 'week04-truss-sections') {
         await import('./week04-workspace.js');
         setWorkspaceBusy(false);
     } else if (exercise === 'ideal-planar-truss') {

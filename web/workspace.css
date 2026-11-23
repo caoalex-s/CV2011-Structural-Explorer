@@ -1499,3 +1499,18 @@ dialog { background:var(--paper); color:var(--ink); border:1px solid var(--line)
     #section-fbd text { font-size:16px; }
     .exercise-links a,.topbar nav a,.exercise-directory>summary,.model-files>summary { min-height:32px; }
 }
+
+.simple-beams #beam-model, .simple-beams #beam-fbd { display: block; width: 100%; max-width: 760px; }
+.simple-beams .beam-stroke { stroke: var(--ink); stroke-width: 4; fill: none; }
+.simple-beams .support-stroke { stroke: var(--ink); stroke-width: 1.6; fill: white; }
+.simple-beams .load-stroke { stroke: #2f6f73; stroke-width: 2; fill: none; }
+.simple-beams .axis-stroke, .simple-beams .dimension-stroke { stroke: #626a68; fill: none; }
+.simple-beams .section-line { stroke: #936516; stroke-dasharray: 5 4; stroke-width: 2; }
+.simple-beams .svg-label { font: 18px Georgia, serif; fill: var(--ink); }
+.simple-beams #beam-cut { min-height: 44px; }
+.simple-beams #beam-answer { min-width: 0; }
+.simple-beams #beam-receipt, .simple-beams .katex-display { max-width: 100%; overflow: auto; }
+@media (max-width: 600px) {
+    .simple-beams .svg-label { font-size: 25px; }
+    .simple-beams .section-controls { grid-template-columns: 1fr; }
+}

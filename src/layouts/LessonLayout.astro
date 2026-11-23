@@ -19,7 +19,7 @@ const base = import.meta.env.BASE_URL;
     <a class="skip-link" href="#main">Skip to content</a>
     <header class="learn-header">
       <a class="learn-brand" href={`${base}learn/`}><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M7 28V12h26v16M7 12l13 16 13-16M3 32h8m18 0h8" /></svg><span>Structural Explorer<small>CV2011 · Learn</small></span></a>
-      <nav aria-label="Main"><a href={`${base}learn/`} aria-current="page">Learn</a><a href={`${base}#sandbox`}>Sandbox</a><a href={`${base}#practice`}>Solve a problem</a></nav>
+      <nav aria-label="Main"><a href={`${base}learn/`} aria-current="page">Course</a><a href={`${base}#sandbox`}>Sandbox</a><a href={`${base}#practice`}>Solve a problem</a></nav>
       {activity && <button id="settings-button" class="quiet">Session</button>}
     </header>
     <main id="main"><slot /></main>
