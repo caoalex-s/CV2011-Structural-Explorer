@@ -105,6 +105,13 @@ export function renderInspector(options: InspectorOptions): void {
             html += '<details class="inspector-help"><summary>Load notation and directions</summary><p class="small">Use P or F for a force, M for a couple, and w or q for distributed loading. An optional subscript uses an underscore, for example P_1 or M_0. Each load has its own label.</p><p class="small">The action belongs to this member side at a joint. Arrows retain their physical line of action; moment arcs retain their application centre.</p></details>';
         }
         container.innerHTML = html + '<button id="delete-selected">Delete selected object</button>';
+        if (document.body.classList.contains('drawing-workspace') && selected.type === 'load') {
+            const principal = container.querySelector<HTMLInputElement>(item.kind === 'moment' ? '[data-property="mz"]' : '[data-property="fy"]');
+            const heading = container.querySelector('h3')!;
+            heading.textContent = (item.kind === 'force' ? 'Point force' : item.kind === 'moment' ? 'Applied moment' : 'Distributed load') + ' · ' + loadLabels(model).get(selected.id);
+            const primaryField = principal?.closest('label');
+            if (primaryField) { primaryField.classList.add('principal-field'); heading.after(primaryField); }
+        }
         container.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-property]').forEach(input => input.addEventListener('change', () => {
             let key = input.dataset.property!;
             let value = input.type === 'checkbox' ? (input as HTMLInputElement).checked : ['kind', 'joint', 'referenceMember', 'member', 'label'].includes(key) ? input.value.trim() : Number(input.value) * Number(input.dataset.direction || 1);

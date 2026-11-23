@@ -16,6 +16,7 @@ import { jointConnections } from './model-view.js';
 import type { Selection } from './model-view.js';
 import { renderInspector } from './inspector.js';
 import { renderResponses, sampleSection } from './responses.js';
+import { createDrawingWorkspace } from './drawing-workspace.js';
 import { createWorkspaceControls } from './workspace-controls.js';
 import { createLearningSession } from './learning-session.js';
 import { createEvidenceEnvelope, EvidenceRequests, parseEvidenceModel } from './model-evidence.js';
@@ -32,7 +33,7 @@ renderCourseConventions();
 const narrowWorkspace = matchMedia('(max-width: 750px)');
 function arrangeWorkspace() {
     for (const disclosure of document.querySelectorAll<HTMLDetailsElement>('#drawing-toolbox, .exercise-directory, .model-files')) {
-        disclosure.open = !narrowWorkspace.matches;
+        disclosure.open = !narrowWorkspace.matches && (disclosure.id === 'drawing-toolbox' || !document.body.classList.contains('drawing-workspace'));
     }
     const canvas = document.getElementById('canvas')!;
     const toolbar = document.querySelector('.response-toolbar')!;
@@ -397,7 +398,13 @@ function renderCanvas() {
     for (const support of model.supports)
         drawing += supportDrawing(support);
     for (const load of model.loads)
-        drawing += loadDrawing(load);
+        {
+            if (selected?.type === 'load' && selected.id === load.id && document.body.classList.contains('drawing-workspace')) {
+                const attachment = screen(position(model, load.member, load.t));
+                drawing += `<circle class="attachment-ring" cx="${attachment.x}" cy="${attachment.y}" r="11" pointer-events="none"/>`;
+            }
+            drawing += loadDrawing(load);
+        }
     for (const node of model.nodes) drawing += jointDrawing(node);
     if ($<HTMLInputElement>('show-reactions').checked && responsesVisible())
         for (const reaction of analysis.reactions) {
@@ -432,6 +439,10 @@ function renderCanvas() {
     if (!model.members.length)
         drawing += `<text x="500" y="180" text-anchor="middle" class="svg-label" style="font-size:23px">Your structure starts here.</text><text x="500" y="215" text-anchor="middle" class="svg-value">Choose Draw member. Click a start point and an end point.</text>`;
     svg.innerHTML = drawing;
+    if (selected && document.body.classList.contains('drawing-workspace')) {
+        const target = svg.querySelector('[data-object="' + CSS.escape(selected.type) + '"][data-id="' + CSS.escape(selected.id) + '"]');
+        target?.classList.add('drawing-selection');
+    }
     fitCanvasAnnotations();
 }
 
@@ -495,6 +506,7 @@ function render() {
     updateEvidenceBinding();
     renderResponses({ model, analysis, currentMember, sectionT, layer,
         resultsVisible: responsesVisible() });
+    drawingWorkspace.update(model, selected);
     controls.setHistory(history.length > 0, future.length > 0);
     inspector();
     $('edit-selection').hidden = !selected;
@@ -699,6 +711,7 @@ svg.addEventListener('wheel', event => { event.preventDefault(); view.scale = Ma
 function setMode(next: string) {
     mode = ['sandbox', 'practice', 'insights'].includes(next) ? next : 'sandbox';
     location.hash = mode;
+    drawingWorkspace.activate(mode === 'sandbox' && !isPortalWorkspace && !portalExercise);
     controls.showMode(mode);
     const sandboxTitle = portalExercise ? 'Portal frame exercise' : isPortalWorkspace ? 'Checked portal workspace' : 'Structural sandbox';
     $('page-title').textContent = mode === 'sandbox' ? sandboxTitle : mode === 'practice' ? 'Practice problems' : 'Review learning progress';
@@ -885,6 +898,14 @@ function record(event: string, answer: string, units: string): Promise<Attempt> 
         solutionRevealed: solutionRevealed || practiceResultsVisible }, event, answer, units);
 }
 // Components bind once. Model edits and navigation still share this controller.
+const drawingWorkspace = createDrawingWorkspace(object => {
+    tool = 'select';
+    controls.showTool(tool);
+    start = null;
+    selected = object;
+    if (object?.type === 'member') currentMember = object.id;
+    render();
+});
 const controls = createWorkspaceControls({
     selectTool: next => {
         tool = next; start = null;
