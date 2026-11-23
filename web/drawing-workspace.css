@@ -146,3 +146,5 @@
     padding:.5rem .75rem; background:#edece5; border-block:1px solid var(--line);
     font:normal .96rem var(--font-math-roman); color:var(--ink); font-variant-numeric:tabular-nums;
 }
+.drawing-workspace .canvas-panel>.object-choice { display:flex; align-items:center; gap:.7rem; padding:.35rem .65rem; background:var(--paper); border-bottom:1px solid var(--line); }
+.drawing-workspace .canvas-panel>.object-choice select { flex:1; width:auto; min-width:0; }

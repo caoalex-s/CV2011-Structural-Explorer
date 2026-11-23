@@ -921,6 +921,7 @@ function record(event: string, answer: string, units: string): Promise<Attempt> 
 const drawingWorkspace = createDrawingWorkspace(object => {
     tool = 'select';
     controls.showTool(tool);
+    $('tool-hint').textContent = 'Select an object to edit. Drag to move.';
     start = null;
     selected = object;
     if (object?.type === 'member') currentMember = object.id;

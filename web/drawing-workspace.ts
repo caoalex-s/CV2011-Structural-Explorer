@@ -10,7 +10,8 @@ export function createDrawingWorkspace(select: (object: Selection | null) => voi
     rail.className = 'drawing-rail';
     rail.setAttribute('aria-label', 'Drawing inspection');
     rail.innerHTML = '<h2>Inspect drawing</h2><label class="object-choice">Object properties<select id="drawing-object"><option value="">Select an object</option></select></label>';
-    const picker = rail.querySelector('select')!;
+    const choice = rail.querySelector('label')!;
+    const picker = choice.querySelector('select')!;
     let objects: Selection[] = [];
     picker.onchange = () => select(objects[picker.selectedIndex - 1] ?? null);
 
@@ -41,13 +42,28 @@ export function createDrawingWorkspace(select: (object: Selection | null) => voi
     function arrangeInspector() {
         if (!active) return;
         const properties = find('.right-panel');
-        if (compact.matches) element('canvas').after(cutReadout, properties);
+        if (compact.matches) element('canvas').after(cutReadout, choice, properties);
         else {
             cutReadout.remove();
-            rail.insertBefore(properties, rail.querySelector('.section-response'));
+            rail.insertBefore(choice, rail.querySelector('.section-response'));
+            choice.after(properties);
         }
     }
     compact.addEventListener('change', arrangeInspector);
+    const menus = [directory, files, utilities];
+    document.addEventListener('pointerdown', event => {
+        if (!active) return;
+        for (const menu of menus)
+            if (menu.open && !menu.contains(event.target as Node)) menu.open = false;
+    });
+    document.addEventListener('keydown', event => {
+        if (!active || event.key !== 'Escape') return;
+        const menu = menus.find(item => item.open && item.contains(document.activeElement));
+        if (menu) {
+            menu.open = false;
+            menu.querySelector('summary')!.focus();
+        }
+    });
     function activate(enabled: boolean) {
         if (enabled === active) return;
         active = enabled;
@@ -55,6 +71,7 @@ export function createDrawingWorkspace(select: (object: Selection | null) => voi
         if (!active) {
             for (const [node, marker] of origins) marker.replaceWith(node);
             origins.clear();
+            rail.append(choice);
             rail.remove(); cutReadout.remove(); title.remove(); sectionTitle.remove(); utilities.remove();
             for (const disclosure of [directory, files, toolbox]) disclosure.open = !matchMedia('(max-width:750px)').matches;
             return;
@@ -81,6 +98,7 @@ export function createDrawingWorkspace(select: (object: Selection | null) => voi
     }
     function update(model: Model, selected: Selection | null, sample: Sample | undefined) {
         if (!active) return;
+        rail.querySelector('h2')!.hidden = compact.matches;
         title.querySelector('h2')!.textContent = element('response-title').textContent;
         title.querySelector('span')!.textContent = `${model.nodes.length} joints · ${model.members.length} ${model.members.length === 1 ? 'member' : 'members'}`;
         cutReadout.hidden = !sample;
@@ -93,7 +111,7 @@ export function createDrawingWorkspace(select: (object: Selection | null) => voi
             ...model.loads.map(l => ({type:'load', id:l.id, name:`${loads.get(l.id)} · ${l.kind === 'force' ? 'Point force' : l.kind === 'moment' ? 'Applied moment' : 'Distributed load'}`})),
             ...model.members.map(m => ({type:'member', id:m.id, name:`Member ${memberLabel(model,m)}`})),
             ...model.nodes.map(n => ({type:'node', id:n.id, name:`Joint ${nodes.get(n.id)}`})),
-            ...model.supports.map(s => ({type:'support', id:s.id, name:`${s.kind} support · ${memberLabel(model,model.members.find(m => m.id === s.member)!)}`}))
+            ...model.supports.map(s => ({type:'support', id:s.id, name:`${s.kind} support · ${memberLabel(model,model.members.find(m => m.id === s.member)!)} at t = ${formatNumber(s.t)}`}))
         ];
         objects = entries;
         picker.replaceChildren(new Option('Select an object',''), ...entries.map(e => new Option(e.name, e.type + ':' + e.id)));

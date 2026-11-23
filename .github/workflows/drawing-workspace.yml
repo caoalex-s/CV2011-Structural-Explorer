@@ -47,6 +47,7 @@ jobs:
       - name: Check course and import routes
         run: |
           playwright="file://$PWD/.data/student-tools/node_modules/playwright/index.mjs"
+          node qa/drawing-workspace/layout.mjs
           node qa/editorial/navigation.mjs
           node qa/simple-beams/simple-beam-student-replay.mjs "$playwright" http://127.0.0.1:8765/ .data/drawing-evidence/simple-beams offline
           fixture=qa/inclined-frame/published-fixtures/cantilever-interior
