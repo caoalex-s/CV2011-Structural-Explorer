@@ -187,7 +187,8 @@ async function collect(name, reference) {
 try {
     // 1. Find the exercise through the main workspace and draw all bars.
     await page.goto(new URL('#sandbox', base).href);
-    await page.getByRole('link', { name: /Ideal planar truss/i }).click();
+    await page.getByRole('link', { name: 'Course', exact: true }).first().click();
+    await page.getByRole('link', { name: 'Method of joints', exact: true }).click();
     await canvas.waitFor({ state: 'visible' });
     if (mode === 'pilot') {
         await control('Session').click();

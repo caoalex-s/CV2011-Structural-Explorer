@@ -166,7 +166,8 @@ async function collect(name, settings, { wrongFirst = false } = {}) {
 
 try {
     await page.goto(new URL('#sandbox', base).href);
-    await page.getByRole('link', { name: /Week 04.*section|Truss.*section/i }).click();
+    await page.getByRole('link', { name: 'Course', exact: true }).first().click();
+    await page.getByRole('link', { name: 'Method of sections', exact: true }).click();
     await cut.waitFor();
     assert.equal(new URL(page.url()).searchParams.get('exercise'), 'week04-truss-sections');
     if (mode === 'pilot') {
