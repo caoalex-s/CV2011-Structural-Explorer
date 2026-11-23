@@ -11,7 +11,7 @@ const origin = 'http://127.0.0.1:8765/';
 const output = '.data/import-evidence';
 await mkdir(output, {recursive:true});
 const fixtureRoot = 'qa/inclined-frame/published-fixtures/cantilever-interior';
-const {model} = JSON.parse(await readFile(fixtureRoot+'.request.json','utf8'));
+const {model, query} = JSON.parse(await readFile(fixtureRoot+'.request.json','utf8'));
 const nativeReport = await readFile(fixtureRoot+'.report','utf8');
 const browser = await chromium.launch();
 const page = await browser.newPage();
@@ -62,6 +62,8 @@ try {
     const [x1,y1,x2,y2] = path.match(/-?[\d.]+/g).map(Number);
     assert.ok(x2>x1 && y2<y1);
     evidence.activeGeometry = {geometry,path};
+    await page.locator('#frame-parameter').fill(String(query.parameter));
+    await page.locator('#frame-side').selectOption(query.cutSide);
     await Promise.all([page.waitForNavigation(),page.locator('#frame-generate').click()]);
     await page.waitForFunction(() => {
         try { return JSON.parse(document.querySelector('#portal-certificate').textContent).protocol === 'CV2011_INCLINED_1'; }
@@ -69,6 +71,7 @@ try {
     },null,{timeout:190000});
     const receipt = JSON.parse(await page.locator('#portal-certificate').textContent());
     assert.deepEqual(receipt.sourceRequest.model.nodes,model.nodes);
+    assert.deepEqual(receipt.sourceRequest.query,query);
     assert.equal(receipt.report,nativeReport);
     assert.equal(receipt.reportDigest,createHash('sha256').update(nativeReport).digest('hex'));
     evidence.receipt = receipt;
