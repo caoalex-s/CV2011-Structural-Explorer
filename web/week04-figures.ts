@@ -58,7 +58,7 @@ export function diagram(d: Drawing, q: Query, section?: CheckedSection) {
     }
     const centre = byId.get(q.centre)!;
     const pivot = `<circle cx="${sx(centre.x)}" cy="${sy(centre.y)}" r="9" fill="none" stroke="#985a1f" stroke-width="1.5"/>` +
-        (section && !retained(centre) ? text(sx(centre.x) + 12, sy(centre.y) - 7, q.centre) : '');
+        (section && !retained(centre) ? text(sx(centre.x), sy(centre.y) + 25, q.centre, 'middle') : '');
     const cut = line({ x: q.cut, y: .6 }, { x: q.cut, y: -2.55 }, 'stroke="#9d5225" stroke-dasharray="6 5" stroke-width="2"');
     const dimensions = section ? '' : `<g fill="#415762">${[0, 2, 4].map(x => line({ x, y: -2.88 }, { x: x + 2, y: -2.88 }, 'stroke="#809699"') + text(sx(x + 1), sy(-2.88) - 5, '2 m', 'middle')).join('')}
         ${line({ x: 6.9, y: 0 }, { x: 6.9, y: -2 }, 'stroke="#809699"')}${text(sx(6.9) + 4, sy(-1), '2 m')}</g>`;
