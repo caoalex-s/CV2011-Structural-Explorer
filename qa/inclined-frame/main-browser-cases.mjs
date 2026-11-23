@@ -15,14 +15,46 @@ export async function runMainInclinedCases({ page, context, output, origin, base
     result.mainInclined = measurements;
     await page.addInitScript(() => {
         const OriginalWorker = window.Worker;
-        window.inclinedWorkerLifecycle = { created: 0, terminated: 0, framePosts: 0 };
+        // Diagram and displacement workers also use the frame protocol. Observe
+        // only the compiled equilibrium worker that serves this fixture.
+        const lifecycle = { workers: [], posts: [], replies: [], terminated: [], edit: null };
+        window.inclinedWorkerLifecycle = lifecycle;
         window.Worker = class extends OriginalWorker {
-            constructor(...arguments_) { super(...arguments_); window.inclinedWorkerLifecycle.created++; }
-            postMessage(...arguments_) {
-                if (arguments_[0]?.protocol === 'frame') window.inclinedWorkerLifecycle.framePosts++;
-                return super.postMessage(...arguments_);
+            constructor(url, options) {
+                super(url, options);
+                if (!new URL(url, location.href).pathname.endsWith('/bundle/worker.mjs')) return;
+                this.testWorkerId = lifecycle.workers.push(String(url));
+                this.addEventListener('message', ({data}) => {
+                    if (data.state === 'accepted') lifecycle.replies.push({
+                        worker: this.testWorkerId, request: data.id, digest: data.inputDigest
+                    });
+                });
             }
-            terminate() { window.inclinedWorkerLifecycle.terminated++; return super.terminate(); }
+            postMessage(...args) {
+                const sent = super.postMessage(...args);
+                const message = args[0];
+                if (!this.testWorkerId || !message?.intervalProposal || message.protocol !== 'frame') return sent;
+                const {query} = JSON.parse(new TextDecoder().decode(message.bytes));
+                const post = {worker:this.testWorkerId, request:message.id, member:query.member, parameter:query.parameter};
+                lifecycle.posts.push(post);
+                const edit = window.editAfterInclinedPost;
+                if (edit && post.member === edit.member && post.parameter === edit.parameter) {
+                    window.editAfterInclinedPost = null;
+                    // The original post is already dispatched. Run the real input
+                    // handler before a worker reply can be delivered on a later task.
+                    queueMicrotask(() => {
+                        const parameter = document.querySelector('#frame-parameter');
+                        parameter.value = String(edit.restore);
+                        parameter.dispatchEvent(new Event('input', {bubbles:true}));
+                        lifecycle.edit = {...post, cleared:document.querySelector('#portal-certificate').textContent === ''};
+                    });
+                }
+                return sent;
+            }
+            terminate() {
+                if (this.testWorkerId) lifecycle.terminated.push(this.testWorkerId);
+                return super.terminate();
+            }
         };
     });
     async function importModel(model) {
@@ -88,21 +120,25 @@ export async function runMainInclinedCases({ page, context, output, origin, base
     await page.locator('#worked-panel').screenshot({ path: screenshot });
     measurements.screenshot = { file: 'main-inclined-accepted.png', sha256: digest(await readFile(screenshot)) };
 
-    // Wait until an actual request enters the worker, then edit the section.
-    // This tests termination of synchronous arithmetic, not just debounce.
-    const before = await page.evaluate(() => ({ ...window.inclinedWorkerLifecycle }));
+    await page.evaluate(settings => { window.editAfterInclinedPost = settings; }, {
+        member: request.query.member, parameter: 0.25, restore: request.query.parameter
+    });
     await page.locator('#frame-parameter').fill('0.25');
-    await page.waitForFunction(count => window.inclinedWorkerLifecycle.framePosts > count, before.framePosts);
-    await page.locator('#frame-parameter').fill(String(request.query.parameter));
-    assert.equal(await page.locator('#portal-certificate').textContent(), '');
-    const afterEdit = await page.evaluate(() => ({ ...window.inclinedWorkerLifecycle }));
-    assert.ok(afterEdit.terminated > before.terminated);
+    await page.waitForFunction(() => window.inclinedWorkerLifecycle.edit !== null);
     const reverted = await accepted();
     assert.equal(reverted.report, nativeReport);
     assert.ok(reverted.revision > first.revision);
-    const after = await page.evaluate(() => ({ ...window.inclinedWorkerLifecycle }));
-    assert.ok(after.created > before.created);
-    measurements.cancellation = { before, afterEdit, after };
+    const lifecycle = await page.evaluate(() => window.inclinedWorkerLifecycle);
+    const interrupted = lifecycle.edit;
+    assert.equal(interrupted.cleared, true);
+    assert.ok(lifecycle.terminated.includes(interrupted.worker));
+    assert.ok(!lifecycle.replies.some(reply => reply.worker === interrupted.worker && reply.request === interrupted.request));
+    const replacement = lifecycle.replies.find(reply => reply.worker > interrupted.worker &&
+        reply.request === reverted.request && reply.digest === reverted.inputDigest);
+    assert.ok(replacement, 'A newly created equilibrium worker must return the accepted receipt');
+    assert.ok(lifecycle.posts.some(post => post.worker === replacement.worker &&
+        post.request === replacement.request && post.member === request.query.member && post.parameter === request.query.parameter));
+    measurements.cancellation = lifecycle;
 
     const changed = structuredClone(request.model);
     changed.loads[0].fy -= 1;

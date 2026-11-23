@@ -1,7 +1,7 @@
 name: Check frame import readiness
 on:
   push:
-    branches: [codex/frame-import-readiness]
+    branches: [codex/frame-import-readiness, codex/inclined-smoke-cancellation]
 permissions:
   contents: read
 jobs:
