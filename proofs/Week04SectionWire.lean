@@ -110,7 +110,7 @@ def report (packet : String) : Option String := do
   let load ← joints.find? (fun j => j.id == "A")
   let p := -load.fy
   let rows ← forceRows source
-  let retained := fun (j : Joint) => if side == "left" then j.x < cut else j.x > cut
+  let retained : Joint → Bool := fun j => if side == "left" then j.x < cut else j.x > cut
   guard (joints.all fun j => j.x != cut)
   let cuts ← cutTerms joints bars rows centre retained
   let (supports,reactions) ← supportTerms joints rows bars.size centre retained
