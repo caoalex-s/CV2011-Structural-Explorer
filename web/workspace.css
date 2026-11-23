@@ -1485,7 +1485,8 @@ dialog { background:var(--paper); color:var(--ink); border:1px solid var(--line)
     .modelbar label { flex:1 1 calc(100% - 7rem); }
     .workspace-heading { margin:.25rem 0 .6rem; }
     .topbar .brand b { white-space:nowrap; }
-    .section-workspace .topbar nav a { padding-block:.4rem; }
+    .truss-workspace .topbar nav { padding:0; gap:.65rem; }
+    .truss-workspace .topbar nav a { padding-block:.55rem; }
     .canvas-panel #canvas { display:block; }
 }
 @media(min-width:1000px) {

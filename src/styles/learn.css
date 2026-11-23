@@ -12,7 +12,8 @@ button:hover, .button:hover { border-color: var(--teal); background: var(--teal-
 .primary:hover { background: var(--accent-hover); color: white; }
 .quiet { background: transparent; }
 :focus-visible { outline: 3px solid var(--focus); outline-offset: 4px; }
-input[type=range], input[type=radio] { accent-color: var(--teal); }
+input[type=range], input[type=radio] { accent-color: var(--accent); }
+input[type=range] { min-height:2.75rem; color:var(--ink); }
 select, input:not([type=range]):not([type=radio]) { border: 1px solid var(--line); border-radius: 6px; padding: 8px; background: white; color: var(--ink); }
 select { max-width: 100%; }
 h1, h2, h3, p { margin: 0; }

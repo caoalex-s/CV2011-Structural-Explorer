@@ -45,6 +45,7 @@ jobs:
       - name: Check file imports and offline mechanics
         if: success() || failure()
         run: |
+          node qa/editorial/navigation.mjs
           node qa/frame-import/readiness.mjs
           playwright="file://$PWD/.data/student-tools/node_modules/playwright/index.mjs"
           fixture=qa/inclined-frame/published-fixtures/cantilever-interior
