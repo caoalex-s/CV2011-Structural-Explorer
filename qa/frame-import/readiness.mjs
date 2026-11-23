@@ -4,7 +4,7 @@
  */
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { chromium } from '../../.data/student-tools/node_modules/playwright/index.mjs';
 
 const origin = 'http://127.0.0.1:8765/';
@@ -96,6 +96,28 @@ try {
     await ready();
     assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('cv2011-model')).nodes),model.nodes);
     assert.deepEqual(errors,[]);
+    // Repeat the release smoke itself in a fresh context, including cancellation,
+    // changed-load checks, exported receipts, and service-worker cleanup.
+    const fixtureDirectory = '.data/live-portal/inclined-native';
+    await mkdir(fixtureDirectory,{recursive:true});
+    for(const suffix of ['.request.json','.report']) {
+        await copyFile(fixtureRoot+suffix,fixtureDirectory+'/cantilever-interior'+suffix);
+    }
+    const manifest = await readFile('public/portal-checker/bundle/manifest.json');
+    const result = {
+        artifact:JSON.parse(manifest).files['checker.wasm'],
+        bundle:createHash('sha256').update(manifest).digest('hex'),
+        cases:[],
+    };
+    const {runMainInclinedCases} = await import('../inclined-frame/main-browser-cases.mjs');
+    const fresh = await browser.newContext({acceptDownloads:true});
+    try {
+        await runMainInclinedCases({page:await fresh.newPage(),context:fresh,output,
+            origin:new URL(origin).origin,base:'/',result});
+        evidence.releaseSmoke = result;
+    } finally {
+        await fresh.close();
+    }
     evidence.passed = true;
 } finally {
     await writeFile(output+'/import.json',JSON.stringify(evidence,null,2));
