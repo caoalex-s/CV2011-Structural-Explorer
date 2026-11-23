@@ -726,7 +726,9 @@ svg.addEventListener('wheel', event => { event.preventDefault(); view.scale = Ma
 function setMode(next: string) {
     mode = ['sandbox', 'practice', 'insights'].includes(next) ? next : 'sandbox';
     location.hash = mode;
+    const wasDrawing = document.body.classList.contains('drawing-workspace');
     drawingWorkspace.activate(mode === 'sandbox' && !isPortalWorkspace && !portalExercise);
+    if (wasDrawing && !document.body.classList.contains('drawing-workspace')) arrangeWorkspace();
     controls.showMode(mode);
     sizeDrawing();
     const sandboxTitle = portalExercise ? 'Portal frame exercise' : isPortalWorkspace ? 'Checked portal workspace' : 'Structural sandbox';

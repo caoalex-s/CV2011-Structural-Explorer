@@ -42,8 +42,13 @@ export function createDrawingWorkspace(select: (object: Selection | null) => voi
     function arrangeInspector() {
         if (!active) return;
         const properties = find('.right-panel');
-        if (compact.matches) element('canvas').after(cutReadout, choice, properties);
-        else {
+        const canvas = element('canvas');
+        const tools = find('.left-panel');
+        if (compact.matches) {
+            canvas.before(tools);
+            canvas.after(cutReadout, choice, properties);
+        } else {
+            canvas.after(tools, find('.response-toolbar'), find('.canvas-header'));
             cutReadout.remove();
             rail.insertBefore(choice, rail.querySelector('.section-response'));
             choice.after(properties);
@@ -51,6 +56,11 @@ export function createDrawingWorkspace(select: (object: Selection | null) => voi
     }
     compact.addEventListener('change', arrangeInspector);
     const menus = [directory, files, utilities];
+    document.addEventListener('click', event => {
+        const command = (event.target as Element).closest('button,a');
+        if (active && command) for (const menu of menus)
+            if (menu.contains(command)) menu.open = false;
+    });
     document.addEventListener('pointerdown', event => {
         if (!active) return;
         for (const menu of menus)
