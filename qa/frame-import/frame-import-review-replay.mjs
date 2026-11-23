@@ -63,7 +63,12 @@ async function waitForReceipt(model) {
         }
     }, model.nodes, { timeout: 190000 });
     const receipt = JSON.parse(await certificate.textContent());
-    assert.deepEqual(receipt.sourceRequest.model, model);
+    const labelledSource = structuredClone(model);
+    assert.equal(labelledSource.loads.length, 1);
+    assert.equal(labelledSource.loads[0].kind, 'force');
+    // The editor supplies a display label for the fixture's unlabeled force.
+    labelledSource.loads[0].label ??= 'P_1';
+    assert.deepEqual(receipt.sourceRequest.model, labelledSource);
     assert.equal(digest(receipt.packet), receipt.packetDigest);
     assert.equal(digest(receipt.report), receipt.reportDigest);
     assert.equal(digest(JSON.stringify(receipt.sourceRequest)), receipt.inputDigest);
