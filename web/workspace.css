@@ -1355,3 +1355,6 @@ dialog::backdrop {
 .truss-workspace #history pre { white-space: pre-wrap; }
 @media(max-width: 820px) { .truss-workspace .work-grid { grid-template-columns: 1fr; } .truss-workspace .canvas-column { grid-row: 1; } }
 .truss-workspace .topbar nav { gap: 1rem; padding: .4rem .75rem; }
+
+#workspace-operation { margin: .5rem 1rem; }
+#workspace[aria-busy="true"] #worked-panel { visibility: hidden; }

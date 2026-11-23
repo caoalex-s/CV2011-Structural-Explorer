@@ -28,7 +28,7 @@ with tarfile.open(archive_path) as archive:
     manifest_bytes = content('portal-checker/bundle/manifest.json')
     assert manifest_bytes == Path('public/portal-checker/bundle/manifest.json').read_bytes()
     manifest = json.loads(manifest_bytes)
-    names = ['index.html', 'verification.json', 'portal-live.js', 'portal-runtime.js',
+    names = ['index.html', 'workspace-entry.js', 'workspace-readiness.js', 'app.js', 'verification.json', 'portal-live.js', 'portal-runtime.js',
              'frame-interval-display.js', 'frame-interval-worked.js', 'main-checker-sw.js',
              'worked.css', 'portal-checker/bundle/manifest.json', 'portal-checker/bundle/worker.mjs']
     names += ['portal-checker/bundle/' + name for name in manifest['files']]

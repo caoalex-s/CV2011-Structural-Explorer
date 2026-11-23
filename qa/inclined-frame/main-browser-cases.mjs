@@ -25,8 +25,17 @@ export async function runMainInclinedCases({ page, context, output, origin, base
             terminate() { window.inclinedWorkerLifecycle.terminated++; return super.terminate(); }
         };
     });
-    const importModel = model => page.locator('#model-file').setInputFiles({ name: 'synthetic-inclined.json',
-        mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ version: 2, model })) });
+    async function importModel(model) {
+        await page.locator('#model-file').setInputFiles({ name: 'synthetic-inclined.json',
+            mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ version: 2, model })) });
+        // Both drawings contain AB. Verify the active coordinates and load before Generate.
+        await page.waitForFunction(expected => {
+            const active = JSON.parse(localStorage.getItem('cv2011-model') || 'null');
+            return !document.getElementById('workspace').inert && active &&
+                JSON.stringify(active.nodes) === JSON.stringify(expected.nodes) &&
+                active.loads[0].fy === expected.loads[0].fy;
+        }, model);
+    }
     async function accepted() {
         await page.waitForFunction(() => {
             try { return JSON.parse(document.getElementById('portal-certificate').textContent).protocol === 'CV2011_INCLINED_1'; }
@@ -50,6 +59,7 @@ export async function runMainInclinedCases({ page, context, output, origin, base
     await page.locator('#frame-side').selectOption(request.query.cutSide);
     await Promise.all([page.waitForNavigation(), page.locator('#frame-generate').click()]);
     const first = await accepted();
+    assert.deepEqual(first.sourceRequest.model.nodes, request.model.nodes);
     assert.equal(first.report, nativeReport);
     await page.waitForFunction(() => document.querySelector('#frame-worked-output [data-evidence="exact-enclosure"]'));
     const exact = value => value.denominator === '1' ? value.numerator : `${value.numerator}/${value.denominator}`;

@@ -3,6 +3,7 @@
  * and worked.ts. learning-session.ts owns connection settings and submitted records.
  * New lesson pages can supply models through this boundary without changing engine.ts.
  */
+import { setWorkspaceBusy } from './workspace-readiness.js';
 import { analyse, example, position, splitMember, nodeLabels, referenceMember } from './engine.js';
 import type { Model, Analysis, Point, Member, Support, Load, Sample } from './engine.js';
 import { courseColors, forceSymbol, momentSymbol, rotationalSpring, supportShape, symbolLabel } from './symbols.js';
@@ -163,7 +164,7 @@ interface Snap {
 function toast(message: string) { $('toast').textContent = message; $('toast').classList.add('show'); setTimeout(() => $('toast').classList.remove('show'), 4200); }
 function checkpoint(before = model) { history.push(clone(before)); if (history.length > 60)
     history.shift(); future.length = 0; }
-function changed() { evidenceRawSource = undefined; assignLoadLabels(model); updateEvidenceBinding(); analysis = analyse(model); localStorage.setItem(modelStorageKey, JSON.stringify(model)); render(); }
+function changed() { $('workspace-operation').hidden = true; evidenceRawSource = undefined; assignLoadLabels(model); updateEvidenceBinding(); analysis = analyse(model); localStorage.setItem(modelStorageKey, JSON.stringify(model)); render(); }
 function commit(action: () => void) { checkpoint(); action(); solutionRevealed = false; hintUsed = false; practiceResultsVisible = false; changed(); }
 function screen(point: {
     x: number;
@@ -714,7 +715,7 @@ $('undo').onclick = () => { if (!history.length)
     return; future.push(clone(model)); model = history.pop()!; selected = null; start = null; changed(); };
 $('redo').onclick = () => { if (!future.length)
     return; history.push(clone(model)); model = future.pop()!; selected = null; changed(); };
-document.addEventListener('keydown', event => { if ((event.target as HTMLElement).matches('input,select,textarea'))
+document.addEventListener('keydown', event => { if ($('workspace').inert || (event.target as HTMLElement).matches('input,select,textarea'))
     return; if (event.key === 'Escape') {
     start = null;
     drag = null;
@@ -744,29 +745,44 @@ $('export-evidence').onclick = async () => {
     } catch (error) { toast(`Could not save evidence snapshot: ${String(error)}`); }
 };
 $('import-model').onclick = () => $('model-file').click();
-$<HTMLInputElement>('model-file').onchange = async () => { try {
-    const file = $<HTMLInputElement>('model-file').files?.[0];
-    if (!file)
-        return;
-    if (file.size > 100000)
-        throw Error('Model file is too large.');
-    const source = await file.text();
-    const parsed = JSON.parse(source), candidate = parsed.model || parsed;
-    if (parsed.version && parsed.version > 2) throw Error('This model uses a newer file format. Update Structural Explorer before opening it.');
-    const checked = analyse(candidate);
-    if (checked.status === 'invalid') {
-        if (!isPortalWorkspace) throw Error(checked.message);
-        parseEvidenceModel(candidate);
-    }
-    commit(() => { model = candidate; selected = null; fit(); });
-    // Keep original text only while its parsed snapshot still matches the drawing.
+const modelFile = $<HTMLInputElement>('model-file');
+let importRevision = 0;
+
+async function openSelectedModel() {
+    const file = modelFile.files?.[0];
+    if (!file) return;
+    const revision = ++importRevision;
+    // Capture the File before clearing the picker so selecting it again retries the read.
+    modelFile.value = '';
+    setWorkspaceBusy(true, `Opening ${file.name}…`);
     try {
-        if (JSON.stringify(parseEvidenceModel(JSON.parse(source))) === JSON.stringify(parseEvidenceModel(model))) evidenceRawSource = source;
-    } catch { /* The ordinary importer can accept models outside the strict snapshot schema. */ }
+        if (file.size > 100000) throw Error('Model file is too large.');
+        const source = await file.text();
+        if (revision !== importRevision) return;
+        const parsed = JSON.parse(source), candidate = parsed.model || parsed;
+        if (parsed.version && parsed.version > 2) throw Error('This model uses a newer file format. Update Structural Explorer before opening it.');
+        const checked = analyse(candidate);
+        if (checked.status === 'invalid') {
+            if (!isPortalWorkspace) throw Error(checked.message);
+            parseEvidenceModel(candidate);
+        }
+        commit(() => { model = candidate; selected = null; start = null; fit(); });
+        try {
+            if (JSON.stringify(parseEvidenceModel(JSON.parse(source))) === JSON.stringify(parseEvidenceModel(model))) evidenceRawSource = source;
+        } catch { /* The ordinary importer accepts drawings outside the strict snapshot schema. */ }
+        const member = model.members.find(item => item.id === currentMember);
+        let geometry = '';
+        if (member) {
+            const a = position(model, member.id, 0), b = position(model, member.id, 1);
+            geometry = ` ${member.id}: ${member.a} (${a.x}, ${a.y}) to ${member.b} (${b.x}, ${b.y}) m.`;
+        }
+        setWorkspaceBusy(false, `Opened ${file.name}.${geometry}`);
+    } catch (error) {
+        if (revision !== importRevision) return;
+        setWorkspaceBusy(false, `Could not open ${file.name}. ${String(error)}`);
+        toast(`Could not open model: ${String(error)}`);
+    }
 }
-catch (error) {
-    toast(`Could not open model: ${String(error)}`);
-} };
 // Guided derivations currently cover a single horizontal, prismatic beam with
 // one pin and one vertical roller. The sandbox accepts a wider model class.
 function problem() {
@@ -888,5 +904,8 @@ if (portalExercise) $('frame-side').addEventListener('change', () => {
 if (!restoredPortalView) fit();
 controls.showLayer(layer);
 setMode(restoredPortalView ? mode : location.hash.slice(1) || 'sandbox');
+modelFile.onchange = openSelectedModel;
+if (modelFile.files?.length) void openSelectedModel();
+else setWorkspaceBusy(false);
 void session.connect();
 void fetch('verification.json').then(r => r.json()).then(v => { proofStatus = v; }).catch(() => { });
