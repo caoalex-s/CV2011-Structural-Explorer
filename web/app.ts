@@ -192,8 +192,24 @@ interface Snap {
 function toast(message: string) { $('toast').textContent = message; $('toast').classList.add('show'); setTimeout(() => $('toast').classList.remove('show'), 4200); }
 function checkpoint(before = model) { history.push(clone(before)); if (history.length > 60)
     history.shift(); future.length = 0; }
-function changed() { $('workspace-operation').hidden = true; evidenceRawSource = undefined; assignLoadLabels(model); updateEvidenceBinding(); analysis = analyse(model); localStorage.setItem(modelStorageKey, JSON.stringify(model)); render(); }
-function commit(action: () => void) { checkpoint(); action(); solutionRevealed = false; hintUsed = false; practiceResultsVisible = false; changed(); }
+function changed(keepInspector = false) {
+    $('workspace-operation').hidden = true;
+    evidenceRawSource = undefined;
+    assignLoadLabels(model);
+    updateEvidenceBinding();
+    analysis = analyse(model);
+    localStorage.setItem(modelStorageKey, JSON.stringify(model));
+    render(keepInspector);
+}
+function editModel(action: () => void, startUndo: boolean, keepInspector: boolean) {
+    if (startUndo) checkpoint();
+    action();
+    solutionRevealed = false;
+    hintUsed = false;
+    practiceResultsVisible = false;
+    changed(keepInspector);
+}
+function commit(action: () => void) { editModel(action, true, false); }
 function screen(point: {
     x: number;
     y: number;
@@ -512,7 +528,7 @@ function inspector(): void {
     renderInspector({
         container: $('inspector'), model, analysis, selected,
         resultsVisible: responsesVisible(),
-        commit, clearSelection: () => { selected = null; inspector(); },
+        commit, adjustLoad: (edit, first) => editModel(edit, first, true), clearSelection: () => { selected = null; inspector(); },
         removeSelected, projectToMember: projection, notify: toast,
     });
 }
@@ -542,7 +558,7 @@ function removeSelected() {
 function sectionSample(): Sample | undefined {
     return sampleSection(analysis, currentMember, sectionT, cutSide(), model);
 }
-function render() {
+function render(keepInspector = false) {
     const member = model.members.find(m => m.id === currentMember) ?? model.members[0];
     currentMember = member?.id ?? '';
     updateEvidenceBinding();
@@ -556,7 +572,7 @@ function render() {
     const checkedScope = document.getElementById('checked-section');
     if (checkedScope) checkedScope.innerHTML = member ? `${escape(memberLabel(model, member))} at ${section.stationMath.join(', ')} (just ${cutSide()})` : 'Choose a member.';
     controls.setHistory(history.length > 0, future.length > 0);
-    inspector();
+    if (!keepInspector) inspector();
     $('edit-selection').hidden = !selected;
     (document.querySelector('.right-panel') as HTMLElement).hidden = !selected;
     $('moment-options').hidden = layer !== 'M';

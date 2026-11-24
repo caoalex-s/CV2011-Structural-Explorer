@@ -62,6 +62,46 @@ try {
         await checked('pointDirection').scrollIntoViewIfNeeded();
         await page.screenshot({path:join(output,'point-'+width+'.png')});
 
+        const range = key => page.locator(`#inspector input[data-range="${key}"]`);
+        async function dragRange(key) {
+            const slider = range(key);
+            await slider.scrollIntoViewIfNeeded();
+            const box = await slider.boundingBox();
+            const y = box.y + box.height / 2;
+            const x = fraction => box.x + box.width * fraction;
+            const cdp = width === 390 ? await page.context().newCDPSession(page) : null;
+            if (cdp) await cdp.send('Input.dispatchTouchEvent', {type:'touchStart',touchPoints:[{x:x(.34),y}]});
+            else { await page.mouse.move(x(.34),y); await page.mouse.down(); }
+            const initial = await slider.inputValue();
+            for (const fraction of [.5,.67,.81]) {
+                if (cdp) await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:x(fraction),y}]});
+                else await page.mouse.move(x(fraction),y);
+            }
+            const during = Number(await slider.inputValue());
+            assert.notEqual(String(during), initial);
+            assert.equal(Number(await prop(key).inputValue()), during);
+            assert.equal((await state()).loads[0].fy, during);
+            assert.equal(await page.locator('#portal-certificate').textContent(),'');
+            if (cdp) { await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]}); await cdp.detach(); }
+            else await page.mouse.up();
+            return during;
+        }
+        const dragged = await dragRange('magnitude');
+        await page.getByRole('button',{name:'Undo',exact:true}).click();
+        assert.equal((await state()).loads[0].fy,30);
+        await page.getByRole('button',{name:'Redo',exact:true}).click();
+        assert.equal((await state()).loads[0].fy,dragged);
+        await picker.selectOption('load:'+point.id);
+        await edit('magnitude',257.25);
+        assert.ok(Number(await range('magnitude').getAttribute('max')) >= 257.25);
+        await range('magnitude').focus();
+        await page.keyboard.press('ArrowLeft');
+        assert.ok(await range('magnitude').evaluate(el=>el===document.activeElement));
+        assert.ok((await state()).loads[0].fy < 257.25);
+        await page.reload();
+        await picker.selectOption('load:'+point.id);
+        assert.equal(Number(await range('magnitude').inputValue()), (await state()).loads[0].fy);
+
         async function place(tool, stations) {
             const toolbox = page.locator('#drawing-toolbox');
             if (await toolbox.getAttribute('open') === null) await toolbox.locator(':scope > summary').click();
@@ -83,6 +123,9 @@ try {
         await choose('momentSense','-1');
         assert.equal((await state()).loads.at(-1).mz,-20);
         await page.screenshot({path:join(output,'moment-'+width+'.png')});
+        await range('momentMagnitude').focus();
+        await page.keyboard.press('ArrowRight');
+        assert.ok((await state()).loads.at(-1).mz < -20);
         await edit('momentMagnitude',0);
         await choose('momentSense','1');
         await edit('momentMagnitude',12);
@@ -90,6 +133,9 @@ try {
         await place('distributed',[.2,.7]);
         assert.ok(await prop('qEnd').isVisible());
         assert.equal(await prop('lineAngle').inputValue(), '270');
+        await range('qEnd').focus();
+        await page.keyboard.press('Home');
+        assert.equal((await state()).loads.at(-1).qEnd,20);
         await choose('lineReference','180');
         assert.equal((await state()).loads.at(-1).direction,180);
         await place('force',[.8]);

@@ -26,9 +26,13 @@ function displayedAngle(angle: number): number {
 const customAngleEditors = new WeakSet<Load>();
 const cardinalChoices = [['270', 'Down'], ['0', 'Right'], ['90', 'Up'], ['180', 'Left']];
 
+const directionArrows: Record<string, string> = {
+    Down: '↓', Right: '→', Up: '↑', Left: '←', Clockwise: '↻', Counterclockwise: '↺',
+};
+
 function directionGroup(key: string, choices: string[][], current: string): string {
     return `<fieldset class="load-direction-group"><legend>Direction</legend><div class="direction-options">${choices.map(([value, label]) =>
-        `<label><input type="radio" name="${key}" data-property="${key}" value="${value}" ${value === current ? 'checked' : ''}><span>${label}</span></label>`).join('')}</div></fieldset>`;
+        `<label><input type="radio" name="${key}" data-property="${key}" value="${value}" ${value === current ? 'checked' : ''}><span>${directionArrows[label] ? `<span aria-hidden="true">${directionArrows[label]} </span>` : ''}${label}</span></label>`).join('')}</div></fieldset>`;
 }
 
 function directionPicker(load: Load, angle: number, angleInput: string): string {
@@ -51,6 +55,7 @@ interface InspectorOptions {
     selected: Selection | null;
     resultsVisible: boolean;
     commit: (edit: () => void) => void;
+    adjustLoad: (edit: () => void, first: boolean) => void;
     clearSelection: () => void;
     removeSelected: () => void;
     projectToMember: (point: { x: number; y: number }, member: Member) => { t: number };
@@ -200,7 +205,7 @@ export function renderInspector(options: InspectorOptions): void {
             if (target.matches('[data-property]') && (event.key === 'Tab' || event.key === 'Enter'))
                 target.dataset.focusStep = String(event.key === 'Enter' ? 0 : event.shiftKey ? -1 : 1);
         };
-        container.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-property]').forEach(input => input.addEventListener('change', () => {
+        function changeProperty(input: HTMLInputElement | HTMLSelectElement, apply = commit) {
             let key = input.dataset.property!;
             let value = input.type === 'checkbox' ? (input as HTMLInputElement).checked : ['kind', 'joint', 'referenceMember', 'member', 'label', 'pointDirection', 'lineReference'].includes(key) ? input.value.trim() : Number(input.value) * Number(input.dataset.direction || 1);
             if (input.type === 'number' && (!input.value.trim() || !Number.isFinite(value) || (['magnitude', 'momentMagnitude'].includes(key) && Number(value) < 0))) {
@@ -229,7 +234,7 @@ export function renderInspector(options: InspectorOptions): void {
             const focusStep = Number(input.dataset.focusStep || 0);
             const restoreKeyboardFocus = (input.dataset.focusStep !== undefined || input.matches(':focus-visible')) && document.body.classList.contains('drawing-workspace');
             const customAngle = value === 'custom';
-            const load = selected.type === 'load' ? model.loads.find(load => load.id === selected.id) : undefined;
+            const load = selected?.type === 'load' ? model.loads.find(load => load.id === selected.id) : undefined;
             if (load && (key === 'pointDirection' || key === 'lineReference')) {
                 if (customAngle) {
                     customAngleEditors.add(load);
@@ -240,7 +245,7 @@ export function renderInspector(options: InspectorOptions): void {
                 } else customAngleEditors.delete(load);
             }
             if (load && (key === 'fx' || key === 'fy') && load.kind === 'force') customAngleEditors.delete(load);
-            commit(() => {
+            apply(() => {
                 if (key === 'pointDirection' || key === 'pointAngle' || key === 'magnitude') {
                     const load = model.loads.find(load => load.id === selected!.id)!;
                     const angle = key === 'magnitude' ? pointAngle(load) : Number(value);
@@ -312,7 +317,51 @@ export function renderInspector(options: InspectorOptions): void {
                 const next = visible[visible.indexOf(edited) + focusStep] ?? edited;
                 next.focus({preventScroll:true});
             });
-        }));
+        }
+        container.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-property]').forEach(input =>
+            input.addEventListener('change', () => changeProperty(input)));
+        if (selected.type === 'load' && document.body.classList.contains('drawing-workspace')) {
+            const load = model.loads.find(load => load.id === selected.id)!;
+            const keys = load.kind === 'distributed' ? ['fy', 'qEnd'] : [load.kind === 'moment' ? 'momentMagnitude' : 'magnitude'];
+            for (const key of keys) {
+                const exact = container.querySelector<HTMLInputElement>(`input[data-property="${key}"]`)!;
+                const label = exact.closest('label')!;
+                const slider = document.createElement('input');
+                slider.type = 'range';
+                slider.className = 'load-value-range';
+                slider.dataset.range = key;
+                slider.setAttribute('aria-label', 'Adjust ' + label.textContent!.trim().toLowerCase());
+                const base = load.kind === 'distributed' ? 20 : 100;
+                const bound = Math.min(Number.MAX_VALUE, Math.max(base, Math.ceil(Math.abs(Number(exact.value)) / base) * base));
+                slider.min = String(load.kind === 'distributed' ? -bound : 0);
+                slider.max = String(bound);
+                slider.step = 'any';
+                slider.value = exact.value;
+                label.after(slider);
+
+                // Keep this native input in place throughout a pointer gesture.
+                // Each keyboard step forms a separate undoable edit.
+                let editing = false;
+                slider.oninput = () => {
+                    // Round only a slider gesture. Exact entry retains its full precision.
+                    const increments = load.kind === 'distributed' ? 10 : 2;
+                    const rounded = Math.round(Number(slider.value) * increments) / increments;
+                    if (Number.isFinite(rounded)) slider.value = String(rounded);
+                    exact.value = slider.value;
+                    changeProperty(exact, edit => options.adjustLoad(edit, !editing));
+                    editing = true;
+                    if (load.kind === 'force') {
+                        for (const component of ['fx', 'fy'] as const)
+                            container.querySelector<HTMLInputElement>(`[data-property="${component}"]`)!.value = String(load[component]);
+                    }
+                };
+                const finish = () => { editing = false; };
+                slider.onchange = finish;
+                slider.onblur = finish;
+                slider.onpointerup = finish;
+                slider.onpointercancel = finish;
+            }
+        }
         bindConnectionEditors(container);
         container.querySelector<HTMLButtonElement>('#delete-selected')!.onclick = () => removeSelected();
     }
