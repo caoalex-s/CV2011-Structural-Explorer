@@ -1,3 +1,4 @@
+import { directedLoadWorked } from './directed-load-worked.js';
 /** Dedicated checked portal panel, sharing the ordinary workspace and edit lifecycle. */
 import { EvidenceRequests, createEvidenceEnvelope } from './model-evidence.js';
 import { portalAmplitude, portalCandidate, encodeCandidate, portalQuery, outputIds, roundedDecimal, profileId } from './portal-candidate.js';
@@ -502,6 +503,10 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
         cutSide.options[1].disabled = parameter === 0;
         clearTimeout(debounce); runtime?.invalidate(); requests.invalidate();
         clear(enabled ? 'Checking current drawing…' : 'This section has not been checked. The first check may reload the workspace.');
+        if (modelAtPresent().loads.some(load => load.direction !== undefined)) {
+            clear('Numerical analysis. The compiled checker covers distributed loads entered along global downward only.');
+            return;
+        }
         let snapshot: Model;
         let query: EvidenceQuery;
         let frameMode: 'exact' | 'inclined' | 'partial' | 'hinge' = 'exact';
@@ -562,6 +567,15 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
     cutSide.onchange = () => changeSectionParameter(parameter);
     generate.onclick = () => {
         if (generate.disabled) return;
+        const drawing = modelAtPresent();
+        if (drawing.loads.some(load => load.direction !== undefined)) {
+            workedOutput.innerHTML = directedLoadWorked(drawing, member, parameter, cutSide.value as 'left' | 'right');
+            workedOutput.hidden = false;
+            collapse.hidden = false;
+            collapse.textContent = 'Collapse solution';
+            collapse.setAttribute('aria-expanded', 'true');
+            return;
+        }
         if (acceptedGeneration) { acceptedGeneration(); return; }
         pendingGeneration = generationKey();
         if (!enabled) {

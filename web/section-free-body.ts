@@ -1,4 +1,4 @@
-import { nodeLabels, type Analysis, type Model, type Sample } from './engine.js';
+import { lineLoadAxis, nodeLabels, type Analysis, type Model, type Sample } from './engine.js';
 import { loadLabelLatex, loadLabels } from './load-labels.js';
 import { memberLabel } from './model-view.js';
 import { math, measureUnits, quantity } from './math.js';
@@ -84,16 +84,18 @@ export function sectionFreeBody(model: Model, analysis: Analysis, memberId: stri
             const stop = Math.min(extent, load.end);
             if (stop <= load.t) continue;
             const intensity = (station: number) => load.fy + (load.qEnd - load.fy) * (station - load.t) / (load.end - load.t);
+            const axis = lineLoadAxis(load, c, s);
+            const axial = c*axis.x + s*axis.y, transverse = -s*axis.x + c*axis.y;
             const maximum = Math.max(Math.abs(intensity(load.t)), Math.abs(intensity(stop)), 1e-12);
             for (let i = 0; i <= 5; i++) {
                 const station = load.t + (stop - load.t) * i / 5;
                 const q = intensity(station);
-                drawing += forceSymbol(x(station), y, s*q, c*q, courseColors.force, '', 32*Math.abs(q)/maximum, 0);
+                drawing += forceSymbol(x(station), y, axial*q, transverse*q, courseColors.force, '', 32*Math.abs(q)/maximum, 0);
             }
             const metre = (value: number) => math(quantity(formatNumber(value), measureUnits.length));
             const loadIntensity = (value: number) => math(quantity(formatNumber(value), '\\mathrm{kN/m}'));
             loadLabel(x((load.t + stop) / 2), y - 64, loadLabelLatex(label));
-            rows.push(`<li>${math(loadLabelLatex(label))} · ${math('x')} from ${metre(load.t*length)} to ${metre(stop*length)} · global vertical intensity ${loadIntensity(intensity(load.t))} to ${loadIntensity(intensity(stop))}</li>`);
+            rows.push(`<li>${math(loadLabelLatex(label))} · ${math('x')} from ${metre(load.t*length)} to ${metre(stop*length)} · ${load.direction === undefined ? 'global vertical intensity' : load.direction === 'member-normal' ? 'intensity along local +y' : 'intensity along global ' + math(String(load.direction) + '^\\circ')} ${loadIntensity(intensity(load.t))} to ${loadIntensity(intensity(stop))}</li>`);
         } else if (includes(load.t)) {
             const X = load.kind === 'force' ? c*load.fx+s*load.fy : 0;
             const Y = load.kind === 'force' ? -s*load.fx+c*load.fy : 0;

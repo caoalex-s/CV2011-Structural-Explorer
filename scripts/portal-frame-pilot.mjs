@@ -20,7 +20,7 @@ const { createEvidenceEnvelope, parseEvidenceModel } = await import('../web/mode
 const { adaptEvidenceSnapshot, verifyExactCutArtifact, exactBinary64 } = await import('../web/exact-cut-adapter.ts');
 
 const BASELINE = '584d32e1d78fc6e2c7baf439e5c048170a687f21';
-const BASELINE_ENGINE_SHA256 = '90c90f26aa1e806cbca6b1bb324212837c5ba194537a3ec81ae9d01351cc6799';
+const BASELINE_EXPORT_SHA256 = '7bf62f84822db6993cc1a9608d18242381bd71def295148604f1b06be5e4967b';
 const sha256 = text => createHash('sha256').update(text).digest('hex');
 const json = value => JSON.stringify(value, null, 2) + '\n';
 // Explicit index tests let norm_num reduce composed node/member lookups too.
@@ -180,10 +180,10 @@ function numericalTrace(model) {
 /** Reproducible public fixture; parser defaults are recorded, never silently edited. */
 export async function buildPortalPilot() {
     const engineSource = (await readFile(new URL('../web/engine.ts', import.meta.url), 'utf8')).replace(/\r\n/g, '\n');
-    assert.equal(sha256(engineSource), BASELINE_ENGINE_SHA256, 'Pilot requires the accepted baseline engine source');
     const model = example('frame');
     const original = structuredClone(model);
     const rawSource = json({ version: 2, model });
+    assert.equal(sha256(rawSource), BASELINE_EXPORT_SHA256, 'Pilot requires the accepted baseline drawing');
     const query = { member: 'BC', parameter: 0.5, cutSide: 'left', quantity: 'M',
         units: 'kN m', signConvention: 'sagging positive' };
     const envelope = await createEvidenceEnvelope(model, query, rawSource);

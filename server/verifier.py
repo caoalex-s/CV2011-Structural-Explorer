@@ -154,6 +154,8 @@ def reference(model):
     if len(model.get("loads", [])) > 50:
         raise ValueError("Use at most 50 loads for guided verification.")
     for load in model.get("loads", []):
+        if "direction" in load:
+            raise ValueError("Guided verification supports global-y distributed loads.")
         if load["member"] != member["id"] or not 0 <= rational(load["t"]) <= 1:
             raise ValueError("Load must lie on the beam.")
         location = rational(load["t"]) * length

@@ -1,10 +1,16 @@
 /** Object properties and joint constraints. Edits pass through the app's undo boundary. */
-import { endConnection, nodeLabels, position, referenceMember } from './engine.js';
+import { angleVector, endConnection, nodeLabels, position, referenceMember } from './engine.js';
 import type { Analysis, Connection, ConnectionRule, Load, Member, Model } from './engine.js';
 import { jointConnections, memberLabel } from './model-view.js';
 import type { Selection } from './model-view.js';
 import { loadLabels, validLoadLabel } from './load-labels.js';
 import { escapeHtml as escape, formatNumber as number } from './ui.js';
+
+// A zero force has no physical direction. Remember its editor angle until
+// the next nonzero magnitude is entered on this load.
+const zeroForceAngles = new WeakMap<Load, number>();
+const pointAngle = (load: Load) => load.fx || load.fy
+    ? Math.atan2(load.fy, load.fx) * 180 / Math.PI : zeroForceAngles.get(load) ?? 0;
 
 interface InspectorOptions {
     container: HTMLElement;
@@ -96,12 +102,26 @@ export function renderInspector(options: InspectorOptions): void {
         if (selected.type === 'load') {
             html += `<label class="field">Load label<input type="text" data-property="label" maxlength="10" value="${escape(loadLabels(model).get(selected.id))}" placeholder="${item.kind === 'moment' ? 'M_0' : item.kind === 'distributed' ? 'w_1' : 'P_1'}"></label>`;
             html += field('t', 'Start / member length', 'any');
-            if (item.kind === 'force')
+            const load = model.loads.find(load => load.id === selected.id)!;
+            const angleField = (key: string, caption: string, value: number) =>
+                `<label class="field">${caption}<input type="number" step="any" data-property="${key}" value="${value}"></label>`;
+            if (item.kind === 'force') {
+                html += '<div class="load-direction-fields">'
+                    + angleField('magnitude', 'Magnitude (kN)', Number(Math.hypot(load.fx, load.fy).toPrecision(15)))
+                    + angleField('pointAngle', 'Angle CCW from global +x (°)', Number(pointAngle(load).toPrecision(15))) + '</div>';
                 html += field('fx', 'Horizontal force Fx, rightward + (kN)') + field('fy', 'Vertical force Fy, upward + (kN)');
+            }
             if (item.kind === 'moment')
                 html += field('mz', 'Moment, CCW + (kN m)');
-            if (item.kind === 'distributed')
-                html += field('end', 'End / member length', 'any') + field('fy', 'Start intensity w, downward + (kN/m)', 'any', -1) + field('qEnd', 'End intensity w, downward + (kN/m)', 'any', -1);
+            if (item.kind === 'distributed') {
+                const normal = load.direction === 'member-normal';
+                const sign = load.direction === undefined ? -1 : 1;
+                html += field('end', 'End / member length') + field('fy', 'Start intensity (kN/m)', 'any', sign)
+                    + '<div class="load-direction-fields">' + field('qEnd', 'End intensity (kN/m)', 'any', sign)
+                    + `<label class="field">Positive direction<select data-property="lineReference"><option value="global">Global angle</option><option value="normal" ${normal ? 'selected' : ''}>Member normal (+local y)</option></select></label>`
+                    + (normal ? '' : angleField('lineAngle','Angle CCW from global +x (°)', Number(load.direction ?? 270)))
+                    + '<p class="small">Intensities vary linearly per metre of member length. A negative value reverses the arrow. The positive member normal points left when looking from the first joint to the second.</p></div>';
+            }
             html += '<details class="inspector-help"><summary>Load notation and directions</summary><p class="small">Use P or F for a force, M for a couple, and w or q for distributed loading. An optional subscript uses an underscore, for example P_1 or M_0. Each load has its own label.</p><p class="small">The action belongs to this member side at a joint. Arrows retain their physical line of action; moment arcs retain their application centre.</p></details>';
         }
         const editorKey = selected.type + ':' + selected.id;
@@ -132,6 +152,8 @@ export function renderInspector(options: InspectorOptions): void {
                 settings.innerHTML = '<summary>Position and load settings</summary>';
                 while (primaryField.nextElementSibling) settings.append(primaryField.nextElementSibling);
                 primaryField.after(settings);
+                const directions = settings.querySelector('.load-direction-fields');
+                if (directions) primaryField.after(directions);
             }
         }
         container.onkeydown = event => {
@@ -141,7 +163,12 @@ export function renderInspector(options: InspectorOptions): void {
         };
         container.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-property]').forEach(input => input.addEventListener('change', () => {
             let key = input.dataset.property!;
-            let value = input.type === 'checkbox' ? (input as HTMLInputElement).checked : ['kind', 'joint', 'referenceMember', 'member', 'label'].includes(key) ? input.value.trim() : Number(input.value) * Number(input.dataset.direction || 1);
+            let value = input.type === 'checkbox' ? (input as HTMLInputElement).checked : ['kind', 'joint', 'referenceMember', 'member', 'label', 'lineReference'].includes(key) ? input.value.trim() : Number(input.value) * Number(input.dataset.direction || 1);
+            if (input.type === 'number' && (!input.value.trim() || !Number.isFinite(value) || (key === 'magnitude' && Number(value) < 0))) {
+                toast(key === 'magnitude' ? 'Enter a finite, nonnegative magnitude.' : 'Enter a finite number.');
+                inspector();
+                return;
+            }
             if (key === 'rotationStiffness') {
                 if (input.value.trim() === '' || Number(value) < 0) { toast('Enter a nonnegative rotational stiffness.'); inspector(); return; }
                 if (value === 0) { key = 'joint'; value = 'pinned'; }
@@ -163,6 +190,30 @@ export function renderInspector(options: InspectorOptions): void {
             const focusStep = Number(input.dataset.focusStep || 0);
             const restoreKeyboardFocus = (input.dataset.focusStep !== undefined || input.matches(':focus-visible')) && document.body.classList.contains('drawing-workspace');
             commit(() => {
+                if (key === 'pointAngle' || key === 'magnitude') {
+                    const load = model.loads.find(load => load.id === selected!.id)!;
+                    const angle = key === 'pointAngle' ? Number(value) : pointAngle(load);
+                    const magnitude = key === 'magnitude' ? Number(value) : Math.hypot(load.fx, load.fy);
+                    const axis = angleVector(angle);
+                    load.fx = magnitude * axis.x;
+                    load.fy = magnitude * axis.y;
+                    if (!magnitude) zeroForceAngles.set(load, angle);
+                    return;
+                }
+                if (key === 'lineReference' || key === 'lineAngle') {
+                    const load = model.loads.find(load => load.id === selected!.id)!;
+                    const angle = key === 'lineAngle' ? ((Number(value) % 360) + 360) % 360 : 270;
+                    const direction = value === 'normal' ? 'member-normal' : angle === 270 ? undefined : angle;
+                    // Preserve the displayed start and end strengths. A legacy
+                    // downward reference stores them as global upward components.
+                    if ((load.direction === undefined) !== (direction === undefined)) {
+                        load.fy = -load.fy;
+                        load.qEnd = -load.qEnd;
+                    }
+                    if (direction === undefined) delete load.direction;
+                    else load.direction = direction;
+                    return;
+                }
                 const previousConnections = selected?.type === 'node' && key === 'joint' ? jointConnections(model, model.nodes.find(node => node.id === selected!.id)!) : [];
                 if (key === 'member') {
                     const point = position(model, String(item.member), Number(item.t));

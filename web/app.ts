@@ -4,7 +4,7 @@
  * New lesson pages can supply models through this boundary without changing engine.ts.
  */
 import { setWorkspaceBusy } from './workspace-readiness.js';
-import { analyse, example, position, splitMember, nodeLabels, referenceMember } from './engine.js';
+import { analyse, example, lineLoadAxis, position, splitMember, nodeLabels, referenceMember } from './engine.js';
 import type { Model, Analysis, Point, Member, Support, Load, Sample } from './engine.js';
 import { courseColors, forceSymbol, momentSymbol, rotationalSpring, supportShape, symbolLabel } from './symbols.js';
 import { renderWorked, showWorkedSolution } from './worked.js';
@@ -20,7 +20,7 @@ import { sectionFreeBody } from './section-free-body.js';
 import { createDrawingWorkspace } from './drawing-workspace.js';
 import { createWorkspaceControls } from './workspace-controls.js';
 import { createLearningSession } from './learning-session.js';
-import { createEvidenceEnvelope, EvidenceRequests, parseEvidenceModel } from './model-evidence.js';
+import { createEvidenceEnvelope, EvidenceRequests, parseDrawing } from './model-evidence.js';
 import type { Attempt } from './learning-session.js';
 import { lessonContext } from './lesson-beam.js';
 import { createPortalPanel, isPortalWorkspace, isCheckedWorkspace, portalStorageKey } from './portal-live.js';
@@ -62,7 +62,7 @@ try {
         if (isPortalWorkspace) {
             // The numerical diagram engine has its own length/tolerance
             // limits. Exact checker inputs use the strict source schema.
-            parseEvidenceModel(candidate);
+            parseDrawing(candidate);
             model = candidate;
         } else if (analyse(candidate).status !== 'invalid')
             model = candidate;
@@ -117,7 +117,7 @@ if (isCheckedWorkspace) {
             // History contains drawings only; accepted reports are never restored.
             for (const [target, snapshots] of [[history, state.history], [future, state.future]] as const) {
                 if (Array.isArray(snapshots) && snapshots.length <= 60) {
-                    snapshots.forEach(snapshot => parseEvidenceModel(snapshot));
+                    snapshots.forEach(snapshot => parseDrawing(snapshot));
                     target.push(...snapshots);
                 }
             }
@@ -321,16 +321,24 @@ function loadDrawing(load: Load) {
         return `<g ${tag}>${momentSymbol(p.x, p.y, load.mz, color, `${label} = ${number(Math.abs(load.mz))} kN m`, 25 + 10 * coupleLane, coupleLane, labelBelow)}</g>`;
     }
     const end = screen(position(model, load.member, load.end));
+    const dx = end.x - p.x, dy = p.y - end.y;
+    const length = Math.hypot(dx, dy);
+    const axis = lineLoadAxis(load, dx / length, dy / length);
     const max = Math.max(Math.abs(load.fy), Math.abs(load.qEnd), 1);
-    let result = `<g ${tag}><path class="hit" d="M ${p.x} ${p.y + load.fy / max * 53} L ${end.x} ${end.y + load.qEnd / max * 53}"/>`;
+    const tail = (point: {x:number; y:number}, intensity: number) =>
+        (point.x - axis.x * intensity / max * 53) + ' ' + (point.y + axis.y * intensity / max * 53);
+    const envelope = 'M ' + tail(p, load.fy) + ' L ' + tail(end, load.qEnd);
+    let result = `<g ${tag}><path class="hit" d="${envelope}"/>`;
     const count = Math.max(3, Math.ceil(Math.hypot(end.x - p.x, end.y - p.y) / 27));
     for (let i = 0; i <= count; i++) {
         const t = i / count, q = load.fy + (load.qEnd - load.fy) * t;
-        result += drawArrow(p.x + (end.x - p.x) * t, p.y + (end.y - p.y) * t, 0, -q / max * 53, color);
+        result += drawArrow(p.x + (end.x - p.x) * t, p.y + (end.y - p.y) * t, axis.x * q / max * 53, -axis.y * q / max * 53, color);
     }
     const endpointLabel = (end: string) => `${label}${label.includes('_') ? ',' : '_'}${end}`;
-    const intensityLabel = load.qEnd === load.fy ? `${label} = ${number(-load.fy)}` : `${endpointLabel('a')} = ${number(-load.fy)} → ${endpointLabel('b')} = ${number(-load.qEnd)}`;
-    result += `<path d="M ${p.x} ${p.y + load.fy / max * 53} L ${end.x} ${end.y + load.qEnd / max * 53}" stroke="${color}" fill="none"/><text class="svg-label" x="${(p.x + end.x) / 2}" y="${Math.min(p.y, end.y) - 67}" text-anchor="middle">${symbolLabel(intensityLabel)} kN/m (↓ +)</text></g>`;
+    const sign = load.direction === undefined ? -1 : 1;
+    const axisLabel = load.direction === undefined ? '↓ +' : load.direction === 'member-normal' ? '+local y' : number(load.direction) + '° global';
+    const intensityLabel = load.qEnd === load.fy ? `${label} = ${number(sign * load.fy)}` : `${endpointLabel('a')} = ${number(sign * load.fy)} → ${endpointLabel('b')} = ${number(sign * load.qEnd)}`;
+    result += `<path d="${envelope}" stroke="${color}" fill="none"/><text class="svg-label" x="${(p.x + end.x) / 2}" y="${Math.min(p.y, end.y) - 67}" text-anchor="middle">${symbolLabel(intensityLabel)} kN/m (${axisLabel})</text></g>`;
     return result;
 }
 function jointDrawing(node: Point) {
@@ -814,7 +822,7 @@ stationSlider.oninput = () => {
     sectionT = Math.round(stationSlider.valueAsNumber) / 1000;
     render();
 };
-$('export-model').onclick = () => download('cv2011-model.json', { version: 2, model });
+$('export-model').onclick = () => download('cv2011-model.json', { version: model.loads.some(load => load.direction !== undefined) ? 3 : 2, model });
 $('export-evidence').onclick = async () => {
     try {
         updateEvidenceBinding();
@@ -842,15 +850,15 @@ async function openSelectedModel() {
         const source = await file.text();
         if (revision !== importRevision) return;
         const parsed = JSON.parse(source), candidate = parsed.model || parsed;
-        if (parsed.version && parsed.version > 2) throw Error('This model uses a newer file format. Update Structural Explorer before opening it.');
+        if (parsed.version && parsed.version > 3) throw Error('This model uses a newer file format. Update Structural Explorer before opening it.');
         const checked = analyse(candidate);
         if (checked.status === 'invalid') {
             if (!isPortalWorkspace) throw Error(checked.message);
-            parseEvidenceModel(candidate);
+            parseDrawing(candidate);
         }
         commit(() => { model = candidate; selected = null; start = null; fit(); });
         try {
-            if (JSON.stringify(parseEvidenceModel(JSON.parse(source))) === JSON.stringify(parseEvidenceModel(model))) evidenceRawSource = source;
+            if (JSON.stringify(parseDrawing(JSON.parse(source))) === JSON.stringify(parseDrawing(model))) evidenceRawSource = source;
         } catch { /* The ordinary importer accepts drawings outside the strict snapshot schema. */ }
         const member = model.members.find(item => item.id === currentMember);
         let geometry = '';
@@ -868,6 +876,7 @@ async function openSelectedModel() {
 // Guided derivations currently cover a single horizontal, prismatic beam with
 // one pin and one vertical roller. The sandbox accepts a wider model class.
 function problem() {
+    if (model.loads.some(load => load.direction !== undefined)) return null;
     if (model.members.length !== 1 || model.supports.length !== 2 || analysis.status !== 'stable')
         return null;
     const member = model.members[0], a = position(model, member.id, 0), b = position(model, member.id, 1);

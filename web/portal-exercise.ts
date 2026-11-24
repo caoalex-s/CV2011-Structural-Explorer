@@ -23,7 +23,7 @@ function portalBeam(model: Model) {
     if (model.nodes.length !== 4 || model.members.length !== 3 || model.supports.length !== 2 || model.loads.length !== 1) return;
     const load = model.loads[0];
     const beam = model.members.find(m => m.id === load.member);
-    if (!beam || load.kind !== 'distributed' || load.fx !== 0 || load.mz !== 0 || !(load.fy * load.qEnd < 0) ||
+    if (!beam || load.direction !== undefined || load.kind !== 'distributed' || load.fx !== 0 || load.mz !== 0 || !(load.fy * load.qEnd < 0) ||
         !(0 <= load.t && load.t < load.end && load.end <= 1)) return;
     const nodes = new Map(model.nodes.map(node => [node.id, node]));
     const b = nodes.get(beam.a), c = nodes.get(beam.b);
