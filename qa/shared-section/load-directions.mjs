@@ -30,6 +30,7 @@ try {
         await page.waitForFunction(()=>!document.querySelector('#workspace')?.inert);
         await picker.selectOption({label:'P₁ · Point force'});
         assert.equal(await prop('pointDirection').inputValue(), '270');
+        assert.equal(await prop('pointAngle').inputValue(), '270');
         await prop('pointDirection').selectOption('custom');
         assert.ok(await prop('pointAngle').evaluate(el => el === document.activeElement));
         await edit('pointAngle',37);
@@ -66,6 +67,7 @@ try {
             assert.equal((await state()).loads.at(-1).kind,tool);
         }
         await place('moment',[.3]);
+        assert.ok(await page.getByLabel('Magnitude (kN m)', {exact:true}).isVisible());
         await prop('momentSense').selectOption('-1');
         assert.equal((await state()).loads.at(-1).mz,-20);
         await edit('momentMagnitude',0);
@@ -74,6 +76,7 @@ try {
         assert.equal((await state()).loads.at(-1).mz,12);
         await place('distributed',[.2,.7]);
         assert.ok(await prop('qEnd').isVisible());
+        assert.equal(await prop('lineAngle').inputValue(), '270');
         await prop('lineReference').selectOption('180');
         assert.equal((await state()).loads.at(-1).direction,180);
         await place('force',[.8]);

@@ -16,8 +16,14 @@ const pointAngle = (load: Load) => load.fx || load.fy
 const zeroMomentSenses = new WeakMap<Load, number>();
 const momentSense = (load: Load) => Math.sign(load.mz) || zeroMomentSenses.get(load) || 1;
 
+// Use the same counterclockwise turn for point and distributed load readouts.
+function displayedAngle(angle: number): number {
+    const remainder = angle % 360;
+    return Number((remainder < 0 ? remainder + 360 : remainder).toPrecision(15)) % 360;
+}
+
 function directionPicker(key: string, angle: number, normal = false): string {
-    const degrees = (angle % 360 + 360) % 360;
+    const degrees = displayedAngle(angle);
     const choices = [['270', 'Down'], ['0', 'Right'], ['90', 'Up'], ['180', 'Left'], ['custom', 'Custom angle']];
     if (key === 'lineReference') choices.push(['normal', 'Member normal']);
     const current = normal ? 'normal' : choices.find(([value]) => Number(value) === degrees)?.[0] ?? 'custom';
@@ -125,7 +131,7 @@ export function renderInspector(options: InspectorOptions): void {
                 html += '<div class="load-direction-fields">'
                     + angleField('magnitude', 'Magnitude (kN)', Number(Math.hypot(load.fx, load.fy).toPrecision(15)))
                     + directionPicker('pointDirection', pointAngle(load))
-                    + angleField('pointAngle', 'Angle (°)', Number(pointAngle(load).toPrecision(15)))
+                    + angleField('pointAngle', 'Angle (°)', displayedAngle(pointAngle(load)))
                     + '<p class="small">Angles increase counterclockwise from global +x (right).</p></div>';
                 const components = field('fx', 'Horizontal (kN)') + field('fy', 'Vertical (kN)')
                     + '<p class="small">Positive components act right and up.</p>';
@@ -133,7 +139,7 @@ export function renderInspector(options: InspectorOptions): void {
             }
             if (item.kind === 'moment') {
                 html += sandbox ? '<div class="load-direction-fields">'
-                    + angleField('momentMagnitude', 'Magnitude (kN·m)', Math.abs(load.mz))
+                    + angleField('momentMagnitude', 'Magnitude (kN m)', Math.abs(load.mz))
                     + `<label class="field">Direction<select data-property="momentSense"><option value="1" ${momentSense(load) === 1 ? 'selected' : ''}>Counterclockwise</option><option value="-1" ${momentSense(load) === -1 ? 'selected' : ''}>Clockwise</option></select></label></div>`
                     : field('mz', 'Moment, CCW + (kN m)');
             }
@@ -145,7 +151,7 @@ export function renderInspector(options: InspectorOptions): void {
                     + field('fy', 'Start intensity (kN/m)', 'any', sign) + field('qEnd', 'End intensity (kN/m)', 'any', sign)
                     + directionPicker('lineReference', angle, normal)
                     + (normal ? '<p class="small">The normal points left when looking from the first joint to the second.</p>'
-                        : angleField('lineAngle', 'Angle (°)', angle) + '<p class="small">Angles increase counterclockwise from global +x (right).</p>')
+                        : angleField('lineAngle', 'Angle (°)', displayedAngle(angle)) + '<p class="small">Angles increase counterclockwise from global +x (right).</p>')
                     + '<p class="small">Intensity varies linearly per metre of member length. Positive follows the selected direction. Negative acts opposite.</p></div>';
             }
             html += `<details class="inspector-help"><summary>Load notation and directions</summary><p class="small">Use ${math('P')} or ${math('F')} for a force, ${math('M')} for a couple, and ${math('w')} or ${math('q')} for distributed loading. To enter ${math('P_1')} or ${math('M_0')}, type <code>P_1</code> or <code>M_0</code>. Each load has its own label.</p><p class="small">The action belongs to this member side at a joint. Arrows retain their physical line of action; moment arcs retain their application centre.</p></details>`;

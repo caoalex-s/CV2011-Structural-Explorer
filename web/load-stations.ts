@@ -9,5 +9,5 @@ export function boundaryStation(t: number, spanPixels: number, enabled: boolean)
 }
 export function stationLabel(t: number): string {
     const index = loadStations.indexOf(t);
-    return index < 0 ? String(t) : names[index];
+    return index < 0 ? String(Number(t.toPrecision(5))) : names[index];
 }
