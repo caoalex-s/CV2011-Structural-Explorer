@@ -28,6 +28,18 @@ for (const name of ['theme.css', 'style.css', 'worked.css', 'workspace.css', 'dr
   const revision = createHash('sha256').update(stylesheet).digest('hex').slice(0, 12);
   indexHtml = indexHtml.replace(`href="${name}"`, `href="${name}?v=${revision}"`);
 }
+// Resolve every static and dynamic workspace import to the exact built bytes.
+// Import-map keys are relative to the document, including the scoped portal copy.
+const imports = { katex: './vendor/katex/katex.mjs' };
+for (const name of (await readdir('dist')).sort()) {
+  if (!name.endsWith('.js')) continue;
+  const bytes = await readFile('dist/' + name);
+  const revision = createHash('sha256').update(bytes).digest('hex').slice(0, 16);
+  imports['./' + name] = './' + name + '?v=' + revision;
+}
+indexHtml = indexHtml.replace(/(<script type="importmap">).*?(<\/script>)/,
+  (_, start, end) => start + JSON.stringify({ imports }) + end);
+indexHtml = indexHtml.replace('src="workspace-entry.js"', 'src="' + imports['./workspace-entry.js'] + '"');
 await writeFile('dist/index.html', indexHtml);
 // Serve the pinned renderer and fonts from the same origin, including offline
 // local use. The import map resolves the browser's bare `katex` import here.
