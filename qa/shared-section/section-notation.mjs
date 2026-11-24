@@ -20,7 +20,7 @@ try {
         const metre = String.raw`\,\mathrm{m}`;
         const force = String.raw`\,\mathrm{kN}`;
         const moment = force + metre;
-        assert.deepEqual(await formulas('.fbd-values'), ['N = 0'+force,'V = -10'+force,'M = 27.8'+moment]);
+        assert.deepEqual(await formulas('.fbd-values'), ['N = 0'+force,'V = -10'+force,'M = 27.76'+moment]);
         assert.deepEqual(await formulas('#checked-section'), ['x = 5.22'+metre, 'L = 8'+metre]);
         assert.ok((await formulas('#section-free-body figcaption')).includes('x = 5.22'+metre));
         assert.deepEqual(await formulas('#fbd-description'), ['x']);

@@ -4,6 +4,7 @@ import type { Analysis, Connection, ConnectionRule, Load, Member, Model } from '
 import { jointConnections, memberLabel } from './model-view.js';
 import type { Selection } from './model-view.js';
 import { loadLabels, validLoadLabel } from './load-labels.js';
+import { math, quantity } from './math.js';
 import { escapeHtml as escape, formatNumber as number } from './ui.js';
 
 // A zero force has no physical direction. Remember its editor angle until
@@ -40,7 +41,7 @@ export function renderInspector(options: InspectorOptions): void {
             return `<label class="field">${name}<select ${attributes} aria-label="${name}: ${label}">${[['rigid', 'Continuous'], ['free', 'Released'], ['spring', 'Elastic spring']].map(([key, caption]) => `<option value="${key}" ${key === (typeof value === 'number' ? 'spring' : value) ? 'selected' : ''}>${caption}</option>`).join('')}</select></label>${typeof value === 'number' ? `<label class="field">Stiffness (${direction === 'rotation' ? 'kN m/rad' : 'kN/m'})<input type="number" min="0" step="any" value="${value}" ${attributes} data-stiffness="true" aria-label="${direction} stiffness: ${label}"></label>` : ''}`;
         }).join('');
         const result = analysis.connections?.find(item => item.member === member.id && item.end === end);
-        const response = result && (resultsVisible) ? `<p class="small">Relative rotation Δθ = ${number(result.relativeRotation)} rad<br>Axial slip = ${number(result.axialSlip * 1000)} mm<br>Transverse slip = ${number(result.transverseSlip * 1000)} mm</p>` : '';
+        const response = result && resultsVisible ? `<p class="small">Relative rotation ${math('\\Delta\\theta = ' + quantity(number(result.relativeRotation), '\\mathrm{rad}'))}<br>Axial slip = ${number(result.axialSlip * 1000)} mm<br>Transverse slip = ${number(result.transverseSlip * 1000)} mm</p>` : '';
         return `<details class="connection-editor" open><summary>${label}</summary>${rows}${response}</details>`;
     }
     function bindConnectionEditors(container: HTMLElement) {
@@ -85,20 +86,22 @@ export function renderInspector(options: InspectorOptions): void {
         if (selected.type === 'node') {
             const node = model.nodes.find(node => node.id === selected!.id)!;
             const connected = jointConnections(model, node), reference = referenceMember(model, node.id);
-            html += `<p class="small">Node <b>${nodeLabels(model).get(node.id)}</b> · labels update automatically when nodes are added or removed.</p>` + field('x', 'x (m)') + field('y', 'y (m)');
+            html += `<p class="small">Node <b>${nodeLabels(model).get(node.id)}</b> · labels update automatically when nodes are added or removed.</p>` + field('x', math('x') + ' (m)') + field('y', math('y') + ' (m)');
             const jointNames: Record<string, string> = { rigid: 'Rigid joint', pinned: 'Internal pin / hinge', 'semi-rigid': 'Semi-rigid joint', custom: 'Member-specific constraints' };
             html += `<label class="field">Joint connection<select data-property="joint">${Object.entries(jointNames).map(([kind, label]) => `<option value="${kind}" ${kind === (node.joint || 'rigid') ? 'selected' : ''}>${label}</option>`).join('')}</select></label>`;
-            if (node.joint === 'semi-rigid') html += field('rotationStiffness', 'Rotational stiffness kθ (kN m/rad)');
-            if (connected.length > 1) html += `<label class="field">Reference member<select data-property="referenceMember">${connected.map(({ member }) => `<option value="${escape(member.id)}" ${member.id === reference ? 'selected' : ''}>${memberLabel(model, member)}</option>`).join('')}</select></label><p class="small">Connections relate each other member end to this reference. A pin shares translations and permits relative rotation. A rotational spring transfers moment M = kθ Δθ.</p>${connected.map(({ member, end }) => connectionEditor(member, end)).join('')}`;
+            if (node.joint === 'semi-rigid') html += field('rotationStiffness', `Rotational stiffness ${math('k_\\theta')} (kN m/rad)`);
+            if (connected.length > 1) html += `<label class="field">Reference member<select data-property="referenceMember">${connected.map(({ member }) => `<option value="${escape(member.id)}" ${member.id === reference ? 'selected' : ''}>${memberLabel(model, member)}</option>`).join('')}</select></label><p class="small">Connections relate each other member end to this reference. A pin shares translations and permits relative rotation. A rotational spring transfers moment ${math(String.raw`M=k_\theta\Delta\theta`)}.</p>${connected.map(({ member, end }) => connectionEditor(member, end)).join('')}`;
             else html += '<p class="small">A joint connection relates two or more members. At a single-member end, use a ground support to constrain movement.</p>';
         }
         if (selected.type === 'member') {
             const member = model.members.find(member => member.id === selected!.id)!;
-            html += `<p class="small">Member <b>${memberLabel(model, member)}</b></p>` + field('EA', 'Axial rigidity EA (kN)') + field('EI', 'Flexural rigidity EI (kN m²)');
+            html += `<p class="small">Member <b>${memberLabel(model, member)}</b></p>`
+                + field('EA', `Axial rigidity ${math('EA')} (kN)`)
+                + field('EI', `Flexural rigidity ${math('EI')} (${math('\\mathrm{kN}\\,\\mathrm{m}^2')})`);
             html += connectionEditor(member, 'a') + connectionEditor(member, 'b');
         }
         if (selected.type === 'support')
-            html += `<label class="field">Support type<select data-property="kind">${['pin', 'roller', 'fixed', 'guided', 'custom'].map(k => `<option ${item.kind === k ? 'selected' : ''}>${k}</option>`).join('')}</select></label>` + field('t', 'Position / member length', '0.01') + (['roller', 'guided'].includes(String(item.kind)) ? field('angle', 'Restrained translation angle from +x (°)') : '') + (item.kind === 'custom' ? [['fixX', 'Restrain global x'], ['fixY', 'Restrain global y'], ['fixRotation', 'Restrain rotation θ']].map(([key, label]) => `<label class="check"><input type="checkbox" data-property="${key}" ${item[key] ? 'checked' : ''}>${label}</label>`).join('') : '') + '<p class="small">Ground restraints act on the selected member side. A pin support does not release continuity between connected members.</p>';
+            html += `<label class="field">Support type<select data-property="kind">${['pin', 'roller', 'fixed', 'guided', 'custom'].map(k => `<option ${item.kind === k ? 'selected' : ''}>${k}</option>`).join('')}</select></label>` + field('t', 'Position / member length', '0.01') + (['roller', 'guided'].includes(String(item.kind)) ? field('angle', `Restrained translation angle from ${math('+x')} (°)`) : '') + (item.kind === 'custom' ? [['fixX', `Restrain global ${math('x')}`], ['fixY', `Restrain global ${math('y')}`], ['fixRotation', `Restrain rotation ${math('\\theta')}`]].map(([key, label]) => `<label class="check"><input type="checkbox" data-property="${key}" ${item[key] ? 'checked' : ''}>${label}</label>`).join('') : '') + '<p class="small">Ground restraints act on the selected member side. A pin support does not release continuity between connected members.</p>';
         if (selected.type === 'load') {
             html += `<label class="field">Load label<input type="text" data-property="label" maxlength="10" value="${escape(loadLabels(model).get(selected.id))}" placeholder="${item.kind === 'moment' ? 'M_0' : item.kind === 'distributed' ? 'w_1' : 'P_1'}"></label>`;
             html += field('t', 'Start / member length', 'any');
@@ -108,8 +111,8 @@ export function renderInspector(options: InspectorOptions): void {
             if (item.kind === 'force') {
                 html += '<div class="load-direction-fields">'
                     + angleField('magnitude', 'Magnitude (kN)', Number(Math.hypot(load.fx, load.fy).toPrecision(15)))
-                    + angleField('pointAngle', 'Angle CCW from global +x (°)', Number(pointAngle(load).toPrecision(15))) + '</div>';
-                html += field('fx', 'Horizontal force Fx, rightward + (kN)') + field('fy', 'Vertical force Fy, upward + (kN)');
+                    + angleField('pointAngle', `Angle CCW from global ${math('+x')} (°)`, Number(pointAngle(load).toPrecision(15))) + '</div>';
+                html += field('fx', `Horizontal force ${math('F_x')}, rightward + (kN)`) + field('fy', `Vertical force ${math('F_y')}, upward + (kN)`);
             }
             if (item.kind === 'moment')
                 html += field('mz', 'Moment, CCW + (kN m)');
@@ -119,10 +122,10 @@ export function renderInspector(options: InspectorOptions): void {
                 html += field('end', 'End / member length') + field('fy', 'Start intensity (kN/m)', 'any', sign)
                     + '<div class="load-direction-fields">' + field('qEnd', 'End intensity (kN/m)', 'any', sign)
                     + `<label class="field">Positive direction<select data-property="lineReference"><option value="global">Global angle</option><option value="normal" ${normal ? 'selected' : ''}>Member normal (+local y)</option></select></label>`
-                    + (normal ? '' : angleField('lineAngle','Angle CCW from global +x (°)', Number(load.direction ?? 270)))
+                    + (normal ? '' : angleField('lineAngle',`Angle CCW from global ${math('+x')} (°)`, Number(load.direction ?? 270)))
                     + '<p class="small">Intensities vary linearly per metre of member length. A negative value reverses the arrow. The positive member normal points left when looking from the first joint to the second.</p></div>';
             }
-            html += '<details class="inspector-help"><summary>Load notation and directions</summary><p class="small">Use P or F for a force, M for a couple, and w or q for distributed loading. An optional subscript uses an underscore, for example P_1 or M_0. Each load has its own label.</p><p class="small">The action belongs to this member side at a joint. Arrows retain their physical line of action; moment arcs retain their application centre.</p></details>';
+            html += `<details class="inspector-help"><summary>Load notation and directions</summary><p class="small">Use ${math('P')} or ${math('F')} for a force, ${math('M')} for a couple, and ${math('w')} or ${math('q')} for distributed loading. To enter ${math('P_1')} or ${math('M_0')}, type <code>P_1</code> or <code>M_0</code>. Each load has its own label.</p><p class="small">The action belongs to this member side at a joint. Arrows retain their physical line of action; moment arcs retain their application centre.</p></details>`;
         }
         const editorKey = selected.type + ':' + selected.id;
         const expanded = container.dataset.object === editorKey && container.querySelector('details.load-settings')?.hasAttribute('open');

@@ -8,7 +8,8 @@ import { roundedDecimal } from './portal-candidate.js';
 import { binary64, encoded } from './frame-rational.js';
 import { validateIntervalFrame } from './frame-interval-model.js';
 import { nodeLabels, type Model } from './engine.js';
-import { memberLabel } from './model-view.js';
+import { memberLabel, reactionSymbols } from './model-view.js';
+import { math, rationalLatex } from './math.js';
 
 const escape = (text: string) => text.replace(/[&<>"']/g, character =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]!));
@@ -65,7 +66,7 @@ export function outwardDecimal(value: Rational, digits: number, direction: 'lowe
 function row(label: string, unit: string, value: IntervalReadout, digits: number): string {
     const lower = outwardDecimal(value.lower, digits + 3, 'lower');
     const upper = outwardDecimal(value.upper, digits + 3, 'upper');
-    return `<tr><th scope="row">${escape(label)} (${unit})</th>
+    return `<tr><th scope="row">${label} (${unit})</th>
       <td data-evidence="rounded-midpoint">≈ ${roundedDecimal(value.midpoint, digits)}</td>
       <td data-evidence="outward-enclosure">[${lower}, ${upper}]</td>
       <td><details><summary>Exact values</summary><p>Midpoint:<br><span data-evidence="exact-midpoint">${exact(value.midpoint)}</span></p>
@@ -76,19 +77,21 @@ function row(label: string, unit: string, value: IntervalReadout, digits: number
 export function renderIntervalValues(values: IntervalValues, drawing?: Model): string {
     const nodes = drawing && nodeLabels(drawing);
     const members = drawing && new Map(drawing.members.map(member => [member.id, memberLabel(drawing, member)]));
-    const fieldNames = ['Axial force N', 'Shear force V', 'Bending moment M', 'Rotation θ', 'Displacement ux', 'Displacement uy'];
+    const fieldNames = [`Axial force ${math('N')}`, `Shear force ${math('V')}`, `Bending moment ${math('M')}`,
+        `Rotation ${math('\\theta')}`, `Global horizontal displacement ${math('u_x')}`, `Global vertical displacement ${math('u_y')}`];
     const fieldUnits = ['kN', 'kN', 'kN m', 'rad', 'm', 'm'];
     const table = (rows: string) => `<table class="frame-interval-values"><thead><tr><th>Quantity</th>
       <th>Rounded midpoint</th><th>Outward decimal interval</th><th>Exact certificate values</th></tr></thead><tbody>${rows}</tbody></table>`;
     const fields = values.fields.map((value, index) => row(fieldNames[index], fieldUnits[index], value, index < 3 ? 6 : 10)).join('');
     const reactions = values.points.map(point => {
-        const label = point.owner === 'node' ? `Node ${nodes?.get(point.id) ?? point.id}` :
-            `Member ${members?.get(point.id) ?? point.id} at t = ${exact(point.parameter)}`;
-        return `<h4>${escape(label)}</h4>${table(point.reactions.map((value, index) =>
-            row(['Grouped reaction Fx', 'Grouped reaction Fy', 'Grouped reaction Mz'][index], index === 2 ? 'kN m' : 'kN', value, 6)).join(''))}`;
+        const label = point.owner === 'node' ? `Node ${escape(nodes?.get(point.id) ?? point.id)}` :
+            `Member ${escape(members?.get(point.id) ?? point.id)} at ${math('t=' + rationalLatex(exact(point.parameter)))}`;
+        const symbols = reactionSymbols(point.owner === 'node' ? nodes?.get(point.id) : undefined);
+        return `<h4>${label}</h4>${table(point.reactions.map((value, index) =>
+            row('Grouped reaction ' + math(symbols[index]), index === 2 ? 'kN m' : 'kN', value, 6)).join(''))}`;
     }).join('');
-    return `<p>Member ${escape(members?.get(values.query.member) ?? values.query.member)} is evaluated at t = ${exact(values.query.parameter)} using the ${values.query.cutSide} limit. Each interval contains the corresponding value of the original linear frame model. The exact midpoint is the reported approximation covered by the accuracy bound.</p>
-      <p>For each exact midpoint m and real model value v, the checker establishes |m − v| ≤ a + 10⁻⁸|v|. The absolute tolerance a is 10⁻⁶ kN for forces, 10⁻⁶ kN m for moments, 10⁻¹⁰ rad for rotation, and 10⁻⁹ m for displacement. Rounded midpoint values help read the tables and have additional decimal rounding error. Decimal interval endpoints are rounded outward to retain containment. Expand Exact values to inspect the original rational interval and midpoint.</p>
+    return `<p>Member ${escape(members?.get(values.query.member) ?? values.query.member)} is evaluated at ${math('t=' + rationalLatex(exact(values.query.parameter)))} using the ${values.query.cutSide} limit. Each interval contains the corresponding value of the original linear frame model. The exact midpoint is the reported approximation covered by the accuracy bound.</p>
+      <p>For each exact midpoint ${math('m')} and real model value ${math('v')}, the checker establishes ${math(String.raw`|m-v|\le a+10^{-8}|v|`)}. The absolute tolerance ${math('a')} is ${math(String.raw`10^{-6}\,\mathrm{kN}`)} for forces, ${math(String.raw`10^{-6}\,\mathrm{kN}\,\mathrm{m}`)} for moments, ${math(String.raw`10^{-10}\,\mathrm{rad}`)} for rotation, and ${math(String.raw`10^{-9}\,\mathrm{m}`)} for displacement. Rounded midpoint values help read the tables and have additional decimal rounding error. Decimal interval endpoints are rounded outward to retain containment. Expand Exact values to inspect the original rational interval and midpoint.</p>
       <h3>Selected section</h3>${table(fields)}
       <h3>Grouped reactions</h3><p>Each row gives the total reaction at its source point. Supports attached to the same source point share this resultant. Geometric coincidence alone does not merge distinct source points. The report does not assign separate reactions to individual supports at one source point.</p>${reactions}`;
 }

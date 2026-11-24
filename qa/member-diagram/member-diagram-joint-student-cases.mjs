@@ -12,7 +12,7 @@ const expectedProtocols = {
     rigid: 'CV2011_FRAME_1', hinge: 'CV2011_HINGE_1',
     spring5000: 'CV2011_ROTATIONAL_SPRING_1', spring2500: 'CV2011_ROTATIONAL_SPRING_1',
 };
-const memberLabels = { AB: 'A–B', BC: 'B–C' };
+const memberLabels = { AB: 'AB', BC: 'BC' };
 const exactAffineCentres = { rigid: [-2, 15], hinge: [38, 15], spring5000: [34, 45], spring2500: [6, 5] };
 const hash = value => createHash('sha256').update(value).digest('hex');
 
@@ -191,7 +191,11 @@ export async function runJointMemberDiagramStudentCases({ page, base, output }) 
         };
         assert.match(status, /^Accepted/i);
         assert.ok(text.includes(memberLabels[member]));
-        assert.match(text, /V₀.*kN.*M₀.*kN\s*[·⋅]?\s*m.*q₀.*kN\/m.*g.*kN\/m²/);
+        const formulas = await diagram.locator('[data-piece] p annotation[encoding="application/x-tex"]').allTextContents();
+        for (const [symbol, unit] of [['V_0=', '\\mathrm{kN}'], ['M_0=', '\\mathrm{kN}\\,\\mathrm{m}'],
+            ['q_0=', '\\mathrm{kN/m}'], ['g=', '\\mathrm{kN/m^2}']]) {
+            assert.ok(formulas.some(formula => formula.startsWith(symbol) && formula.endsWith(unit)), symbol);
+        }
         compareJointDiagram(observed, family, mode, member);
         if (mode === 'hinge') {
             assert.match(workedText, /released end|released-end rotation/i);
@@ -202,9 +206,9 @@ export async function runJointMemberDiagramStudentCases({ page, base, output }) 
         const jointValues = {};
         const expectedValues = springFractions[family][mode];
         if (expectedValues) {
-            assert.match(workedText, /Δθ/);
-            assert.match(workedText, /T\s*=\s*k/);
-            assert.match(workedText, /kN\s*[·⋅]?\s*m\/rad/);
+            const spring = await worked.locator('[data-spring-side] annotation[encoding="application/x-tex"]').allTextContents();
+            assert.ok(spring.includes(String.raw`T=k_\theta\Delta\theta`));
+            assert.ok(spring.some(formula => formula.includes(String.raw`\mathrm{kN}\,\mathrm{m}/\mathrm{rad}`)));
             for (const [name, [top, bottom]] of Object.entries(expectedValues)) {
                 const readout = worked.locator(`[data-spring-value="${name}"]`);
                 assert.ok(await readout.isVisible());

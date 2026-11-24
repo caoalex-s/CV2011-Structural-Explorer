@@ -62,7 +62,7 @@ try {
         await picker.selectOption('load:line');
         await prop('lineReference').selectOption('normal');
         const fileMenu=page.locator('.model-files');
-        if (!(await fileMenu.getAttribute('open')!==null)) await fileMenu.locator('summary').click();
+        if (await fileMenu.getAttribute('open') === null) await fileMenu.locator('summary').click();
         const downloaded=page.waitForEvent('download');
         await page.locator('#export-model').click();
         const file=await downloaded;

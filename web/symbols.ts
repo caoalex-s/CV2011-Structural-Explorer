@@ -34,10 +34,13 @@ export function forceGeometry(x: number, y: number, fx: number, fy: number, leng
 function arrowHead(x: number, y: number, ux: number, uy: number, color: string): string {
     return `<path d="M ${x} ${y} L ${x - 10 * ux + 3.5 * uy} ${y - 10 * uy - 3.5 * ux} L ${x - 8 * ux} ${y - 8 * uy} L ${x - 10 * ux - 3.5 * uy} ${y - 10 * uy + 3.5 * ux} Z" fill="${color}"/>`;
 }
-export function forceSymbol(x: number, y: number, fx: number, fy: number, color: string, label = '', length = 60, gap = 5): string {
+export function forceSymbol(x: number, y: number, fx: number, fy: number, color: string, label = '', length = 60, gap = 5,
+    fromOrigin = false): string {
     const geometry = forceGeometry(x, y, fx, fy, length, gap);
     if (!geometry) return '';
-    const { tip, tail, ux, uy } = geometry;
+    const { ux, uy } = geometry;
+    const tip = fromOrigin ? { x: x + (gap + length) * ux, y: y + (gap + length) * uy } : geometry.tip;
+    const tail = fromOrigin ? { x: x + gap * ux, y: y + gap * uy } : geometry.tail;
     const leader = gap > 8 ? `<path d="M ${tip.x} ${tip.y} L ${x} ${y}" stroke="${color}" stroke-width="0.8" stroke-dasharray="2 3" opacity=".65"/>` : '';
     // Keep the hit region on the actual arrow for forces in every direction.
     return `<g data-vector="force" data-origin-x="${x}" data-origin-y="${y}">${leader}<path class="hit" d="M ${tail.x} ${tail.y} L ${tip.x} ${tip.y}"/><path d="M ${tail.x} ${tail.y} L ${tip.x} ${tip.y}" stroke="${color}" stroke-width="1.8" fill="none"/>${arrowHead(tip.x, tip.y, ux, uy, color)}${label ? `<text x="${tail.x + 8}" y="${tail.y - 9}" class="svg-label" style="fill:${color}">${symbolLabel(label)}</text>` : ''}</g>`;

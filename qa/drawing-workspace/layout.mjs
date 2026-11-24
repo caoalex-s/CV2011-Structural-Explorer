@@ -11,11 +11,12 @@ try {
         const beam = await page.locator('#canvas [data-object="member"]').first().boundingBox();
         assert.ok(beam && beam.y > 0 && beam.y + beam.height < (width > 750 ? 1000 : 844), 'Beam must fit on opening at ' + width);
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), width);
-        const station = 'x = 4 m · L = 8 m';
-        assert.equal(await page.locator('#section-distance').textContent(), station);
+        const station = [String.raw`x = 4\,\mathrm{m}`, String.raw`L = 8\,\mathrm{m}`];
+        const tex = 'annotation[encoding="application/x-tex"]';
+        assert.deepEqual(await page.locator('#section-distance').locator(tex).allTextContents(), station);
         if (width <= 750) {
             const strip = page.locator('.cut-readout');
-            assert.ok((await strip.innerText()).startsWith(station));
+            assert.deepEqual((await strip.locator(tex).allTextContents()).slice(0, 2), station);
             assert.ok(await strip.evaluate(e => e.scrollWidth <= e.clientWidth));
         }
         const picker = page.locator('#drawing-object');

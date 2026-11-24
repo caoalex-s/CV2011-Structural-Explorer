@@ -11,8 +11,9 @@ import { renderWorked, showWorkedSolution } from './worked.js';
 import { renderCourseConventions } from './course.js';
 import { assignLoadLabels, loadLabels } from './load-labels.js';
 import { workspaceConventions } from './axes.js';
-import { element as $, escapeHtml as escape, formatNumber as number, downloadJson as download } from './ui.js';
-import { jointConnections } from './model-view.js';
+import { math, measureUnits, quantity } from './math.js';
+import { element as $, escapeHtml as escape, formatNumber as number, formatSectionResult, downloadJson as download } from './ui.js';
+import { jointConnections, memberLabel } from './model-view.js';
 import type { Selection } from './model-view.js';
 import { renderInspector } from './inspector.js';
 import { renderResponses, sampleSection } from './responses.js';
@@ -415,7 +416,7 @@ function renderCanvas() {
                 const offset = section[field] * scale * sense / view.scale;
                 const station = position(model, member.id, sectionT);
                 const dot = screen({x: station.x - (b.y-a.y)/length*offset, y: station.y + (b.x-a.x)/length*offset});
-                drawing += `<circle class="cut-ordinate" data-side="${cutSide()}" cx="${dot.x}" cy="${dot.y}" r="5"><title>Selected ${field} = ${number(section[field])} ${field === 'M' ? 'kN·m' : 'kN'}</title></circle>`;
+                drawing += `<circle class="cut-ordinate" data-side="${cutSide()}" cx="${dot.x}" cy="${dot.y}" r="5"><title>Selected ${field} = ${formatSectionResult(section[field])} ${field === 'M' ? 'kN m' : 'kN'}</title></circle>`;
             }
             if (maximum > 1e-8) {
                 const peak = all.reduce((a, b) => Math.abs(a[field]) > Math.abs(b[field]) ? a : b);
@@ -447,7 +448,7 @@ function renderCanvas() {
             if (Math.abs(reaction.fx) > 1e-7)
                 drawing += `<g pointer-events="none">${forceSymbol(p.x, p.y, reaction.fx, 0, courseColors.reaction, `${label}ₓ = ${number(Math.abs(reaction.fx))} kN`, 42, 20)}</g>`;
             if (Math.abs(reaction.mz) > 1e-7)
-                drawing += `<g pointer-events="none">${momentSymbol(p.x, p.y, reaction.mz, courseColors.reaction, `M(${label}) = ${number(Math.abs(reaction.mz))} kN m`, 37)}</g>`;
+                drawing += `<g pointer-events="none">${momentSymbol(p.x, p.y, reaction.mz, courseColors.reaction, `M_${label} = ${number(Math.abs(reaction.mz))} kN m`, 37)}</g>`;
         }
     if (analysis.mechanism)
         for (const motion of analysis.mechanism) {
@@ -542,20 +543,18 @@ function sectionSample(): Sample | undefined {
     return sampleSection(analysis, currentMember, sectionT, cutSide(), model);
 }
 function render() {
-    if (!model.members.some(m => m.id === currentMember))
-        currentMember = model.members[0]?.id || '';
+    const member = model.members.find(m => m.id === currentMember) ?? model.members[0];
+    currentMember = member?.id ?? '';
     updateEvidenceBinding();
     const section = renderResponses({ model, analysis, currentMember, sectionT, layer, cutSide: cutSide(),
         resultsVisible: responsesVisible() });
-    drawingWorkspace.update(model, selected, section.sample, section.station, section.face);
+    drawingWorkspace.update(model, selected, section.sample, section.stationMath, section.face);
     const fbd = $('section-free-body');
     fbd.hidden = mode !== 'sandbox' || !section.sample;
     $('section-free-body-content').innerHTML = !fbd.hidden && section.sample
         ? sectionFreeBody(model, analysis, currentMember, sectionT, cutSide(), section.sample) : '';
     const checkedScope = document.getElementById('checked-section');
-    if (checkedScope) checkedScope.innerHTML = currentMember
-        ? escape(currentMember) + ' · ' + section.stationMath + ' · just ' + cutSide()
-        : 'Choose a member.';
+    if (checkedScope) checkedScope.innerHTML = member ? `${escape(memberLabel(model, member))} at ${section.stationMath.join(', ')} (just ${cutSide()})` : 'Choose a member.';
     controls.setHistory(history.length > 0, future.length > 0);
     inspector();
     $('edit-selection').hidden = !selected;
@@ -697,7 +696,7 @@ svg.addEventListener('pointermove', event => {
         endDrag();
     }
     const p = world(event);
-    $('coordinates').textContent = `x ${p.x.toFixed(2)} m · y ${p.y.toFixed(2)} m`;
+    $('coordinates').textContent = `x = ${p.x.toFixed(2)} m, y = ${p.y.toFixed(2)} m`;
     if (drag?.kind === 'pan') {
         const pixelScale = svg.getScreenCTM()!.a;
         view.cx = drag.cx - (event.clientX - drag.x) / (pixelScale * view.scale);
@@ -767,7 +766,7 @@ function setMode(next: string) {
     sizeDrawing();
     const sandboxTitle = portalExercise ? 'Portal frame exercise' : isPortalWorkspace ? 'Checked portal workspace' : 'Structural sandbox';
     $('page-title').textContent = mode === 'sandbox' ? sandboxTitle : mode === 'practice' ? 'Practice problems' : 'Review learning progress';
-    $('page-description').textContent = mode === 'sandbox' && portalExercise ? 'Draw the three-member portal, then predict every location where |M| is greatest on BC.' : mode === 'sandbox' ? 'Draw a structure or open a model to inspect its response.' : mode === 'practice' ? 'Build the model, submit a step, and examine the reasoning.' : 'Review submitted steps and the evidence behind recurring errors.';
+    $('page-description').innerHTML = mode === 'sandbox' && portalExercise ? `Draw the three-member portal, then predict every location where ${math('|M|')} is greatest on BC.` : mode === 'sandbox' ? 'Draw a structure or open a model to inspect its response.' : mode === 'practice' ? 'Build the model, submit a step, and examine the reasoning.' : 'Review submitted steps and the evidence behind recurring errors.';
     $('page-description').hidden = mode === 'sandbox' && !portalExercise;
     $('practice-panel').hidden = mode !== 'practice';
     $('insights-panel').hidden = mode !== 'insights';
@@ -904,7 +903,7 @@ const stepDefinitions: Record<string, {
     normal: { title: 'Normal force at the cut', units: 'kN', hint: 'Isolate the left segment. Positive normal force acts away from the cut. Resolve all horizontal forces on this segment.' },
     shear: { title: 'Shear force at the cut', units: 'kN', hint: 'For a left segment, positive shear acts downward at its right cut. Include only the portion of each distributed load to the left of the cut.' },
     moment: { title: 'Moment at the cut', units: 'kN m', hint: 'Sum moments about the cut. Keep every load at its own lever arm. A positive applied couple contributes a negative jump in the sagging-positive moment diagram.' },
-    deflection: { title: 'Vertical displacement v at the cut (upward +)', units: 'mm', hint: 'Integrate the moment equation EI v″ = M twice on each interval. Apply the displacement boundary conditions at both supports and continuity of displacement v and physical slope θ = v′ at each continuous section. If using downward-positive virtual-work displacement Δ, enter v = −Δ.' },
+    deflection: { title: `Global vertical displacement ${math('u_y')} at the cut (upward +)`, units: 'mm', hint: `Integrate the moment equation ${math("EI\\,v''=M")} twice on each interval. Apply the displacement boundary conditions at both supports and continuity of displacement ${math('v')} and physical slope ${math("\\theta=v'")} at each continuous section. On this rightward horizontal beam, ${math('u_y=v')}. If using downward-positive virtual-work displacement ${math('\\Delta')}, enter ${math('u_y=-\\Delta')}.` },
 };
 function renderPractice() {
     const p = problem(), panel = $('practice-panel');
@@ -913,14 +912,14 @@ function renderPractice() {
         return;
     }
     const step = stepDefinitions[solutionStep];
-    panel.innerHTML = `<div class="panel-label">STEP-BY-STEP WORKSPACE</div><h2>From equilibrium to displacement</h2><p class="small">Submit a value or an arithmetic expression. Use +, −, *, /, parentheses, and ^. Numeric inputs are checked against the current model and cut. Upward reactions and displacements are positive.</p><div class="steps">${Object.entries(stepDefinitions).map(([key, value], index) => `<button data-step="${key}" class="${solutionStep === key ? 'active' : ''}">${index + 1}. ${value.title.split(' at ')[0]}</button>`).join('')}</div><h2>${step.title}</h2><p class="small">Current cut: x = ${number(p.section)} m from the member start. ${['normal', 'shear', 'moment'].includes(solutionStep) ? 'Use the right-hand limit at an interior point action.' : ''}</p><div class="answer-row"><input id="answer" aria-label="Your answer" placeholder="Enter a value or expression"><select id="answer-units" aria-label="Answer units">${['kN', 'N', 'kN m', 'N m', 'mm', 'm'].map(u => `<option ${u === step.units ? 'selected' : ''}>${u}</option>`).join('')}</select><button class="primary" id="check-answer">Check step</button></div><button id="hint">Show hint</button> <button id="reveal">Reveal derivation</button><div id="step-feedback" aria-live="polite"></div>`;
+    panel.innerHTML = `<div class="panel-label">STEP-BY-STEP WORKSPACE</div><h2>From equilibrium to displacement</h2><p class="small">Submit a value or an arithmetic expression. Use +, −, *, /, parentheses, and ^. Numeric inputs are checked against the current model and cut. Upward reactions and displacements are positive.</p><div class="steps">${Object.entries(stepDefinitions).map(([key, value], index) => `<button data-step="${key}" class="${solutionStep === key ? 'active' : ''}">${index + 1}. ${value.title.split(' at ')[0]}</button>`).join('')}</div><h2>${step.title}</h2><p class="small">Current cut: ${math('x = ' + quantity(number(p.section), measureUnits.length))} from the member start. ${['normal', 'shear', 'moment'].includes(solutionStep) ? 'Use the right-hand limit at an interior point action.' : ''}</p><div class="answer-row"><input id="answer" aria-label="Your answer" placeholder="Enter a value or expression"><select id="answer-units" aria-label="Answer units">${['kN', 'N', 'kN m', 'N m', 'mm', 'm'].map(u => `<option ${u === step.units ? 'selected' : ''}>${u}</option>`).join('')}</select><button class="primary" id="check-answer">Check step</button></div><button id="hint">Show hint</button> <button id="reveal">Reveal derivation</button><div id="step-feedback" aria-live="polite"></div>`;
     panel.insertAdjacentHTML('beforeend', `<div class="dialog-buttons"><button id="show-computed">${practiceResultsVisible ? 'Hide computed response' : 'Reveal computed response'}</button></div><details class="small"><summary>Verification scope</summary><p>Symbolic checks run on the connected course verifier. Formal library: ${escape(proofStatus.lean === 'checked' ? 'Lean build passed' : 'Lean build status pending')}. ${escape(proofStatus.scope)} The drawing-to-model conversion and numerical solver are checked separately.</p></details>`);
     $('show-computed').onclick = () => { practiceResultsVisible = !practiceResultsVisible; if (practiceResultsVisible) {
         solutionRevealed = true;
         void record('reveal', '', step.units);
     } render(); };
     panel.querySelectorAll<HTMLButtonElement>('[data-step]').forEach(button => button.onclick = () => { solutionStep = button.dataset.step!; hintUsed = false; renderPractice(); });
-    $('hint').onclick = () => { hintUsed = true; $('step-feedback').innerHTML = `<div class="feedback">${escape(step.hint)}</div>`; void record('hint', '', step.units); };
+    $('hint').onclick = () => { hintUsed = true; $('step-feedback').innerHTML = `<div class="feedback">${step.hint}</div>`; void record('hint', '', step.units); };
     $('reveal').onclick = async () => {
         solutionRevealed = true;
         const attempt = await record('reveal', '', step.units);
@@ -932,7 +931,7 @@ function renderPractice() {
             showWorkedSolution(solutionStep === 'deflection' ? 'integration' : 'sections');
         } else {
             const expected = expectedValue(p);
-            $('step-feedback').innerHTML = `<div class="feedback">Numerical reference: ${number(expected, 5)} ${step.units}. Connect the verifier for a symbolic derivation.<p>${escape(step.hint)}</p></div>`;
+            $('step-feedback').innerHTML = `<div class="feedback">Numerical reference: ${number(expected, 5)} ${step.units}. Connect the verifier for a symbolic derivation.<p>${step.hint}</p></div>`;
         }
     };
     $('check-answer').onclick = async () => {

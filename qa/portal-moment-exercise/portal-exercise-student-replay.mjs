@@ -245,7 +245,7 @@ try {
     // 1. Discover the exercise and use the same canvas controls as a student.
     await page.goto(base);
     await page.getByRole('link', { name: 'Course', exact: true }).first().click();
-    await page.getByRole('link', { name: 'Portal frame · maximum |M|', exact: true }).click();
+    await page.getByRole('link', { name: 'Portal frame · maximum bending-moment magnitude', exact: true }).click();
     await momentPanel.waitFor({ state: 'visible' });
     assert.match(await momentPanel.getByRole('heading').textContent(), /largest \|M\|.*BC/);
     assert.equal(await canvas.locator('[data-object="member"]').count(), 0, 'Fresh exercise must open blank');

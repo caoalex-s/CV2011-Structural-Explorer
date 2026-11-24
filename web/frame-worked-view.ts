@@ -7,7 +7,7 @@ import { type FrameWorkedSolution, type WorkedStep, validateFrameWorked } from '
 import { symbols, expression } from './frame-worked-rules.js';
 import type { Rational } from './portal-candidate.js';
 import { nodeLabels } from './engine.js';
-import { memberLabel } from './model-view.js';
+import { memberLabel, reactionSymbols } from './model-view.js';
 import type { CheckedFramePoint } from './frame-result.js';
 
 const escape = (text: string) => text.replace(/[&<>"']/g, character =>
@@ -32,7 +32,7 @@ export function renderFrameWorked(report: FrameWorkedSolution): string {
     validateFrameWorked(report);
     const { model, values, query } = report;
     if (values.kind === 'mechanism') return `<h3>No unique equilibrium solution</h3><p>${escape(frameStatus(values))}</p>
-      <details><summary>Checked mechanism and external work</summary>${frameDescriptions(values).map(text => `<p>${escape(text)}</p>`).join('')}</details>`;
+      <details><summary>Checked mechanism and external work</summary>${frameDescriptions(values, model).map(text => `<p>${escape(text)}</p>`).join('')}</details>`;
     const labels = loadLabels(model);
     const nodeNames = nodeLabels(model);
     const memberName = (id: string) => memberLabel(model, model.members.find(member => member.id === id)!);
@@ -58,7 +58,11 @@ export function renderFrameWorked(report: FrameWorkedSolution): string {
         model.supports.some(support => support.member === point.id && support.t === Number(point.parameter.numerator) / Number(point.parameter.denominator)) ||
         model.supports.some(support => { const member = model.members.find(item => item.id === support.member)!;
             return point.owner === 'node' && ((support.t === 0 && member.a === point.id) || (support.t === 1 && member.b === point.id)); }));
-    const reactionRows = reactions.map(point => `<tr><td>${escape(pointName(point))}</td>${point.reaction!.map(value => `<td>${math('\\approx ' + rounded(value))}</td>`).join('')}</tr>`).join('');
+    const reactionRows = reactions.map(point => {
+        const components = reactionSymbols(point.owner === 'node' ? nodeNames.get(point.id) : undefined);
+        const cells = point.reaction!.map((value, index) => `<td>${math(components[index] + ' \\approx ' + rounded(value))}</td>`);
+        return `<tr><th scope="row">${escape(pointName(point))}</th>${cells.join('')}</tr>`;
+    }).join('');
     const motionRows = values.points.map(point => `<tr><td>${escape(pointName(point))}</td>${point.motion.map(value => `<td>${math('\\approx ' + rounded(value))}</td>`).join('')}</tr>`).join('');
     const operands = Object.entries(interval.values).map(([key, value]) => `${symbols[key]}\\approx ${rounded(value)}`).join(',\\quad ');
     return `<p class="worked-evidence-summary">The current drawing has a unique linear equilibrium solution. Returned displacements, grouped reactions, and selected section values are checked. Method rules and intermediate substitutions explain these results and are not separately Lean-checked.</p>
@@ -75,8 +79,8 @@ export function renderFrameWorked(report: FrameWorkedSolution): string {
       <details><summary>Checked joint and cut displacements</summary><table><thead><tr><th>Point</th><th>${math('u_x')} (m)</th><th>${math('u_y')} (m)</th><th>Rotation ${math('\\theta')} (rad)</th></tr></thead><tbody>${motionRows}</tbody></table></details>
       <h3>3. Support reactions</h3>
       <p>The residual gives the grouped support force and moment at each restrained point:</p>${math('\\mathbf R=K\\mathbf d-\\mathbf F.', true)}
-      <table><thead><tr><th>Point</th><th>${math('R_x')} (kN)</th><th>${math('R_y')} (kN)</th><th>${math('M_z')} (kN m)</th></tr></thead><tbody>${reactionRows}</tbody></table>
-      <p>These returned reactions are checked. Positive ${math('R_y')} acts upward and positive ${math('M_z')} acts counterclockwise. Canvas reaction labels show magnitudes, with direction indicated by the arrows. Coincident restraints share a grouped reaction without assigning a unique force to each individual restraint.</p>
+      <table><thead><tr><th>Point</th><th>Horizontal force (kN)</th><th>Vertical force (kN)</th><th>Moment (kN m)</th></tr></thead><tbody>${reactionRows}</tbody></table>
+      <p>These returned reactions are checked. Positive vertical reactions act upward and positive reaction moments act counterclockwise. Canvas reaction labels show magnitudes, with direction indicated by the arrows. Coincident restraints share a grouped reaction without assigning a unique force to each individual restraint.</p>
       <h3>4. Section forces and displacements</h3>
       <p>The selected interval on ${escape(memberName(query.member))} extends from ${math('t \\approx ' + rounded(interval.from))} to ${math('t \\approx ' + rounded(interval.to))}. Coordinate ${math('x')} is measured from its start. Local displacement components are ${math('u')} and ${math('v')}, with start values ${math('u_0')}, ${math('v_0')}, and ${math('\\theta_0')}.</p>
       <p>Direction cosines ${math('c')} and ${math('s')} transform global motion into local motion. The local axial and transverse load intensities are ${math('p(x)=p_0+k_p x')} and ${math('q(x)=q_0+k_q x')}. Their start values and slopes include every distributed load acting on this interval. The start axial force ${math('a_1')}, transverse force ${math('a_2')}, and moment ${math('a_3')} follow from the element stiffness and consistent load vector:</p>

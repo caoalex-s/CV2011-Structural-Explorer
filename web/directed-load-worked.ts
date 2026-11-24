@@ -3,7 +3,7 @@ import { analyse, lineLoadAxis, position, type Model } from './engine.js';
 import { loadLabels, loadLabelLatex } from './load-labels.js';
 import { math, measureUnits, quantity } from './math.js';
 import { sampleSection } from './responses.js';
-import { formatNumber } from './ui.js';
+import { formatNumber, formatSectionResult } from './ui.js';
 
 export function directedLoadWorked(model: Model, member: string, t: number, side: 'left' | 'right') {
     const labels = loadLabels(model);
@@ -21,14 +21,14 @@ export function directedLoadWorked(model: Model, member: string, t: number, side
     const result = analyse(model);
     const cut = sampleSection(result, member, t, side, model);
     const readout = cut ? [
-        math('N=' + quantity(formatNumber(cut.N), measureUnits.force)),
-        math('V=' + quantity(formatNumber(cut.V), measureUnits.force)),
-        math('M=' + quantity(formatNumber(cut.M), measureUnits.moment)),
-    ].join(' · ') : 'A numerical section result is unavailable for this drawing and cut.';
+        math('N=' + quantity(formatSectionResult(cut.N), measureUnits.force)),
+        math('V=' + quantity(formatSectionResult(cut.V), measureUnits.force)),
+        math('M=' + quantity(formatSectionResult(cut.M), measureUnits.moment)),
+    ].join(', ') : 'A numerical section result is unavailable for this drawing and cut.';
     return '<h3>Resolve the distributed loads</h3><p>For member direction cosines '
         + math('(c,s)') + ', resolve the global intensity into local components '
         + math('p=cw_x+sw_y') + ' and ' + math('q=-sw_x+cw_y') + ' per metre of member. Each varies linearly between its end values.</p><ul>'
         + rows.join('') + '</ul><p>Section equilibrium gives ' + math(String.raw`\mathrm dN/\mathrm dx=-p`)
         + ', ' + math(String.raw`\mathrm dV/\mathrm dx=q`) + ' and ' + math(String.raw`\mathrm dM/\mathrm dx=V`)
-        + ' between concentrated actions.</p><p>Numerical section response · ' + readout + '</p>';
+        + ' between concentrated actions.</p><p>Numerical section response: ' + readout + '</p>';
 }

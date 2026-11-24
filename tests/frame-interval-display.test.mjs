@@ -68,8 +68,8 @@ test('exact enclosures remain visible and rounded results have a separate eviden
     assert.match(html, /data-evidence="exact-enclosure"[^>]*>\[1\/3, 1\]</);
     assert.match(html, /data-evidence="rounded-midpoint">≈ 0\.666667</);
     assert.match(html, /additional decimal rounding error/);
-    assert.match(html, /10⁻¹⁰ rad/);
-    assert.match(html, /10⁻⁹ m/);
+    assert.ok(html.includes('>10^{-10}\\,\\mathrm{rad}</annotation>'));
+    assert.ok(html.includes('>10^{-9}\\,\\mathrm{m}</annotation>'));
     assert.doesNotMatch(html, /<script>|<img /);
     assert.match(html, /&lt;script&gt;/);
     assert.equal((html.match(/data-evidence="exact-enclosure"/g) ?? []).length, 15);

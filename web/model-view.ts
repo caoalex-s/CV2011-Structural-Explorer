@@ -9,7 +9,15 @@ export interface Selection {
 
 export function memberLabel(model: Model, member: Member): string {
     const labels = nodeLabels(model);
-    return `${labels.get(member.a)}–${labels.get(member.b)}`;
+    const start = labels.get(member.a) ?? '?';
+    const end = labels.get(member.b) ?? '?';
+    // Separate multi-letter joint names so the two endpoints are identifiable.
+    return start.length === 1 && end.length === 1 ? start + end : start + ' ' + end;
+}
+
+/** Reaction notation for a named joint, with generic symbols for other points. */
+export function reactionSymbols(joint?: string): [string, string, string] {
+    return joint ? [`${joint}_x`, `${joint}_y`, `M_{${joint}}`] : ['R_x', 'R_y', 'M_z'];
 }
 
 export function jointConnections(model: Model, node: Point) {

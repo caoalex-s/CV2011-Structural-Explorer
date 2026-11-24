@@ -3,6 +3,7 @@ import { endConnection } from './engine.js';
 import type { Model } from './engine.js';
 import { absolute, add, binary64, compare, equal, integer, one, sub } from './frame-rational.js';
 import type { Fraction } from './frame-rational.js';
+import { math, measureUnits, numberLatex, quantity } from './math.js';
 import { element as $ } from './ui.js';
 
 export const portalExercise = new URLSearchParams(location.search).get('exercise') === 'portal-absolute-moment';
@@ -102,16 +103,16 @@ function peaks(rows: HTMLElement, model: Model) {
 function substitutions(diagram: HTMLElement, model: Model): string[] {
     const load = model.loads[0];
     const lines: string[] = [];
-    const display = (n: number) => String(Number(n.toPrecision(6))).replace('-', '−');
+    const metres = (value: number) => quantity(numberLatex(value), measureUnits.length);
     function polynomial(values: number[]) {
         const terms: string[] = [];
-        const powers = ['', 'ξ', 'ξ²', 'ξ³'];
+        const powers = ['', '\\xi', '\\xi^2', '\\xi^3'];
         values.forEach((value, index) => {
             if (value === 0) return;
-            const sign = value < 0 ? '−' : '+';
+            const sign = value < 0 ? '-' : '+';
             const magnitude = Math.abs(value);
-            const term = (index > 0 && magnitude === 1 ? '' : display(magnitude)) + powers[index];
-            terms.push(terms.length ? ' ' + sign + ' ' + term : (value < 0 ? '−' : '') + term);
+            const term = (index > 0 && magnitude === 1 ? '' : numberLatex(magnitude)) + powers[index];
+            terms.push(terms.length ? ' ' + sign + ' ' + term : (value < 0 ? '-' : '') + term);
         });
         return terms.join('') || '0';
     }
@@ -128,9 +129,12 @@ function substitutions(diagram: HTMLElement, model: Model): string[] {
         const loaded = centre > load.t && centre < load.end;
         const gradient = loaded ? (load.fy - load.qEnd) / (6 * (load.end - load.t)) : 0;
         const w0 = loaded ? -load.fy + gradient * (a - 6 * load.t) : 0;
-        lines.push('For ' + display(a) + ' ≤ x ≤ ' + display(b) + ' m, take ξ = x − ' + display(a) + ' m. ' +
-            'w(ξ) ≈ ' + polynomial([w0, gradient]) + ' kN/m, V(ξ) ≈ ' + polynomial([v0, -w0, -gradient / 2]) +
-            ' kN and M(ξ) ≈ ' + polynomial([m0, v0, -w0 / 2, -gradient / 6]) + ' kN·m.');
+        const interval = math(String.raw`${metres(a)} \le x \le ${metres(b)}`);
+        const local = math(String.raw`\xi = x - (${metres(a)})`);
+        const intensity = math(String.raw`w(\xi) \approx \bigl(${polynomial([w0, gradient])}\bigr)\,\mathrm{kN/m}`);
+        const shearField = math(String.raw`V(\xi) \approx \bigl(${polynomial([v0, -w0, -gradient / 2])}\bigr)\,${measureUnits.force}`);
+        const momentField = math(String.raw`M(\xi) \approx \bigl(${polynomial([m0, v0, -w0 / 2, -gradient / 6])}\bigr)\,${measureUnits.moment}`);
+        lines.push(`For ${interval}, take ${local}. Then ${intensity}, ${shearField} and ${momentField}.`);
     }
     return lines;
 }
@@ -138,9 +142,9 @@ function substitutions(diagram: HTMLElement, model: Model): string[] {
 export function createMomentExercise(getModel: () => Model, selectBeam: (id: string) => void, refresh: () => void,
     history: () => { predictions: number; revealed: boolean }, adjust: (boundaries: { t: number; end: number }) => void, record: (event: string, answer: string, assisted: boolean) => void) {
     const panel = $('portal-exercise');
-    panel.innerHTML = `<h2>Where does the largest |M| occur on BC?</h2>
-    <p>Draw AB upwards 4 m, BC to the right 6 m, and CD downwards 4 m. For example, start at A (0, −2) m. Fix both bases and keep the joints rigid. Use EA = 2,000,000 kN and EI = 20,000 kN·m² for all three members.</p>
-    <p>Apply a vertical distributed load over BC. In Properties set the downward-positive intensities to +6 kN/m at B and −6 kN/m at C. Measure x from B towards C.</p>
+    panel.innerHTML = `<h2>Where does the largest ${math('|M|')} occur on BC?</h2>
+    <p>Draw AB upwards 4 m, BC to the right 6 m, and CD downwards 4 m. For example, start at A ${math(quantity('(0,-2)', measureUnits.length))}. Fix both bases and keep the joints rigid. Use ${math(String.raw`EA = 2{,}000{,}000\,\mathrm{kN}`)} and ${math(String.raw`EI = 20{,}000\,\mathrm{kN}\,\mathrm{m}^2`)} for all three members.</p>
+    <p>Apply a vertical distributed load over BC. In Properties set the downward-positive intensities to ${math(String.raw`+6\,\mathrm{kN/m}`)} at B and ${math(String.raw`-6\,\mathrm{kN/m}`)} at C. Measure ${math('x')} from B towards C.</p>
     <label>Predict every location of the largest bending-moment magnitude, in metres from B. Separate multiple locations with commas (tolerance 0.02 m).
     <input id="moment-prediction" maxlength="256" autocomplete="off"></label>
     <button id="moment-check">Check prediction</button> <button id="moment-reveal" disabled>Reveal worked solution</button>
@@ -215,15 +219,24 @@ export function createMomentExercise(getModel: () => Model, selectBeam: (id: str
         if (!revealedOnThisCheck) record('reveal', prediction, true);
         exposed = true; save(); document.body.classList.remove('moment-locked'); refresh();
 
-        const locations = outcome.distinct.map(p => 'x ≈ ' + ((p.x0 + p.x1) / 2).toFixed(4) + ' m (M ≈ ' + p.moment.toFixed(4) + ' kN·m)').join(' and ');
+        const locations = outcome.distinct.map(p => {
+            const distance = quantity(((p.x0 + p.x1) / 2).toFixed(4), measureUnits.length);
+            const moment = quantity(p.moment.toFixed(4), measureUnits.moment);
+            return math('x \\approx ' + distance) + ' (' + math('M \\approx ' + moment) + ')';
+        }).join(' and ');
         const heading = document.createElement('strong');
-        heading.textContent = (outcome.resolved ? (outcome.distinct.length === 2 ?
+        heading.innerHTML = (outcome.resolved ? (outcome.distinct.length === 2 ?
             'Reflection about midspan reverses the load and moment signs. The two extrema have equal magnitude at ' :
             'The largest magnitude occurs at ') : 'The checked bounds leave these possible locations: ') + locations + '.';
         explanation.replaceChildren(heading);
-        for (const line of ['Take downward w as positive. On each interval w = w₀ + gξ. Integrating dV/dx = −w gives V = V₀ − w₀ξ − gξ²/2. Integrating dM/dx = V gives M = M₀ + V₀ξ − w₀ξ²/2 − gξ³/6.',
-            ...working, 'Set V = 0 to locate the interior moment extrema. Compare their absolute moments with those at the member ends and load boundaries in the checked table.']) {
-            const paragraph = document.createElement('p'); paragraph.textContent = line; explanation.append(paragraph);
+        for (const line of [
+            `Take downward ${math('w')} as positive. On each interval ${math(String.raw`w = w_0 + g\xi`)}.`,
+            `Integrating ${math(String.raw`\mathrm{d}V/\mathrm{d}x = -w`)} gives ${math(String.raw`V = V_0 - w_0\xi - \tfrac{1}{2}g\xi^2`)}.`,
+            `Integrating ${math(String.raw`\mathrm{d}M/\mathrm{d}x = V`)} gives ${math(String.raw`M = M_0 + V_0\xi - \tfrac{1}{2}w_0\xi^2 - \tfrac{1}{6}g\xi^3`)}.`,
+            ...working,
+            `Set ${math('V = 0')} to locate the interior moment extrema. Compare their absolute moments with those at the member ends and load boundaries in the checked table.`,
+        ]) {
+            const paragraph = document.createElement('p'); paragraph.innerHTML = line; explanation.append(paragraph);
         }
     };
     function status(message: string) {

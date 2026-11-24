@@ -52,10 +52,14 @@ async function selectForceByKeyboard(page) {
     assert.equal(await selector.evaluate(element => element.selectedIndex),target);
 }
 
-async function verifyResults(page, expectedShear, expectedMoment) {
+async function verifyResults(page, expectedShear, expectedMoment, phase) {
     const text = normalize(await page.locator('#section-results').innerText());
-    assert.match(text,new RegExp('Shear force V.*?' + expectedShear + '\\s*kN','i'));
-    assert.match(text,new RegExp('Bending moment M.*?' + expectedMoment + '\\s*kN\\s*[·⋅]?\\s*m','i'));
+    const metrics = page.locator('#section-results .metric');
+    if (phase === 'after') {
+        assert.deepEqual((await metrics.locator('annotation[encoding="application/x-tex"]').allTextContents()).slice(1, 3), ['V', 'M']);
+    }
+    assert.equal((await metrics.nth(1).locator('strong').innerText()).replaceAll('−','-').replace(/\s+/g,' '), expectedShear + ' kN');
+    assert.equal((await metrics.nth(2).locator('strong').innerText()).replaceAll('−','-').replace(/\s+/g,' '), expectedMoment + ' kN m');
     return text;
 }
 
@@ -72,7 +76,7 @@ async function replay(phase,base,size,input) {
         await page.locator('#canvas [data-object="load"]').waitFor();
         await page.evaluate(() => document.fonts.ready);
         const initial = await measure(page);
-        const before = await verifyResults(page,-10,40);
+        const before = await verifyResults(page,-10,40,phase);
         await page.screenshot({path:join(out,prefix+'-initial.png')});
 
         if (input==='keyboard') await selectForceByKeyboard(page);
@@ -103,7 +107,7 @@ async function replay(phase,base,size,input) {
             const active = document.activeElement;
             return active.id || active.getAttribute('data-property') || active.tagName;
         });
-        const changed = await verifyResults(page,-15,60);
+        const changed = await verifyResults(page,-15,60,phase);
         const persisted = await page.evaluate(() => JSON.parse(localStorage.getItem('cv2011-model')));
         assert.equal(persisted.loads[0].t,.5);
         assert.equal(persisted.loads[0].fx,0);
@@ -118,7 +122,7 @@ async function replay(phase,base,size,input) {
         const shearLabel = normalize(await page.locator('#canvas .svg-value').first().textContent());
         assert.match(shearLabel,/15\s*kN/);
         await page.locator('#undo').click();
-        const undone = await verifyResults(page,-10,40);
+        const undone = await verifyResults(page,-10,40,phase);
         assert.deepEqual(errors,[]);
         assert.deepEqual(posts,[]);
         assert.equal(response.scrollWidth,response.viewport.width);

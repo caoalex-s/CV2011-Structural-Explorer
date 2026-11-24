@@ -64,6 +64,25 @@ async function review(size, viewport) {
         assert.equal(await fbd.getAttribute('data-member'),expected.member);
         assert.equal(Number(await fbd.getAttribute('data-parameter')),expected.parameter);
         assert.equal(await fbd.getAttribute('data-side'),expected.cutSide);
+        const notation = page.locator('#section-free-body .section-fbd-labels');
+        const formulas = await notation.locator('annotation[encoding="application/x-tex"]').allTextContents();
+        assert.ok(formulas.includes(expected.parameter === 0 ? 'L' : 'x'), 'The retained length must be typeset');
+        assert.equal(await notation.locator('.math-error').count(), 0);
+        const results = page.locator('#section-free-body .fbd-values');
+        assert.doesNotMatch(await results.innerText(), /[·⋅]/);
+        assert.equal(await results.locator(':scope > .katex').count(), 3);
+        const cutFace = fbd.locator('[data-cut-face]');
+        assert.ok(await cutFace.evaluate(line => line.getBoundingClientRect().height > 0 &&
+            getComputedStyle(line).visibility === 'visible'));
+        assert.equal(await cutFace.getAttribute('stroke'), '#16334A');
+        assert.equal(await notation.locator('[data-fbd-label="cut"] annotation').textContent(), '\\text{Cut}');
+        const faceX = Number(await cutFace.getAttribute('data-origin-x'));
+        const faceY = Number(await cutFace.getAttribute('data-origin-y'));
+        for (const vector of await fbd.locator('[data-cut-action] [data-vector]').all()) {
+            assert.equal(Number(await vector.getAttribute('data-origin-x')), faceX);
+            assert.equal(Number(await vector.getAttribute('data-origin-y')), faceY);
+            assert.equal(await vector.locator('path[stroke]').last().getAttribute('stroke'), '#2F6F73');
+        }
         if (expected.loads) {
             const names=await fbd.locator('[data-load-id]').evaluateAll(elements=>elements.map(el=>el.dataset.loadId));
             assert.deepEqual(names.sort(),expected.loads.toSorted());
@@ -77,14 +96,17 @@ async function review(size, viewport) {
     }
     async function verifyReadouts(expected) {
         const readouts=normalize(await page.locator('#section-results').innerText());
-        assert.match(readouts,new RegExp('Shear force V.*?' + expected.shear + '\\s*kN','i'));
-        assert.match(readouts,new RegExp('Bending moment M.*?' + expected.moment + '\\s*kN\\s*[·⋅]?\\s*m','i'));
+        const metrics = page.locator('#section-results .metric');
+        assert.deepEqual((await metrics.locator('annotation[encoding="application/x-tex"]').allTextContents()).slice(1, 3), ['V', 'M']);
+        assert.equal(normalize(await metrics.nth(1).locator('strong').innerText()), expected.shear + ' kN');
+        assert.equal(normalize(await metrics.nth(2).locator('strong').innerText()), expected.moment + ' kN m');
         if (mobile) {
             const compact=page.locator('.cut-readout');
-            const strip=normalize(await compact.innerText());
-            const signed = value => (value < 0 ? '-' : '\\+?') + Math.abs(value);
-            assert.match(strip,new RegExp('V = ' + signed(expected.shear) + '\\s*kN'));
-            assert.match(strip,new RegExp('M = ' + signed(expected.moment) + '\\s*kN\\s*[·⋅]?\\s*m'));
+            assert.doesNotMatch(await compact.innerText(), /[·⋅]/);
+            const formulas = await compact.locator('annotation[encoding="application/x-tex"]').allTextContents();
+            const signed = value => (value > 0 ? '+' : '') + value;
+            assert.ok(formulas.includes(String.raw`V = ${signed(expected.shear)}\,\mathrm{kN}`));
+            assert.ok(formulas.includes(String.raw`M = ${signed(expected.moment)}\,\mathrm{kN}\,\mathrm{m}`));
             assert.ok(await compact.evaluate(element=>element.scrollWidth <= element.clientWidth));
             assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth),viewport.width);
         }

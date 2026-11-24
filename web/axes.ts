@@ -1,5 +1,6 @@
 /** Fixed global axes and the selected member's right-handed local axes. */
 import type { Model } from './engine.js';
+import { math } from './math.js';
 
 export function memberBasis(model: Model, memberId: string): { cosine: number; sine: number } | undefined {
     const member = model.members.find(item => item.id === memberId);
@@ -18,9 +19,11 @@ function axesSvg(cosine: number, sine: number, id: string, labels: [string, stri
     return `<svg viewBox="0 0 90 90" aria-hidden="true"><defs><marker id="${id}" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="currentColor"/></marker></defs><path d="M45 45 L${endX.x} ${endX.y} M45 45 L${endY.x} ${endY.y}" fill="none" stroke="currentColor" stroke-width="1.6" marker-end="url(#${id})"/><text x="${45+37*cosine}" y="${49-37*sine}" text-anchor="middle">${labels[0]}</text><text x="${45-37*sine}" y="${49-37*cosine}" text-anchor="middle">${labels[1]}</text></svg>`;
 }
 
+const cutConvention = `<details class="cut-convention"><summary>Signs &amp; axes</summary><div><b>Positive cut actions</b><br>On the right face of the retained start portion, ${math('N')} acts along ${math('+x')}, ${math('V')} acts along ${math('-y')}, and ${math('M')} acts counterclockwise.<br>Positive global vertical displacement ${math('u_y')} is upward and positive rotation ${math('\\theta')} is counterclockwise.<br>Member ${math('x')} runs from start to end. Member ${math('y')} is ${math('90^\\circ')} counterclockwise from ${math('x')}.<br><small>Moment plotting side does not change these signs.</small></div></details>`;
+
 export function workspaceConventions(model: Model, memberId: string): string {
     const basis = memberBasis(model, memberId);
-    return `<div class="axis-item" title="Global axes: +x right · +y up. Readouts: +v upward · +θ ↺">${axesSvg(1, 0, 'global-axis-arrow', ['x', 'y'])}<span>Global</span></div>
+    return `<div class="axis-item" title="Global axes: +x right, +y up. Positive vertical displacement is upward. Positive rotation is counterclockwise.">${axesSvg(1, 0, 'global-axis-arrow', ['x', 'y'])}<span>Global</span></div>
         <div class="axis-item" title="Selected member: x start → end; y is 90° counterclockwise from x">${basis ? axesSvg(basis.cosine, basis.sine, 'local-axis-arrow', ['x', 'y']) : ''}<span>${basis ? 'Member' : 'Select a member'}</span></div>
-        <details class="cut-convention"><summary>Signs &amp; axes</summary><div><b>Positive cut actions</b><br>Right face of the retained start portion:<br>N along +x · V along −y · M ↺<br>Readouts: +v upward · +θ ↺<br>Member x: start → end; y: 90° counterclockwise from x.<br><small>Moment plotting side does not change these signs.</small></div></details>`;
+        ${cutConvention}`;
 }

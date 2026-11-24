@@ -146,6 +146,8 @@
     padding:.5rem .75rem; background:#edece5; border-block:1px solid var(--line);
     font:normal .96rem var(--font-math-roman); color:var(--ink); font-variant-numeric:tabular-nums;
 }
+.drawing-workspace .cut-readout:not([hidden]) { display:flex; flex-wrap:wrap; gap:.15rem .8rem; }
+.drawing-workspace .cut-readout > .katex { white-space:nowrap; }
 .drawing-workspace .canvas-panel>.object-choice { display:flex; align-items:center; gap:.7rem; padding:.35rem .65rem; background:var(--paper); border-bottom:1px solid var(--line); }
 .drawing-workspace .canvas-panel>.object-choice select { flex:1; width:auto; min-width:0; }
 
@@ -157,15 +159,29 @@
 #section-free-body summary { cursor:pointer; padding:.4rem 0; font-weight:600; }
 #section-free-body figure { margin:.45rem 0; }
 #section-free-body figcaption { font:normal 1rem var(--font-heading); }
-#section-free-body svg { width:100%; display:block; }
-#section-free-body svg text { font:20px var(--font-heading); }
+.section-fbd-plot { position:relative; margin:.4rem 0; background:white; border:1px solid var(--line); border-radius:var(--radius-control); }
+#section-free-body .section-fbd-plot #section-fbd { display:block; float:none; width:100%; max-width:none; margin:0; border:0; }
+.section-fbd-member,.section-fbd-face { fill:none; stroke-linecap:round; stroke-linejoin:round; vector-effect:non-scaling-stroke; }
+.section-fbd-member { stroke-width:3; }
+.section-fbd-face { stroke-width:1.5; }
+.section-fbd-guide { stroke:#657177; stroke-width:1; fill:none; vector-effect:non-scaling-stroke; }
+.section-fbd-plot svg [data-vector] path { vector-effect:non-scaling-stroke; }
+.section-fbd-plot svg .hit { display:none; }
+.section-fbd-labels { position:absolute; inset:0; pointer-events:none; color:var(--ink); }
+.section-fbd-math { position:absolute; transform:translate(-50%, -50%); font-size:.88rem; white-space:nowrap; }
+.section-fbd-math:is([data-fbd-label="applied"],[data-fbd-label="normal"],[data-fbd-label="shear"],[data-fbd-label="moment"]) { color:#2F6F73; }
+.section-fbd-math:is([data-fbd-label="dimension"],[data-fbd-label="end"]) { color:#657177; }
 #section-free-body ul { padding-left:1rem; font-size:.87rem; }
 #checked-section { font:normal 1.1rem var(--font-math-roman); }
 .drawing-workspace #portal-introduction,.drawing-workspace .inspector-heading>span { display:none; }
 .drawing-workspace .inspector-heading { float:right; }
 .drawing-workspace .inspector h3 { margin-top:0; }
 .cut-ordinate { fill:var(--accent); stroke:white; stroke-width:2; pointer-events:none; }
-.fbd-values { font:normal 1rem var(--font-math-roman); text-align:center; }
+#section-free-body .fbd-values {
+    display:flex; flex-wrap:wrap; justify-content:center; gap:.2rem 1rem;
+    font:normal 1rem var(--font-math-roman);
+}
+#section-free-body .fbd-values > .katex { white-space:nowrap; }
 .cut-face-label { font:15px var(--font-ui); fill:var(--accent-hover); paint-order:stroke; stroke:var(--paper); stroke-width:3; pointer-events:none; }
 .drawing-workspace .left-panel { background:var(--paper-deep); color:var(--ink); }
 .drawing-workspace .tools button { color:var(--ink); }
@@ -179,25 +195,6 @@
     .cut-face-label { font-size:20px; }
 }
 .drawing-workspace .canvas-panel>#section-free-body { padding:.4rem 1rem; border-top:1px solid var(--line); }
-.drawing-workspace #section-free-body #section-fbd { float:none; width:100%; margin:auto; }
 .drawing-workspace .canvas-panel>.section-response { padding:.5rem .75rem; margin:0; }
 .drawing-workspace #section-free-body figure { max-width:45rem; margin:.4rem auto; }
 .drawing-workspace #section-free-body figcaption { text-align:center; }
-
-.section-fbd-plot { position:relative; margin:.4rem 0; background:white; border:1px solid var(--line); border-radius:var(--radius-control); }
-#section-free-body .section-fbd-plot #section-fbd { display:block; float:none; width:100%; max-width:none; margin:0; border:0; }
-.section-fbd-member,.section-fbd-face { fill:none; stroke-linecap:round; stroke-linejoin:round; vector-effect:non-scaling-stroke; }
-.section-fbd-member { stroke-width:3; }
-.section-fbd-face { stroke-width:1.5; }
-.section-fbd-guide { stroke:#657177; stroke-width:1; fill:none; vector-effect:non-scaling-stroke; }
-.section-fbd-plot svg [data-vector] path { vector-effect:non-scaling-stroke; }
-.section-fbd-plot svg .hit { display:none; }
-.section-fbd-labels { position:absolute; inset:0; pointer-events:none; color:var(--ink); }
-.section-fbd-math { position:absolute; transform:translate(-50%, -50%); font-size:.88rem; white-space:nowrap; }
-.section-fbd-math[data-fbd-label="applied"] { color:#2F6F73; }
-.section-fbd-math:is([data-fbd-label="normal"],[data-fbd-label="shear"],[data-fbd-label="moment"]) { color:#2F6F73; }
-.section-fbd-math:is([data-fbd-label="dimension"],[data-fbd-label="end"]) { color:#657177; }
-
-/* Wrap between complete quantities so a sign or unit stays with its value. */
-#section-free-body .fbd-values { display:flex; flex-wrap:wrap; justify-content:center; gap:.2rem 1rem; }
-#section-free-body .fbd-values > .katex { white-space:nowrap; }

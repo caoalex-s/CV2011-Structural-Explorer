@@ -1,7 +1,8 @@
 import { nodeLabels, type Model, type Sample } from './engine.js';
 import { memberLabel, type Selection } from './model-view.js';
 import { loadLabels } from './load-labels.js';
-import { element, formatNumber } from './ui.js';
+import { math, measureUnits, quantity } from './math.js';
+import { element, formatNumber, formatSectionResult } from './ui.js';
 
 // Native option text cannot contain typeset subscripts.
 function displayLoadLabel(label: string) {
@@ -116,15 +117,17 @@ export function createDrawingWorkspace(select: (object: Selection | null) => voi
         for (const button of toolbox.querySelectorAll('button[data-tool]'))
             button.setAttribute('title', button.textContent!.trim());
     }
-    function update(model: Model, selected: Selection | null, sample: Sample | undefined, station: string, face: string) {
+    function update(model: Model, selected: Selection | null, sample: Sample | undefined, stationMath: string[], face: string) {
         if (!active) return;
         rail.querySelector('h2')!.hidden = compact.matches;
         title.querySelector('h2')!.textContent = element('response-title').textContent;
         title.querySelector('span')!.textContent = `${model.nodes.length} joints · ${model.members.length} ${model.members.length === 1 ? 'member' : 'members'}`;
         cutReadout.hidden = !sample;
         if (sample) {
-            const sign = (value: number) => (value > 1e-7 ? '+' : '') + formatNumber(value);
-            cutReadout.textContent = station + (face ? ' · ' + face : '') + '   ·   V = ' + sign(sample.V) + ' kN   ·   M = ' + sign(sample.M) + ' kN·m';
+            const sign = (value: number) => (value > 1e-7 ? '+' : '') + formatSectionResult(value);
+            const shear = math('V = ' + quantity(sign(sample.V), measureUnits.force));
+            const moment = math('M = ' + quantity(sign(sample.M), measureUnits.moment));
+            cutReadout.innerHTML = [...stationMath, ...(face ? [`<span>${face}</span>`] : []), shear, moment].join(' ');
         }
         const nodes = nodeLabels(model), loads = loadLabels(model);
         const entries = [

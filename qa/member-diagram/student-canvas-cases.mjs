@@ -273,8 +273,8 @@ export async function runMemberDiagramStudentCases({ page, base, output }) {
             canvasScale /= 1.25;
         }
         await affineLoad(top);
-        await page.getByLabel('Inspect member').selectOption({ label: 'B–C' });
-        await generate('portal-affine-sign-change', handReferences.portal, 'B–C');
+        await page.getByLabel('Inspect member').selectOption({ label: 'BC' });
+        await generate('portal-affine-sign-change', handReferences.portal, 'BC');
 
         // Flip and restore the load through the UI. The old diagram must vanish
         // on the edit, and a new Generate is required even after restoring it.
@@ -283,13 +283,13 @@ export async function runMemberDiagramStudentCases({ page, base, output }) {
         assert.equal(await diagram.isVisible(), false, 'Old diagram remained visible after the load edit');
         await setNumber('fy', 6);
         assert.equal(await diagram.isVisible(), false, 'Old diagram reappeared after edit and revert');
-        await generate('portal-affine-after-revert', handReferences.portal, 'B–C');
+        await generate('portal-affine-after-revert', handReferences.portal, 'BC');
     });
 
     await scenario('pin-roller-affine-sign-change', async () => {
         await pinRoller(6);
         await affineLoad(0);
-        await generate('pin-roller-affine-sign-change', handReferences.pinRoller, 'A–B');
+        await generate('pin-roller-affine-sign-change', handReferences.pinRoller, 'AB');
     });
 
     await scenario('pin-roller-jumps-and-flat-shear', async () => {
@@ -298,12 +298,12 @@ export async function runMemberDiagramStudentCases({ page, base, output }) {
         await setNumber('fy', -12);
         await place('moment', 4);
         await setNumber('mz', 6);
-        await generate('pin-roller-jumps-and-flat-shear', handReferences.jumps, 'A–B');
+        await generate('pin-roller-jumps-and-flat-shear', handReferences.jumps, 'AB');
     });
 
     await scenario('pin-roller-unloaded', async () => {
         await pinRoller(6);
-        await generate('pin-roller-unloaded', handReferences.unloaded, 'A–B');
+        await generate('pin-roller-unloaded', handReferences.unloaded, 'AB');
     });
 
     const result = { records, errors };
