@@ -462,7 +462,7 @@ function renderCanvas() {
             if (Math.abs(reaction.fy) > 1e-7)
                 drawing += `<g pointer-events="none" class="${p.x > canvasWidth * .75 ? 'reaction-label-left' : ''}">${forceSymbol(p.x, p.y, 0, reaction.fy, courseColors.reaction, `${label}ᵧ = ${number(Math.abs(reaction.fy))} kN`, 42, 44)}</g>`;
             if (Math.abs(reaction.fx) > 1e-7)
-                drawing += `<g pointer-events="none">${forceSymbol(p.x, p.y, reaction.fx, 0, courseColors.reaction, `${label}ₓ = ${number(Math.abs(reaction.fx))} kN`, 42, 20)}</g>`;
+                drawing += `<g pointer-events="none" data-horizontal-reaction>${forceSymbol(p.x, p.y, reaction.fx, 0, courseColors.reaction, `${label}ₓ = ${number(Math.abs(reaction.fx))} kN`, 42, 20)}</g>`;
             if (Math.abs(reaction.mz) > 1e-7)
                 drawing += `<g pointer-events="none">${momentSymbol(p.x, p.y, reaction.mz, courseColors.reaction, `M_${label} = ${number(Math.abs(reaction.mz))} kN m`, 37)}</g>`;
         }
@@ -515,10 +515,23 @@ function fitCanvasAnnotations(): void {
         const box = label.getBoundingClientRect();
         const shift = box.left < bounds.left + 8 ? bounds.left + 8 - box.left
             : box.right > bounds.right - 8 ? bounds.right - 8 - box.right : 0;
-        return { label, x: Number(label.getAttribute('x')) + shift / pixelScale, shift };
+        return { label, shift, left: box.left + shift, right: box.right + shift, top: box.top, bottom: box.bottom };
     });
-    for (const { label, x, shift } of adjustments) {
-        if (shift) label.setAttribute('x', String(x));
+    const forceLabels = adjustments.filter(({label}) => label.closest('[data-object="load"] [data-vector="force"]'));
+    for (const annotation of adjustments) {
+        const {label, shift} = annotation;
+        if (shift) label.setAttribute('x', String(Number(label.getAttribute('x')) + shift / pixelScale));
+        if (!label.closest('[data-horizontal-reaction]')) continue;
+        // When the two text boxes meet, lift only the reaction caption.
+        // Keep both force vectors on their original lines of action.
+        let bottom = annotation.bottom;
+        for (const force of forceLabels.slice().sort((a,b) => b.bottom - a.bottom)) {
+            if (force.right <= annotation.left || force.left >= annotation.right) continue;
+            const top = bottom - (annotation.bottom - annotation.top);
+            if (bottom > force.top - 3 && top < force.bottom + 3) bottom = force.top - 3;
+        }
+        if (bottom < annotation.bottom)
+            label.setAttribute('y', String(Number(label.getAttribute('y')) + (bottom - annotation.bottom) / pixelScale));
     }
 }
 // Re-establish original label anchors after a viewport or font-metric change.

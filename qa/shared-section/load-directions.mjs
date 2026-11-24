@@ -48,6 +48,12 @@ try {
         await page.locator('.force-components > summary').click();
         assert.equal(await prop('fx').inputValue(), '20');
         assert.equal(await prop('fy').inputValue(), '0');
+        const forceLabel = page.locator('#canvas [data-object="load"] [data-vector="force"] text').first();
+        const reactionLabel = page.locator('#canvas [data-horizontal-reaction] text').first();
+        const [forceBox, reactionBox] = await Promise.all([forceLabel.boundingBox(),reactionLabel.boundingBox()]);
+        assert.ok(forceBox && reactionBox);
+        assert.ok(forceBox.x >= reactionBox.x + reactionBox.width || reactionBox.x >= forceBox.x + forceBox.width
+            || forceBox.y >= reactionBox.y + reactionBox.height || reactionBox.y >= forceBox.y + forceBox.height);
         const point = (await state()).loads[0];
         assert.deepEqual([point.fx,point.fy],[20,0]);
         await edit('magnitude',30);
