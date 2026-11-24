@@ -22,13 +22,26 @@ function displayedAngle(angle: number): number {
     return Number((remainder < 0 ? remainder + 360 : remainder).toPrecision(15)) % 360;
 }
 
-function directionPicker(key: string, angle: number, normal = false): string {
-    const degrees = displayedAngle(angle);
-    const choices = [['270', 'Down'], ['0', 'Right'], ['90', 'Up'], ['180', 'Left'], ['custom', 'Custom angle']];
-    if (key === 'lineReference') choices.push(['normal', 'Member normal']);
-    const current = normal ? 'normal' : choices.find(([value]) => Number(value) === degrees)?.[0] ?? 'custom';
-    return `<label class="field">Direction<select data-property="${key}">${choices.map(([value, label]) =>
-        `<option value="${value}" ${value === current ? 'selected' : ''}>${label}</option>`).join('')}</select></label>`;
+// Custom is an editor choice even when its angle happens to match a preset.
+const customAngleEditors = new WeakSet<Load>();
+const cardinalChoices = [['270', 'Down'], ['0', 'Right'], ['90', 'Up'], ['180', 'Left']];
+
+function directionGroup(key: string, choices: string[][], current: string): string {
+    return `<fieldset class="load-direction-group"><legend>Direction</legend><div class="direction-options">${choices.map(([value, label]) =>
+        `<label><input type="radio" name="${key}" data-property="${key}" value="${value}" ${value === current ? 'checked' : ''}><span>${label}</span></label>`).join('')}</div></fieldset>`;
+}
+
+function directionPicker(load: Load, angle: number, angleInput: string): string {
+    const line = load.kind === 'distributed';
+    const normal = line && load.direction === 'member-normal';
+    const preset = cardinalChoices.find(([value]) => Number(value) === displayedAngle(angle));
+    const custom = !normal && (!preset || customAngleEditors.has(load));
+    const current = normal ? 'normal' : custom ? 'custom' : preset![0];
+    const choices = [...cardinalChoices];
+    if (line) choices.push(['normal', 'Member normal']);
+    choices.push(['custom', 'Custom angle']);
+    return directionGroup(line ? 'lineReference' : 'pointDirection', choices, current)
+        + `<div class="custom-angle-editor" ${custom ? '' : 'hidden'}>${angleInput}<p class="small">Angles increase counterclockwise from global +x (right).</p></div>`;
 }
 
 interface InspectorOptions {
@@ -130,9 +143,7 @@ export function renderInspector(options: InspectorOptions): void {
             if (item.kind === 'force') {
                 html += '<div class="load-direction-fields">'
                     + angleField('magnitude', 'Magnitude (kN)', Number(Math.hypot(load.fx, load.fy).toPrecision(15)))
-                    + directionPicker('pointDirection', pointAngle(load))
-                    + angleField('pointAngle', 'Angle (°)', displayedAngle(pointAngle(load)))
-                    + '<p class="small">Angles increase counterclockwise from global +x (right).</p></div>';
+                    + directionPicker(load, pointAngle(load), angleField('pointAngle', 'Angle (°)', displayedAngle(pointAngle(load)))) + '</div>';
                 const components = field('fx', 'Horizontal (kN)') + field('fy', 'Vertical (kN)')
                     + '<p class="small">Positive components act right and up.</p>';
                 html += sandbox ? '<details class="force-components"><summary>Global components</summary>' + components + '</details>' : components;
@@ -140,7 +151,7 @@ export function renderInspector(options: InspectorOptions): void {
             if (item.kind === 'moment') {
                 html += sandbox ? '<div class="load-direction-fields">'
                     + angleField('momentMagnitude', 'Magnitude (kN m)', Math.abs(load.mz))
-                    + `<label class="field">Direction<select data-property="momentSense"><option value="1" ${momentSense(load) === 1 ? 'selected' : ''}>Counterclockwise</option><option value="-1" ${momentSense(load) === -1 ? 'selected' : ''}>Clockwise</option></select></label></div>`
+                    + directionGroup('momentSense', [['-1', 'Clockwise'], ['1', 'Counterclockwise']], String(momentSense(load))) + '</div>'
                     : field('mz', 'Moment, CCW + (kN m)');
             }
             if (item.kind === 'distributed') {
@@ -149,9 +160,8 @@ export function renderInspector(options: InspectorOptions): void {
                 const angle = Number(load.direction ?? 270);
                 html += field('end', 'End / member length') + '<div class="load-direction-fields">'
                     + field('fy', 'Start intensity (kN/m)', 'any', sign) + field('qEnd', 'End intensity (kN/m)', 'any', sign)
-                    + directionPicker('lineReference', angle, normal)
-                    + (normal ? '<p class="small">The normal points left when looking from the first joint to the second.</p>'
-                        : angleField('lineAngle', 'Angle (°)', displayedAngle(angle)) + '<p class="small">Angles increase counterclockwise from global +x (right).</p>')
+                    + directionPicker(load, angle, angleField('lineAngle', 'Angle (°)', normal ? 0 : displayedAngle(angle)))
+                    + (normal ? '<p class="small">The normal points left when looking from the first joint to the second.</p>' : '')
                     + '<p class="small">Intensity varies linearly per metre of member length. Positive follows the selected direction. Negative acts opposite.</p></div>';
             }
             html += `<details class="inspector-help"><summary>Load notation and directions</summary><p class="small">Use ${math('P')} or ${math('F')} for a force, ${math('M')} for a couple, and ${math('w')} or ${math('q')} for distributed loading. To enter ${math('P_1')} or ${math('M_0')}, type <code>P_1</code> or <code>M_0</code>. Each load has its own label.</p><p class="small">The action belongs to this member side at a joint. Arrows retain their physical line of action; moment arcs retain their application centre.</p></details>`;
@@ -219,13 +229,17 @@ export function renderInspector(options: InspectorOptions): void {
             const focusStep = Number(input.dataset.focusStep || 0);
             const restoreKeyboardFocus = (input.dataset.focusStep !== undefined || input.matches(':focus-visible')) && document.body.classList.contains('drawing-workspace');
             const customAngle = value === 'custom';
-            const angleKey = key === 'pointDirection' ? 'pointAngle' : 'lineAngle';
-            if (customAngle && container.querySelector(`[data-property="${angleKey}"]`)) {
-                const angle = container.querySelector<HTMLInputElement>(`[data-property="${angleKey}"]`)!;
-                angle.focus();
-                angle.select();
-                return;
+            const load = selected.type === 'load' ? model.loads.find(load => load.id === selected.id) : undefined;
+            if (load && (key === 'pointDirection' || key === 'lineReference')) {
+                if (customAngle) {
+                    customAngleEditors.add(load);
+                    if (load.direction !== 'member-normal') {
+                        container.querySelector<HTMLElement>('.custom-angle-editor')!.hidden = false;
+                        return;
+                    }
+                } else customAngleEditors.delete(load);
             }
+            if (load && (key === 'fx' || key === 'fy') && load.kind === 'force') customAngleEditors.delete(load);
             commit(() => {
                 if (key === 'pointDirection' || key === 'pointAngle' || key === 'magnitude') {
                     const load = model.loads.find(load => load.id === selected!.id)!;
@@ -282,10 +296,10 @@ export function renderInspector(options: InspectorOptions): void {
                     }
                 }
             });
-            if (customAngle) {
-                const angle = container.querySelector<HTMLInputElement>('[data-property="lineAngle"]');
-                angle?.focus();
-                angle?.select();
+            // Arrow keys continue within the group after a model edit rebuilds it.
+            if (input.type === 'radio') {
+                container.querySelector<HTMLInputElement>(`input[name="${key}"]:checked`)?.focus({preventScroll:true});
+                return;
             }
             // A commit rebuilds the fields. Preserve native Tab navigation when it
             // succeeded, and restore the edited control when focus fell to the body.
@@ -294,7 +308,7 @@ export function renderInspector(options: InspectorOptions): void {
                 const edited = container.querySelector<HTMLElement>('[data-property="' + CSS.escape(key) + '"]');
                 if (!edited) return;
                 const visible = [...container.querySelectorAll<HTMLElement>('input, select, button, summary')]
-                    .filter(control => control.checkVisibility() && !control.matches(':disabled'));
+                    .filter(control => control.checkVisibility() && !control.matches(':disabled, input[type="radio"]:not(:checked)'));
                 const next = visible[visible.indexOf(edited) + focusStep] ?? edited;
                 next.focus({preventScroll:true});
             });

@@ -12,6 +12,14 @@ try {
         const errors=[];
         page.on('pageerror', error=>errors.push(String(error)));
         const prop = key => page.locator('#inspector [data-property="'+key+'"]');
+        const checked = key => page.locator(`#inspector input[name="${key}"]:checked`);
+        async function choose(key, value) {
+            const label = page.locator(`#inspector label:has(input[name="${key}"][value="${value}"])`);
+            if (width === 390) await label.tap();
+            else await label.click();
+            assert.equal(await checked(key).count(), 1);
+            assert.equal(await checked(key).inputValue(), value);
+        }
         const picker = page.locator('#drawing-object');
         async function edit(key,value) {
             const control = prop(key);
@@ -29,25 +37,29 @@ try {
         await page.goto(base+'#sandbox');
         await page.waitForFunction(()=>!document.querySelector('#workspace')?.inert);
         await picker.selectOption({label:'P₁ · Point force'});
-        assert.equal(await prop('pointDirection').inputValue(), '270');
-        assert.equal(await prop('pointAngle').inputValue(), '270');
-        await prop('pointDirection').selectOption('custom');
+        assert.equal(await checked('pointDirection').inputValue(), '270');
+        assert.equal(await prop('pointAngle').isVisible(), false);
+        await choose('pointDirection','custom');
+        await page.keyboard.press('Tab');
         assert.ok(await prop('pointAngle').evaluate(el => el === document.activeElement));
         await edit('pointAngle',37);
-        assert.equal(await prop('pointDirection').inputValue(), 'custom');
-        await prop('pointDirection').selectOption('0');
+        assert.equal(await checked('pointDirection').inputValue(), 'custom');
+        await choose('pointDirection','0');
         await page.locator('.force-components > summary').click();
         assert.equal(await prop('fx').inputValue(), '20');
         assert.equal(await prop('fy').inputValue(), '0');
         const point = (await state()).loads[0];
         assert.deepEqual([point.fx,point.fy],[20,0]);
         await edit('magnitude',30);
-        await edit('pointAngle',90);
+        await checked('pointDirection').focus();
+        await page.keyboard.press('ArrowRight');
+        assert.equal(await checked('pointDirection').inputValue(), '90');
+        assert.ok(await checked('pointDirection').evaluate(el => el === document.activeElement));
         assert.deepEqual((await state()).loads.map(({fx,fy})=>[fx,fy]),[[0,30]]);
         await page.locator('#frame-generate').click();
         await page.waitForFunction(()=>{try {return JSON.parse(document.querySelector('#portal-certificate').textContent).sourceRequest.model.loads[0].fy===30;}catch{return false;}},null,{timeout:120000});
         await picker.selectOption('load:'+point.id);
-        await prop('pointAngle').scrollIntoViewIfNeeded();
+        await checked('pointDirection').scrollIntoViewIfNeeded();
         await page.screenshot({path:join(output,'point-'+width+'.png')});
 
         async function place(tool, stations) {
@@ -68,16 +80,17 @@ try {
         }
         await place('moment',[.3]);
         assert.ok(await page.getByLabel('Magnitude (kN m)', {exact:true}).isVisible());
-        await prop('momentSense').selectOption('-1');
+        await choose('momentSense','-1');
         assert.equal((await state()).loads.at(-1).mz,-20);
+        await page.screenshot({path:join(output,'moment-'+width+'.png')});
         await edit('momentMagnitude',0);
-        await prop('momentSense').selectOption('1');
+        await choose('momentSense','1');
         await edit('momentMagnitude',12);
         assert.equal((await state()).loads.at(-1).mz,12);
         await place('distributed',[.2,.7]);
         assert.ok(await prop('qEnd').isVisible());
         assert.equal(await prop('lineAngle').inputValue(), '270');
-        await prop('lineReference').selectOption('180');
+        await choose('lineReference','180');
         assert.equal((await state()).loads.at(-1).direction,180);
         await place('force',[.8]);
         assert.ok(await prop('magnitude').isVisible());
@@ -88,19 +101,20 @@ try {
         model.loads=[{id:'line',label:'w_1',member,kind:'distributed',t:0,end:1,fx:0,fy:-2,qEnd:-4,mz:0}];
         await open(model,2);
         await picker.selectOption('load:line');
+        await choose('lineReference','custom');
         await edit('lineAngle',0);
         await edit('fy',-2);
         assert.deepEqual((await state()).loads.map(({direction,fy,qEnd})=>[direction,fy,qEnd]),[[0,-2,4]]);
         await page.locator('#frame-generate').click();
         assert.match(await page.locator('#frame-worked-output').innerText(),/Numerical section response/);
         assert.equal(await page.locator('#portal-certificate').textContent(),'');
-        await prop('lineReference').selectOption('normal');
+        await choose('lineReference','normal');
         assert.equal((await state()).loads[0].direction,'member-normal');
         assert.equal(await page.locator('#frame-worked-output').textContent(),'');
         await page.getByRole('button',{name:'Undo',exact:true}).click();
         assert.equal((await state()).loads[0].direction,0);
         await picker.selectOption('load:line');
-        await prop('lineReference').selectOption('normal');
+        await choose('lineReference','normal');
         const fileMenu=page.locator('.model-files');
         if (await fileMenu.getAttribute('open') === null) await fileMenu.locator('summary').click();
         const downloaded=page.waitForEvent('download');
@@ -114,7 +128,7 @@ try {
         assert.equal(exported.model.loads[0].direction,'member-normal');
         await page.reload();
         await picker.selectOption('load:line');
-        assert.equal(await prop('lineReference').inputValue(),'normal');
+        assert.equal(await checked('lineReference').inputValue(),'normal');
         exported.model.loads[0].id='reversed';
         exported.model.nodes[1].x=-3;exported.model.nodes[1].y=-4;
         await open(exported.model,3);
@@ -124,7 +138,7 @@ try {
         assert.ok(last[2]>last[0] && last[3]>last[1], 'Reversed member normal must point right and down');
         assert.match(await page.locator('#section-free-body-content').textContent(),/intensity along local/);
         assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth),width);
-        await prop('lineReference').scrollIntoViewIfNeeded();
+        await checked('lineReference').scrollIntoViewIfNeeded();
         await page.screenshot({path:join(output,'line-'+width+'.png')});
         assert.deepEqual(errors,[]);
         await writeFile(join(output,'result-'+width+'.json'),JSON.stringify({width,point,exported,errors},null,2));

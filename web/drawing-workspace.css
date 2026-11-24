@@ -209,3 +209,17 @@
 .drawing-workspace .load-direction-fields :is(input,select),
 .drawing-workspace .force-components input { width:100%; min-width:0; min-height:2.75rem; }
 .drawing-workspace .force-components summary { padding:.65rem 0; font-weight:600; cursor:pointer; }
+
+.load-direction-group { border:0; margin:.65rem 0; padding:0; min-width:0; }
+.load-direction-group legend { padding:0; margin-bottom:.35rem; font-weight:600; }
+.direction-options { display:flex; flex-wrap:wrap; gap:.3rem; }
+.direction-options label {
+    display:inline-flex; align-items:center; gap:.35rem; min-height:2.75rem;
+    padding:.25rem .55rem; border:1px solid var(--line); border-radius:.375rem;
+    background:white; cursor:pointer;
+}
+.load-direction-fields .direction-options input[type="radio"] {
+    appearance:auto; width:1rem; height:1rem; min-height:0; margin:0; accent-color:var(--accent);
+}
+.direction-options label:has(:checked) { background:#f4e6de; border-color:var(--accent); }
+.direction-options label:has(:focus-visible) { outline:2px solid var(--accent-hover); outline-offset:2px; }
