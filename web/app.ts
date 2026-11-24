@@ -659,9 +659,13 @@ svg.addEventListener('pointerdown', event => {
             return;
         }
         const loadId = id('q');
-        commit(() => model.loads.push({ id: loadId, member: attachment.member, kind: 'distributed', t: Math.min(start!.t!, attachment.t), end: Math.max(start!.t!, attachment.t), fx: 0, fy: -5, mz: 0, qEnd: -5 }));
+        const editing = document.body.classList.contains('drawing-workspace');
+        commit(() => {
+            model.loads.push({ id: loadId, member: attachment.member, kind: 'distributed', t: Math.min(start!.t!, attachment.t), end: Math.max(start!.t!, attachment.t), fx: 0, fy: -5, mz: 0, qEnd: -5 });
+            if (editing) selected = { type: 'load', id: loadId };
+        });
         const placed = model.loads.find(l => l.id === loadId)!;
-        toast('Load stations ' + stationLabel(placed.t) + ' to ' + stationLabel(placed.end) + '. Select the load to edit either boundary.');
+        toast('Load stations ' + stationLabel(placed.t) + ' to ' + stationLabel(placed.end) + (editing ? '. Edit the intensities and direction in Properties.' : '. Select the load to edit either boundary.'));
         start = null;
         renderCanvas();
         return;

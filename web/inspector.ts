@@ -13,6 +13,18 @@ const zeroForceAngles = new WeakMap<Load, number>();
 const pointAngle = (load: Load) => load.fx || load.fy
     ? Math.atan2(load.fy, load.fx) * 180 / Math.PI : zeroForceAngles.get(load) ?? 0;
 
+const zeroMomentSenses = new WeakMap<Load, number>();
+const momentSense = (load: Load) => Math.sign(load.mz) || zeroMomentSenses.get(load) || 1;
+
+function directionPicker(key: string, angle: number, normal = false): string {
+    const degrees = (angle % 360 + 360) % 360;
+    const choices = [['270', 'Down'], ['0', 'Right'], ['90', 'Up'], ['180', 'Left'], ['custom', 'Custom angle']];
+    if (key === 'lineReference') choices.push(['normal', 'Member normal']);
+    const current = normal ? 'normal' : choices.find(([value]) => Number(value) === degrees)?.[0] ?? 'custom';
+    return `<label class="field">Direction<select data-property="${key}">${choices.map(([value, label]) =>
+        `<option value="${value}" ${value === current ? 'selected' : ''}>${label}</option>`).join('')}</select></label>`;
+}
+
 interface InspectorOptions {
     container: HTMLElement;
     model: Model;
@@ -108,31 +120,42 @@ export function renderInspector(options: InspectorOptions): void {
             const load = model.loads.find(load => load.id === selected.id)!;
             const angleField = (key: string, caption: string, value: number) =>
                 `<label class="field">${caption}<input type="number" step="any" data-property="${key}" value="${value}"></label>`;
+            const sandbox = document.body.classList.contains('drawing-workspace');
             if (item.kind === 'force') {
                 html += '<div class="load-direction-fields">'
                     + angleField('magnitude', 'Magnitude (kN)', Number(Math.hypot(load.fx, load.fy).toPrecision(15)))
-                    + angleField('pointAngle', `Angle CCW from global ${math('+x')} (°)`, Number(pointAngle(load).toPrecision(15))) + '</div>';
-                html += field('fx', `Horizontal force ${math('F_x')}, rightward + (kN)`) + field('fy', `Vertical force ${math('F_y')}, upward + (kN)`);
+                    + directionPicker('pointDirection', pointAngle(load))
+                    + angleField('pointAngle', 'Angle (°)', Number(pointAngle(load).toPrecision(15)))
+                    + '<p class="small">Angles increase counterclockwise from global +x (right).</p></div>';
+                const components = field('fx', 'Horizontal (kN)') + field('fy', 'Vertical (kN)')
+                    + '<p class="small">Positive components act right and up.</p>';
+                html += sandbox ? '<details class="force-components"><summary>Global components</summary>' + components + '</details>' : components;
             }
-            if (item.kind === 'moment')
-                html += field('mz', 'Moment, CCW + (kN m)');
+            if (item.kind === 'moment') {
+                html += sandbox ? '<div class="load-direction-fields">'
+                    + angleField('momentMagnitude', 'Magnitude (kN·m)', Math.abs(load.mz))
+                    + `<label class="field">Direction<select data-property="momentSense"><option value="1" ${momentSense(load) === 1 ? 'selected' : ''}>Counterclockwise</option><option value="-1" ${momentSense(load) === -1 ? 'selected' : ''}>Clockwise</option></select></label></div>`
+                    : field('mz', 'Moment, CCW + (kN m)');
+            }
             if (item.kind === 'distributed') {
                 const normal = load.direction === 'member-normal';
                 const sign = load.direction === undefined ? -1 : 1;
-                html += field('end', 'End / member length') + field('fy', 'Start intensity (kN/m)', 'any', sign)
-                    + '<div class="load-direction-fields">' + field('qEnd', 'End intensity (kN/m)', 'any', sign)
-                    + `<label class="field">Positive direction<select data-property="lineReference"><option value="global">Global angle</option><option value="normal" ${normal ? 'selected' : ''}>Member normal (+local y)</option></select></label>`
-                    + (normal ? '' : angleField('lineAngle',`Angle CCW from global ${math('+x')} (°)`, Number(load.direction ?? 270)))
-                    + '<p class="small">Intensities vary linearly per metre of member length. A negative value reverses the arrow. The positive member normal points left when looking from the first joint to the second.</p></div>';
+                const angle = Number(load.direction ?? 270);
+                html += field('end', 'End / member length') + '<div class="load-direction-fields">'
+                    + field('fy', 'Start intensity (kN/m)', 'any', sign) + field('qEnd', 'End intensity (kN/m)', 'any', sign)
+                    + directionPicker('lineReference', angle, normal)
+                    + (normal ? '<p class="small">The normal points left when looking from the first joint to the second.</p>'
+                        : angleField('lineAngle', 'Angle (°)', angle) + '<p class="small">Angles increase counterclockwise from global +x (right).</p>')
+                    + '<p class="small">Intensity varies linearly per metre of member length. Positive follows the selected direction. Negative acts opposite.</p></div>';
             }
             html += `<details class="inspector-help"><summary>Load notation and directions</summary><p class="small">Use ${math('P')} or ${math('F')} for a force, ${math('M')} for a couple, and ${math('w')} or ${math('q')} for distributed loading. To enter ${math('P_1')} or ${math('M_0')}, type <code>P_1</code> or <code>M_0</code>. Each load has its own label.</p><p class="small">The action belongs to this member side at a joint. Arrows retain their physical line of action; moment arcs retain their application centre.</p></details>`;
         }
         const editorKey = selected.type + ':' + selected.id;
         const expanded = container.dataset.object === editorKey && container.querySelector('details.load-settings')?.hasAttribute('open');
+        const componentsOpen = container.dataset.object === editorKey && container.querySelector('details.force-components')?.hasAttribute('open');
         container.dataset.object = editorKey;
         container.innerHTML = html + '<button id="delete-selected">Delete selected object</button>';
         if (document.body.classList.contains('drawing-workspace') && selected.type === 'load') {
-            const principal = container.querySelector<HTMLInputElement>(item.kind === 'moment' ? '[data-property="mz"]' : '[data-property="fy"]');
             const heading = container.querySelector('h3')!;
             const label = loadLabels(model).get(selected.id)!;
             heading.textContent = (item.kind === 'force' ? 'Point force' : item.kind === 'moment' ? 'Applied moment' : 'Distributed load') + ' · ';
@@ -145,19 +168,16 @@ export function renderInspector(options: InspectorOptions): void {
                 notation.append(index);
             }
             heading.append(notation);
-            const primaryField = principal?.closest('label');
-            if (primaryField) {
-                primaryField.classList.add('principal-field');
-                heading.after(primaryField);
-                const settings = document.createElement('details');
-                settings.className = 'load-settings';
-                settings.open = !!expanded;
-                settings.innerHTML = '<summary>Position and load settings</summary>';
-                while (primaryField.nextElementSibling) settings.append(primaryField.nextElementSibling);
-                primaryField.after(settings);
-                const directions = settings.querySelector('.load-direction-fields');
-                if (directions) primaryField.after(directions);
-            }
+            const directions = container.querySelector('.load-direction-fields')!;
+            const components = container.querySelector<HTMLDetailsElement>('.force-components');
+            const settings = document.createElement('details');
+            settings.className = 'load-settings';
+            settings.open = !!expanded;
+            settings.innerHTML = '<summary>Position and load settings</summary>';
+            for (const child of [...container.children])
+                if (child !== heading && child !== directions && child !== components) settings.append(child);
+            if (components) components.open = !!componentsOpen;
+            container.append(settings);
         }
         container.onkeydown = event => {
             const target = event.target as HTMLElement;
@@ -166,9 +186,9 @@ export function renderInspector(options: InspectorOptions): void {
         };
         container.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-property]').forEach(input => input.addEventListener('change', () => {
             let key = input.dataset.property!;
-            let value = input.type === 'checkbox' ? (input as HTMLInputElement).checked : ['kind', 'joint', 'referenceMember', 'member', 'label', 'lineReference'].includes(key) ? input.value.trim() : Number(input.value) * Number(input.dataset.direction || 1);
-            if (input.type === 'number' && (!input.value.trim() || !Number.isFinite(value) || (key === 'magnitude' && Number(value) < 0))) {
-                toast(key === 'magnitude' ? 'Enter a finite, nonnegative magnitude.' : 'Enter a finite number.');
+            let value = input.type === 'checkbox' ? (input as HTMLInputElement).checked : ['kind', 'joint', 'referenceMember', 'member', 'label', 'pointDirection', 'lineReference'].includes(key) ? input.value.trim() : Number(input.value) * Number(input.dataset.direction || 1);
+            if (input.type === 'number' && (!input.value.trim() || !Number.isFinite(value) || (['magnitude', 'momentMagnitude'].includes(key) && Number(value) < 0))) {
+                toast(['magnitude', 'momentMagnitude'].includes(key) ? 'Enter a finite, nonnegative magnitude.' : 'Enter a finite number.');
                 inspector();
                 return;
             }
@@ -192,10 +212,18 @@ export function renderInspector(options: InspectorOptions): void {
             }
             const focusStep = Number(input.dataset.focusStep || 0);
             const restoreKeyboardFocus = (input.dataset.focusStep !== undefined || input.matches(':focus-visible')) && document.body.classList.contains('drawing-workspace');
+            const customAngle = value === 'custom';
+            const angleKey = key === 'pointDirection' ? 'pointAngle' : 'lineAngle';
+            if (customAngle && container.querySelector(`[data-property="${angleKey}"]`)) {
+                const angle = container.querySelector<HTMLInputElement>(`[data-property="${angleKey}"]`)!;
+                angle.focus();
+                angle.select();
+                return;
+            }
             commit(() => {
-                if (key === 'pointAngle' || key === 'magnitude') {
+                if (key === 'pointDirection' || key === 'pointAngle' || key === 'magnitude') {
                     const load = model.loads.find(load => load.id === selected!.id)!;
-                    const angle = key === 'pointAngle' ? Number(value) : pointAngle(load);
+                    const angle = key === 'magnitude' ? pointAngle(load) : Number(value);
                     const magnitude = key === 'magnitude' ? Number(value) : Math.hypot(load.fx, load.fy);
                     const axis = angleVector(angle);
                     load.fx = magnitude * axis.x;
@@ -203,9 +231,20 @@ export function renderInspector(options: InspectorOptions): void {
                     if (!magnitude) zeroForceAngles.set(load, angle);
                     return;
                 }
+                if (key === 'momentMagnitude' || key === 'momentSense') {
+                    const load = model.loads.find(load => load.id === selected!.id)!;
+                    const sense = key === 'momentSense' ? Number(value) : momentSense(load);
+                    load.mz = sense * (key === 'momentMagnitude' ? Number(value) : Math.abs(load.mz));
+                    zeroMomentSenses.set(load, sense);
+                    return;
+                }
                 if (key === 'lineReference' || key === 'lineAngle') {
                     const load = model.loads.find(load => load.id === selected!.id)!;
-                    const angle = key === 'lineAngle' ? Number(value) % 360 : 270;
+                    let angle = Number(value) % 360;
+                    if (customAngle) {
+                        const a = position(model, load.member, 0), b = position(model, load.member, 1);
+                        angle = Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI + 90;
+                    }
                     const direction = value === 'normal' ? 'member-normal' : angle === 270 || angle === -90 ? undefined : angle;
                     // Preserve the displayed start and end strengths. A legacy
                     // downward reference stores them as global upward components.
@@ -237,6 +276,11 @@ export function renderInspector(options: InspectorOptions): void {
                     }
                 }
             });
+            if (customAngle) {
+                const angle = container.querySelector<HTMLInputElement>('[data-property="lineAngle"]');
+                angle?.focus();
+                angle?.select();
+            }
             // A commit rebuilds the fields. Preserve native Tab navigation when it
             // succeeded, and restore the edited control when focus fell to the body.
             if (restoreKeyboardFocus) requestAnimationFrame(() => {

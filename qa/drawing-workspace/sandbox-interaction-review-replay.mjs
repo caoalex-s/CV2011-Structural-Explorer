@@ -83,12 +83,12 @@ async function replay(phase,base,size,input) {
         else await selectForceOnDrawing(page,input);
         const selected = await measure(page);
         await page.screenshot({path:join(out,prefix+'-selected.png')});
-        const editor = page.locator('#inspector [data-property="fy"]');
+        const polar = await page.locator('.force-components').count() > 0;
+        const editor = page.locator(polar ? '#inspector [data-property="magnitude"]' : '#inspector [data-property="fy"]');
         await editor.waitFor({state:'visible'});
-        assert.equal(await editor.inputValue(),'-20');
+        assert.equal(await editor.inputValue(),polar ? '20' : '-20');
         const name = await editor.evaluate(element => Array.from(element.labels, label => label.textContent.trim()).join(' '));
-        assert.match(name,/Vertical force/i);
-        assert.match(name,/upward/i);
+        assert.match(name,polar ? /Magnitude/i : /Vertical force/i);
 
         if (input==='keyboard') {
             for(let i=0;i<32 && !await editor.evaluate(node=>node===document.activeElement);i++) {
@@ -96,9 +96,9 @@ async function replay(phase,base,size,input) {
             }
             assert.equal(await editor.evaluate(node=>node===document.activeElement),true,'Keyboard cannot reach the force field');
             await page.keyboard.press('Control+a');
-            await page.keyboard.type('-30');
+            await page.keyboard.type(polar ? '30' : '-30');
         } else {
-            await editor.fill('-30');
+            await editor.fill(polar ? '30' : '-30');
         }
         await page.keyboard.press('Tab'); // commit the edit
         await page.waitForFunction(() =>

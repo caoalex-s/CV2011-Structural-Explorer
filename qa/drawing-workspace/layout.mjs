@@ -23,11 +23,11 @@ try {
         await picker.focus();
         await page.keyboard.press('Home');
         await page.keyboard.press('ArrowDown');
-        const force = page.locator('#inspector [data-property="fy"]');
+        const force = page.locator('#inspector [data-property="magnitude"]');
         for (let i = 0; i < 5 && !await force.evaluate(e => e === document.activeElement); i++)
             await page.keyboard.press('Tab');
-        assert.ok(await force.evaluate(e => e === document.activeElement), 'Tab from object selector to vertical force at ' + width);
-        await force.fill('-30');
+        assert.ok(await force.evaluate(e => e === document.activeElement), 'Tab from object selector to force magnitude at ' + width);
+        await force.fill('30');
         await page.keyboard.press('Tab');
         await page.waitForFunction(() => document.querySelector('#section-results .is-current strong')?.textContent.includes('60'));
         await page.waitForFunction(() => document.activeElement !== document.body);

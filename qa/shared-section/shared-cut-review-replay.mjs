@@ -187,6 +187,7 @@ async function review(size, viewport) {
         digest=await check('point-right',right);
 
         await page.locator('#drawing-object').selectOption('load:P1');
+        await page.locator('.force-components > summary').click();
         const input=page.locator('#inspector [data-property="fy"]');
         await input.fill('-30');
         await input.press('Tab');

@@ -29,7 +29,15 @@ try {
         await page.goto(base+'#sandbox');
         await page.waitForFunction(()=>!document.querySelector('#workspace')?.inert);
         await picker.selectOption({label:'P₁ · Point force'});
-        await edit('pointAngle',0);
+        assert.equal(await prop('pointDirection').inputValue(), '270');
+        await prop('pointDirection').selectOption('custom');
+        assert.ok(await prop('pointAngle').evaluate(el => el === document.activeElement));
+        await edit('pointAngle',37);
+        assert.equal(await prop('pointDirection').inputValue(), 'custom');
+        await prop('pointDirection').selectOption('0');
+        await page.locator('.force-components > summary').click();
+        assert.equal(await prop('fx').inputValue(), '20');
+        assert.equal(await prop('fy').inputValue(), '0');
         const point = (await state()).loads[0];
         assert.deepEqual([point.fx,point.fy],[20,0]);
         await edit('magnitude',30);
@@ -41,6 +49,33 @@ try {
         await prop('pointAngle').scrollIntoViewIfNeeded();
         await page.screenshot({path:join(output,'point-'+width+'.png')});
 
+        async function place(tool, stations) {
+            await page.locator(`button[data-tool="${tool}"]`).click();
+            const memberPath = page.locator('#canvas [data-object="member"] path').first();
+            await page.locator('#canvas').scrollIntoViewIfNeeded();
+            for (const station of stations) {
+                const [x,y] = await memberPath.evaluate((el,t) => {
+                    const p = el.getPointAtLength(el.getTotalLength()*t).matrixTransform(el.getScreenCTM());
+                    return [p.x,p.y];
+                },station);
+                if (width === 390) await page.touchscreen.tap(x,y);
+                else await page.mouse.click(x,y);
+            }
+            assert.equal((await state()).loads.at(-1).kind,tool);
+        }
+        await place('moment',[.3]);
+        await prop('momentSense').selectOption('-1');
+        assert.equal((await state()).loads.at(-1).mz,-20);
+        await edit('momentMagnitude',0);
+        await prop('momentSense').selectOption('1');
+        await edit('momentMagnitude',12);
+        assert.equal((await state()).loads.at(-1).mz,12);
+        await place('distributed',[.2,.7]);
+        assert.ok(await prop('qEnd').isVisible());
+        await prop('lineReference').selectOption('180');
+        assert.equal((await state()).loads.at(-1).direction,180);
+        await place('force',[.8]);
+        assert.ok(await prop('magnitude').isVisible());
         const model=await state();
         const member=model.members[0].id;
         model.nodes[1].x=3; model.nodes[1].y=4;

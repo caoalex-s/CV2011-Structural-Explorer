@@ -198,3 +198,14 @@
 .drawing-workspace .canvas-panel>.section-response { padding:.5rem .75rem; margin:0; }
 .drawing-workspace #section-free-body figure { max-width:45rem; margin:.4rem auto; }
 .drawing-workspace #section-free-body figcaption { text-align:center; }
+
+.drawing-workspace .load-direction-fields .field,
+.drawing-workspace .force-components .field {
+    display:grid;
+    grid-template-columns:minmax(0,1fr) minmax(8rem,1.1fr);
+    align-items:center;
+    gap:.5rem;
+}
+.drawing-workspace .load-direction-fields :is(input,select),
+.drawing-workspace .force-components input { width:100%; min-width:0; min-height:2.75rem; }
+.drawing-workspace .force-components summary { padding:.65rem 0; font-weight:600; cursor:pointer; }
