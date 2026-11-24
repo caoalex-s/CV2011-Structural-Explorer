@@ -205,8 +205,8 @@ export function renderInspector(options: InspectorOptions): void {
                 }
                 if (key === 'lineReference' || key === 'lineAngle') {
                     const load = model.loads.find(load => load.id === selected!.id)!;
-                    const angle = key === 'lineAngle' ? ((Number(value) % 360) + 360) % 360 : 270;
-                    const direction = value === 'normal' ? 'member-normal' : angle === 270 ? undefined : angle;
+                    const angle = key === 'lineAngle' ? Number(value) % 360 : 270;
+                    const direction = value === 'normal' ? 'member-normal' : angle === 270 || angle === -90 ? undefined : angle;
                     // Preserve the displayed start and end strengths. A legacy
                     // downward reference stores them as global upward components.
                     if ((load.direction === undefined) !== (direction === undefined)) {

@@ -76,7 +76,10 @@ export function renderResponses(options: ResponseOptions) {
     $('section-distance').innerHTML = stationMath.join(', ');
     const sample = sampleSection(analysis, currentMember, sectionT, cutSide, model);
     const note = document.getElementById('frame-overview-convention');
-    if (note) note.textContent = !sample && member && analysis.status === 'stable'
+    const numericalOnly = model.loads.some(load => load.direction !== undefined);
+    if (note) note.textContent = numericalOnly
+        ? 'Section values use the numerical frame analysis. Show the worked solution for the load projections and section equilibrium.'
+        : !sample && member && analysis.status === 'stable'
         ? 'The numerical mesh combines nearby stations here. Show the worked solution to check the selected face on the original drawing.'
         : 'Numerical section values are interpolated between diagram samples. Show the worked solution to check this member, station and cut face.';
     const atBoundary = sectionT === 0 || sectionT === 1 || model.loads.some(l => l.member === currentMember && l.kind !== 'distributed' && l.t === sectionT)

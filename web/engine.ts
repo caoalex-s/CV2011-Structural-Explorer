@@ -57,11 +57,11 @@ export interface Load {
 
 /** Unit vector at an angle counterclockwise from global +x. */
 export function angleVector(degrees: number) {
-    const angle = ((degrees % 360) + 360) % 360;
+    const angle = degrees % 360;
     if (angle === 0) return { x: 1, y: 0 };
-    if (angle === 90) return { x: 0, y: 1 };
-    if (angle === 180) return { x: -1, y: 0 };
-    if (angle === 270) return { x: 0, y: -1 };
+    if (angle === 90 || angle === -270) return { x: 0, y: 1 };
+    if (Math.abs(angle) === 180) return { x: -1, y: 0 };
+    if (angle === 270 || angle === -90) return { x: 0, y: -1 };
     return { x: Math.cos(angle * Math.PI / 180), y: Math.sin(angle * Math.PI / 180) };
 }
 

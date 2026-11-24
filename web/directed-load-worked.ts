@@ -3,6 +3,7 @@ import { analyse, lineLoadAxis, position, type Model } from './engine.js';
 import { loadLabels, loadLabelLatex } from './load-labels.js';
 import { math, measureUnits, quantity } from './math.js';
 import { sampleSection } from './responses.js';
+import { memberLabel } from './model-view.js';
 import { formatNumber, formatSectionResult } from './ui.js';
 
 export function directedLoadWorked(model: Model, member: string, t: number, side: 'left' | 'right') {
@@ -15,7 +16,11 @@ export function directedLoadWorked(model: Model, member: string, t: number, side
         const components = (intensity: number) => math(quantity(
             '(' + formatNumber((c*axis.x+s*axis.y)*intensity) + ', ' + formatNumber((-s*axis.x+c*axis.y)*intensity) + ')',
             String.raw`\mathrm{kN}/\mathrm{m}`));
-        return '<li>' + math(loadLabelLatex(labels.get(load.id)!)) + ' gives local axial and transverse intensities '
+        const member = model.members.find(member => member.id === load.member)!;
+        const reference = load.direction === 'member-normal' ? 'the member normal'
+            : math(String(load.direction ?? 90) + '^\\circ') + ' counterclockwise from global ' + math('+x');
+        return '<li>On member ' + memberLabel(model, member) + ', ' + math(loadLabelLatex(labels.get(load.id)!))
+            + ' acts along ' + reference + '. Its local axial and transverse intensities are '
             + components(load.fy) + ' at the load start and ' + components(load.qEnd) + ' at the load end.</li>';
     });
     const result = analyse(model);
@@ -30,5 +35,5 @@ export function directedLoadWorked(model: Model, member: string, t: number, side
         + math('p=cw_x+sw_y') + ' and ' + math('q=-sw_x+cw_y') + ' per metre of member. Each varies linearly between its end values.</p><ul>'
         + rows.join('') + '</ul><p>Section equilibrium gives ' + math(String.raw`\mathrm dN/\mathrm dx=-p`)
         + ', ' + math(String.raw`\mathrm dV/\mathrm dx=q`) + ' and ' + math(String.raw`\mathrm dM/\mathrm dx=V`)
-        + ' between concentrated actions.</p><p>Numerical section response: ' + readout + '</p>';
+        + ' between concentrated actions.</p><p>Numerical section response at the selected cut: ' + readout + '</p>';
 }
