@@ -195,5 +195,9 @@
 .section-fbd-labels { position:absolute; inset:0; pointer-events:none; color:var(--ink); }
 .section-fbd-math { position:absolute; transform:translate(-50%, -50%); font-size:.88rem; white-space:nowrap; }
 .section-fbd-math[data-fbd-label="applied"] { color:#2F6F73; }
-.section-fbd-math:is([data-fbd-label="normal"],[data-fbd-label="shear"],[data-fbd-label="moment"]) { color:#16334A; }
+.section-fbd-math:is([data-fbd-label="normal"],[data-fbd-label="shear"],[data-fbd-label="moment"]) { color:#2F6F73; }
 .section-fbd-math:is([data-fbd-label="dimension"],[data-fbd-label="end"]) { color:#657177; }
+
+/* Wrap between complete quantities so a sign or unit stays with its value. */
+#section-free-body .fbd-values { display:flex; flex-wrap:wrap; justify-content:center; gap:.2rem 1rem; }
+#section-free-body .fbd-values > .katex { white-space:nowrap; }

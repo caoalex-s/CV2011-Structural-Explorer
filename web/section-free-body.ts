@@ -28,6 +28,7 @@ export function sectionFreeBody(model: Model, analysis: Analysis, memberId: stri
     const appliedNames: string[] = [];
     const occupied: { x: number; y: number }[] = [];
     const rows: string[] = [];
+    const crowdedLabels: string[] = [];
     const unitForce = (v: number) => Math.abs(v) < 1e-7 ? 0 : v;
     function label(px: number, py: number, latex: string, role: string) {
         annotations.push(`<span class="section-fbd-math" data-fbd-label="${role}" style="left:${100 * px / width}%;top:${100 * py / height}%">${math(latex)}</span>`);
@@ -39,9 +40,10 @@ export function sectionFreeBody(model: Model, analysis: Analysis, memberId: stri
         for (const lane of [py, 49, 25, 157, 14]) {
             if (occupied.every(other => Math.abs(other.x - px) >= 48 || Math.abs(other.y - lane) >= 23)) {
                 label(px, lane, latex, role);
-                break;
+                return;
             }
         }
+        crowdedLabels.push(math(latex));
     }
     function actionRow(station: number, X: number, Y: number, C: number, name: string) {
         const position = math('x = ' + quantity(formatNumber(station * length), measureUnits.length));
@@ -118,9 +120,9 @@ export function sectionFreeBody(model: Model, analysis: Analysis, memberId: stri
     }
     actionRow(t, cutFx, cutFy, cutMoment, 'Cut action');
     // Preserve the sandbox vectors, including the two concentric moment arcs.
-    arrows += `<g data-cut-action="N">${forceSymbol(cutX, y, cutFx, 0, courseColors.member, '', 27, 0)}</g>
-        <g data-cut-action="V">${forceSymbol(cutX, y, 0, cutFy, courseColors.member, '', 27, 0)}</g>
-        <g data-cut-action="M">${momentSymbol(cutX, y, cutMoment, courseColors.member, '', 17)}</g>`;
+    arrows += `<g data-cut-action="N">${forceSymbol(cutX, y, cutFx, 0, courseColors.force, '', 27, 0)}</g>
+        <g data-cut-action="V">${forceSymbol(cutX, y, 0, cutFy, courseColors.force, '', 27, 0)}</g>
+        <g data-cut-action="M">${momentSymbol(cutX, y, cutMoment, courseColors.force, '', 17)}</g>`;
     const station = formatNumber(t*length);
     const body = `Member ${escapeHtml(memberLabel(model, member))}`;
     const caption = `${body} · x = ${station} m · just ${side}`;
@@ -128,7 +130,7 @@ export function sectionFreeBody(model: Model, analysis: Analysis, memberId: stri
         math('N = ' + quantity(formatNumber(cut.N), measureUnits.force)),
         math('V = ' + quantity(formatNumber(cut.V), measureUnits.force)),
         math('M = ' + quantity(formatNumber(cut.M), measureUnits.moment)),
-    ].join(' · ');
+    ].join(' ');
     return `<figure><figcaption>Member ${math(nodeLabels(model).get(start.id)!)}–${math(nodeLabels(model).get(end.id)!)} · ${math('x = ' + quantity(station, measureUnits.length))} · just ${side}</figcaption><div class="section-fbd-plot"><svg id="section-fbd" viewBox="0 0 ${width} ${height}" role="img"
         data-member="${escapeHtml(memberId)}" data-parameter="${t}" data-side="${side}" aria-label="${caption}. Retained ${retainRight ? 'end' : 'start'} portion. Applied actions: ${escapeHtml(appliedNames.join(', ') || 'none')}." aria-describedby="fbd-description">
         <title>${caption}. Retained ${retainRight ? 'end' : 'start'} portion in member axes. ${escapeHtml(appliedNames.join(', '))}</title>
@@ -138,6 +140,7 @@ export function sectionFreeBody(model: Model, analysis: Analysis, memberId: stri
         <path class="section-fbd-face" data-cut-face data-origin-x="${cutX}" data-origin-y="${y}" stroke="${courseColors.member}"
             d="M${cutX} ${y-23}v15l7 4-14 8 7 4v15"/>
         ${arrows}</svg><div class="section-fbd-labels" aria-label="Diagram notation">${annotations.join('')}</div></div>
+        ${crowdedLabels.length ? `<p>Additional actions on this portion include ${crowdedLabels.join(', ')}.</p>` : ''}
         <p class="fbd-values">${cutActions}</p>
         <p id="fbd-description" class="small">The zigzag marks the cut on the retained ${retainRight ? 'end' : 'start'} portion. The local coordinate ${math('x')} runs from the member start to its end. The arrows show the actual directions and the values use the section sign convention.</p>
         <details><summary>Forces and couples on the free body</summary><p>Force components are in member axes. Couples in this list are positive counterclockwise. The net action at ${math(node)} includes the forces and couples transferred or applied at that end.</p><ul>${rows.join('')}</ul></details></figure>`;
