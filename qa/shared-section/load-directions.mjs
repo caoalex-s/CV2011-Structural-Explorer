@@ -50,6 +50,8 @@ try {
         await page.screenshot({path:join(output,'point-'+width+'.png')});
 
         async function place(tool, stations) {
+            const toolbox = page.locator('#drawing-toolbox');
+            if (await toolbox.getAttribute('open') === null) await toolbox.locator(':scope > summary').click();
             await page.locator(`button[data-tool="${tool}"]`).click();
             const memberPath = page.locator('#canvas [data-object="member"] path').first();
             await page.locator('#canvas').scrollIntoViewIfNeeded();
