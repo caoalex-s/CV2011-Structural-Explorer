@@ -526,9 +526,9 @@ function fitCanvasAnnotations(): void {
         // Keep both force vectors on their original lines of action.
         let bottom = annotation.bottom;
         for (const force of forceLabels.slice().sort((a,b) => b.bottom - a.bottom)) {
-            if (force.right <= annotation.left || force.left >= annotation.right) continue;
+            if (force.right + 6 <= annotation.left || force.left >= annotation.right + 6) continue;
             const top = bottom - (annotation.bottom - annotation.top);
-            if (bottom > force.top - 3 && top < force.bottom + 3) bottom = force.top - 3;
+            if (bottom > force.top - 6 && top < force.bottom + 6) bottom = force.top - 6;
         }
         if (bottom < annotation.bottom)
             label.setAttribute('y', String(Number(label.getAttribute('y')) + (bottom - annotation.bottom) / pixelScale));
@@ -536,6 +536,7 @@ function fitCanvasAnnotations(): void {
 }
 // Re-establish original label anchors after a viewport or font-metric change.
 window.addEventListener('resize', renderCanvas);
+document.fonts.addEventListener('loadingdone', renderCanvas);
 void document.fonts.ready.then(renderCanvas);
 function inspector(): void {
     renderInspector({
