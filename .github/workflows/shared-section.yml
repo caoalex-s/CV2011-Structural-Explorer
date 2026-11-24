@@ -1,7 +1,7 @@
 name: Review shared section
 on:
   push:
-    branches: [codex/shared-section]
+    branches: [codex/shared-section, codex/section-fbd-notation]
 permissions:
   contents: read
   actions: read
@@ -30,6 +30,7 @@ jobs:
           python3 -m http.server 8765 --bind 127.0.0.1 --directory dist > "$RUNNER_TEMP/candidate.log" 2>&1 &
           for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8765/ -o /dev/null && break; sleep 1; done
           node qa/shared-section/shared-cut-review-replay.mjs "file://$PWD/.data/student-tools/node_modules/playwright/index.mjs" http://127.0.0.1:8765/ .data/shared-evidence/cuts
+          node qa/shared-section/section-notation.mjs "file://$PWD/.data/student-tools/node_modules/playwright/index.mjs" http://127.0.0.1:8765/ .data/shared-evidence/notation
       - name: Check course and import routes
         run: |
           playwright="file://$PWD/.data/student-tools/node_modules/playwright/index.mjs"

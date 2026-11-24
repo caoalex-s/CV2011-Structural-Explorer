@@ -1,7 +1,7 @@
 /** Concise course presentation. Only fixed rules and generated numeric tokens
  * enter KaTeX; drawing identifiers and labels enter escaped HTML text. */
-import { math, numberLatex } from './math.js';
-import { loadLabels, loadLabelText } from './load-labels.js';
+import { math, measureUnits, numberLatex, quantity } from './math.js';
+import { loadLabels, loadLabelLatex } from './load-labels.js';
 import { frameDescriptions, frameStatus } from './frame-display.js';
 import { type FrameWorkedSolution, type WorkedStep, validateFrameWorked } from './frame-worked.js';
 import { symbols, expression } from './frame-worked-rules.js';
@@ -40,9 +40,20 @@ export function renderFrameWorked(report: FrameWorkedSolution): string {
         `${memberName(point.id)} (t ≈ ${Number(point.parameter.numerator) / Number(point.parameter.denominator)})`;
     const selected = model.members.find(member => member.id === query.member)!;
     const interval = report.interval!;
-    const inputRows = model.loads.map(load => `<tr><td>${escape(loadLabelText(labels.get(load.id)!))}</td><td>${escape(memberName(load.member))}</td>
-      <td>${load.kind === 'distributed' ? `t = ${load.t} to ${load.end}` : `t = ${load.t}`}</td><td>${load.kind === 'force' ? `Fx = ${load.fx} kN, Fy = ${load.fy} kN` : load.kind === 'moment' ? `Mz = ${load.mz} kN m` : `upward-positive intensity = ${load.fy} to ${load.qEnd} kN/m; drawing w = ${-load.fy} to ${-load.qEnd} kN/m (downward positive)`}</td></tr>`).join('');
-    const supportRows = model.supports.map((support, index) => `<li>Support ${index + 1}: ${escape(support.kind)}, ${escape(memberName(support.member))} at t = ${support.t}${support.kind === 'roller' ? `, normal angle ${support.angle}°` : ''}.</li>`).join('');
+    const scalar = (value: number) => numberLatex(value, 17);
+    const action = (name: string, value: number, unit: string) => math(name + '=' + quantity(scalar(value), unit));
+    const inputRows = model.loads.map(load => {
+        const position = load.kind === 'distributed'
+            ? math(String.raw`${scalar(load.t)}\le t\le ${scalar(load.end)}`)
+            : math('t=' + scalar(load.t));
+        const intensity = (start: number, end: number) => `${math(quantity(scalar(start), '\\mathrm{kN/m}'))} to ${math(quantity(scalar(end), '\\mathrm{kN/m}'))}`;
+        const signedAction = load.kind === 'force'
+            ? `${action('F_x', load.fx, measureUnits.force)}, ${action('F_y', load.fy, measureUnits.force)}`
+            : load.kind === 'moment' ? action('M_z', load.mz, measureUnits.moment)
+                : `Upward-positive intensity ${intensity(load.fy, load.qEnd)}. Drawing ${math('w')} runs from ${intensity(-load.fy, -load.qEnd)} (downward positive).`;
+        return `<tr><td>${math(loadLabelLatex(labels.get(load.id)!))}</td><td>${escape(memberName(load.member))}</td><td>${position}</td><td>${signedAction}</td></tr>`;
+    }).join('');
+    const supportRows = model.supports.map((support, index) => `<li>Support ${index + 1}: ${escape(support.kind)}, ${escape(memberName(support.member))} at ${math('t=' + scalar(support.t))}${support.kind === 'roller' ? ', normal angle ' + math(scalar(support.angle) + '^\\circ') : ''}.</li>`).join('');
     const reactions = values.points.filter(point => point.reaction?.some(value => value.numerator !== '0') ||
         model.supports.some(support => support.member === point.id && support.t === Number(point.parameter.numerator) / Number(point.parameter.denominator)) ||
         model.supports.some(support => { const member = model.members.find(item => item.id === support.member)!;
@@ -52,23 +63,23 @@ export function renderFrameWorked(report: FrameWorkedSolution): string {
     const operands = Object.entries(interval.values).map(([key, value]) => `${symbols[key]}\\approx ${rounded(value)}`).join(',\\quad ');
     return `<p class="worked-evidence-summary">The current drawing has a unique linear equilibrium solution. Returned displacements, grouped reactions, and selected section values are checked. Method rules and intermediate substitutions explain these results and are not separately Lean-checked.</p>
       <h3>1. Drawing and selected section</h3>
-      <p>Member ${escape(memberName(query.member))} runs from ${escape(nodeNames.get(selected.a)!)} to ${escape(nodeNames.get(selected.b)!)}. Evaluate t = ${query.parameter} using the ${query.cutSide} limit along that direction. Local x follows the member and local y is its counterclockwise normal.</p>
-      <p>Axial force N is positive in tension. Bending moment M is positive in sagging with dM/dx = V. Global y is upward and positive rotation is counterclockwise.</p>
+      <p>Member ${escape(memberName(query.member))} runs from ${escape(nodeNames.get(selected.a)!)} to ${escape(nodeNames.get(selected.b)!)}. Evaluate ${math('t = ' + numberLatex(query.parameter, 17))} using the ${query.cutSide} limit along that direction. Local ${math('x')} follows the member and local ${math('y')} is its counterclockwise normal.</p>
+      <p>Axial force ${math('N')} is positive in tension. Bending moment ${math('M')} is positive in sagging with ${math(String.raw`\mathrm{d}M/\mathrm{d}x = V`)}. Global ${math('y')} is upward and positive rotation is counterclockwise.</p>
       <details><summary>Applied loads, supports, and member properties</summary><table><thead><tr><th>Load</th><th>Member</th><th>Position</th><th>Signed action</th></tr></thead><tbody>${inputRows}</tbody></table><ul>${supportRows}</ul>
-        <table><thead><tr><th>Member</th><th>Source ID</th><th>EA (kN)</th><th>EI (kN m²)</th></tr></thead><tbody>${model.members.map(member => `<tr><td>${escape(memberName(member.id))}</td><td>${escape(member.id)}</td><td>${member.EA}</td><td>${member.EI}</td></tr>`).join('')}</tbody></table>
-        <table><thead><tr><th>Node</th><th>x (m)</th><th>y (m)</th></tr></thead><tbody>${model.nodes.map(node => `<tr><td>${escape(nodeNames.get(node.id)!)}</td><td>${node.x}</td><td>${node.y}</td></tr>`).join('')}</tbody></table></details>
+        <table><thead><tr><th>Member</th><th>Source ID</th><th>${math('EA')} (kN)</th><th>${math('EI')} (${math('\\mathrm{kN}\\,\\mathrm{m}^2')})</th></tr></thead><tbody>${model.members.map(member => `<tr><td>${escape(memberName(member.id))}</td><td>${escape(member.id)}</td><td>${member.EA}</td><td>${member.EI}</td></tr>`).join('')}</tbody></table>
+        <table><thead><tr><th>Node</th><th>${math('x')} (m)</th><th>${math('y')} (m)</th></tr></thead><tbody>${model.nodes.map(node => `<tr><td>${escape(nodeNames.get(node.id)!)}</td><td>${node.x}</td><td>${node.y}</td></tr>`).join('')}</tbody></table></details>
       <h3>2. Equilibrium and compatibility</h3>
       <p>Let the displacement vector ${math('\\mathbf d')} contain global translations and rotations at the joints and load or support cuts. The restraint matrix ${math('C')} imposes zero motion in supported directions. Assemble stiffness ${math('K')} and consistent loads ${math('\\mathbf F')} from the current members and solve for the free coordinates:</p>
       ${math('C\\mathbf d=0,\\qquad K_{\\mathrm{ff}}\\mathbf d_{\\mathrm f}=\\mathbf F_{\\mathrm f}.', true)}
       <p>The accepted positive LDL factorisation establishes uniqueness for this drawing. The checked displacement vector satisfies the restraints and equilibrium.</p>
-      <details><summary>Checked joint and cut displacements</summary><table><thead><tr><th>Point</th><th>ux (m)</th><th>uy (m)</th><th>Rotation (rad)</th></tr></thead><tbody>${motionRows}</tbody></table></details>
+      <details><summary>Checked joint and cut displacements</summary><table><thead><tr><th>Point</th><th>${math('u_x')} (m)</th><th>${math('u_y')} (m)</th><th>Rotation ${math('\\theta')} (rad)</th></tr></thead><tbody>${motionRows}</tbody></table></details>
       <h3>3. Support reactions</h3>
       <p>The residual gives the grouped support force and moment at each restrained point:</p>${math('\\mathbf R=K\\mathbf d-\\mathbf F.', true)}
-      <table><thead><tr><th>Point</th><th>Rx (kN)</th><th>Ry (kN)</th><th>Mz (kN m)</th></tr></thead><tbody>${reactionRows}</tbody></table>
-      <p>These returned reactions are checked. Positive Ry acts upward and positive Mz acts counterclockwise. Canvas reaction labels show magnitudes, with direction indicated by the arrows. Coincident restraints share a grouped reaction without assigning a unique force to each individual restraint.</p>
+      <table><thead><tr><th>Point</th><th>${math('R_x')} (kN)</th><th>${math('R_y')} (kN)</th><th>${math('M_z')} (kN m)</th></tr></thead><tbody>${reactionRows}</tbody></table>
+      <p>These returned reactions are checked. Positive ${math('R_y')} acts upward and positive ${math('M_z')} acts counterclockwise. Canvas reaction labels show magnitudes, with direction indicated by the arrows. Coincident restraints share a grouped reaction without assigning a unique force to each individual restraint.</p>
       <h3>4. Section forces and displacements</h3>
-      <p>The selected interval on ${escape(memberName(query.member))} extends from t ≈ ${escape(String(Number(interval.from.numerator) / Number(interval.from.denominator)))} to t ≈ ${escape(String(Number(interval.to.numerator) / Number(interval.to.denominator)))}. Coordinate x is measured from its start. Local displacement components are u and v, with start values u₀, v₀, and θ₀.</p>
-      <p>Direction cosines c and s transform global motion into local motion. The local axial and transverse load intensities are ${math('p(x)=p_0+k_p x')} and ${math('q(x)=q_0+k_q x')}. Their start values and slopes include every distributed load acting on this interval. The start axial force a₁, transverse force a₂, and moment a₃ follow from the element stiffness and consistent load vector:</p>
+      <p>The selected interval on ${escape(memberName(query.member))} extends from ${math('t \\approx ' + rounded(interval.from))} to ${math('t \\approx ' + rounded(interval.to))}. Coordinate ${math('x')} is measured from its start. Local displacement components are ${math('u')} and ${math('v')}, with start values ${math('u_0')}, ${math('v_0')}, and ${math('\\theta_0')}.</p>
+      <p>Direction cosines ${math('c')} and ${math('s')} transform global motion into local motion. The local axial and transverse load intensities are ${math('p(x)=p_0+k_p x')} and ${math('q(x)=q_0+k_q x')}. Their start values and slopes include every distributed load acting on this interval. The start axial force ${math('a_1')}, transverse force ${math('a_2')}, and moment ${math('a_3')} follow from the element stiffness and consistent load vector:</p>
       ${math('\\mathbf a=k_e\\mathbf d_e-\\mathbf f_e.', true)}
       <details><summary>Current interval and explanatory intermediate values</summary>${math(operands + '.', true)}<p>Values are reconstructed with exact rational arithmetic from the accepted displacement vector. The compiled checker does not separately check these printed intermediate equations.</p></details>
       ${report.steps.filter(step => ['N', 'V', 'M'].includes(step.id)).map(field).join('')}

@@ -3,7 +3,7 @@ import { nodeLabels, position } from './engine.js';
 import type { Analysis, Model, Sample } from './engine.js';
 import { courseColors } from './symbols.js';
 import { memberLabel } from './model-view.js';
-import { math } from './math.js';
+import { math, measureUnits, quantity } from './math.js';
 import { element as $, escapeHtml as escape, formatNumber as number } from './ui.js';
 
 interface ResponseOptions {
@@ -93,5 +93,7 @@ export function renderResponses(options: ResponseOptions) {
     $('response-title').textContent = descriptions[layer][0];
     $('response-description').textContent = descriptions[layer][1];
     $('legend').innerHTML = `<div class="legend-item"><span class="swatch" style="background:${courseColors.force}"></span>Applied forces and moments</div><div class="legend-item"><span class="swatch" style="background:${courseColors.reaction}"></span>Reactions and displaced shape</div><p class="small">● Rigid continuity · ○ Pin / hinge<br>Spiral: rotational spring<br>Circle between rails: sliding joint<br>◇ Member-specific constraints</p><p class="small">Forces stay on their lines of action. Moment arcs are centred at their application points. A ground pin does not create an internal hinge.</p><p class="small">At a point action, choose the section immediately to its left or right. The member endpoints use their inward limits. Values between plotted samples are interpolated.</p>`;
-    return { sample, station, face };
+    const stationMath = member ? math('x = ' + quantity(number(sectionT * length), measureUnits.length))
+        + ' · ' + math('L = ' + quantity(number(length), measureUnits.length)) : '—';
+    return { sample, station, stationMath, face };
 }

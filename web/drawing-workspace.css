@@ -183,3 +183,17 @@
 .drawing-workspace .canvas-panel>.section-response { padding:.5rem .75rem; margin:0; }
 .drawing-workspace #section-free-body figure { max-width:45rem; margin:.4rem auto; }
 .drawing-workspace #section-free-body figcaption { text-align:center; }
+
+.section-fbd-plot { position:relative; margin:.4rem 0; background:white; border:1px solid var(--line); border-radius:var(--radius-control); }
+#section-free-body .section-fbd-plot #section-fbd { display:block; float:none; width:100%; max-width:none; margin:0; border:0; }
+.section-fbd-member,.section-fbd-face { fill:none; stroke-linecap:round; stroke-linejoin:round; vector-effect:non-scaling-stroke; }
+.section-fbd-member { stroke-width:3; }
+.section-fbd-face { stroke-width:1.5; }
+.section-fbd-guide { stroke:#657177; stroke-width:1; fill:none; vector-effect:non-scaling-stroke; }
+.section-fbd-plot svg [data-vector] path { vector-effect:non-scaling-stroke; }
+.section-fbd-plot svg .hit { display:none; }
+.section-fbd-labels { position:absolute; inset:0; pointer-events:none; color:var(--ink); }
+.section-fbd-math { position:absolute; transform:translate(-50%, -50%); font-size:.88rem; white-space:nowrap; }
+.section-fbd-math[data-fbd-label="applied"] { color:#2F6F73; }
+.section-fbd-math:is([data-fbd-label="normal"],[data-fbd-label="shear"],[data-fbd-label="moment"]) { color:#16334A; }
+.section-fbd-math:is([data-fbd-label="dimension"],[data-fbd-label="end"]) { color:#657177; }

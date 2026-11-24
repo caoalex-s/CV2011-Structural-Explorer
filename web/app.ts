@@ -545,7 +545,9 @@ function render() {
     $('section-free-body-content').innerHTML = !fbd.hidden && section.sample
         ? sectionFreeBody(model, analysis, currentMember, sectionT, cutSide(), section.sample) : '';
     const checkedScope = document.getElementById('checked-section');
-    if (checkedScope) checkedScope.textContent = currentMember ? currentMember + ' · ' + section.station + ' · just ' + cutSide() : 'Choose a member.';
+    if (checkedScope) checkedScope.innerHTML = currentMember
+        ? escape(currentMember) + ' · ' + section.stationMath + ' · just ' + cutSide()
+        : 'Choose a member.';
     controls.setHistory(history.length > 0, future.length > 0);
     inspector();
     $('edit-selection').hidden = !selected;
