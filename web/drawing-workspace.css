@@ -279,3 +279,10 @@
 .point-quick-edit #inspector .dial-values .field { margin:0; }
 .point-quick-edit #inspector .dial-values .load-value-range { grid-column:2; }
 .point-quick-edit #full-point-properties { min-height:2.75rem; }
+
+.empty-drawing-actions { display:none; }
+.drawing-workspace.empty-drawing .empty-drawing-actions { display:flex; gap:.5rem; padding:.5rem .8rem; }
+.drawing-workspace.empty-drawing :is(.section-response,.cut-readout,.response-toolbar,.support-reactions,.object-choice) { display:none; }
+@media (max-width:750px) {
+    .drawing-workspace .work-grid.is-focused #canvas { width:100%; aspect-ratio:1; height:auto; max-height:none; }
+}

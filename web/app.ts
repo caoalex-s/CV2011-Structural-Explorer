@@ -174,10 +174,12 @@ let proofStatus = { lean: 'pending', scope: 'Scaled reaction equilibrium identit
 const svg = $('canvas') as unknown as SVGSVGElement;
 // Shared drawing dimensions keep pointer mapping, fitting and annotations aligned.
 let canvasWidth = 1000;
-const canvasHeight = 400;
+let canvasHeight = 400;
 function sizeDrawing() {
     const width = narrowWorkspace.matches && document.body.classList.contains('drawing-workspace') ? 640 : 1000;
-    if (width === canvasWidth) return;
+    const height = width === 640 && document.querySelector('.work-grid.is-focused') ? 640 : 400;
+    if (width === canvasWidth && height === canvasHeight) return;
+    canvasHeight = height;
     // Preserve the visible span and pan centre when the drawing sheet changes width.
     view.scale *= width / canvasWidth;
     canvasWidth = width;
@@ -551,7 +553,7 @@ function renderCanvas() {
         drawing += `<circle cx="${p.x}" cy="${p.y}" r="8" fill="none" stroke="#087f78" stroke-width="1.5"/>`;
     }
     if (!model.members.length)
-        drawing += `<text x="${canvasWidth / 2}" y="180" text-anchor="middle" class="svg-label" style="font-size:23px">Your structure starts here.</text><text x="${canvasWidth / 2}" y="215" text-anchor="middle" class="svg-value">Choose Draw member. Click a start point and an end point.</text>`;
+        drawing += `<text x="${canvasWidth / 2}" y="180" text-anchor="middle" class="svg-label" style="font-size:23px">Your structure starts here.</text><text x="${canvasWidth / 2}" y="215" text-anchor="middle" class="svg-value">Choose Draw member, then its two endpoints.</text>`;
     if (model.members.length && document.body.classList.contains('drawing-workspace')) {
         // The scale bar measures undeformed model length, independently of diagram magnification.
         const metres = 2 ** Math.floor(Math.log2(90 / view.scale));
@@ -971,7 +973,10 @@ $<HTMLInputElement>('grid-spacing').onchange = renderCanvas;
 $('zoom-in').onclick = () => { view.scale = Math.min(500, view.scale * 1.25); renderCanvas(); };
 $('zoom-out').onclick = () => { view.scale = Math.max(10, view.scale / 1.25); renderCanvas(); };
 $('fit').onclick = () => { fit(); renderCanvas(); };
-$('focus-workspace').onclick = () => controls.setFocus($('focus-workspace').getAttribute('aria-pressed') !== 'true');
+$('focus-workspace').onclick = () => {
+    controls.setFocus($('focus-workspace').getAttribute('aria-pressed') !== 'true');
+    renderCanvas();
+};
 $('full-point-properties').onclick = () => {
     exactPointId = undefined;
     render();
@@ -1139,7 +1144,7 @@ function renderPractice() {
             return;
         }
         const result = attempt.result!;
-        $('step-feedback').innerHTML = `<div class="feedback ${result.status === 'incorrect' ? 'incorrect' : ''}"><b>${escape(result.status === 'correct' ? 'Correct' : result.status === 'incorrect' ? 'Check this step' : 'Awaiting verification')}</b><p>${escape(result.message)}</p><span class="small">${attempt.synced ? 'Recorded by the verifier.' : 'Saved on this device; not yet verified by the server.'}</span></div>`;
+        $('step-feedback').innerHTML = `<div class="feedback ${result.status === 'incorrect' ? 'incorrect' : ''}"><b>${escape(result.status === 'correct' ? 'Correct' : result.status === 'incorrect' ? 'Check this step' : 'Your answer awaits verification')}</b><p>${escape(result.message)}</p><span class="small">${attempt.synced ? 'Recorded by the verifier.' : 'Answer saved on this device. The course verifier grades this submission separately from the structural model check.'}</span></div>`;
         $<HTMLButtonElement>('check-answer').disabled = false;
     };
     $<HTMLInputElement>('answer').onkeydown = event => { if (event.key === 'Enter')
@@ -1191,7 +1196,7 @@ portalPanel = createPortalPanel(() => model, value => commit(() => {
 
 if (!restoredPortalView) fit();
 controls.showLayer(layer);
-setMode(restoredPortalView ? mode : location.hash.slice(1) || 'sandbox');
+setMode(location.hash.slice(1) || (restoredPortalView ? mode : 'sandbox'));
 modelFile.onchange = openSelectedModel;
 if (modelFile.files?.length) void openSelectedModel();
 else setWorkspaceBusy(false);

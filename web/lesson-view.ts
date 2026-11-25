@@ -122,8 +122,13 @@ export function sectionEquations(inputs: BeamInputs, section: number): string {
     const momentRule = after ? 'A_y x-P(x-a)' : 'A_y x';
     const shearNumbers = after ? `${number(left)}-${P}` : number(left);
     const momentNumbers = `${number(left)}(${number(x)})${after ? `-${P}(${number(x)}-${number(a)})` : ''}`;
-    return `<div class="section-readout">${math(`x=${number(x)}\\;\\mathrm{m}`, true)}
-        ${math(`N=0,\\quad V=${shearRule}=${shearNumbers}\\approx ${number(shear)}\\;\\mathrm{kN}.`, true)}
-        ${math(`M=${momentRule}=${momentNumbers}\\approx ${number(moment)}\\;\\mathrm{kN}\\,\\mathrm{m}.`, true)}</div>
-        <div class="peak-readout">${math(String.raw`M_{\max}=\frac{Pa(L-a)}{L}=\frac{${P}(${number(a)})(${L}-${number(a)})}{${L}}\approx ${number(peak)}\;\mathrm{kN}\,\mathrm{m}.`, true)}</div>`;
+    // Keep each substitution and its result together as the available width changes.
+    const row = (...terms: string[]) => '<div class="substitution-row">' +
+        terms.map(term => '<span>' + math(term) + '</span>').join(' ') + '</div>';
+    return `<div class="section-readout">${row(String.raw`x=${number(x)}\;\mathrm{m}`)}
+        ${row('N=0,', 'V=' + shearRule, '=' + shearNumbers, String.raw`\approx ${number(shear)}\;\mathrm{kN}`)}
+        ${row('M=' + momentRule, '=' + momentNumbers, String.raw`\approx ${number(moment)}\;\mathrm{kN}\,\mathrm{m}`)}</div>
+        <div class="peak-readout">${row(String.raw`M_{\max}=\frac{Pa(L-a)}{L}`,
+            String.raw`=\frac{${P}(${number(a)})(${L}-${number(a)})}{${L}}`,
+            String.raw`\approx ${number(peak)}\;\mathrm{kN}\,\mathrm{m}`)}</div>`;
 }

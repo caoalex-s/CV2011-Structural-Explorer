@@ -28,6 +28,14 @@ export function createDrawingWorkspace(select: (object: Selection | null) => voi
     const title = document.createElement('header');
     title.className = 'drawing-title';
     title.innerHTML = '<h2></h2><span></span>';
+    const emptyActions = document.createElement('div');
+    emptyActions.className = 'empty-drawing-actions';
+    emptyActions.innerHTML = '<button type="button">Draw member</button> <button type="button">Open beam example</button>';
+    emptyActions.children[0].addEventListener('click', () => document.querySelector<HTMLButtonElement>('[data-tool="member"]')!.click());
+    emptyActions.children[1].addEventListener('click', () => {
+        element<HTMLSelectElement>('preset').value = 'beam';
+        element('load-preset').click();
+    });
     const cutReadout = document.createElement('div');
     cutReadout.className = 'cut-readout';
     cutReadout.setAttribute('aria-live','polite');
@@ -90,6 +98,7 @@ export function createDrawingWorkspace(select: (object: Selection | null) => voi
             for (const [node, marker] of origins) marker.replaceWith(node);
             origins.clear();
             rail.append(choice);
+            emptyActions.remove(); document.body.classList.remove('empty-drawing');
             rail.remove(); cutReadout.remove(); title.remove(); sectionTitle.remove(); utilities.remove();
             for (const disclosure of [directory, files, toolbox]) disclosure.open = !matchMedia('(max-width:750px)').matches;
             return;
@@ -98,7 +107,7 @@ export function createDrawingWorkspace(select: (object: Selection | null) => voi
         const actions = find('.header-actions');
         actions.before(utilities);
         move(actions, utilities);
-        panel.prepend(title);
+        panel.prepend(title, emptyActions);
         move(find('.left-panel'), panel, title.nextSibling);
         find('.work-grid').append(rail);
         move(find('.right-panel'), rail);
@@ -120,7 +129,8 @@ export function createDrawingWorkspace(select: (object: Selection | null) => voi
     function update(model: Model, selected: Selection | null, sample: Sample | undefined, stationMath: string[], face: string) {
         if (!active) return;
         rail.querySelector('h2')!.hidden = compact.matches;
-        title.querySelector('h2')!.textContent = element('response-title').textContent;
+        document.body.classList.toggle('empty-drawing', model.members.length === 0);
+        title.querySelector('h2')!.textContent = model.members.length ? element('response-title').textContent : 'Draw a structure';
         title.querySelector('span')!.textContent = `${model.nodes.length} joints · ${model.members.length} ${model.members.length === 1 ? 'member' : 'members'}`;
         cutReadout.hidden = !sample;
         if (sample) {

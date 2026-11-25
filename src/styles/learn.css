@@ -194,3 +194,6 @@ dialog .actions { margin: 22px 0; }
 .lesson-links { display:flex; gap:1.2rem; flex-wrap:wrap; margin-top:.6rem; }
 .primary { background:var(--ink); }
 @media(max-width:650px) { .course-map li { grid-template-columns:1fr; gap:.45rem; } }
+
+.substitution-row { display:flex; flex-wrap:wrap; align-items:baseline; gap:.2em .35em; margin-block:.5em; }
+.substitution-row > span { white-space:nowrap; }

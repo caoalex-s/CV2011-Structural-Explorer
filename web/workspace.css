@@ -1518,3 +1518,21 @@ dialog { background:var(--paper); color:var(--ink); border:1px solid var(--line)
 @media (max-width: 600px) {
     .simple-beams #beam-answer .katex-display { font-size: .82rem; }
 }
+
+.beam-cut-sheet { position:relative; width:100%; max-width:760px; padding-bottom:44px; }
+.simple-beams #beam-cut-grip { position:absolute; bottom:0; transform:translateX(-50%); min-height:44px; min-width:52px; touch-action:none; cursor:ew-resize; color:var(--ink); background:var(--paper); border:1px solid var(--muted); }
+.simple-beams #beam-cut-grip.at-load,.simple-beams button[aria-pressed="true"] { border:2px solid var(--accent); background:#f5ebe4; }
+.simple-beams #beam-cut-grip:focus-visible { outline:3px solid var(--ink); outline-offset:2px; }
+@media (max-width:650px) {
+    #insights-panel .prediction-attempts { display:block; width:100%; }
+    .prediction-attempts thead { position:absolute; clip-path:inset(50%); width:1px; height:1px; overflow:hidden; }
+    .prediction-attempts tbody,.prediction-attempts tr { display:block; }
+    .prediction-attempts tr { border-top:1px solid var(--line); padding:.5rem 0; }
+    .prediction-attempts td { display:grid; grid-template-columns:6rem minmax(0,1fr); border:0; padding:.2rem; overflow-wrap:anywhere; }
+    .prediction-attempts td::before { color:var(--muted); }
+    .prediction-attempts td:nth-child(1)::before { content:"Course ID"; }
+    .prediction-attempts td:nth-child(2)::before { content:"Event"; }
+    .prediction-attempts td:nth-child(3)::before { content:"Prediction"; }
+    .prediction-attempts td:nth-child(4)::before { content:"Solution shown"; }
+    .prediction-attempts pre { white-space:pre-wrap; overflow-wrap:anywhere; }
+}
