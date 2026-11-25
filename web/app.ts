@@ -522,7 +522,8 @@ function renderCanvas() {
                 const dot = screen({x: station.x - (b.y-a.y)/length*offset, y: station.y + (b.x-a.x)/length*offset});
                 drawing += `<circle class="cut-ordinate" data-side="${cutSide()}" cx="${dot.x}" cy="${dot.y}" r="5"><title>Selected ${field} = ${formatSectionResult(section[field])} ${field === 'M' ? 'kN m' : 'kN'}</title></circle>`;
             }
-            if (maximum > 1e-8) {
+            // Retain the scale note at zero response so a load edit cannot shift the inspector dial.
+            if (all.length) {
                 const peak = all.reduce((a, b) => Math.abs(a[field]) > Math.abs(b[field]) ? a : b);
                 diagramNote.innerHTML = 'Peak ' + math('|' + field + '|=' + quantity(number(Math.abs(peak[field])), field === 'M' ? measureUnits.moment : measureUnits.force)) + ' · Diagram scaled to fit';
                 diagramNote.hidden = false;
