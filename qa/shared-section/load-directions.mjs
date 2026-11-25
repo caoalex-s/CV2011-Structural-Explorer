@@ -39,7 +39,26 @@ try {
         await picker.selectOption({label:'P₁ · Point force'});
         assert.equal(await checked('pointDirection').inputValue(), '270');
         assert.equal(await prop('pointAngle').isVisible(), false);
-        await choose('pointDirection','custom');
+        const pad = page.locator('#inspector .cardinal-pad');
+        const positions = {};
+        for (const name of ['Up','Left','Right','Down']) {
+            const radio = pad.getByRole('radio',{name,exact:true});
+            const box = await radio.boundingBox();
+            assert.ok(box.width >= 44 && box.height >= 44, name+' touch target');
+            positions[name] = {x:box.x + box.width/2, y:box.y + box.height/2};
+        }
+        assert.equal(positions.Up.x,positions.Down.x);
+        assert.equal(positions.Left.y,positions.Right.y);
+        assert.ok(positions.Up.y < positions.Left.y && positions.Down.y > positions.Right.y);
+        assert.ok(positions.Left.x < positions.Up.x && positions.Right.x > positions.Up.x);
+        await checked('pointDirection').focus();
+        await page.keyboard.press('ArrowLeft');
+        assert.equal(await checked('pointDirection').inputValue(),'180');
+        await page.keyboard.press('Tab');
+        assert.equal(await page.locator(':focus').inputValue(),'custom');
+        assert.equal(await checked('pointDirection').inputValue(),'180');
+        await page.keyboard.press('Space');
+        assert.equal(await checked('pointDirection').inputValue(),'custom');
         await page.keyboard.press('Tab');
         assert.ok(await prop('pointAngle').evaluate(el => el === document.activeElement));
         await edit('pointAngle',37);
@@ -60,7 +79,7 @@ try {
         assert.deepEqual([point.fx,point.fy],[20,0]);
         await edit('magnitude',30);
         await checked('pointDirection').focus();
-        await page.keyboard.press('ArrowRight');
+        await page.keyboard.press('ArrowUp');
         assert.equal(await checked('pointDirection').inputValue(), '90');
         assert.ok(await checked('pointDirection').evaluate(el => el === document.activeElement));
         assert.deepEqual((await state()).loads.map(({fx,fy})=>[fx,fy]),[[0,30]]);

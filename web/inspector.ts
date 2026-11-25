@@ -30,9 +30,42 @@ const directionArrows: Record<string, string> = {
     Down: '↓', Right: '→', Up: '↑', Left: '←', Clockwise: '↻', Counterclockwise: '↺',
 };
 
+function directionOption(key: string, value: string, label: string, current: string): string {
+    const arrow = directionArrows[label];
+    return `<label><input type="radio" name="${key}" data-property="${key}" value="${value}" ${value === current ? 'checked' : ''}><span>${arrow ? `<span class="choice-arrow" aria-hidden="true">${arrow}</span> ` : ''}${label}</span></label>`;
+}
+
 function directionGroup(key: string, choices: string[][], current: string): string {
-    return `<fieldset class="load-direction-group"><legend>Direction</legend><div class="direction-options">${choices.map(([value, label]) =>
-        `<label><input type="radio" name="${key}" data-property="${key}" value="${value}" ${value === current ? 'checked' : ''}><span>${directionArrows[label] ? `<span aria-hidden="true">${directionArrows[label]} </span>` : ''}${label}</span></label>`).join('')}</div></fieldset>`;
+    const options = choices.map(([value,label]) => directionOption(key,value,label,current));
+    if (key === 'momentSense') return `<fieldset class="load-direction-group"><legend>Direction</legend><div class="direction-options">${options.join('')}</div></fieldset>`;
+    return `<fieldset class="load-direction-group direction-controller"><legend>Direction</legend>
+        <div class="direction-options controller-layout"><div class="cardinal-pad">${options.slice(0,cardinalChoices.length).join('')}<span class="pad-origin" aria-hidden="true"></span></div>
+        <div class="direction-alternatives">${options.slice(cardinalChoices.length).join('')}</div></div></fieldset>`;
+}
+
+// The arrow keys select their physical direction. Tab also reaches each
+// alternative in the same radio group without changing the applied load.
+function navigateDirectionPad(event: KeyboardEvent, input: HTMLInputElement): void {
+    const group = input.closest('.direction-controller');
+    if (!group || event.altKey || event.ctrlKey || event.metaKey) return;
+    const directions: Record<string,string> = { ArrowDown:'270', ArrowRight:'0', ArrowUp:'90', ArrowLeft:'180' };
+    const value = directions[event.key];
+    if (value) {
+        event.preventDefault();
+        const choice = group.querySelector<HTMLInputElement>(`input[value="${value}"]`)!;
+        choice.focus();
+        if (!choice.checked) choice.click();
+        return;
+    }
+    if (event.key !== 'Tab') return;
+    const cardinal = group.querySelector<HTMLInputElement>('.cardinal-pad input:checked') ?? group.querySelector<HTMLInputElement>('.cardinal-pad input[value="90"]')!;
+    const stops = [cardinal, ...group.querySelectorAll<HTMLInputElement>('.direction-alternatives input')];
+    const index = input.closest('.cardinal-pad') ? 0 : stops.indexOf(input);
+    const next = stops[index + (event.shiftKey ? -1 : 1)];
+    if (next) {
+        event.preventDefault();
+        next.focus();
+    }
 }
 
 function directionPicker(load: Load, angle: number, angleInput: string): string {
@@ -202,6 +235,10 @@ export function renderInspector(options: InspectorOptions): void {
         }
         container.onkeydown = event => {
             const target = event.target as HTMLElement;
+            if (target instanceof HTMLInputElement && target.type === 'radio' && target.closest('.direction-controller')) {
+                navigateDirectionPad(event,target);
+                return;
+            }
             if (target.matches('[data-property]') && (event.key === 'Tab' || event.key === 'Enter'))
                 target.dataset.focusStep = String(event.key === 'Enter' ? 0 : event.shiftKey ? -1 : 1);
         };
