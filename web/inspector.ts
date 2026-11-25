@@ -52,7 +52,7 @@ function directionPicker(load: Load, angle: number, angleInput: string, strength
         + directionOption('lineReference','normal','Member normal',reference) + '</div>' : '';
     return `<fieldset class="load-direction-group"><legend class="${line ? '' : 'visually-hidden'}">${line ? 'Positive intensity direction' : 'Point force settings'}</legend>
         <div class="dial-layout">${directionDial(displayedAngle(angle),line)}<div class="dial-values">${angleInput}${choices}${strengthInput}</div></div>
-        <p class="small" id="dial-help">Counterclockwise from ${math('+x')}. <span class="dial-key-help">Drag the rim or use the arrow keys (1°).</span>${line ? '<span class="visually-hidden"> Editing the angle selects Global.</span>' : ''}</p></fieldset>`;
+        <p class="small" id="dial-help">Drag the dot. Angles increase counterclockwise from ${math('+x')}. <span class="dial-key-help">Arrow keys adjust by 1°.</span>${line ? '<span class="visually-hidden"> Editing the angle selects Global.</span>' : ''}</p></fieldset>`;
 }
 
 interface InspectorOptions {
@@ -177,7 +177,7 @@ export function renderInspector(options: InspectorOptions): void {
                     + '<div class="line-strengths"><div>' + field('fy', 'Start intensity (kN/m)', 'any', sign)
                     + '</div><div>' + field('qEnd', 'End intensity (kN/m)', 'any', sign) + '</div></div>'
                     + directionPicker(load, angle, angleField('lineAngle', 'Angle (°)', displayedAngle(angle)))
-                    + '<p class="small" data-normal-help ' + (normal ? '' : 'hidden') + '>The normal points left from start to end. Editing the angle selects Global.</p>'
+                    + '<p class="small" data-normal-help ' + (normal ? '' : 'hidden') + '>Looking from start to end, the normal points left. Editing the angle selects Global.</p>'
                     + '<p class="small">Intensity varies linearly along the member. Negative values reverse the arrows.</p></div>';
             }
             html += `<details class="inspector-help"><summary>Load notation and directions</summary><p class="small">Use ${math('P')} or ${math('F')} for a force, ${math('M')} for a couple, and ${math('w')} or ${math('q')} for distributed loading. To enter ${math('P_1')} or ${math('M_0')}, type <code>P_1</code> or <code>M_0</code>. Each load has its own label.</p><p class="small">The action belongs to this member side at a joint. Arrows retain their physical line of action; moment arcs retain their application centre.</p></details>`;

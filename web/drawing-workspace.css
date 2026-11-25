@@ -249,7 +249,7 @@
 .dial-reference { margin-top:.4rem; flex-direction:column; gap:.15rem; }
 .dial-reference label { padding:.15rem .25rem; }
 .drawing-workspace .inspector-panel:has(.load-direction-fields) {
-    background:var(--surface); border:0; border-top:1px solid var(--line);
+    background:transparent; border:0; border-top:1px solid var(--line);
     border-bottom:1px solid var(--line); border-radius:0;
 }
 .load-direction-fields .dial-values .field + .field { margin-top:.45rem; }
@@ -257,6 +257,7 @@
 .drawing-workspace .line-strengths .field { display:flex; flex-direction:column; align-items:stretch; gap:.2rem; }
 .drawing-workspace .dial-reference label,
 .drawing-workspace .dial-reference label:has(:checked) { background:transparent; border-color:transparent; }
+#dial-help { margin:.4rem 0 0; }
 .dial-key-help { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
 .load-direction-group:has(.direction-dial:focus-visible) .dial-key-help { position:static; width:auto; height:auto; clip-path:none; }
 
