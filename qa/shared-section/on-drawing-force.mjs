@@ -78,7 +78,55 @@ try {
         assert.ok(await page.locator('#inspector .direction-dial').isVisible());
         await page.reload();
         assert.deepEqual(await model(),final);
-        await writeFile(join(output,'result-'+width+'.json'),JSON.stringify({width,rotated,final},null,2));
+        const fixture = await page.evaluate(()=>JSON.parse(localStorage.getItem('cv2011-model')));
+        const edgeCases = [['edge-left',.0625,.25],['edge-right',.9375,.75]];
+        for (const [id,t] of edgeCases) fixture.loads.push({...final,id,label:id==='edge-left'?'P_2':'P_3',t,fx:0,fy:-20});
+        await page.locator('#model-file').setInputFiles({name:'edge-forces.json',mimeType:'application/json',
+            buffer:Buffer.from(JSON.stringify({version:2,model:fixture}))});
+        const edgeResults = [];
+        for (const [id,t,destination] of edgeCases) {
+            const picker = page.locator('#drawing-object');
+            await picker.selectOption('load:'+id);
+            await canvas.scrollIntoViewIfNeeded();
+            const edge = page.locator(`#canvas [data-point-force][data-id="${id}"]`);
+            const source = () => page.evaluate(id=>JSON.parse(localStorage.getItem('cv2011-model')).loads.find(l=>l.id===id),id);
+            const pivot = await edge.locator('[data-vector=force]').evaluate(g=>{
+                const p=new DOMPoint(+g.dataset.originX,+g.dataset.originY).matrixTransform(g.getScreenCTM());
+                return [p.x,p.y];
+            });
+            const knob = await page.locator(`[data-rotate-force="${id}"] circle`).first().boundingBox();
+            const cx=knob.x+knob.width/2, cy=knob.y+knob.height/2;
+            const r=Math.hypot(cx-pivot[0],cy-pivot[1]);
+            // Rotate toward the interior of the sheet on either end.
+            const direction=id==='edge-left'?-1:1;
+            await point(cx,cy,'down');
+            await point(pivot[0]-direction*r,pivot[1],'move');
+            await point(pivot[0]-direction*r,pivot[1],'up');
+            const turned=await source();
+            assert.equal(turned.t,t);
+            assert.equal(turned.fx,direction*20);
+            assert.equal(turned.fy,0);
+            await page.getByRole('button',{name:'Undo',exact:true}).click();
+            await picker.selectOption('load:'+id);
+            await canvas.scrollIntoViewIfNeeded();
+            const start=await edge.locator('path.hit').evaluate(path=>{
+                const p=path.getPointAtLength(.9*path.getTotalLength()).matrixTransform(path.getScreenCTM());
+                return [p.x,p.y];
+            });
+            const endX=await canvas.locator('[data-object=member] path').first().evaluate((path,t)=>
+                path.getPointAtLength(t*path.getTotalLength()).matrixTransform(path.getScreenCTM()).x,destination);
+            await point(...start,'down');
+            await point(endX,start[1],'move');
+            await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+            await point(endX,start[1],'up');
+            const moved=await source();
+            assert.equal(moved.t,destination);
+            assert.equal(moved.fx,0);
+            assert.equal(moved.fy,-20);
+            assert.deepEqual(await model(),final);
+            edgeResults.push({id,turned,moved});
+        }
+        await writeFile(join(output,'result-'+width+'.json'),JSON.stringify({width,rotated,final,edgeResults},null,2));
         await touch?.detach();
         await page.close();
     }
