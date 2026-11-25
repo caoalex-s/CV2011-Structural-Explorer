@@ -231,7 +231,7 @@
 
 .controller-layout { align-items:center; gap:.75rem; }
 .cardinal-pad {
-    display:grid; grid-template-columns:repeat(3,3.15rem); grid-template-rows:repeat(3,2.8rem);
+    display:grid; grid-template-columns:repeat(3,3.15rem); grid-template-rows:repeat(3,max(46px,2.875rem));
     grid-template-areas:". up ." "left origin right" ". down ."; gap:2px;
     isolation:isolate;
 }
