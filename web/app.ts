@@ -195,7 +195,9 @@ function toast(message: string) { $('toast').textContent = message; $('toast').c
 function checkpoint(before = model) { history.push(clone(before)); if (history.length > 60)
     history.shift(); future.length = 0; }
 function changed(keepInspector = false) {
-    $('workspace-operation').hidden = true;
+    // Removing the import status above the drawing would shift the pivot
+    // beneath an active pointer. Dismiss it once the rotation finishes.
+    if (!rotation) $('workspace-operation').hidden = true;
     evidenceRawSource = undefined;
     assignLoadLabels(model);
     updateEvidenceBinding();
@@ -602,6 +604,8 @@ function fitCanvasAnnotations(): void {
         return { label, shift, left: box.left + shift, right: box.right + shift, top: box.top, bottom: box.bottom };
     });
     const forceLabels = adjustments.filter(({label}) => label.closest('[data-object="load"] [data-vector="force"]'));
+    const obstacles = [...forceLabels, ...[...svg.querySelectorAll('.node-label')].map(label=>label.getBoundingClientRect())]
+        .sort((a,b)=>b.bottom-a.bottom);
     for (const annotation of adjustments) {
         const {label, shift} = annotation;
         if (shift) label.setAttribute('x', String(Number(label.getAttribute('x')) + shift / pixelScale));
@@ -609,7 +613,7 @@ function fitCanvasAnnotations(): void {
         // When the two text boxes meet, lift only the reaction caption.
         // Keep both force vectors on their original lines of action.
         let bottom = annotation.bottom;
-        for (const force of forceLabels.slice().sort((a,b) => b.bottom - a.bottom)) {
+        for (const force of obstacles) {
             if (force.right + 6 <= annotation.left || force.left >= annotation.right + 6) continue;
             const top = bottom - (annotation.bottom - annotation.top);
             if (bottom > force.top - 6 && top < force.bottom + 6) bottom = force.top - 6;
@@ -914,8 +918,9 @@ svg.addEventListener('pointermove', event => {
 });
 function finishRotation(event?: PointerEvent) {
     if (!rotation || (event && rotation.pointer !== event.pointerId)) return;
-    const pointer = rotation.pointer;
+    const {pointer,changed} = rotation;
     rotation = undefined;
+    if (changed) $('workspace-operation').hidden = true;
     if (svg.hasPointerCapture(pointer)) svg.releasePointerCapture(pointer);
     renderCanvas();
 }

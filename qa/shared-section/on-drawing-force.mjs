@@ -101,6 +101,12 @@ try {
             const direction=id==='edge-left'?-1:1;
             await point(cx,cy,'down');
             await point(pivot[0]-direction*r,pivot[1],'move');
+            await page.waitForFunction(({id,fx})=>JSON.parse(localStorage.getItem('cv2011-model')).loads.find(l=>l.id===id).fx===fx,{id,fx:direction*20});
+            const screenPivot=await edge.locator('[data-vector=force]').evaluate(g=>{
+                const p=new DOMPoint(+g.dataset.originX,+g.dataset.originY).matrixTransform(g.getScreenCTM());
+                return [p.x,p.y];
+            });
+            assert.ok(Math.hypot(screenPivot[0]-pivot[0],screenPivot[1]-pivot[1])<1);
             await point(pivot[0]-direction*r,pivot[1],'up');
             const turned=await source();
             assert.equal(turned.t,t);
