@@ -34,11 +34,21 @@ try {
                 buffer:Buffer.from(JSON.stringify({version,model}))});
             await page.waitForFunction(expected=>JSON.parse(localStorage.getItem('cv2011-model'))?.loads[0].id===expected,model.loads[0].id);
         }
+        async function assertDirection(x, y) {
+            const svg = page.locator('#inspector .pad-indicator');
+            const axis = await svg.locator('.indicator-pointer').evaluate(pointer => {
+                const matrix = pointer.getScreenCTM();
+                const length = Math.hypot(matrix.a, matrix.b);
+                return [matrix.a/length, -matrix.b/length];
+            });
+            assert.ok(Math.hypot(axis[0]-x, axis[1]-y)<1e-6, JSON.stringify({axis,x,y}));
+        }
         await page.goto(base+'#sandbox');
         await page.waitForFunction(()=>!document.querySelector('#workspace')?.inert);
         await picker.selectOption({label:'P₁ · Point force'});
         assert.equal(await checked('pointDirection').inputValue(), '270');
         assert.equal(await prop('pointAngle').isVisible(), false);
+        await assertDirection(0,-1);
         const pad = page.locator('#inspector .cardinal-pad');
         const positions = {};
         for (const name of ['Up','Left','Right','Down']) {
@@ -62,6 +72,7 @@ try {
         await page.keyboard.press('Tab');
         assert.ok(await prop('pointAngle').evaluate(el => el === document.activeElement));
         await edit('pointAngle',37);
+        await assertDirection(Math.cos(37*Math.PI/180),Math.sin(37*Math.PI/180));
         assert.equal(await checked('pointDirection').inputValue(), 'custom');
         await choose('pointDirection','0');
         await page.locator('.force-components > summary').click();
@@ -183,6 +194,7 @@ try {
         assert.equal(await page.locator('#portal-certificate').textContent(),'');
         await choose('lineReference','normal');
         assert.equal((await state()).loads[0].direction,'member-normal');
+        await assertDirection(-.8,.6);
         assert.equal(await page.locator('#frame-worked-output').textContent(),'');
         await page.getByRole('button',{name:'Undo',exact:true}).click();
         assert.equal((await state()).loads[0].direction,0);
@@ -206,6 +218,8 @@ try {
         exported.model.nodes[1].x=-3;exported.model.nodes[1].y=-4;
         await open(exported.model,3);
         await picker.selectOption('load:reversed');
+        await assertDirection(.8,-.6);
+        assert.ok(await page.getByRole('group',{name:'Positive intensity direction',exact:true}).isVisible());
         const paths=await page.locator('#canvas [data-object="load"] [data-vector="force"] path[stroke]').evaluateAll(items=>items.map(item=>item.getAttribute('d')));
         const last=paths.at(-1).match(/[-+\d.e]+/g).map(Number);
         assert.ok(last[2]>last[0] && last[3]>last[1], 'Reversed member normal must point right and down');

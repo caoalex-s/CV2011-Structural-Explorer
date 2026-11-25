@@ -35,12 +35,21 @@ function directionOption(key: string, value: string, label: string, current: str
     return `<label><input type="radio" name="${key}" data-property="${key}" value="${value}" ${value === current ? 'checked' : ''}><span>${arrow ? `<span class="choice-arrow" aria-hidden="true">${arrow}</span> ` : ''}${label}</span></label>`;
 }
 
-function directionGroup(key: string, choices: string[][], current: string): string {
-    const options = choices.map(([value,label]) => directionOption(key,value,label,current));
-    if (key === 'momentSense') return `<fieldset class="load-direction-group"><legend>Direction</legend><div class="direction-options">${options.join('')}</div></fieldset>`;
-    return `<fieldset class="load-direction-group direction-controller"><legend>Direction</legend>
-        <div class="direction-options controller-layout"><div class="cardinal-pad">${options.slice(0,cardinalChoices.length).join('')}<span class="pad-origin" aria-hidden="true"></span></div>
-        <div class="direction-alternatives">${options.slice(cardinalChoices.length).join('')}</div></div></fieldset>`;
+/** The normal follows the drawn start-to-end axis. Legacy downward-positive
+ * intensity fields use 270 degrees in this editor. */
+function positiveIntensityAngle(model: Model, load: Load): number {
+    if (load.direction !== 'member-normal') return load.direction ?? 270;
+    const a = position(model, load.member, 0), b = position(model, load.member, 1);
+    return Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI + 90;
+}
+
+function directionIndicator(angle: number, line: boolean): string {
+    const degrees = displayedAngle(angle);
+    const description = `${line ? 'Positive intensity' : 'Force direction'}: ${number(degrees)} degrees counterclockwise from global positive x`;
+    // The path points right at zero. SVG screen coordinates increase downward.
+    return `<svg class="pad-indicator" viewBox="-24 -24 48 48" role="img" aria-label="${description}">
+        <circle class="indicator-rim" r="21"/><path class="indicator-ticks" d="M0 -20v3 M20 0h-3 M0 20v-3 M-20 0h3"/>
+        <g class="indicator-pointer" transform="rotate(${-degrees})"><path d="M-12 -2H4V-7L15 0 4 7V2H-12Z"/></g></svg>`;
 }
 
 // The arrow keys select their physical direction. Tab also reaches each
@@ -77,7 +86,11 @@ function directionPicker(load: Load, angle: number, angleInput: string): string 
     const choices = [...cardinalChoices];
     if (line) choices.push(['normal', 'Member normal']);
     choices.push(['custom', 'Custom angle']);
-    return directionGroup(line ? 'lineReference' : 'pointDirection', choices, current)
+    const key = line ? 'lineReference' : 'pointDirection';
+    const options = choices.map(([value,label]) => directionOption(key,value,label,current));
+    return `<fieldset class="load-direction-group direction-controller"><legend>${line ? 'Positive intensity direction' : 'Direction'}</legend>
+        <div class="direction-options controller-layout"><div class="cardinal-pad">${options.slice(0,cardinalChoices.length).join('')}${directionIndicator(angle,line)}</div>
+        <div class="direction-alternatives">${options.slice(cardinalChoices.length).join('')}</div></div></fieldset>`
         + `<div class="custom-angle-editor" ${custom ? '' : 'hidden'}>${angleInput}<p class="small">Angles increase counterclockwise from global +x (right).</p></div>`;
 }
 
@@ -189,16 +202,18 @@ export function renderInspector(options: InspectorOptions): void {
             if (item.kind === 'moment') {
                 html += sandbox ? '<div class="load-direction-fields">'
                     + angleField('momentMagnitude', 'Magnitude (kN m)', Math.abs(load.mz))
-                    + directionGroup('momentSense', [['-1', 'Clockwise'], ['1', 'Counterclockwise']], String(momentSense(load))) + '</div>'
+                    + '<fieldset class="load-direction-group"><legend>Direction</legend><div class="direction-options">'
+                    + directionOption('momentSense','-1','Clockwise',String(momentSense(load)))
+                    + directionOption('momentSense','1','Counterclockwise',String(momentSense(load))) + '</div></fieldset></div>'
                     : field('mz', 'Moment, CCW + (kN m)');
             }
             if (item.kind === 'distributed') {
                 const normal = load.direction === 'member-normal';
                 const sign = load.direction === undefined ? -1 : 1;
-                const angle = Number(load.direction ?? 270);
+                const angle = positiveIntensityAngle(model, load);
                 html += field('end', 'End / member length') + '<div class="load-direction-fields">'
                     + field('fy', 'Start intensity (kN/m)', 'any', sign) + field('qEnd', 'End intensity (kN/m)', 'any', sign)
-                    + directionPicker(load, angle, angleField('lineAngle', 'Angle (°)', normal ? 0 : displayedAngle(angle)))
+                    + directionPicker(load, angle, angleField('lineAngle', 'Angle (°)', displayedAngle(angle)))
                     + (normal ? '<p class="small">The normal points left when looking from the first joint to the second.</p>' : '')
                     + '<p class="small">Intensity varies linearly per metre of member length. Positive follows the selected direction. Negative acts opposite.</p></div>';
             }
@@ -303,10 +318,7 @@ export function renderInspector(options: InspectorOptions): void {
                 if (key === 'lineReference' || key === 'lineAngle') {
                     const load = model.loads.find(load => load.id === selected!.id)!;
                     let angle = Number(value) % 360;
-                    if (customAngle) {
-                        const a = position(model, load.member, 0), b = position(model, load.member, 1);
-                        angle = Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI + 90;
-                    }
+                    if (customAngle) angle = positiveIntensityAngle(model,load);
                     const direction = value === 'normal' ? 'member-normal' : angle === 270 || angle === -90 ? undefined : angle;
                     // Preserve the displayed start and end strengths. A legacy
                     // downward reference stores them as global upward components.
