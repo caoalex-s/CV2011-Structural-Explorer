@@ -20,6 +20,7 @@ import { pointAngle, setPointForce } from './point-force-edit.js';
 import { renderInspector } from './inspector.js';
 import { renderResponses, sampleSection } from './responses.js';
 import { sectionFreeBody } from './section-free-body.js';
+import { createSandboxCut } from './sandbox-cut.js';
 import { createDrawingWorkspace } from './drawing-workspace.js';
 import { createWorkspaceControls } from './workspace-controls.js';
 import { createLearningSession } from './learning-session.js';
@@ -172,11 +173,22 @@ function updateEvidenceBinding() {
 let solutionStep = 'reaction_left', solutionRevealed = false, hintUsed = false, practiceResultsVisible = false;
 let proofStatus = { lean: 'pending', scope: 'Scaled reaction equilibrium identities and plotting-side inversion.' };
 const svg = $('canvas') as unknown as SVGSVGElement;
+// Redraw the geometry independently so the cut grip retains keyboard focus
+// and pointer capture while inspection updates the free body and checked query.
+const geometry = document.createElementNS('http://www.w3.org/2000/svg','g');
+svg.append(geometry);
+const updateCutGrip = createSandboxCut(svg,(parameter, face) => {
+    const nextFace = parameter === 0 ? 'right' : parameter === 1 ? 'left' : face;
+    if (parameter === sectionT && nextFace === cutSide()) return;
+    sectionT = parameter;
+    $<HTMLSelectElement>('frame-side').value = nextFace;
+    render(true);
+});
 // Shared drawing dimensions keep pointer mapping, fitting and annotations aligned.
 let canvasWidth = 1000;
 let canvasHeight = 400;
 function sizeDrawing() {
-    const width = narrowWorkspace.matches && document.body.classList.contains('drawing-workspace') ? 640 : 1000;
+    const width = narrowWorkspace.matches && (isDrawingSandbox() || isPortalWorkspace || portalExercise) ? 640 : 1000;
     const height = width === 640 && document.querySelector('.work-grid.is-focused') ? 640 : 400;
     if (width === canvasWidth && height === canvasHeight) return;
     canvasHeight = height;
@@ -461,6 +473,9 @@ function responsesVisible() {
 }
 function renderCanvas() {
     sizeDrawing();
+    const diagramNote = $('frame-diagram-note');
+    diagramNote.hidden = true;
+    const frameSheet = isPortalWorkspace || portalExercise;
     const signsExpanded = $('workspace-conventions').querySelector('details')?.open ?? false;
     $('workspace-conventions').innerHTML = workspaceConventions(model, currentMember);
     $('workspace-conventions').querySelector('details')!.open = signsExpanded;
@@ -500,7 +515,11 @@ function renderCanvas() {
             }
             if (maximum > 1e-8) {
                 const peak = all.reduce((a, b) => Math.abs(a[field]) > Math.abs(b[field]) ? a : b);
-                drawing += `<text x="22" y="${canvasHeight - 25}" class="svg-value">${symbolLabel(`Peak |${field}| = ${number(Math.abs(peak[field]))} ${field === 'M' ? 'kN m' : 'kN'} · diagrams scaled to fit`)}</text>`;
+                if (frameSheet) {
+                    svg.after(diagramNote);
+                    diagramNote.innerHTML = 'Peak ' + math('|' + field + '|=' + quantity(number(Math.abs(peak[field])), field === 'M' ? measureUnits.moment : measureUnits.force)) + ' · Diagram scaled to fit';
+                    diagramNote.hidden = false;
+                } else drawing += `<text x="22" y="${canvasHeight - 25}" class="svg-value">${symbolLabel(`Peak |${field}| = ${number(Math.abs(peak[field]))} ${field === 'M' ? 'kN m' : 'kN'} · diagrams scaled to fit`)}</text>`;
             }
         }
     }
@@ -528,7 +547,7 @@ function renderCanvas() {
             if (Math.abs(reaction.fx) > 1e-7)
                 drawing += `<g pointer-events="none" data-horizontal-reaction>${forceSymbol(p.x, p.y, reaction.fx, 0, courseColors.reaction, `${label}ₓ = ${number(Math.abs(reaction.fx))} kN`, 42, 20)}</g>`;
             if (Math.abs(reaction.mz) > 1e-7)
-                drawing += `<g pointer-events="none">${momentSymbol(p.x, p.y, reaction.mz, courseColors.reaction, `M_${label} = ${number(Math.abs(reaction.mz))} kN m`, 37)}</g>`;
+                drawing += `<g pointer-events="none" data-moment-reaction>${momentSymbol(p.x, p.y, reaction.mz, courseColors.reaction, `M_${label} = ${number(Math.abs(reaction.mz))} kN m`, 37)}</g>`;
         }
     if (analysis.mechanism)
         for (const motion of analysis.mechanism) {
@@ -560,7 +579,7 @@ function renderCanvas() {
         const end = canvasWidth - 25, begin = end - metres * view.scale;
         drawing += `<g class="drawing-scale" aria-label="Drawing scale"><path d="M${begin} ${canvasHeight - 34}v6H${end}v-6"/><text x="${(begin + end) / 2}" y="${canvasHeight - 39}" text-anchor="middle">${number(metres)} m</text></g>`;
     }
-    svg.innerHTML = drawing;
+    geometry.innerHTML = drawing;
     if (selected && document.body.classList.contains('drawing-workspace')) {
         const target = svg.querySelector('[data-object="' + CSS.escape(selected.type) + '"][data-id="' + CSS.escape(selected.id) + '"]');
         target?.classList.add('drawing-selection');
@@ -574,7 +593,7 @@ function renderCanvas() {
             const angle = number(wrap(pointAngle(point)));
             const textX = Math.max(45,Math.min(canvasWidth-45,h.x));
             const textY = h.y > canvasHeight-65 ? h.y-h.radius-8 : h.y+h.radius+21;
-            svg.insertAdjacentHTML('beforeend',`<g data-rotate-force="${escape(point.id)}" class="rotate-handle"><title>Rotate point force</title>
+            geometry.insertAdjacentHTML('beforeend',`<g data-rotate-force="${escape(point.id)}" class="rotate-handle"><title>Rotate point force</title>
                 <circle cx="${h.x}" cy="${h.y}" r="${h.radius}" fill="transparent"/>
                 <circle cx="${h.x}" cy="${h.y}" r="${h.radius*.26}" fill="#fffdf6" stroke="${courseColors.force}" stroke-width="2"/>
                 </g>${rotation?.changed ? `<text class="rotate-angle svg-value" x="${textX}" y="${textY}" text-anchor="middle" pointer-events="none">${angle}°</text>` : ''}`);
@@ -590,6 +609,16 @@ function renderCanvas() {
         hit.setAttribute('fill','transparent');
         label.after(hit);
     }
+    const member = model.members.find(m => m.id === currentMember);
+    const inspect = isDrawingSandbox() && tool === 'select' && analysis.status === 'stable' && member;
+    svg.setAttribute('role',inspect ? 'group' : 'img');
+    updateCutGrip(inspect ? {
+        member:member.id, start:screen(position(model,member.id,0)), end:screen(position(model,member.id,1)),
+        parameter:sectionT, face:cutSide(), stations:[0,1,
+            ...model.supports.filter(s=>s.member===member.id).map(s=>s.t),
+            ...model.loads.filter(l=>l.member===member.id).flatMap(l=>l.kind==='distributed' ? [l.t,l.end] : [l.t])]
+    } : undefined);
+
 }
 
 /** Keep labels legible at the canvas edges without moving their force vectors.
@@ -606,7 +635,8 @@ function fitCanvasAnnotations(): void {
         return { label, shift, left: box.left + shift, right: box.right + shift, top: box.top, bottom: box.bottom };
     });
     const forceLabels = adjustments.filter(({label}) => label.closest('[data-object="load"] [data-vector="force"]'));
-    const obstacles = [...forceLabels, ...[...svg.querySelectorAll('.node-label')].map(label=>label.getBoundingClientRect())]
+    const fixedCaptions = adjustments.filter(({label}) => label.closest('[data-moment-reaction]'));
+    const obstacles = [...forceLabels, ...fixedCaptions, ...[...svg.querySelectorAll('.node-label')].map(label=>label.getBoundingClientRect())]
         .sort((a,b)=>b.bottom-a.bottom);
     for (const annotation of adjustments) {
         const {label, shift} = annotation;
@@ -620,8 +650,18 @@ function fitCanvasAnnotations(): void {
             const top = bottom - (annotation.bottom - annotation.top);
             if (bottom > force.top - 6 && top < force.bottom + 6) bottom = force.top - 6;
         }
-        if (bottom < annotation.bottom)
-            label.setAttribute('y', String(Number(label.getAttribute('y')) + (bottom - annotation.bottom) / pixelScale));
+        if (bottom < annotation.bottom) {
+            const delta = (bottom - annotation.bottom) / pixelScale;
+            const x = Number(label.getAttribute('x')), y = Number(label.getAttribute('y'));
+            label.setAttribute('y', String(y + delta));
+            if (isPortalWorkspace || portalExercise) {
+                const leader = document.createElementNS(svg.namespaceURI,'path');
+                leader.setAttribute('d', `M${x} ${y}v${delta + 3}`);
+                leader.setAttribute('stroke',courseColors.reaction);
+                leader.setAttribute('stroke-width','1');
+                label.before(leader);
+            }
+        }
     }
 }
 // Re-establish original label anchors after a viewport or font-metric change.

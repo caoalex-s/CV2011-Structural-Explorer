@@ -286,3 +286,15 @@
 @media (max-width:750px) {
     .drawing-workspace .work-grid.is-focused #canvas { width:100%; aspect-ratio:1; height:auto; max-height:none; }
 }
+
+#frame-diagram-note { padding:.3rem .8rem; font-size:.9rem; color:var(--ink); background:var(--paper); }
+@media (max-width:750px) {
+    .canvas-panel:has(#frame-diagram-note:not([hidden])) #canvas .svg-label { font-size:22px; }
+}
+
+#sandbox-cut-grip { cursor:grab; touch-action:none; user-select:none; outline:none; }
+#sandbox-cut-grip:active { cursor:grabbing; }
+#sandbox-cut-grip .cut-tab { fill:var(--paper); stroke:var(--accent); stroke-width:1; }
+#sandbox-cut-grip:focus-visible .cut-tab { stroke:var(--ink); stroke-width:3; }
+#sandbox-cut-grip text { fill:var(--ink); font:600 12px var(--font-ui); }
+.cut-grip-leader { pointer-events:none; stroke:var(--accent); stroke-width:1; stroke-dasharray:3 3; vector-effect:non-scaling-stroke; }
