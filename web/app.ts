@@ -483,7 +483,7 @@ function renderCanvas() {
     sizeDrawing();
     const diagramNote = $('frame-diagram-note');
     diagramNote.hidden = true;
-    const frameSheet = isPortalWorkspace || portalExercise;
+    if (svg.nextElementSibling !== diagramNote) svg.after(diagramNote);
     const signsExpanded = $('workspace-conventions').querySelector('details')?.open ?? false;
     $('workspace-conventions').innerHTML = workspaceConventions(model, currentMember);
     $('workspace-conventions').querySelector('details')!.open = signsExpanded;
@@ -499,7 +499,8 @@ function renderCanvas() {
                 const path = element.samples.map((p, i) => { const q = screen({ x: p.x + p.ux * magnification, y: p.y + p.uy * magnification }); return `${i ? 'L' : 'M'} ${q.x} ${q.y}`; }).join(' ');
                 drawing += `<path d="${path}" fill="none" stroke="${courseColors.reaction}" stroke-width="2.5"/>`;
             }
-            drawing += `<text x="22" y="${canvasHeight - 25}" class="svg-value">Displacement magnification ×${number(magnification)} · values are unscaled</text>`;
+            diagramNote.textContent = 'Displacement magnification ×' + number(magnification) + '. Reported displacements are unscaled.';
+            diagramNote.hidden = false;
         }
         else {
             const field = layer as 'N' | 'V' | 'M', maximum = Math.max(...all.map(p => Math.abs(p[field])), 1e-10), scale = 70 / maximum;
@@ -523,11 +524,8 @@ function renderCanvas() {
             }
             if (maximum > 1e-8) {
                 const peak = all.reduce((a, b) => Math.abs(a[field]) > Math.abs(b[field]) ? a : b);
-                if (frameSheet) {
-                    svg.after(diagramNote);
-                    diagramNote.innerHTML = 'Peak ' + math('|' + field + '|=' + quantity(number(Math.abs(peak[field])), field === 'M' ? measureUnits.moment : measureUnits.force)) + ' · Diagram scaled to fit';
-                    diagramNote.hidden = false;
-                } else drawing += `<text x="22" y="${canvasHeight - 25}" class="svg-value">${symbolLabel(`Peak |${field}| = ${number(Math.abs(peak[field]))} ${field === 'M' ? 'kN m' : 'kN'} · diagrams scaled to fit`)}</text>`;
+                diagramNote.innerHTML = 'Peak ' + math('|' + field + '|=' + quantity(number(Math.abs(peak[field])), field === 'M' ? measureUnits.moment : measureUnits.force)) + ' · Diagram scaled to fit';
+                diagramNote.hidden = false;
             }
         }
     }

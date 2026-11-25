@@ -289,7 +289,7 @@
 
 #frame-diagram-note { padding:.3rem .8rem; font-size:.9rem; color:var(--ink); background:var(--paper); }
 @media (max-width:750px) {
-    .canvas-panel:has(#frame-diagram-note:not([hidden])) #canvas .svg-label { font-size:22px; }
+    body:not(.drawing-workspace) .canvas-panel:has(#frame-diagram-note:not([hidden])) #canvas .svg-label { font-size:22px; }
 }
 
 #sandbox-cut-grip { cursor:grab; touch-action:none; user-select:none; outline:none; }
