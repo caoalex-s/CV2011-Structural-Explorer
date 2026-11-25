@@ -230,7 +230,8 @@
 }
 
 .controller-layout {
-    align-items:center; gap:.6rem; padding:.4rem; border:1px solid #c7c6bb;
+    display:grid; grid-template-columns:max-content minmax(0,1fr); align-items:center;
+    gap:.35rem; padding:.4rem; border:1px solid #c7c6bb;
     border-radius:.75rem; background:#f1efe7;
 }
 .cardinal-pad {
@@ -264,9 +265,9 @@
 .cardinal-pad label:not(:has(:checked)):has(:focus-visible) { outline-color:#252d2e; }
 .direction-alternatives {
     display:flex; flex-direction:column; align-items:stretch; gap:.2rem;
-    flex:1 1 6.7rem; min-width:0;
+    min-width:0;
 }
-.direction-alternatives label { padding:.3rem .4rem; background:transparent; border-color:transparent; }
+.direction-alternatives label { padding:.3rem .15rem; background:transparent; border-color:transparent; }
 .direction-alternatives label:has(:checked) { border-color:var(--accent); }
 @media (forced-colors:active) {
     .cardinal-pad label:has(:checked) { border:3px solid Highlight; }
