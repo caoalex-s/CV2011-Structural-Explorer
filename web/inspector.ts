@@ -14,6 +14,10 @@ const zeroForceAngles = new WeakMap<Load, number>();
 const pointAngle = (load: Load) => load.fx || load.fy
     ? Math.atan2(load.fy, load.fx) * 180 / Math.PI : zeroForceAngles.get(load) ?? 0;
 
+// Repeated rotations must preserve the entered strength throughout a gesture.
+const forceMagnitudes = new WeakMap<Load, number>();
+const forceMagnitude = (load: Load) => forceMagnitudes.get(load) ?? Math.hypot(load.fx, load.fy);
+
 const zeroMomentSenses = new WeakMap<Load, number>();
 const momentSense = (load: Load) => Math.sign(load.mz) || zeroMomentSenses.get(load) || 1;
 
@@ -150,7 +154,7 @@ export function renderInspector(options: InspectorOptions): void {
             const sandbox = document.body.classList.contains('drawing-workspace');
             if (item.kind === 'force') {
                 html += '<div class="load-direction-fields">'
-                    + angleField('magnitude', 'Magnitude (kN)', Number(Math.hypot(load.fx, load.fy).toPrecision(15)))
+                    + angleField('magnitude', 'Magnitude (kN)', Number(forceMagnitude(load).toPrecision(15)))
                     + directionPicker(load, pointAngle(load), angleField('pointAngle', 'Angle (°)', displayedAngle(pointAngle(load)))) + '</div>';
                 const components = field('fx', 'Horizontal (kN)') + field('fy', 'Vertical (kN)')
                     + '<p class="small">Positive components act right and up.</p>';
@@ -242,7 +246,8 @@ export function renderInspector(options: InspectorOptions): void {
                 if (key === 'pointAngle' || key === 'magnitude') {
                     const load = model.loads.find(load => load.id === selected!.id)!;
                     const angle = key === 'magnitude' ? pointAngle(load) : Number(value);
-                    const magnitude = key === 'magnitude' ? Number(value) : Math.hypot(load.fx, load.fy);
+                    const magnitude = key === 'magnitude' ? Number(value) : forceMagnitude(load);
+                    forceMagnitudes.set(load,magnitude);
                     const axis = angleVector(angle);
                     load.fx = magnitude * axis.x;
                     load.fy = magnitude * axis.y;
@@ -278,6 +283,8 @@ export function renderInspector(options: InspectorOptions): void {
                     const projected = projectToMember(point, next);
                     item.t = projected.t;
                 }
+                if (selected?.type === 'load' && item.kind === 'force' && (key === 'fx' || key === 'fy'))
+                    forceMagnitudes.delete(model.loads.find(load => load.id === selected.id)!);
                 (item as Record<string, unknown>)[key] = value;
                 if (selected?.type === 'node' && key === 'joint') {
                     const node = model.nodes.find(node => node.id === selected!.id)!;
