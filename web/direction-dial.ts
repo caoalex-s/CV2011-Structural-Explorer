@@ -1,6 +1,18 @@
 /** Interactive direction in global coordinates. The SVG uses screen y downward. */
-const wrap = (angle: number) => (angle % 360 + 360) % 360;
+export const wrap = (angle: number) => (angle % 360 + 360) % 360;
 const angularDistance = (a: number, b: number) => Math.abs(wrap(a - b + 180) - 180);
+
+/** One snap latch per gesture, shared by the dial and the drawing handle. */
+export function angleSnap(start: number, grab: boolean) {
+    const initial = wrap(Math.round(start/45)*45);
+    let held = grab && angularDistance(initial,start)<1e-9 ? initial : undefined;
+    return (raw: number) => {
+        const nearest = wrap(Math.round(raw/45)*45);
+        if (held !== undefined && angularDistance(raw,held)>6) held = undefined;
+        if (held === undefined && angularDistance(raw,nearest)<=3) held = nearest;
+        return held ?? wrap(Math.round(raw*100)/100);
+    };
+}
 
 export function directionDial(angle: number, line: boolean): string {
     const ticks = Array.from({length: 8}, (_, i) =>
@@ -19,7 +31,7 @@ export function directionDial(angle: number, line: boolean): string {
 export function bindDirectionDial(dial: SVGSVGElement, edit: (degrees: number, first: boolean) => void): void {
     let degrees = Number(dial.getAttribute('aria-valuenow'));
     let pointer: number | undefined;
-    let held: number | undefined;
+    let snap = angleSnap(degrees,false);
     let changed = false;
     let startX = 0, startY = 0, grabbingHandle = false, grabOffset = 0;
 
@@ -46,10 +58,7 @@ export function bindDirectionDial(dial: SVGSVGElement, edit: (degrees: number, f
         const angle = pointerAngle(event);
         if (angle === undefined) return;
         const raw = wrap(angle + grabOffset);
-        const nearest = wrap(Math.round(raw/45)*45);
-        if (held !== undefined && angularDistance(raw,held) > 6) held = undefined;
-        if (held === undefined && angularDistance(raw,nearest) <= 3) held = nearest;
-        apply(held ?? wrap(Math.round(raw*100)/100));
+        apply(snap(raw));
     }
     dial.onpointerdown = event => {
         if (pointer !== undefined || event.button !== 0) return;
@@ -63,8 +72,7 @@ export function bindDirectionDial(dial: SVGSVGElement, edit: (degrees: number, f
         startX = event.clientX; startY = event.clientY;
         grabbingHandle = Math.hypot(startX-handle.left-handle.width/2,startY-handle.top-handle.height/2) <= handle.width/2+4;
         grabOffset = grabbingHandle ? degrees-angle : 0;
-        const nearest = wrap(Math.round(degrees/45)*45);
-        held = grabbingHandle && angularDistance(nearest,degrees)<1e-9 ? nearest : undefined;
+        snap = angleSnap(degrees,grabbingHandle);
         changed = false;
         move(event);
     };
@@ -73,7 +81,6 @@ export function bindDirectionDial(dial: SVGSVGElement, edit: (degrees: number, f
         if (id !== pointer) return;
         pointer = undefined;
         changed = false;
-        held = undefined;
         if (dial.hasPointerCapture(id)) dial.releasePointerCapture(id);
     }
     dial.onpointerup = event => { move(event); finish(event.pointerId); };

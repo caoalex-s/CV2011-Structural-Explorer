@@ -15,6 +15,8 @@ import { math, measureUnits, quantity } from './math.js';
 import { element as $, escapeHtml as escape, formatNumber as number, formatSectionResult, downloadJson as download } from './ui.js';
 import { jointConnections, memberLabel } from './model-view.js';
 import type { Selection } from './model-view.js';
+import { angleSnap, wrap } from './direction-dial.js';
+import { pointAngle, setPointForce } from './point-force-edit.js';
 import { renderInspector } from './inspector.js';
 import { renderResponses, sampleSection } from './responses.js';
 import { sectionFreeBody } from './section-free-body.js';
@@ -315,11 +317,39 @@ function supportDrawing(support: Support) {
     const custom = support.kind === 'custom' ? `<text y="29" text-anchor="middle" stroke="none" fill="${courseColors.ink}" font-size="8">${support.fixX ? 'x' : ''}${support.fixY ? 'y' : ''}${support.fixRotation ? 'θ' : ''}</text>` : '';
     return `<g class="clickable" data-object="support" data-id="${escape(support.id)}" transform="translate(${p.x} ${p.y}) rotate(${rotation})" stroke="${courseColors.member}" stroke-width="1.6" fill="none"><title>${escape(support.kind)} ground support</title><circle cy="15" r="25" class="node-hit" stroke="none"/>${selectedRing}${supportShape(support.kind)}${custom}</g>`;
 }
+let exactPointId: string | undefined;
+let rotation: {
+    load: Load; pointer: number; offset: number; snap: (raw: number) => number;
+    outward: boolean; startX: number; startY: number; changed: boolean;
+} | undefined;
+
+function isDrawingSandbox() { return mode === 'sandbox' && document.body.classList.contains('drawing-workspace'); }
+
+function pointHandle(load: Load) {
+    const origin = screen(position(model,load.member,load.t));
+    const magnitude = Math.hypot(load.fx,load.fy);
+    const ux = load.fx/magnitude, uy = -load.fy/magnitude;
+    const scale = svg.getScreenCTM()?.a || 1;
+    const radius = 22/scale;
+    function room(dx: number, dy: number) {
+        const x = dx > 0 ? (canvasWidth-radius-origin.x)/dx : dx < 0 ? (radius-origin.x)/dx : Infinity;
+        const y = dy > 0 ? (canvasHeight-radius-origin.y)/dy : dy < 0 ? (radius-origin.y)/dy : Infinity;
+        return Math.min(x,y);
+    }
+    // Near a sheet edge the free tip may have more room than the tail. Keep
+    // that choice fixed during rotation so the free end follows the pointer.
+    const tail = room(-ux,-uy), tip = room(ux,uy);
+    const outward = rotation?.load === load ? rotation.outward : tail < 65 && tip > tail;
+    const reach = Math.max(12,Math.min(65,outward ? tip : tail));
+    const sign = outward ? 1 : -1;
+    return {x:origin.x+sign*reach*ux,y:origin.y+sign*reach*uy,reach,outward,radius};
+}
+
 function loadDrawing(load: Load) {
     const p = screen(position(model, load.member, load.t));
     const label = loadLabels(model).get(load.id)!;
     const color = courseColors.force;
-    const tag = `class="clickable" data-object="load" data-id="${escape(load.id)}"`;
+    const tag = `class="clickable" ${load.kind === 'force' && isDrawingSandbox() ? 'data-point-force' : ''} data-object="load" data-id="${escape(load.id)}"`;
     // Concentric arcs keep each applied couple centred on its attachment.
     const labelBelow = p.y < canvasHeight / 2;
     const preceding = model.loads.slice(0, model.loads.indexOf(load));
@@ -332,7 +362,8 @@ function loadDrawing(load: Load) {
         return `<g ${tag}><circle cx="${p.x}" cy="${p.y}" r="16" class="node-hit"/><text x="${p.x + 8}" y="${load.kind === 'moment' ? (labelBelow ? p.y + 49 + 10 * coupleLane : p.y - 35 - 10 * coupleLane) : p.y - 15}" dy="${labelBelow ? coupleLane : -coupleLane}em" class="svg-label">${symbolLabel(label)} = 0 ${load.kind === 'force' ? 'kN' : 'kN m'}</text></g>`;
     if (load.kind === 'force') {
         const magnitude = Math.hypot(load.fx, load.fy);
-        return `<g ${tag}>${forceSymbol(p.x, p.y, load.fx, load.fy, color, `${label} = ${number(magnitude)} kN`)}</g>`;
+        const handle = selected?.type === 'load' && selected.id === load.id && isDrawingSandbox() ? pointHandle(load) : undefined;
+        return `<g ${tag}>${forceSymbol(p.x, p.y, load.fx, load.fy, color, `${label} = ${number(magnitude)} kN`, handle ? handle.reach-5 : 60, 5, handle?.outward)}</g>`;
     }
     if (load.kind === 'moment') {
         return `<g ${tag}>${momentSymbol(p.x, p.y, load.mz, color, `${label} = ${number(Math.abs(load.mz))} kN m`, 25 + 10 * coupleLane, coupleLane, labelBelow)}</g>`;
@@ -501,7 +532,35 @@ function renderCanvas() {
         const target = svg.querySelector('[data-object="' + CSS.escape(selected.type) + '"][data-id="' + CSS.escape(selected.id) + '"]');
         target?.classList.add('drawing-selection');
     }
+    if (isDrawingSandbox()) {
+        const point = selected?.type === 'load' ? model.loads.find(l => l.id === selected?.id && l.kind === 'force') : undefined;
+        if (point && Math.hypot(point.fx,point.fy) >= 1e-12) {
+            const h = pointHandle(point);
+            const caption = svg.querySelector<SVGTextElement>(`[data-point-force][data-id="${CSS.escape(point.id)}"] text`);
+            if (caption) {
+                // Leave a finger-sized gap between the rotation and annotation targets.
+                const above = h.y > h.radius + 45;
+                caption.setAttribute('y',String(h.y + (above ? -h.radius-8 : h.radius+30)));
+            }
+            const angle = number(wrap(pointAngle(point)));
+            const textX = Math.max(45,Math.min(canvasWidth-45,h.x));
+            const textY = h.y > canvasHeight-65 ? h.y-h.radius-8 : h.y+h.radius+21;
+            svg.insertAdjacentHTML('beforeend',`<g data-rotate-force="${escape(point.id)}" class="rotate-handle"><title>Rotate point force</title>
+                <circle cx="${h.x}" cy="${h.y}" r="${h.radius}" fill="transparent"/>
+                <circle cx="${h.x}" cy="${h.y}" r="${h.radius*.26}" fill="#fffdf6" stroke="${courseColors.force}" stroke-width="2"/>
+                </g>${rotation?.changed ? `<text class="rotate-angle svg-value" x="${textX}" y="${textY}" text-anchor="middle" pointer-events="none">${angle}°</text>` : ''}`);
+        }
+    }
     fitCanvasAnnotations();
+    for (const label of svg.querySelectorAll<SVGTextElement>('[data-point-force] text')) {
+        const box = label.getBBox();
+        const hit = document.createElementNS('http://www.w3.org/2000/svg','rect');
+        hit.setAttribute('data-force-annotation','');
+        hit.setAttribute('x',String(box.x-2)); hit.setAttribute('y',String(box.y-2));
+        hit.setAttribute('width',String(box.width+4)); hit.setAttribute('height',String(box.height+4));
+        hit.setAttribute('fill','transparent');
+        label.after(hit);
+    }
 }
 
 /** Keep labels legible at the canvas edges without moving their force vectors.
@@ -587,6 +646,9 @@ function render(keepInspector = false) {
     if (checkedScope) checkedScope.innerHTML = member ? `${escape(memberLabel(model, member))} at ${section.stationMath.join(', ')} (just ${cutSide()})` : 'Choose a member.';
     controls.setHistory(history.length > 0, future.length > 0);
     if (!keepInspector) inspector();
+    if (!isDrawingSandbox() || selected?.type !== 'load' || selected.id !== exactPointId) exactPointId = undefined;
+    document.body.classList.toggle('point-quick-edit',!!exactPointId);
+    $('full-point-properties').hidden = !exactPointId;
     $('edit-selection').hidden = !selected;
     (document.querySelector('.right-panel') as HTMLElement).hidden = !selected;
     $('moment-options').hidden = layer !== 'M';
@@ -612,6 +674,29 @@ svg.addEventListener('pointerdown', event => {
         svg.setPointerCapture(event.pointerId);
         return;
     }
+    if (rotation) return;
+    const target = event.target as Element;
+    const handle = target.closest<SVGElement>('[data-rotate-force]');
+    if (handle && isDrawingSandbox() && tool !== 'delete') {
+        const load = model.loads.find(load => load.id === handle.dataset.rotateForce)!;
+        const origin = position(model,load.member,load.t);
+        const raw = Math.atan2(p.y-origin.y,p.x-origin.x)*180/Math.PI;
+        const angle = wrap(pointAngle(load));
+        rotation = {load,pointer:event.pointerId,offset:angle-raw,snap:angleSnap(angle,true),
+            outward:pointHandle(load).outward,startX:event.clientX,startY:event.clientY,changed:false};
+        svg.setPointerCapture(event.pointerId);
+        event.preventDefault();
+        return;
+    }
+    if (target.closest('[data-force-annotation]') && object && isDrawingSandbox() && (tool === 'select' || selected?.id === object.dataset.id)) {
+        exactPointId = object.dataset.id;
+        selected = {type:'load',id:exactPointId!};
+        controls.setFocus(false);
+        render();
+        document.querySelector('.inspector-panel')!.scrollIntoView({block:'nearest',behavior:'instant'});
+        return;
+    }
+    exactPointId = undefined;
     if (tool === 'delete' && object) {
         selected = { type: object.dataset.object!, id: object.dataset.id! };
         removeSelected();
@@ -724,6 +809,22 @@ svg.addEventListener('pointerdown', event => {
     });
 });
 svg.addEventListener('pointermove', event => {
+    if (rotation) {
+        const gesture = rotation;
+        if (gesture.pointer !== event.pointerId) return;
+        if (selected?.id !== gesture.load.id || !model.loads.includes(gesture.load)) { finishRotation(); return; }
+        if (!gesture.changed && Math.hypot(event.clientX-gesture.startX,event.clientY-gesture.startY)<3) return;
+        const origin = position(model,gesture.load.member,gesture.load.t);
+        const p = world(event);
+        const dx = p.x-origin.x, dy = p.y-origin.y;
+        if (Math.hypot(dx,dy)*view.scale*(svg.getScreenCTM()?.a || 1)<6) return;
+        const angle = gesture.snap(Math.atan2(dy,dx)*180/Math.PI + gesture.offset);
+        if (Math.abs(wrap(angle-pointAngle(gesture.load)+180)-180)<1e-9) return;
+        const first = !gesture.changed;
+        gesture.changed = true;
+        editModel(() => setPointForce(gesture.load,angle),first,false);
+        return;
+    }
     // Re-rendering the SVG can detach the original pointer target. A released
     // button must end a drag even when the browser omits the expected up event.
     if (drag && event.buttons === 0) {
@@ -775,6 +876,17 @@ svg.addEventListener('pointermove', event => {
     if (start || tool !== 'select')
         renderCanvas();
 });
+function finishRotation(event?: PointerEvent) {
+    if (!rotation || (event && rotation.pointer !== event.pointerId)) return;
+    const pointer = rotation.pointer;
+    rotation = undefined;
+    if (svg.hasPointerCapture(pointer)) svg.releasePointerCapture(pointer);
+    renderCanvas();
+}
+svg.addEventListener('pointerup',finishRotation);
+svg.addEventListener('pointercancel',finishRotation);
+svg.addEventListener('lostpointercapture',finishRotation);
+window.addEventListener('blur',() => finishRotation());
 function endDrag() {
     const completed = drag;
     drag = null;
@@ -819,6 +931,11 @@ $('zoom-in').onclick = () => { view.scale = Math.min(500, view.scale * 1.25); re
 $('zoom-out').onclick = () => { view.scale = Math.max(10, view.scale / 1.25); renderCanvas(); };
 $('fit').onclick = () => { fit(); renderCanvas(); };
 $('focus-workspace').onclick = () => controls.setFocus($('focus-workspace').getAttribute('aria-pressed') !== 'true');
+$('full-point-properties').onclick = () => {
+    exactPointId = undefined;
+    render();
+    document.querySelector<SVGSVGElement>('.direction-dial')?.focus({preventScroll:true});
+};
 $('close-inspector').onclick = () => {
     selected = null;
     render();

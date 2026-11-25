@@ -1,5 +1,5 @@
 /** Object properties and joint constraints. Edits pass through the app's undo boundary. */
-import { angleVector, endConnection, nodeLabels, position, referenceMember } from './engine.js';
+import { endConnection, nodeLabels, position, referenceMember } from './engine.js';
 import type { Analysis, Connection, ConnectionRule, Load, Member, Model } from './engine.js';
 import { jointConnections, memberLabel } from './model-view.js';
 import type { Selection } from './model-view.js';
@@ -8,15 +8,7 @@ import { loadLabels, validLoadLabel } from './load-labels.js';
 import { math, quantity } from './math.js';
 import { escapeHtml as escape, formatNumber as number } from './ui.js';
 
-// A zero force has no physical direction. Remember its editor angle until
-// the next nonzero magnitude is entered on this load.
-const zeroForceAngles = new WeakMap<Load, number>();
-const pointAngle = (load: Load) => load.fx || load.fy
-    ? Math.atan2(load.fy, load.fx) * 180 / Math.PI : zeroForceAngles.get(load) ?? 0;
-
-// Repeated rotations must preserve the entered strength throughout a gesture.
-const forceMagnitudes = new WeakMap<Load, number>();
-const forceMagnitude = (load: Load) => forceMagnitudes.get(load) ?? Math.hypot(load.fx, load.fy);
+import { componentsEdited, forceMagnitude, pointAngle, setPointForce } from './point-force-edit.js';
 
 const zeroMomentSenses = new WeakMap<Load, number>();
 const momentSense = (load: Load) => Math.sign(load.mz) || zeroMomentSenses.get(load) || 1;
@@ -249,11 +241,7 @@ export function renderInspector(options: InspectorOptions): void {
                     const load = model.loads.find(load => load.id === selected!.id)!;
                     const angle = key === 'magnitude' ? pointAngle(load) : Number(value);
                     const magnitude = key === 'magnitude' ? Number(value) : forceMagnitude(load);
-                    forceMagnitudes.set(load,magnitude);
-                    const axis = angleVector(angle);
-                    load.fx = magnitude * axis.x;
-                    load.fy = magnitude * axis.y;
-                    if (!magnitude) zeroForceAngles.set(load, angle);
+                    setPointForce(load,angle,magnitude);
                     return;
                 }
                 if (key === 'momentMagnitude' || key === 'momentSense') {
@@ -286,7 +274,7 @@ export function renderInspector(options: InspectorOptions): void {
                     item.t = projected.t;
                 }
                 if (selected?.type === 'load' && item.kind === 'force' && (key === 'fx' || key === 'fy'))
-                    forceMagnitudes.delete(model.loads.find(load => load.id === selected.id)!);
+                    componentsEdited(model.loads.find(load => load.id === selected.id)!);
                 (item as Record<string, unknown>)[key] = value;
                 if (selected?.type === 'node' && key === 'joint') {
                     const node = model.nodes.find(node => node.id === selected!.id)!;
