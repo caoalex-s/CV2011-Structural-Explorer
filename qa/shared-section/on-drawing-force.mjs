@@ -42,6 +42,10 @@ try {
         });
         const box=await handle.boundingBox();
         const hx=box.x+box.width/2, hy=box.y+box.height/2;
+        const cut = await page.locator('#sandbox-cut-grip .cut-hit').boundingBox();
+        assert.ok(cut.x+cut.width <= box.x || box.x+box.width <= cut.x ||
+            cut.y+cut.height <= box.y || box.y+box.height <= cut.y,'The force and cut hit areas overlap');
+        assert.ok(await page.evaluate(({hx,hy})=>!!document.elementFromPoint(hx,hy)?.closest('[data-rotate-force]'),{hx,hy}));
         const radius=Math.hypot(hx-origin[0],hy-origin[1]);
         await point(hx,hy,'down');
         for(const degrees of [285,315,350,15,30]) {

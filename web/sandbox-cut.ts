@@ -46,15 +46,21 @@ export function createSandboxCut(svg: SVGSVGElement, change: (t: number, face: '
             gx += drag.offsetX; gy += drag.offsetY;
         } else {
             const obstacles = Array.from(svg.querySelectorAll<SVGGraphicsElement>(
-                '[data-object] text,[data-vector] text,[data-vector] .hit,[data-object="support"],.node-label,.rotate-handle circle:first-child,.cut-ordinate,.cut-face-label,.drawing-scale'
+                '[data-object] text,[data-vector] text,[data-vector] .hit,[data-object="support"],.node-label,.cut-ordinate,.cut-face-label,.drawing-scale'
             ), element=>element.getBoundingClientRect());
+            // The transparent first circle is the full force-rotation target.
+            // Give it priority over captions even in a crowded support region.
+            const rotation = svg.querySelector('[data-rotate-force] circle')?.getBoundingClientRect();
             const preferred = dx < 0 ? -1 : 1;
             let best = Infinity;
-            for (const distance of [47,-47,70,-70]) {
-                const px = Math.max(29/scale, Math.min(bounds.width-29/scale,x-dy/length*preferred*distance/scale));
-                const py = Math.max(23/scale, Math.min(bounds.height-23/scale,y+dx/length*preferred*distance/scale));
+            const lanes = [[47,0],[-47,0],[70,0],[-70,0],[48,60],[48,-60],[-48,60],[-48,-60]];
+            for (const [distance, along] of lanes) {
+                const px = Math.max(29/scale, Math.min(bounds.width-29/scale,x+(-dy*preferred*distance+dx*along)/(length*scale)));
+                const py = Math.max(23/scale, Math.min(bounds.height-23/scale,y+(dx*preferred*distance+dy*along)/(length*scale)));
                 const centre = new DOMPoint(px,py).matrixTransform(matrix);
-                let cost = Math.abs(distance) + (distance<0 ? 5 : 0);
+                let cost = Math.hypot(distance,along) + (distance<0 ? 5 : 0);
+                if (rotation && centre.x+31 > rotation.left && centre.x-31 < rotation.right &&
+                    centre.y+25 > rotation.top && centre.y-25 < rotation.bottom) continue;
                 for (const rect of obstacles) {
                     const w = Math.min(centre.x+29,rect.right)-Math.max(centre.x-29,rect.left);
                     const h = Math.min(centre.y+23,rect.bottom)-Math.max(centre.y-23,rect.top);
