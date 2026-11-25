@@ -235,6 +235,7 @@
     gap:.8rem; align-items:center;
 }
 .direction-dial { display:block; width:100%; aspect-ratio:1; touch-action:none; cursor:grab; user-select:none; border-radius:50%; }
+.dial-cue { display:block; margin-top:-.35rem; text-align:center; font-size:.8rem; color:var(--muted); }
 .direction-dial:active { cursor:grabbing; }
 .direction-dial:focus-visible { outline:3px solid #743923; outline-offset:2px; }
 .dial-face { fill:transparent; }

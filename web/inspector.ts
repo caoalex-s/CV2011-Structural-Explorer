@@ -51,8 +51,8 @@ function directionPicker(load: Load, angle: number, angleInput: string, strength
         + directionOption('lineReference','global','Global',reference)
         + directionOption('lineReference','normal','Member normal',reference) + '</div>' : '';
     return `<fieldset class="load-direction-group"><legend class="${line ? '' : 'visually-hidden'}">${line ? 'Positive intensity direction' : 'Point force settings'}</legend>
-        <div class="dial-layout">${directionDial(displayedAngle(angle),line)}<div class="dial-values">${angleInput}${choices}${strengthInput}</div></div>
-        <p class="small" id="dial-help">Drag the dot. Angles increase counterclockwise from ${math('+x')}. <span class="dial-key-help">Arrow keys adjust by 1°.</span>${line ? '<span class="visually-hidden"> Editing the angle selects Global.</span>' : ''}</p></fieldset>`;
+        <div class="dial-layout"><div class="dial-control">${directionDial(displayedAngle(angle),line)}<span class="dial-cue">Drag to rotate</span></div><div class="dial-values">${angleInput}${choices}${strengthInput}</div></div>
+        <p class="small" id="dial-help">Counterclockwise from ${math('+x')}. <span class="dial-key-help">Arrow keys adjust by 1°.</span>${line ? '<span class="visually-hidden"> Editing the angle selects Global.</span>' : ''}</p></fieldset>`;
 }
 
 interface InspectorOptions {
