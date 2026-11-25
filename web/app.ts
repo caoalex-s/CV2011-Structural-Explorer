@@ -693,14 +693,22 @@ function render(keepInspector = false) {
 svg.addEventListener('pointerdown', event => {
     if (mode === 'insights')
         return;
-    const p = world(event), object = (event.target as Element).closest<SVGElement>('[data-object]');
+    let target = event.target as Element;
+    // Touch browsers may retarget a shaft press to the nearby draggable circle.
+    // Use the physical contact point to distinguish the two editing gestures.
+    if (event.pointerType === 'touch' && isDrawingSandbox()) {
+        const contact = document.elementFromPoint(event.clientX,event.clientY);
+        if (contact && svg.contains(contact) &&
+            (target.closest('[data-rotate-force],[data-point-force]') || contact.closest('[data-rotate-force],[data-point-force]')))
+            target = contact;
+    }
+    const p = world(event), object = target.closest<SVGElement>('[data-object]');
     if (event.button === 1 || event.button === 2) {
         drag = { kind: 'pan', x: event.clientX, y: event.clientY, cx: view.cx, cy: view.cy };
         svg.setPointerCapture(event.pointerId);
         return;
     }
     if (rotation) return;
-    const target = event.target as Element;
     const handle = target.closest<SVGElement>('[data-rotate-force]');
     if (handle && isDrawingSandbox() && tool !== 'delete') {
         const load = model.loads.find(load => load.id === handle.dataset.rotateForce)!;
