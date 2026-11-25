@@ -49,6 +49,10 @@ try {
             await point(origin[0]-radius*Math.cos(radians),origin[1]+radius*Math.sin(radians),'move');
         }
         assert.ok(await page.locator('#canvas .rotate-angle').isVisible());
+        await page.waitForFunction(() => {
+            const force=JSON.parse(localStorage.getItem('cv2011-model')).loads.find(l=>l.id==='P1');
+            return Math.abs(Math.atan2(force.fy,force.fx)*180/Math.PI-30)<3;
+        });
         const rotated=await model();
         const angle=Math.atan2(rotated.fy,rotated.fx)*180/Math.PI;
         assert.ok(Math.abs(angle-30)<3,JSON.stringify({width,angle}));

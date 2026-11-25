@@ -808,21 +808,24 @@ svg.addEventListener('pointerdown', event => {
         }
     });
 });
+function rotateToPointer(event: PointerEvent) {
+    const gesture = rotation;
+    if (!gesture || gesture.pointer !== event.pointerId) return;
+    if (selected?.id !== gesture.load.id || !model.loads.includes(gesture.load)) { finishRotation(); return; }
+    if (!gesture.changed && Math.hypot(event.clientX-gesture.startX,event.clientY-gesture.startY)<3) return;
+    const origin = position(model,gesture.load.member,gesture.load.t);
+    const p = world(event);
+    const dx = p.x-origin.x, dy = p.y-origin.y;
+    if (Math.hypot(dx,dy)*view.scale*(svg.getScreenCTM()?.a || 1)<6) return;
+    const angle = gesture.snap(Math.atan2(dy,dx)*180/Math.PI + gesture.offset);
+    if (Math.abs(wrap(angle-pointAngle(gesture.load)+180)-180)<1e-9) return;
+    const first = !gesture.changed;
+    gesture.changed = true;
+    editModel(() => setPointForce(gesture.load,angle),first,false);
+}
 svg.addEventListener('pointermove', event => {
     if (rotation) {
-        const gesture = rotation;
-        if (gesture.pointer !== event.pointerId) return;
-        if (selected?.id !== gesture.load.id || !model.loads.includes(gesture.load)) { finishRotation(); return; }
-        if (!gesture.changed && Math.hypot(event.clientX-gesture.startX,event.clientY-gesture.startY)<3) return;
-        const origin = position(model,gesture.load.member,gesture.load.t);
-        const p = world(event);
-        const dx = p.x-origin.x, dy = p.y-origin.y;
-        if (Math.hypot(dx,dy)*view.scale*(svg.getScreenCTM()?.a || 1)<6) return;
-        const angle = gesture.snap(Math.atan2(dy,dx)*180/Math.PI + gesture.offset);
-        if (Math.abs(wrap(angle-pointAngle(gesture.load)+180)-180)<1e-9) return;
-        const first = !gesture.changed;
-        gesture.changed = true;
-        editModel(() => setPointForce(gesture.load,angle),first,false);
+        rotateToPointer(event);
         return;
     }
     // Re-rendering the SVG can detach the original pointer target. A released
@@ -883,7 +886,7 @@ function finishRotation(event?: PointerEvent) {
     if (svg.hasPointerCapture(pointer)) svg.releasePointerCapture(pointer);
     renderCanvas();
 }
-svg.addEventListener('pointerup',finishRotation);
+svg.addEventListener('pointerup',event => { rotateToPointer(event); finishRotation(event); });
 svg.addEventListener('pointercancel',finishRotation);
 svg.addEventListener('lostpointercapture',finishRotation);
 window.addEventListener('blur',() => finishRotation());
