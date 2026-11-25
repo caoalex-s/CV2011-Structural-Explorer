@@ -1,3 +1,4 @@
+import { math, measureUnits, quantity } from './math.js';
 import { beamDrawing, cutDrawing, cutEquations } from './lesson-view.js';
 import { beamValues, initialBeam, lessonBeam, retainsPointLoad, type CutSide } from './lesson-beam.js';
 import { checkBeam, invalidateBeamCheck } from './beam-cut-check.js';
@@ -51,7 +52,12 @@ function clear() {
 }
 function showCutValues(scope: string, shear: number, moment: number) {
     const feedback = el('beam-cut-feedback');
-    feedback.textContent = scope + ' · ' + station().description + ' · V = ' + signed(shear) + ' kN · M = ' + signed(moment) + ' kN·m';
+    const q = station();
+    const face = q.x === 4 ? ' (just ' + q.side + ')' : '';
+    const value = (variable: string, amount: number, unit: string) =>
+        math(variable + '=' + quantity(amount > 0 ? '+' + amount : String(amount),unit));
+    feedback.innerHTML = `<b>${scope}</b><span>${math('x=' + quantity(String(q.x),measureUnits.length))}${face}</span>
+        <span>${value('V',shear,measureUnits.force)}</span><span>${value('M',moment,measureUnits.moment)}</span>`;
     feedback.hidden = false;
 }
 const grip = el<HTMLButtonElement>('beam-cut-grip');

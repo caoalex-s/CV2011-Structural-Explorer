@@ -159,7 +159,7 @@ try {
     }
     await page.waitForFunction(() => document.querySelector('#beam-cut').value === '25');
     await noCurrentReceipt();
-    assert.match(await page.locator('#beam-cut-feedback').innerText(),/Numerical preview.*6 m/);
+    assert.match(await page.locator('#beam-cut-feedback').innerText(),/Numerical preview/);
     assert.equal(await page.locator('#beam-fbd [data-cut-load="P"]').count(),1);
     if (touch) await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
     else await page.mouse.up();

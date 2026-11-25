@@ -1523,7 +1523,9 @@ dialog { background:var(--paper); color:var(--ink); border:1px solid var(--line)
 .simple-beams #beam-cut-grip { position:absolute; bottom:0; transform:translateX(-50%); min-height:44px; min-width:52px; touch-action:none; cursor:ew-resize; color:var(--ink); background:var(--paper); border:1px solid var(--muted); }
 .simple-beams #beam-cut-grip.at-load,.simple-beams button[aria-pressed="true"] { border:2px solid var(--accent); background:#f5ebe4; }
 .simple-beams #beam-cut-grip:focus-visible { outline:3px solid var(--ink); outline-offset:2px; }
-#beam-cut-feedback { margin:.4rem 0; font-variant-numeric:tabular-nums; }
+#beam-cut-feedback:not([hidden]) { display:flex; flex-wrap:wrap; align-items:baseline; gap:.25rem 1rem; margin:.5rem 0; }
+#beam-cut-feedback > span { white-space:nowrap; }
+#beam-cut-feedback > b { flex-basis:100%; }
 @media (max-width:650px) {
     #insights-panel { min-width:0; }
     #insights-panel .insights-cards { grid-template-columns:repeat(auto-fit,minmax(min(9rem,100%),1fr)); }
