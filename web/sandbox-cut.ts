@@ -9,7 +9,7 @@ export interface CutTrack {
     stations: number[];
 }
 
-export function createSandboxCut(svg: SVGSVGElement, change: (t: number, face: 'left'|'right') => void) {
+export function createSandboxCut(svg: SVGSVGElement, change: (t: number, face: 'left'|'right', preview: boolean) => void) {
     const ns = 'http://www.w3.org/2000/svg';
     const grip = document.createElementNS(ns,'g');
     grip.id = 'sandbox-cut-grip';
@@ -18,7 +18,8 @@ export function createSandboxCut(svg: SVGSVGElement, change: (t: number, face: '
     grip.setAttribute('aria-label','Cut position on selected member');
     grip.setAttribute('aria-valuemin','0');
     grip.setAttribute('aria-valuemax','1');
-    grip.innerHTML = '<title>Drag cut along member. Left and right arrows move the cut. Up and down choose the right or left face.</title><rect class="cut-hit" x="-28" y="-22" width="56" height="44" fill="transparent"/><rect class="cut-tab" x="-26" y="-13" width="52" height="26" rx="6"/><text text-anchor="middle" y="4">↔ Cut</text>';
+    grip.innerHTML = '<title>Drag cut along member. Left and right arrows move the cut. Up and down choose the right or left face.</title><rect class="cut-hit" x="-28" y="-22" width="56" height="44" fill="transparent"/><rect class="cut-tab" x="-26" y="-13" width="52" height="26" rx="6"/><path class="grip-axis" d="M-6 0H6m-3-3 3 3-3 3M-3-3l-3 3 3 3"/><text x="6" text-anchor="middle" y="4">Cut</text>';
+    const axis = grip.querySelector('.grip-axis')!;
     const leader = document.createElementNS(ns,'path');
     leader.setAttribute('class','cut-grip-leader');
     svg.append(leader,grip);
@@ -36,6 +37,7 @@ export function createSandboxCut(svg: SVGSVGElement, change: (t: number, face: '
         const dx = next.end.x-next.start.x, dy = next.end.y-next.start.y;
         const length = Math.hypot(dx,dy);
         if (length === 0) return;
+        axis.setAttribute('transform',`translate(-13 0) rotate(${Math.atan2(dy,dx)*180/Math.PI})`);
         const x = next.start.x+dx*next.parameter, y = next.start.y+dy*next.parameter;
         // Prefer the space below a beam or beside a column. Keep the touch
         // target away from action labels, joints and the point-force handle.
@@ -44,7 +46,7 @@ export function createSandboxCut(svg: SVGSVGElement, change: (t: number, face: '
             gx += drag.offsetX; gy += drag.offsetY;
         } else {
             const obstacles = Array.from(svg.querySelectorAll<SVGGraphicsElement>(
-                '[data-object] text,[data-vector] text,.node-label,.rotate-handle circle:first-child,.cut-ordinate,.cut-face-label,.drawing-scale'
+                '[data-object] text,[data-vector] text,[data-vector] .hit,[data-object="support"],.node-label,.rotate-handle circle:first-child,.cut-ordinate,.cut-face-label,.drawing-scale'
             ), element=>element.getBoundingClientRect());
             const preferred = dx < 0 ? -1 : 1;
             let best = Infinity;
@@ -69,6 +71,7 @@ export function createSandboxCut(svg: SVGSVGElement, change: (t: number, face: '
     }
     grip.onpointerdown = event => {
         if (!track || event.button !== 0 || drag) return;
+        if (event.pointerType === 'touch' && !grip.contains(document.elementFromPoint(event.clientX,event.clientY))) return;
         event.stopPropagation();
         grip.focus({preventScroll:true});
         drag = {pointer:event.pointerId,member:track.member,t:track.parameter,face:track.face,
@@ -88,7 +91,7 @@ export function createSandboxCut(svg: SVGSVGElement, change: (t: number, face: '
         let t = Math.max(0, Math.min(1,drag.t+delta));
         const nearest = track.stations.reduce((best,s) => Math.abs(s-t)<Math.abs(best-t) ? s : best);
         if (Math.abs(t-nearest)*length <= 6) t=nearest;
-        change(t,drag.face);
+        change(t,drag.face,true);
     }
     grip.onpointermove = move;
     function finish(event: PointerEvent, cancel: boolean) {
@@ -98,7 +101,8 @@ export function createSandboxCut(svg: SVGSVGElement, change: (t: number, face: '
         const previous = drag;
         drag = undefined;
         if (grip.hasPointerCapture(event.pointerId)) grip.releasePointerCapture(event.pointerId);
-        if (cancel && track?.member === previous.member) change(previous.t,previous.face);
+        if (track?.member === previous.member)
+            change(cancel ? previous.t : track.parameter, cancel ? previous.face : track.face,false);
         update(track);
     }
     grip.onpointerup = event => finish(event,false);
@@ -117,7 +121,7 @@ export function createSandboxCut(svg: SVGSVGElement, change: (t: number, face: '
             default: return;
         }
         event.preventDefault();
-        change(t,side);
+        change(t,side,false);
     };
     return update;
 }

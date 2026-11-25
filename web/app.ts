@@ -152,12 +152,13 @@ if (isCheckedWorkspace) {
 }
 let portalPanel: ReturnType<typeof createPortalPanel> | undefined;
 let portalSignature = '';
+let previewingCut = false;
 const evidenceRequests = new EvidenceRequests();
 let evidenceRawSource: string | undefined;
 const cutSide = (): 'left' | 'right' => sectionT === 0 ? 'right' : sectionT === 1 ? 'left'
     : document.querySelector<HTMLSelectElement>('#frame-side')?.value === 'left' ? 'left' : 'right';
 const evidenceQuery = () => ({ member: currentMember, parameter: sectionT, cutSide: cutSide(), quantity: 'section-response', units: 'kN, kN m, m, rad', signConvention: 'global y upward; rotation counterclockwise; tension N positive; sagging M positive; dM/dx = V' });
-function updateEvidenceBinding() {
+function updateEvidenceBinding(preview = false) {
     if (isCheckedWorkspace) $<HTMLInputElement>('section-position').value = String(sectionT * 1000);
     try { evidenceRequests.update(model, evidenceQuery()); }
     catch { evidenceRequests.invalidate(); }
@@ -167,7 +168,8 @@ function updateEvidenceBinding() {
     if (signature !== portalSignature) {
         portalSignature = signature;
         momentExercise?.bind(signature + ($<HTMLSelectElement>('frame-side')?.value || ''));
-        portalPanel?.update(currentMember, sectionT);
+        previewingCut = preview;
+        portalPanel?.update(currentMember, sectionT, preview);
     }
 }
 let solutionStep = 'reaction_left', solutionRevealed = false, hintUsed = false, practiceResultsVisible = false;
@@ -177,12 +179,18 @@ const svg = $('canvas') as unknown as SVGSVGElement;
 // and pointer capture while inspection updates the free body and checked query.
 const geometry = document.createElementNS('http://www.w3.org/2000/svg','g');
 svg.append(geometry);
-const updateCutGrip = createSandboxCut(svg,(parameter, face) => {
+const updateCutGrip = createSandboxCut(svg,(parameter, face, preview) => {
     const nextFace = parameter === 0 ? 'right' : parameter === 1 ? 'left' : face;
-    if (parameter === sectionT && nextFace === cutSide()) return;
+    if (parameter === sectionT && nextFace === cutSide()) {
+        if (!preview && previewingCut) {
+            previewingCut = false;
+            portalPanel?.update(currentMember,sectionT);
+        }
+        return;
+    }
     sectionT = parameter;
     $<HTMLSelectElement>('frame-side').value = nextFace;
-    render(true);
+    render(true,preview);
 });
 // Shared drawing dimensions keep pointer mapping, fitting and annotations aligned.
 let canvasWidth = 1000;
@@ -628,6 +636,17 @@ function fitCanvasAnnotations(): void {
     const bounds = svg.getBoundingClientRect();
     const pixelScale = svg.getScreenCTM()?.a;
     if (!pixelScale || bounds.width === 0) return;
+    // On the phone portal sheet use the space outside each column. Keep the
+    // caption above its reaction shaft and the base moment beside its arc.
+    if (narrowWorkspace.matches && (isPortalWorkspace || portalExercise)) {
+        for (const label of svg.querySelectorAll<SVGTextElement>('[data-horizontal-reaction] text')) {
+            const vector = label.closest<SVGElement>('[data-vector]')!;
+            const x = Number(vector.dataset.originX), left = x <= canvasWidth/2;
+            label.setAttribute('text-anchor',left ? 'end' : 'start');
+            label.setAttribute('x',String(x + (left ? -38 : 38)));
+            label.setAttribute('y',String(Number(vector.dataset.originY)-10));
+        }
+    }
     const adjustments = Array.from(svg.querySelectorAll<SVGTextElement>('.svg-label, .svg-value')).map(label => {
         const box = label.getBoundingClientRect();
         const shift = box.left < bounds.left + 8 ? bounds.left + 8 - box.left
@@ -702,10 +721,10 @@ function removeSelected() {
 function sectionSample(): Sample | undefined {
     return sampleSection(analysis, currentMember, sectionT, cutSide(), model);
 }
-function render(keepInspector = false) {
+function render(keepInspector = false, previewCut = false) {
     const member = model.members.find(m => m.id === currentMember) ?? model.members[0];
     currentMember = member?.id ?? '';
-    updateEvidenceBinding();
+    updateEvidenceBinding(previewCut);
     const section = renderResponses({ model, analysis, currentMember, sectionT, layer, cutSide: cutSide(),
         resultsVisible: responsesVisible() });
     drawingWorkspace.update(model, selected, section.sample, section.stationMath, section.face);

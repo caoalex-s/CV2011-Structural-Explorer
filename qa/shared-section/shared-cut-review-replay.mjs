@@ -143,6 +143,32 @@ async function review(size, viewport) {
         await page.screenshot({path:join(output,size+'-'+name+'.png'),fullPage:true});
         return value.inputDigest;
     }
+    async function dragToMidspan() {
+        const grip = page.locator('#sandbox-cut-grip');
+        await grip.scrollIntoViewIfNeeded();
+        const bounds = await grip.boundingBox();
+        const x = bounds.x+bounds.width/2, y = bounds.y+bounds.height/2;
+        const member = await page.locator('#canvas [data-object="member"] path').first().evaluate(path => {
+            const matrix = path.getScreenCTM();
+            const start = path.getPointAtLength(0).matrixTransform(matrix);
+            const end = path.getPointAtLength(path.getTotalLength()).matrixTransform(matrix);
+            return {dx:end.x-start.x,dy:end.y-start.y};
+        });
+        const delta = .5-Number(await t.inputValue());
+        const move = {x:x+member.dx*delta,y:y+member.dy*delta};
+        const touch = mobile ? await context.newCDPSession(page) : null;
+        if (touch) {
+            await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});
+            await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[move]});
+        } else {
+            await page.mouse.move(x,y); await page.mouse.down(); await page.mouse.move(move.x,move.y);
+        }
+        await page.waitForFunction(()=>document.querySelector('#frame-parameter').valueAsNumber === .5);
+        assert.equal(await receipt.textContent(),'');
+        if (touch) await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+        else await page.mouse.up();
+        assert.equal(await t.inputValue(),'0.5');
+    }
     async function importDrawing(drawing) {
         const payload=Buffer.from(JSON.stringify({version:2,model:drawing}));
         await page.locator('#model-file').setInputFiles({name:'shared-cut-test.json',mimeType:'application/json',buffer:payload});
@@ -198,7 +224,12 @@ async function review(size, viewport) {
         await check('edited-point-left',{...left,force:30,shear:15,moment:60});
 
         await importDrawing(beam);
-        await t.fill('0.5');
+        await t.fill('0.3123456789');
+        await side.selectOption('left');
+        const stored = await page.evaluate(()=>localStorage.getItem('cv2011-model'));
+        await dragToMidspan();
+        assert.equal(await side.inputValue(),'left');
+        assert.equal(await page.evaluate(()=>localStorage.getItem('cv2011-model')),stored);
         await t.press('Tab');
         await side.selectOption('left');
         digest=await check('couple-left',{...left,shear:12,moment:48});
@@ -219,6 +250,23 @@ async function review(size, viewport) {
         assert.equal(await side.inputValue(),'right');
         await noStale(digest);
         await check('next-member-start',{...right,member:'BC',parameter:0,loads:[]});
+
+        for (const reversed of [false,true]) {
+            // Keep the same physical supports and load as the local member axes reverse.
+            const inclined = structuredClone(beam);
+            inclined.nodes[1].x=4; inclined.nodes[1].y=3;
+            if (reversed) {
+                inclined.members[0].a='B'; inclined.members[0].b='A';
+                inclined.supports.forEach(s=>{s.t=1-s.t;});
+            }
+            await importDrawing(inclined);
+            await t.fill('0.323456789');
+            await dragToMidspan();
+            await page.locator('#sandbox-cut-grip').press('End');
+            assert.equal(await t.inputValue(),'1'); assert.equal(await side.inputValue(),'left');
+            await page.locator('#sandbox-cut-grip').press('Home');
+            assert.equal(await t.inputValue(),'0'); assert.equal(await side.inputValue(),'right');
+        }
 
         await page.locator('.drawing-utilities > summary').click();
         await page.getByRole('button',{name:'Learning insights',exact:true}).click();

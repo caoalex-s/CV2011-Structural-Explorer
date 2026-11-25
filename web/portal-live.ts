@@ -498,7 +498,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
             reactionTheorem: 'PortalSoundness.accepted_grouped_reactions',
             values: Object.fromEntries(outputIds.map((name, i) => [name, checked[i + 1]])) }, null, 2);
     }
-    function update(nextMember: string, nextParameter: number) {
+    function update(nextMember: string, nextParameter: number, preview = false) {
         member = nextMember; parameter = nextParameter;
         if (pendingGeneration !== generationKey()) pendingGeneration = null;
         sectionParameter.value = String(parameter);
@@ -508,6 +508,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
         cutSide.options[0].disabled = parameter === 1;
         cutSide.options[1].disabled = parameter === 0;
         clearTimeout(debounce); runtime?.invalidate(); requests.invalidate();
+        if (preview) { clear('Numerical section preview. Release the cut to finish inspecting this station.'); return; }
         clear(enabled ? 'Checking current drawing…' : 'This section has not been checked. The first check may reload the workspace.');
         if (modelAtPresent().loads.some(load => load.direction !== undefined)) {
             clear('Numerical analysis. The compiled checker covers distributed loads entered along global downward only.');
