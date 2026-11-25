@@ -1523,16 +1523,15 @@ dialog { background:var(--paper); color:var(--ink); border:1px solid var(--line)
 .simple-beams #beam-cut-grip { position:absolute; bottom:0; transform:translateX(-50%); min-height:44px; min-width:52px; touch-action:none; cursor:ew-resize; color:var(--ink); background:var(--paper); border:1px solid var(--muted); }
 .simple-beams #beam-cut-grip.at-load,.simple-beams button[aria-pressed="true"] { border:2px solid var(--accent); background:#f5ebe4; }
 .simple-beams #beam-cut-grip:focus-visible { outline:3px solid var(--ink); outline-offset:2px; }
+#beam-cut-feedback { margin:.4rem 0; font-variant-numeric:tabular-nums; }
 @media (max-width:650px) {
-    #insights-panel .prediction-attempts { display:block; width:100%; }
-    .prediction-attempts thead { position:absolute; clip-path:inset(50%); width:1px; height:1px; overflow:hidden; }
-    .prediction-attempts tbody,.prediction-attempts tr { display:block; }
-    .prediction-attempts tr { border-top:1px solid var(--line); padding:.5rem 0; }
-    .prediction-attempts td { display:grid; grid-template-columns:6rem minmax(0,1fr); border:0; padding:.2rem; overflow-wrap:anywhere; }
-    .prediction-attempts td::before { color:var(--muted); }
-    .prediction-attempts td:nth-child(1)::before { content:"Course ID"; }
-    .prediction-attempts td:nth-child(2)::before { content:"Event"; }
-    .prediction-attempts td:nth-child(3)::before { content:"Prediction"; }
-    .prediction-attempts td:nth-child(4)::before { content:"Solution shown"; }
-    .prediction-attempts pre { white-space:pre-wrap; overflow-wrap:anywhere; }
+    #insights-panel { min-width:0; }
+    #insights-panel .insights-cards { grid-template-columns:repeat(auto-fit,minmax(min(9rem,100%),1fr)); }
+    #insights-panel table { display:block; width:100%; min-width:0; }
+    #insights-panel thead { position:absolute; clip-path:inset(50%); width:1px; height:1px; overflow:hidden; }
+    #insights-panel tbody,#insights-panel tr { display:block; }
+    #insights-panel tr { border-top:1px solid var(--line); padding:.5rem 0; }
+    #insights-panel td { display:grid; grid-template-columns:7rem minmax(0,1fr); border:0; padding:.2rem; white-space:normal; overflow-wrap:anywhere; }
+    #insights-panel td::before { content:attr(data-heading); color:var(--muted); }
+    #insights-panel pre { white-space:pre-wrap; overflow-wrap:anywhere; }
 }

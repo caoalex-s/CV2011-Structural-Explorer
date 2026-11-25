@@ -12,7 +12,8 @@ const options = '<option value="">Choose</option><option value="drop">Drops</opt
 el('workspace').innerHTML = `<header class="exercise-heading"><p class="course-reference">Weeks 4–5 · Internal actions</p><h1>Simple beams</h1></header>
 <p class="exercise-intro">What happens to the shear force V and bending moment M as a cut crosses a downward point load?</p>
 <div class="section-task"><section class="section-model"><div class="beam-cut-sheet"><svg id="beam-model" role="img" viewBox="0 0 760 245"></svg>
-<button id="beam-cut-grip" type="button" role="slider" aria-label="Drag cut along beam" aria-valuemin="1" aria-valuemax="32"><span aria-hidden="true">↔</span> Cut</button></div>
+<button id="beam-cut-grip" type="button" role="slider" aria-label="Drag cut along beam" aria-valuemin="1" aria-valuemax="32"><span aria-hidden="true">↔</span> Drag cut</button></div>
+<p id="beam-cut-feedback" hidden></p>
 <div class="section-controls"><label>Downward load P (kN)<input id="beam-load" type="number" min="5" max="50" step="1" value="20"></label>
 <label>Cut position <output id="beam-station" for="beam-cut"></output><input type="range" id="beam-cut" min="1" max="32" value="16"></label></div>
 <button id="beam-left-limit">Just left of P</button> <button id="beam-right-limit">Just right of P</button></section>
@@ -43,9 +44,15 @@ function station() {
 function clear() {
     revision++;
     invalidateBeamCheck();
+    el('beam-cut-feedback').hidden = true;
     el('beam-answer').replaceChildren();
     el('beam-answer').hidden = true;
     el('beam-status').textContent = '';
+}
+function showCutValues(scope: string, shear: number, moment: number) {
+    const feedback = el('beam-cut-feedback');
+    feedback.textContent = scope + ' · ' + station().description + ' · V = ' + signed(shear) + ' kN · M = ' + signed(moment) + ' kN·m';
+    feedback.hidden = false;
 }
 const grip = el<HTMLButtonElement>('beam-cut-grip');
 function refreshModel() {
@@ -59,8 +66,9 @@ function refreshModel() {
     grip.classList.toggle('at-load', parameter === inputs().position);
     for (const [button, index] of [['beam-left-limit','16'],['beam-right-limit','17']])
         el(button).setAttribute('aria-pressed', String(index === cut.value));
+    const cutX = 100 + 560 * parameter;
     el('beam-model').innerHTML = valid() ? beamDrawing(inputs(), parameter, false, 'pin-roller', false) +
-        `<path class="section-line" d="M${100+560*parameter} 85V238"><title>Cut at ${description}</title></path>` : '';
+        `<path class="section-line" d="M${cutX} 90V172 M${cutX} 234v11"><title>Cut at ${description}</title></path>` : '';
 }
 function resetPrediction() {
     clear(); opened = false; recorded = false;
@@ -77,6 +85,7 @@ function moveCut(preview = false) {
     reveal.disabled = !recorded;
     if (opened && preview) {
         const q = station(), values = beamValues(inputs(),q.parameter,q.side);
+        showCutValues('Numerical preview',values.shear,values.moment);
         el('beam-answer').innerHTML = `<h2>Retained left free body at ${q.description}</h2>
             <svg id="beam-fbd" role="img" viewBox="0 0 760 235">${cutDrawing(inputs(),q.parameter,q.side)}</svg>
             <p>Numerical preview · V = ${signed(values.shear)} kN · M = ${signed(values.moment)} kN·m</p>`;
@@ -167,6 +176,7 @@ async function check(logReveal: boolean, resumed = false) {
         if (!receipt || revision !== current) return;
         opened = true;
         const { Ay, By, shear: V, moment: M } = receipt.values;
+        showCutValues('Checked cut',V,M);
         const includes = retainsPointLoad(q.parameter, beam.position, q.side);
         const count = Number(shear.value === 'drop') + Number(moment.value === 'same');
         el('beam-answer').innerHTML = `<h2>Equilibrium at ${q.description}</h2><p>Taking moments about A gives B<sub>y</sub> = P × 4 / 8 = ${By} kN. Vertical equilibrium gives A<sub>y</sub> = P − B<sub>y</sub> = ${Ay} kN.</p>

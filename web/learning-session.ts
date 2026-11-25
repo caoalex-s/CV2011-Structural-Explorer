@@ -234,9 +234,14 @@ export function createLearningSession({ notify: toast, onConnectionChange, exerc
 
             <h2>Portal exercise predictions</h2><table class="data-table"><thead><tr><th>Pseudonymous ID</th><th>Event</th><th>Prediction (m)</th><th>Worked solution for this drawing</th></tr></thead><tbody>${records.filter(a=>a.step === 'portal_absolute_moment').slice(-30).map(a=>`<tr><td>${escape(a.courseId)}</td><td>${escape(a.event.replaceAll('_',' '))}</td><td>${escape(a.answer)}</td><td>${a.solutionRevealed?'Worked solution shown':'No reveal recorded'}</td></tr>`).join('')}</tbody></table>
             <p class="small">Each edited drawing has its own first prediction. A reveal row records when the student opened that drawing’s worked solution.</p>
-            <h2>Recent attempts</h2><div style="overflow:auto"><table class="data-table"><thead><tr><th>Course ID</th><th>Step</th><th>Attempt</th><th>Answer</th><th>Result</th><th>Recorded aid</th></tr></thead><tbody>${rows.slice(-30).reverse().map(({attempt: a, ordinal, assisted}) => `<tr><td>${escape(a.courseId)}</td><td>${escape(a.step.replaceAll('_', ' '))}</td><td>${ordinal === 1 ? 'First' : `Retry ${ordinal - 1}`}</td><td>${escape(a.answer)} ${escape(a.units)}</td><td>${escape(a.result?.status || 'unresolved')}</td><td>${assisted ? 'Hint / explanation shown' : 'None recorded'}</td></tr>`).join('')}</tbody></table></div>
+            <h2>Recent attempts</h2><div style="overflow:auto"><table class="data-table"><thead><tr><th>Course ID</th><th>Step</th><th>Attempt</th><th>Answer</th><th>Result</th><th>Recorded aid</th></tr></thead><tbody>${rows.slice(-30).reverse().map(({attempt: a, ordinal, assisted}) => `<tr><td>${escape(a.courseId)}</td><td>${escape(a.step.replaceAll('_', ' '))}</td><td>${ordinal === 1 ? 'First' : `Retry ${ordinal - 1}`}</td><td>${escape(predictionSummary(a))} ${escape(a.units)}</td><td>${escape(a.result?.status || 'unresolved')}</td><td>${assisted ? 'Hint / explanation shown' : 'None recorded'}</td></tr>`).join('')}</tbody></table></div>
             <p class="small">First and retry counts use the records available in this view. Concepts are grouped by question; numerical steps are grouped by model and section. Error categories describe answer patterns and require instructor interpretation.</p>
             <div class="dialog-buttons"><button id="refresh-insights">Refresh</button><button id="export-attempts">Export all available records</button></div>`;
+        for (const table of panel.querySelectorAll('table')) {
+            const headings = Array.from(table.querySelectorAll('thead th'), cell => cell.textContent || '');
+            for (const row of table.querySelectorAll<HTMLTableRowElement>('tbody tr'))
+                Array.from(row.cells).forEach((cell,index) => cell.dataset.heading = headings[index]);
+        }
         $<HTMLSelectElement>('submission-group').value = insightGroup;
         $('submission-group').onchange = () => {
             insightGroup = $<HTMLSelectElement>('submission-group').value as SubmissionGroup;

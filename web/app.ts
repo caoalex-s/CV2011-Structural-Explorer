@@ -476,7 +476,7 @@ function renderCanvas() {
                 const path = element.samples.map((p, i) => { const q = screen({ x: p.x + p.ux * magnification, y: p.y + p.uy * magnification }); return `${i ? 'L' : 'M'} ${q.x} ${q.y}`; }).join(' ');
                 drawing += `<path d="${path}" fill="none" stroke="${courseColors.reaction}" stroke-width="2.5"/>`;
             }
-            drawing += `<text x="22" y="375" class="svg-value">Displacement magnification ×${number(magnification)} · values are unscaled</text>`;
+            drawing += `<text x="22" y="${canvasHeight - 25}" class="svg-value">Displacement magnification ×${number(magnification)} · values are unscaled</text>`;
         }
         else {
             const field = layer as 'N' | 'V' | 'M', maximum = Math.max(...all.map(p => Math.abs(p[field])), 1e-10), scale = 70 / maximum;
@@ -500,7 +500,7 @@ function renderCanvas() {
             }
             if (maximum > 1e-8) {
                 const peak = all.reduce((a, b) => Math.abs(a[field]) > Math.abs(b[field]) ? a : b);
-                drawing += `<text x="22" y="375" class="svg-value">${symbolLabel(`Peak |${field}| = ${number(Math.abs(peak[field]))} ${field === 'M' ? 'kN m' : 'kN'} · diagrams scaled to fit`)}</text>`;
+                drawing += `<text x="22" y="${canvasHeight - 25}" class="svg-value">${symbolLabel(`Peak |${field}| = ${number(Math.abs(peak[field]))} ${field === 'M' ? 'kN m' : 'kN'} · diagrams scaled to fit`)}</text>`;
             }
         }
     }
@@ -553,12 +553,12 @@ function renderCanvas() {
         drawing += `<circle cx="${p.x}" cy="${p.y}" r="8" fill="none" stroke="#087f78" stroke-width="1.5"/>`;
     }
     if (!model.members.length)
-        drawing += `<text x="${canvasWidth / 2}" y="180" text-anchor="middle" class="svg-label" style="font-size:23px">Your structure starts here.</text><text x="${canvasWidth / 2}" y="215" text-anchor="middle" class="svg-value">Choose Draw member, then its two endpoints.</text>`;
+        drawing += `<text x="${canvasWidth / 2}" y="${canvasHeight / 2 - 20}" text-anchor="middle" class="svg-label" style="font-size:23px">Your structure starts here.</text><text x="${canvasWidth / 2}" y="${canvasHeight / 2 + 15}" text-anchor="middle" class="svg-value">Choose Draw member, then its two endpoints.</text>`;
     if (model.members.length && document.body.classList.contains('drawing-workspace')) {
         // The scale bar measures undeformed model length, independently of diagram magnification.
         const metres = 2 ** Math.floor(Math.log2(90 / view.scale));
         const end = canvasWidth - 25, begin = end - metres * view.scale;
-        drawing += `<g class="drawing-scale" aria-label="Drawing scale"><path d="M${begin} 366v6H${end}v-6"/><text x="${(begin + end) / 2}" y="361" text-anchor="middle">${number(metres)} m</text></g>`;
+        drawing += `<g class="drawing-scale" aria-label="Drawing scale"><path d="M${begin} ${canvasHeight - 34}v6H${end}v-6"/><text x="${(begin + end) / 2}" y="${canvasHeight - 39}" text-anchor="middle">${number(metres)} m</text></g>`;
     }
     svg.innerHTML = drawing;
     if (selected && document.body.classList.contains('drawing-workspace')) {

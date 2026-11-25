@@ -115,7 +115,13 @@ async function collect(name, settings) {
 }
 
 try {
+    // The saved Practice view must yield to a subsequent explicit sandbox URL.
+    await page.goto(new URL('#practice',base).href);
+    await page.locator('#check-answer').waitFor();
+    await page.goto(new URL('learn/beam-basics/',base).href);
     await page.goto(new URL('#sandbox',base).href);
+    await page.locator('.drawing-workspace').waitFor();
+    assert.equal(new URL(page.url()).hash,'#sandbox');
     const courseLink = page.getByRole('link',{name:/^Course$|^Learn$/}).first();
     await courseLink.click();
     await page.getByRole('link',{name:/Simple beams/}).click();
@@ -139,6 +145,26 @@ try {
     await page.keyboard.press('Enter');
     await collect('left-limit',{limit:'left'});
 
+    const grip = page.locator('#beam-cut-grip');
+    await grip.scrollIntoViewIfNeeded();
+    const handle = await grip.boundingBox(), sheet = await page.locator('.beam-cut-sheet').boundingBox();
+    const x = handle.x + handle.width / 2, y = handle.y + handle.height / 2;
+    const destination = x + sheet.width * 140 / 760; // x = 6 m
+    const touch = compact ? await context.newCDPSession(page) : null;
+    if (touch) {
+        await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});
+        await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:destination,y}]});
+    } else {
+        await page.mouse.move(x,y); await page.mouse.down(); await page.mouse.move(destination,y);
+    }
+    await page.waitForFunction(() => document.querySelector('#beam-cut').value === '25');
+    await noCurrentReceipt();
+    assert.match(await page.locator('#beam-cut-feedback').innerText(),/Numerical preview.*6 m/);
+    assert.equal(await page.locator('#beam-fbd [data-cut-load="P"]').count(),1);
+    if (touch) await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+    else await page.mouse.up();
+    await collect('drag-to-six-metres',{cut:6,limit:'right'});
+    await page.locator('#beam-left-limit').click();
     await cut.focus();
     await page.keyboard.press('ArrowRight');
     assert.equal(await cut.inputValue(),'17');
