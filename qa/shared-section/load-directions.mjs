@@ -35,7 +35,7 @@ try {
             await page.waitForFunction(expected=>JSON.parse(localStorage.getItem('cv2011-model'))?.loads[0].id===expected,model.loads[0].id);
         }
         async function assertDirection(x, y) {
-            const svg = page.locator('#inspector .pad-indicator');
+            const svg = page.locator('#inspector .direction-dial');
             const axis = await svg.locator('.indicator-pointer').evaluate(pointer => {
                 const matrix = pointer.getScreenCTM();
                 const length = Math.hypot(matrix.a, matrix.b);
@@ -46,35 +46,16 @@ try {
         await page.goto(base+'#sandbox');
         await page.waitForFunction(()=>!document.querySelector('#workspace')?.inert);
         await picker.selectOption({label:'P₁ · Point force'});
-        assert.equal(await checked('pointDirection').inputValue(), '270');
-        assert.equal(await prop('pointAngle').isVisible(), false);
+        const dial = page.locator('#inspector .direction-dial');
         await assertDirection(0,-1);
-        const pad = page.locator('#inspector .cardinal-pad');
-        const positions = {};
-        for (const name of ['Up','Left','Right','Down']) {
-            const radio = pad.getByRole('radio',{name,exact:true});
-            const box = await radio.boundingBox();
-            assert.ok(box.width >= 44 && box.height >= 44, name+' touch target');
-            positions[name] = {x:box.x + box.width/2, y:box.y + box.height/2};
-        }
-        assert.equal(positions.Up.x,positions.Down.x);
-        assert.equal(positions.Left.y,positions.Right.y);
-        assert.ok(positions.Up.y < positions.Left.y && positions.Down.y > positions.Right.y);
-        assert.ok(positions.Left.x < positions.Up.x && positions.Right.x > positions.Up.x);
-        await checked('pointDirection').focus();
-        await page.keyboard.press('ArrowLeft');
-        assert.equal(await checked('pointDirection').inputValue(),'180');
-        await page.keyboard.press('Tab');
-        assert.equal(await page.locator(':focus').inputValue(),'custom');
-        assert.equal(await checked('pointDirection').inputValue(),'180');
-        await page.keyboard.press('Space');
-        assert.equal(await checked('pointDirection').inputValue(),'custom');
+        await dial.focus();
+        await page.keyboard.press('ArrowRight');
+        assert.equal(await dial.getAttribute('aria-valuenow'),'271');
         await page.keyboard.press('Tab');
         assert.ok(await prop('pointAngle').evaluate(el => el === document.activeElement));
-        await edit('pointAngle',37);
-        await assertDirection(Math.cos(37*Math.PI/180),Math.sin(37*Math.PI/180));
-        assert.equal(await checked('pointDirection').inputValue(), 'custom');
-        await choose('pointDirection','0');
+        await edit('pointAngle',46.25);
+        await assertDirection(Math.cos(46.25*Math.PI/180),Math.sin(46.25*Math.PI/180));
+        await edit('pointAngle',0);
         await page.locator('.force-components > summary').click();
         assert.equal(await prop('fx').inputValue(), '20');
         assert.equal(await prop('fy').inputValue(), '0');
@@ -89,16 +70,50 @@ try {
         const point = (await state()).loads[0];
         assert.deepEqual([point.fx,point.fy],[20,0]);
         await edit('magnitude',30);
-        await checked('pointDirection').focus();
-        await page.keyboard.press('ArrowUp');
-        assert.equal(await checked('pointDirection').inputValue(), '90');
-        assert.ok(await checked('pointDirection').evaluate(el => el === document.activeElement));
+        await dial.focus();
+        await page.keyboard.press('PageUp');
+        await page.keyboard.press('PageUp');
+        assert.equal(await dial.getAttribute('aria-valuenow'),'90');
+        assert.ok(await dial.evaluate(el => el === document.activeElement));
         assert.deepEqual((await state()).loads.map(({fx,fy})=>[fx,fy]),[[0,30]]);
         await page.locator('#frame-generate').click();
         await page.waitForFunction(()=>{try {return JSON.parse(document.querySelector('#portal-certificate').textContent).sourceRequest.model.loads[0].fy===30;}catch{return false;}},null,{timeout:120000});
         await picker.selectOption('load:'+point.id);
-        await checked('pointDirection').scrollIntoViewIfNeeded();
+        await dial.scrollIntoViewIfNeeded();
         await page.screenshot({path:join(output,'point-'+width+'.png')});
+
+        const dialBox = await dial.boundingBox();
+        const touch = width === 390 ? await page.context().newCDPSession(page) : null;
+        async function pointAt(degrees, phase) {
+            const angle = degrees*Math.PI/180;
+            const x = dialBox.x + dialBox.width*(.5 + 40/128*Math.cos(angle));
+            const y = dialBox.y + dialBox.height*(.5 - 40/128*Math.sin(angle));
+            if (touch) {
+                const type = {down:'touchStart',move:'touchMove',up:'touchEnd'}[phase];
+                await touch.send('Input.dispatchTouchEvent',{type,touchPoints:phase==='up'?[]:[{x,y}]});
+            } else {
+                await page.mouse.move(x,y);
+                if (phase==='down') await page.mouse.down();
+                if (phase==='up') await page.mouse.up();
+            }
+        }
+        await pointAt(90,'down');
+        await pointAt(43.5,'move');
+        assert.equal(await dial.getAttribute('aria-valuenow'),'45');
+        assert.equal(await page.locator('#portal-certificate').textContent(),'');
+        await pointAt(49,'move');
+        assert.equal(await dial.getAttribute('aria-valuenow'),'45');
+        await pointAt(55,'move');
+        assert.ok(Math.abs(Number(await dial.getAttribute('aria-valuenow'))-55)<2);
+        await pointAt(359,'move');
+        assert.equal(await dial.getAttribute('aria-valuenow'),'0');
+        await pointAt(3,'move');
+        assert.equal(await dial.getAttribute('aria-valuenow'),'0');
+        await pointAt(3,'up');
+        await touch?.detach();
+        await page.getByRole('button',{name:'Undo',exact:true}).click();
+        assert.equal((await state()).loads[0].fy,30);
+        await picker.selectOption('load:'+point.id);
 
         const range = key => page.locator(`#inspector input[data-range="${key}"]`);
         async function dragRange(key) {
@@ -174,7 +189,7 @@ try {
         await range('qEnd').focus();
         await page.keyboard.press('Home');
         assert.equal((await state()).loads.at(-1).qEnd,20);
-        await choose('lineReference','180');
+        await edit('lineAngle',180);
         assert.equal((await state()).loads.at(-1).direction,180);
         await place('force',[.8]);
         assert.ok(await prop('magnitude').isVisible());
@@ -185,7 +200,6 @@ try {
         model.loads=[{id:'line',label:'w_1',member,kind:'distributed',t:0,end:1,fx:0,fy:-2,qEnd:-4,mz:0}];
         await open(model,2);
         await picker.selectOption('load:line');
-        await choose('lineReference','custom');
         await edit('lineAngle',0);
         await edit('fy',-2);
         assert.deepEqual((await state()).loads.map(({direction,fy,qEnd})=>[direction,fy,qEnd]),[[0,-2,4]]);

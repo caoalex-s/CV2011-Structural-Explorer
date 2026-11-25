@@ -3,6 +3,7 @@ import { angleVector, endConnection, nodeLabels, position, referenceMember } fro
 import type { Analysis, Connection, ConnectionRule, Load, Member, Model } from './engine.js';
 import { jointConnections, memberLabel } from './model-view.js';
 import type { Selection } from './model-view.js';
+import { bindDirectionDial, directionDial } from './direction-dial.js';
 import { loadLabels, validLoadLabel } from './load-labels.js';
 import { math, quantity } from './math.js';
 import { escapeHtml as escape, formatNumber as number } from './ui.js';
@@ -22,10 +23,6 @@ function displayedAngle(angle: number): number {
     return Number((remainder < 0 ? remainder + 360 : remainder).toPrecision(15)) % 360;
 }
 
-// Custom is an editor choice even when its angle happens to match a preset.
-const customAngleEditors = new WeakSet<Load>();
-const cardinalChoices = [['270', 'Down'], ['0', 'Right'], ['90', 'Up'], ['180', 'Left']];
-
 const directionArrows: Record<string, string> = {
     Down: '↓', Right: '→', Up: '↑', Left: '←', Clockwise: '↻', Counterclockwise: '↺',
 };
@@ -43,55 +40,15 @@ function positiveIntensityAngle(model: Model, load: Load): number {
     return Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI + 90;
 }
 
-function directionIndicator(angle: number, line: boolean): string {
-    const degrees = displayedAngle(angle);
-    const description = `${line ? 'Positive intensity' : 'Force direction'}: ${number(degrees)} degrees counterclockwise from global positive x`;
-    // The path points right at zero. SVG screen coordinates increase downward.
-    return `<svg class="pad-indicator" viewBox="-24 -24 48 48" role="img" aria-label="${description}">
-        <circle class="indicator-rim" r="21"/><path class="indicator-ticks" d="M0 -20v3 M20 0h-3 M0 20v-3 M-20 0h3"/>
-        <g class="indicator-pointer" transform="rotate(${-degrees})"><path d="M-12 -2H4V-7L15 0 4 7V2H-12Z"/></g></svg>`;
-}
-
-// The arrow keys select their physical direction. Tab also reaches each
-// alternative in the same radio group without changing the applied load.
-function navigateDirectionPad(event: KeyboardEvent, input: HTMLInputElement): void {
-    const group = input.closest('.direction-controller');
-    if (!group || event.altKey || event.ctrlKey || event.metaKey) return;
-    const directions: Record<string,string> = { ArrowDown:'270', ArrowRight:'0', ArrowUp:'90', ArrowLeft:'180' };
-    const value = directions[event.key];
-    if (value) {
-        event.preventDefault();
-        const choice = group.querySelector<HTMLInputElement>(`input[value="${value}"]`)!;
-        choice.focus();
-        if (!choice.checked) choice.click();
-        return;
-    }
-    if (event.key !== 'Tab') return;
-    const cardinal = group.querySelector<HTMLInputElement>('.cardinal-pad input:checked') ?? group.querySelector<HTMLInputElement>('.cardinal-pad input[value="90"]')!;
-    const stops = [cardinal, ...group.querySelectorAll<HTMLInputElement>('.direction-alternatives input')];
-    const index = input.closest('.cardinal-pad') ? 0 : stops.indexOf(input);
-    const next = stops[index + (event.shiftKey ? -1 : 1)];
-    if (next) {
-        event.preventDefault();
-        next.focus();
-    }
-}
-
 function directionPicker(load: Load, angle: number, angleInput: string): string {
     const line = load.kind === 'distributed';
-    const normal = line && load.direction === 'member-normal';
-    const preset = cardinalChoices.find(([value]) => Number(value) === displayedAngle(angle));
-    const custom = !normal && (!preset || customAngleEditors.has(load));
-    const current = normal ? 'normal' : custom ? 'custom' : preset![0];
-    const choices = [...cardinalChoices];
-    if (line) choices.push(['normal', 'Member normal']);
-    choices.push(['custom', 'Custom angle']);
-    const key = line ? 'lineReference' : 'pointDirection';
-    const options = choices.map(([value,label]) => directionOption(key,value,label,current));
-    return `<fieldset class="load-direction-group direction-controller"><legend>${line ? 'Positive intensity direction' : 'Direction'}</legend>
-        <div class="direction-options controller-layout"><div class="cardinal-pad">${options.slice(0,cardinalChoices.length).join('')}${directionIndicator(angle,line)}</div>
-        <div class="direction-alternatives">${options.slice(cardinalChoices.length).join('')}</div></div></fieldset>`
-        + `<div class="custom-angle-editor" ${custom ? '' : 'hidden'}>${angleInput}<p class="small">Angles increase counterclockwise from global +x (right).</p></div>`;
+    const reference = load.direction === 'member-normal' ? 'normal' : 'global';
+    const choices = line ? '<div class="direction-options dial-reference">'
+        + directionOption('lineReference','global','Global',reference)
+        + directionOption('lineReference','normal','Member normal',reference) + '</div>' : '';
+    return `<fieldset class="load-direction-group"><legend>${line ? 'Positive intensity direction' : 'Direction'}</legend>
+        <div class="dial-layout">${directionDial(displayedAngle(angle),line)}<div class="dial-values">${angleInput}${choices}</div></div>
+        <p class="small" id="dial-help">Drag the rim or enter an angle counterclockwise from +x. Arrow keys adjust by 1°.${line ? ' Editing the angle selects Global.' : ''}</p></fieldset>`;
 }
 
 interface InspectorOptions {
@@ -214,7 +171,7 @@ export function renderInspector(options: InspectorOptions): void {
                 html += field('end', 'End / member length') + '<div class="load-direction-fields">'
                     + field('fy', 'Start intensity (kN/m)', 'any', sign) + field('qEnd', 'End intensity (kN/m)', 'any', sign)
                     + directionPicker(load, angle, angleField('lineAngle', 'Angle (°)', displayedAngle(angle)))
-                    + (normal ? '<p class="small">The normal points left when looking from the first joint to the second.</p>' : '')
+                    + '<p class="small" data-normal-help ' + (normal ? '' : 'hidden') + '>The normal points left when looking from the first joint to the second.</p>'
                     + '<p class="small">Intensity varies linearly per metre of member length. Positive follows the selected direction. Negative acts opposite.</p></div>';
             }
             html += `<details class="inspector-help"><summary>Load notation and directions</summary><p class="small">Use ${math('P')} or ${math('F')} for a force, ${math('M')} for a couple, and ${math('w')} or ${math('q')} for distributed loading. To enter ${math('P_1')} or ${math('M_0')}, type <code>P_1</code> or <code>M_0</code>. Each load has its own label.</p><p class="small">The action belongs to this member side at a joint. Arrows retain their physical line of action; moment arcs retain their application centre.</p></details>`;
@@ -250,16 +207,12 @@ export function renderInspector(options: InspectorOptions): void {
         }
         container.onkeydown = event => {
             const target = event.target as HTMLElement;
-            if (target instanceof HTMLInputElement && target.type === 'radio' && target.closest('.direction-controller')) {
-                navigateDirectionPad(event,target);
-                return;
-            }
             if (target.matches('[data-property]') && (event.key === 'Tab' || event.key === 'Enter'))
                 target.dataset.focusStep = String(event.key === 'Enter' ? 0 : event.shiftKey ? -1 : 1);
         };
         function changeProperty(input: HTMLInputElement | HTMLSelectElement, apply = commit) {
             let key = input.dataset.property!;
-            let value = input.type === 'checkbox' ? (input as HTMLInputElement).checked : ['kind', 'joint', 'referenceMember', 'member', 'label', 'pointDirection', 'lineReference'].includes(key) ? input.value.trim() : Number(input.value) * Number(input.dataset.direction || 1);
+            let value = input.type === 'checkbox' ? (input as HTMLInputElement).checked : ['kind', 'joint', 'referenceMember', 'member', 'label', 'lineReference'].includes(key) ? input.value.trim() : Number(input.value) * Number(input.dataset.direction || 1);
             if (input.type === 'number' && (!input.value.trim() || !Number.isFinite(value) || (['magnitude', 'momentMagnitude'].includes(key) && Number(value) < 0))) {
                 toast(['magnitude', 'momentMagnitude'].includes(key) ? 'Enter a finite, nonnegative magnitude.' : 'Enter a finite number.');
                 inspector();
@@ -285,20 +238,8 @@ export function renderInspector(options: InspectorOptions): void {
             }
             const focusStep = Number(input.dataset.focusStep || 0);
             const restoreKeyboardFocus = (input.dataset.focusStep !== undefined || input.matches(':focus-visible')) && document.body.classList.contains('drawing-workspace');
-            const customAngle = value === 'custom';
-            const load = selected?.type === 'load' ? model.loads.find(load => load.id === selected.id) : undefined;
-            if (load && (key === 'pointDirection' || key === 'lineReference')) {
-                if (customAngle) {
-                    customAngleEditors.add(load);
-                    if (load.direction !== 'member-normal') {
-                        container.querySelector<HTMLElement>('.custom-angle-editor')!.hidden = false;
-                        return;
-                    }
-                } else customAngleEditors.delete(load);
-            }
-            if (load && (key === 'fx' || key === 'fy') && load.kind === 'force') customAngleEditors.delete(load);
             apply(() => {
-                if (key === 'pointDirection' || key === 'pointAngle' || key === 'magnitude') {
+                if (key === 'pointAngle' || key === 'magnitude') {
                     const load = model.loads.find(load => load.id === selected!.id)!;
                     const angle = key === 'magnitude' ? pointAngle(load) : Number(value);
                     const magnitude = key === 'magnitude' ? Number(value) : Math.hypot(load.fx, load.fy);
@@ -318,7 +259,7 @@ export function renderInspector(options: InspectorOptions): void {
                 if (key === 'lineReference' || key === 'lineAngle') {
                     const load = model.loads.find(load => load.id === selected!.id)!;
                     let angle = Number(value) % 360;
-                    if (customAngle) angle = positiveIntensityAngle(model,load);
+                    if (value === 'global') angle = positiveIntensityAngle(model,load);
                     const direction = value === 'normal' ? 'member-normal' : angle === 270 || angle === -90 ? undefined : angle;
                     // Preserve the displayed start and end strengths. A legacy
                     // downward reference stores them as global upward components.
@@ -361,7 +302,7 @@ export function renderInspector(options: InspectorOptions): void {
                 if (document.activeElement !== document.body) return;
                 const edited = container.querySelector<HTMLElement>('[data-property="' + CSS.escape(key) + '"]');
                 if (!edited) return;
-                const visible = [...container.querySelectorAll<HTMLElement>('input, select, button, summary')]
+                const visible = [...container.querySelectorAll<HTMLElement>('input, select, button, summary, [role="slider"]')]
                     .filter(control => control.checkVisibility() && !control.matches(':disabled, input[type="radio"]:not(:checked)'));
                 const next = visible[visible.indexOf(edited) + focusStep] ?? edited;
                 next.focus({preventScroll:true});
@@ -369,6 +310,25 @@ export function renderInspector(options: InspectorOptions): void {
         }
         container.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-property]').forEach(input =>
             input.addEventListener('change', () => changeProperty(input)));
+        const dial = container.querySelector<SVGSVGElement>('.direction-dial');
+        if (dial && selected.type === 'load') {
+            const load = model.loads.find(load => load.id === selected.id)!;
+            const exact = container.querySelector<HTMLInputElement>(load.kind === 'force' ? '[data-property="pointAngle"]' : '[data-property="lineAngle"]')!;
+            bindDirectionDial(dial,(degrees,first) => {
+                exact.value = String(degrees);
+                changeProperty(exact, edit => options.adjustLoad(edit,first));
+                if (load.kind === 'distributed') {
+                    container.querySelector<HTMLInputElement>('input[name="lineReference"][value="global"]')!.checked = true;
+                    container.querySelector<HTMLElement>('[data-normal-help]')!.hidden = true;
+                    const sign = load.direction === undefined ? -1 : 1;
+                    for (const key of ['fy','qEnd'])
+                        container.querySelector<HTMLInputElement>(`[data-property="${key}"]`)!.dataset.direction = String(sign);
+                } else {
+                    for (const key of ['fx','fy'] as const)
+                        container.querySelector<HTMLInputElement>(`[data-property="${key}"]`)!.value = String(load[key]);
+                }
+            });
+        }
         if (selected.type === 'load' && document.body.classList.contains('drawing-workspace')) {
             const load = model.loads.find(load => load.id === selected.id)!;
             const keys = load.kind === 'distributed' ? ['fy', 'qEnd'] : [load.kind === 'moment' ? 'momentMagnitude' : 'magnitude'];

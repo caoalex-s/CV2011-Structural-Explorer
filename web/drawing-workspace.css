@@ -229,49 +229,27 @@
     margin:-.2rem 0 .4rem; accent-color:var(--accent); cursor:pointer;
 }
 
-.controller-layout {
-    display:grid; grid-template-columns:max-content minmax(0,1fr); align-items:center;
-    gap:.35rem; padding:.4rem; border:1px solid #c7c6bb;
-    border-radius:.75rem; background:#f1efe7;
+
+.dial-layout {
+    display:grid; grid-template-columns:minmax(7rem, 9rem) minmax(0,1fr);
+    gap:.7rem; padding:.55rem; align-items:center;
+    border:1px solid #c7c6bb; border-radius:.75rem; background:#f1efe7;
 }
-.cardinal-pad {
-    display:grid; grid-template-columns:repeat(3,3.15rem); grid-template-rows:repeat(3,max(46px,2.875rem));
-    grid-template-areas:". up ." "left origin right" ". down ."; gap:1px;
-    padding:3px; border:1px solid #273334; border-radius:1rem;
-    background:#344242;
-    isolation:isolate;
-}
-.cardinal-pad label {
-    position:relative; justify-content:center; min-height:0; padding:0;
-    border-color:#bdc3b8; background:#eceee7;
-    box-shadow:inset 0 -2px 0 #d6d8d0;
-    font-size:.78rem; line-height:1; text-align:center;
-}
-.cardinal-pad label:has([value="90"]) { grid-area:up; }
-.cardinal-pad label:has([value="180"]) { grid-area:left; }
-.cardinal-pad label:has([value="0"]) { grid-area:right; }
-.cardinal-pad label:has([value="270"]) { grid-area:down; }
-.cardinal-pad .choice-arrow { display:block; font:600 1.2rem/1 system-ui,sans-serif; margin-bottom:2px; }
-.load-direction-fields .cardinal-pad input[type="radio"] {
-    position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer;
-}
-.cardinal-pad label:has(:checked) { background:#743923; color:white; border-color:#61301e; box-shadow:none; }
-.cardinal-pad label:has(:focus-visible) { outline:2px solid #252d2e; outline-offset:2px; z-index:1; }
-.pad-indicator { grid-area:origin; place-self:center; width:100%; max-width:3rem; pointer-events:none; }
-.indicator-rim { fill:#202d2e; stroke:#84918a; stroke-width:1; }
-.indicator-ticks { fill:none; stroke:#c3cdc4; stroke-width:1.25; }
+.direction-dial { display:block; width:100%; aspect-ratio:1; touch-action:none; cursor:grab; user-select:none; border-radius:50%; }
+.direction-dial:active { cursor:grabbing; }
+.direction-dial:focus-visible { outline:3px solid #743923; outline-offset:2px; }
+.dial-face { fill:#283636; }
+.dial-track { stroke:#c2cabf; stroke-width:2; fill:none; }
+.dial-ticks { stroke:#a8b5ac; stroke-width:1.4; }
+.dial-axes { fill:#eef1e7; font:9px system-ui,sans-serif; text-anchor:middle; }
 .indicator-pointer { fill:#ffc19e; }
-.cardinal-pad label:has(:focus-visible) { outline:2px solid white; outline-offset:-3px; box-shadow:0 0 0 2px #252d2e; }
-.cardinal-pad label:not(:has(:checked)):has(:focus-visible) { outline-color:#252d2e; }
-.direction-alternatives {
-    display:flex; flex-direction:column; align-items:stretch; gap:.2rem;
-    min-width:0;
-}
-.direction-alternatives label { padding:.3rem .15rem; background:transparent; border-color:transparent; }
-.direction-alternatives label:has(:checked) { border-color:var(--accent); }
-@media (forced-colors:active) {
-    .cardinal-pad label:has(:checked) { border:3px solid Highlight; }
-    .indicator-rim { fill:Canvas; stroke:CanvasText; }
-    .indicator-ticks { stroke:CanvasText; }
-    .indicator-pointer { fill:CanvasText; }
+.dial-handle { fill:#fff4df; stroke:#96513b; stroke-width:3; }
+.dial-pivot { fill:#ffc19e; }
+.load-direction-fields .dial-values .field { display:flex; flex-direction:column; align-items:stretch; gap:.2rem; margin:0; }
+.dial-reference { margin-top:.4rem; flex-direction:column; gap:.15rem; }
+.dial-reference label { padding:.25rem .35rem; }
+@media(forced-colors:active) {
+    .dial-face { fill:Canvas; }
+    .dial-track,.dial-ticks,.dial-handle { stroke:CanvasText; }
+    .dial-axes,.indicator-pointer,.dial-pivot,.dial-handle { fill:CanvasText; }
 }
