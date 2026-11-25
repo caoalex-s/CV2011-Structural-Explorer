@@ -44,15 +44,15 @@ function positiveIntensityAngle(model: Model, load: Load): number {
     return Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI + 90;
 }
 
-function directionPicker(load: Load, angle: number, angleInput: string): string {
+function directionPicker(load: Load, angle: number, angleInput: string, strengthInput = ''): string {
     const line = load.kind === 'distributed';
     const reference = load.direction === 'member-normal' ? 'normal' : 'global';
     const choices = line ? '<div class="direction-options dial-reference">'
         + directionOption('lineReference','global','Global',reference)
         + directionOption('lineReference','normal','Member normal',reference) + '</div>' : '';
-    return `<fieldset class="load-direction-group"><legend>${line ? 'Positive intensity direction' : 'Direction'}</legend>
-        <div class="dial-layout">${directionDial(displayedAngle(angle),line)}<div class="dial-values">${angleInput}${choices}</div></div>
-        <p class="small" id="dial-help">Drag the rim or enter an angle counterclockwise from ${math('+x')}. Arrow keys adjust by 1°.${line ? ' Editing the angle selects Global.' : ''}</p></fieldset>`;
+    return `<fieldset class="load-direction-group"><legend class="${line ? '' : 'visually-hidden'}">${line ? 'Positive intensity direction' : 'Point force settings'}</legend>
+        <div class="dial-layout">${directionDial(displayedAngle(angle),line)}<div class="dial-values">${angleInput}${choices}${strengthInput}</div></div>
+        <p class="small" id="dial-help">Counterclockwise from ${math('+x')}. <span class="dial-key-help">Drag the rim or use the arrow keys (1°).</span>${line ? '<span class="visually-hidden"> Editing the angle selects Global.</span>' : ''}</p></fieldset>`;
 }
 
 interface InspectorOptions {
@@ -154,8 +154,9 @@ export function renderInspector(options: InspectorOptions): void {
             const sandbox = document.body.classList.contains('drawing-workspace');
             if (item.kind === 'force') {
                 html += '<div class="load-direction-fields">'
-                    + angleField('magnitude', 'Magnitude (kN)', Number(forceMagnitude(load).toPrecision(15)))
-                    + directionPicker(load, pointAngle(load), angleField('pointAngle', 'Angle (°)', displayedAngle(pointAngle(load)))) + '</div>';
+                    + directionPicker(load, pointAngle(load),
+                        angleField('pointAngle', 'Angle (°)', displayedAngle(pointAngle(load))),
+                        angleField('magnitude', 'Magnitude (kN)', Number(forceMagnitude(load).toPrecision(15)))) + '</div>';
                 const components = field('fx', 'Horizontal (kN)') + field('fy', 'Vertical (kN)')
                     + '<p class="small">Positive components act right and up.</p>';
                 html += sandbox ? '<details class="force-components"><summary>Global components</summary>' + components + '</details>' : components;
@@ -173,10 +174,11 @@ export function renderInspector(options: InspectorOptions): void {
                 const sign = load.direction === undefined ? -1 : 1;
                 const angle = positiveIntensityAngle(model, load);
                 html += field('end', 'End / member length') + '<div class="load-direction-fields">'
-                    + field('fy', 'Start intensity (kN/m)', 'any', sign) + field('qEnd', 'End intensity (kN/m)', 'any', sign)
+                    + '<div class="line-strengths"><div>' + field('fy', 'Start intensity (kN/m)', 'any', sign)
+                    + '</div><div>' + field('qEnd', 'End intensity (kN/m)', 'any', sign) + '</div></div>'
                     + directionPicker(load, angle, angleField('lineAngle', 'Angle (°)', displayedAngle(angle)))
-                    + '<p class="small" data-normal-help ' + (normal ? '' : 'hidden') + '>The normal points left when looking from the first joint to the second.</p>'
-                    + '<p class="small">Intensity varies linearly per metre of member length. Positive follows the selected direction. Negative acts opposite.</p></div>';
+                    + '<p class="small" data-normal-help ' + (normal ? '' : 'hidden') + '>The normal points left from start to end. Editing the angle selects Global.</p>'
+                    + '<p class="small">Intensity varies linearly along the member. Negative values reverse the arrows.</p></div>';
             }
             html += `<details class="inspector-help"><summary>Load notation and directions</summary><p class="small">Use ${math('P')} or ${math('F')} for a force, ${math('M')} for a couple, and ${math('w')} or ${math('q')} for distributed loading. To enter ${math('P_1')} or ${math('M_0')}, type <code>P_1</code> or <code>M_0</code>. Each load has its own label.</p><p class="small">The action belongs to this member side at a joint. Arrows retain their physical line of action; moment arcs retain their application centre.</p></details>`;
         }
