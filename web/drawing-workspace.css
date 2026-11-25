@@ -242,6 +242,7 @@
 .dial-track { stroke:#c2cabf; stroke-width:2; fill:none; }
 .dial-ticks { stroke:#a8b5ac; stroke-width:1.4; }
 .dial-axes { fill:#eef1e7; font:9px system-ui,sans-serif; text-anchor:middle; }
+.dial-axes tspan { font-family:var(--font-math-roman); font-style:italic; }
 .indicator-pointer { fill:#ffc19e; }
 .dial-handle { fill:#fff4df; stroke:#96513b; stroke-width:3; }
 .dial-pivot { fill:#ffc19e; }

@@ -10,7 +10,7 @@ export function directionDial(angle: number, line: boolean): string {
         aria-valuemin="0" aria-valuemax="360" aria-valuenow="${angle}" aria-valuetext="${angle} degrees counterclockwise from global positive x">
         <circle class="dial-face" r="62"/><circle class="dial-track" r="40"/>
         <g class="dial-ticks">${ticks}</g>
-        <g class="dial-axes" aria-hidden="true"><text x="55" y="3">+x</text><text x="0" y="-51">+y</text></g>
+        <g class="dial-axes" aria-hidden="true"><text x="55" y="3">+<tspan>x</tspan></text><text x="0" y="-51">+<tspan>y</tspan></text></g>
         <g class="indicator-pointer" transform="rotate(${-angle})">
           <path d="M-10 -2H18V-6L29 0 18 6V2H-10Z"/><circle class="dial-handle" cx="40" cy="0" r="7"/>
         </g><circle class="dial-pivot" r="3"/></svg>`;

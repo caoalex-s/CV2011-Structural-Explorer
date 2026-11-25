@@ -52,7 +52,7 @@ function directionPicker(load: Load, angle: number, angleInput: string): string 
         + directionOption('lineReference','normal','Member normal',reference) + '</div>' : '';
     return `<fieldset class="load-direction-group"><legend>${line ? 'Positive intensity direction' : 'Direction'}</legend>
         <div class="dial-layout">${directionDial(displayedAngle(angle),line)}<div class="dial-values">${angleInput}${choices}</div></div>
-        <p class="small" id="dial-help">Drag the rim or enter an angle counterclockwise from +x. Arrow keys adjust by 1°.${line ? ' Editing the angle selects Global.' : ''}</p></fieldset>`;
+        <p class="small" id="dial-help">Drag the rim or enter an angle counterclockwise from ${math('+x')}. Arrow keys adjust by 1°.${line ? ' Editing the angle selects Global.' : ''}</p></fieldset>`;
 }
 
 interface InspectorOptions {
