@@ -345,6 +345,35 @@ function pointHandle(load: Load) {
     return {x:origin.x+sign*reach*ux,y:origin.y+sign*reach*uy,reach,outward,radius};
 }
 
+/** Keep the annotation touch target clear of the shaft, handle and section marker. */
+function placePointCaption(label: SVGTextElement, load: Load, h: ReturnType<typeof pointHandle>) {
+    const box = label.getBBox();
+    const origin = screen(position(model,load.member,load.t));
+    const clearance = 5/(svg.getScreenCTM()?.a || 1);
+    const obstacles = [...svg.querySelectorAll<SVGGraphicsElement>('.cut-marker,.cut-face-label,[data-horizontal-reaction] text')]
+        .map(element => element.getBBox());
+    obstacles.push(new DOMRect(Math.min(origin.x,h.x),Math.min(origin.y,h.y),
+        Math.abs(origin.x-h.x),Math.abs(origin.y-h.y)));
+    const left = h.x-h.radius-clearance-box.width, right = h.x+h.radius+clearance;
+    const above = Math.min(h.y,origin.y)-box.height-clearance, below = Math.max(h.y,origin.y)+clearance;
+    const sides = h.x < origin.x ? [left,right] : [right,left];
+    const levels = h.y > origin.y ? [below,above] : [above,below];
+    let best = {x:0,y:0,score:Infinity};
+    for (const x of sides) for (const y of levels) {
+        const px = Math.max(clearance, Math.min(x,canvasWidth-box.width-clearance));
+        const py = Math.max(clearance, Math.min(y,canvasHeight-box.height-clearance));
+        let score = Math.abs(px-x) + Math.abs(py-y);
+        for (const blocked of obstacles) {
+            const w = Math.min(px+box.width,blocked.x+blocked.width+clearance)-Math.max(px,blocked.x-clearance);
+            const ht = Math.min(py+box.height,blocked.y+blocked.height+clearance)-Math.max(py,blocked.y-clearance);
+            if (w>0 && ht>0) score += w*ht;
+        }
+        if (score < best.score) best={x:px,y:py,score};
+    }
+    label.setAttribute('x',String(Number(label.getAttribute('x'))+best.x-box.x));
+    label.setAttribute('y',String(Number(label.getAttribute('y'))+best.y-box.y));
+}
+
 function loadDrawing(load: Load) {
     const p = screen(position(model, load.member, load.t));
     const label = loadLabels(model).get(load.id)!;
@@ -505,7 +534,7 @@ function renderCanvas() {
     if (currentMember && model.members.some(m => m.id === currentMember) && analysis.status === 'stable') {
         const a = position(model, currentMember, 0), b = position(model, currentMember, 1), p = screen(position(model, currentMember, sectionT));
         const length = Math.hypot(b.x - a.x, b.y - a.y), nx = -(b.y - a.y) / length, ny = -(b.x - a.x) / length;
-        drawing += `<path d="M ${p.x - nx * 40} ${p.y - ny * 40} L ${p.x + nx * 40} ${p.y + ny * 40}" stroke="#bf7650" stroke-width="1.5" stroke-dasharray="4 4" pointer-events="none"/><circle cx="${p.x}" cy="${p.y}" r="3" fill="#bf7650"/>`;
+        drawing += `<path class="cut-marker" d="M ${p.x - nx * 40} ${p.y - ny * 40} L ${p.x + nx * 40} ${p.y + ny * 40}" stroke="#bf7650" stroke-width="1.5" stroke-dasharray="4 4" pointer-events="none"/><circle cx="${p.x}" cy="${p.y}" r="3" fill="#bf7650"/>`;
     }
     if (currentMember && analysis.status === 'stable' && document.body.classList.contains('drawing-workspace')) {
         const p = screen(position(model, currentMember, sectionT));
@@ -537,11 +566,7 @@ function renderCanvas() {
         if (point && Math.hypot(point.fx,point.fy) >= 1e-12) {
             const h = pointHandle(point);
             const caption = svg.querySelector<SVGTextElement>(`[data-point-force][data-id="${CSS.escape(point.id)}"] text`);
-            if (caption) {
-                // Leave a finger-sized gap between the rotation and annotation targets.
-                const above = h.y > h.radius + 45;
-                caption.setAttribute('y',String(h.y + (above ? -h.radius-8 : h.radius+30)));
-            }
+            if (caption) placePointCaption(caption,point,h);
             const angle = number(wrap(pointAngle(point)));
             const textX = Math.max(45,Math.min(canvasWidth-45,h.x));
             const textY = h.y > canvasHeight-65 ? h.y-h.radius-8 : h.y+h.radius+21;
