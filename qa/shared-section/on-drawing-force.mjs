@@ -80,6 +80,26 @@ try {
         assert.ok(await page.locator('#inspector [data-range=magnitude]').isVisible());
         await page.screenshot({path:join(output,'exact-'+width+'.png')});
         assert.ok(await page.locator('#inspector .direction-dial').isVisible());
+        await page.getByRole('button',{name:'Inspect cut here'}).click();
+        for (const face of ['right','left']) {
+            const faceControl = page.locator('#frame-side');
+            await faceControl.selectOption(face);
+            const plot = page.locator('.section-fbd-plot');
+            await plot.scrollIntoViewIfNeeded();
+            const labels = plot.locator('[data-fbd-label="normal"], [data-fbd-label="moment"], [data-fbd-label="shear"]');
+            const boxes = await labels.evaluateAll(items => items.map(item => item.getBoundingClientRect().toJSON()));
+            assert.equal(boxes.length,face === 'left' ? 3 : 2);
+            for (const [index, box] of boxes.entries()) {
+                for (const other of boxes.slice(index + 1))
+                    assert.ok(box.right <= other.left || other.right <= box.left ||
+                        box.bottom <= other.top || other.bottom <= box.top, 'Cut labels overlap: ' + face);
+            }
+            const origin = await plot.locator('[data-cut-face]').evaluate(el => [el.dataset.originX,el.dataset.originY]);
+            const vectors = await plot.locator('[data-cut-action] [data-vector]').evaluateAll(items =>
+                items.map(el => [el.dataset.originX,el.dataset.originY]));
+            for (const vector of vectors) assert.deepEqual(vector,origin);
+            await plot.screenshot({path:join(output,`fbd-${face}-${width}.png`)});
+        }
         await page.reload();
         assert.deepEqual(await model(),final);
         const fixture = await page.evaluate(()=>JSON.parse(localStorage.getItem('cv2011-model')));

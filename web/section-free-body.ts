@@ -73,7 +73,9 @@ export function sectionFreeBody(model: Model, analysis: Analysis, memberId: stri
     if (endMoment) label(endX + outward * 40, y - 42, `M_{${node}}`, 'end-couple');
     if (cutFx) label(cutX + outward * 53, y - 22, 'N(x)', 'normal');
     if (cutFy) label(cutX + outward * 32, y + 48, 'V(x)', 'shear');
-    if (cutMoment) label(cutX + outward * 45, y - 30, 'M(x)', 'moment');
+    // Label the moment above the retained segment and the axial force beyond
+    // the cut. The arrow and moment arc still share the physical cut origin.
+    if (cutMoment) label(cutX - outward * 45, y - 42, 'M(x)', 'moment');
     let arrows = externalAction(opposite, endFx, endFy, endMoment, 'Net member-end action', courseColors.reaction);
     const includes = (station: number) => station > 0 && station < 1 &&
         (retainRight || station < t || station === t && side === 'right');
