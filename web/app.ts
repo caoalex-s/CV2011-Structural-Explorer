@@ -1246,7 +1246,10 @@ function renderPractice() {
 function expectedValue(p: NonNullable<ReturnType<typeof problem>>) { return { reaction_left: p.left.fy, reaction_right: p.right.fy, normal: p.N, shear: p.V, moment: p.M, deflection: p.deflection }[solutionStep]!; }
 function record(event: string, answer: string, units: string): Promise<Attempt> {
     return session.record({ model, section: sectionT, step: solutionStep, side, hintUsed,
-        solutionRevealed: solutionRevealed || practiceResultsVisible }, event, answer, units);
+        // Revealing the full model exposes reactions and diagram values for
+        // other questions and stations on the same drawing.
+        solutionRevealed: solutionRevealed || practiceResultsVisible ||
+            session.sawPracticeSolution(model, Object.keys(stepDefinitions)) }, event, answer, units);
 }
 // Components bind once. Model edits and navigation still share this controller.
 const drawingWorkspace = createDrawingWorkspace(object => {
