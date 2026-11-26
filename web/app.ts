@@ -95,7 +95,7 @@ let restoreCheckerControls: (() => void) | undefined;
 function preserveCheckerView() {
     sessionStorage.setItem(modelStorageKey + '/view', JSON.stringify({ model: JSON.stringify(model),
         member: currentMember, parameter: sectionT, layer, mode, side, view, selected, tool,
-        history, future, solutionStep, solutionRevealed, hintUsed, practiceResultsVisible,
+        history, future, solutionStep, solutionRevealed, hintUsed, practiceResultsVisible, practiceView,
         gridSpacing: $<HTMLInputElement>('grid-spacing').value,
         focused: document.querySelector('.work-grid')!.classList.contains('is-focused'),
         checkboxes: Object.fromEntries([...document.querySelectorAll<HTMLInputElement>('input[type=checkbox][id]')]
@@ -132,6 +132,8 @@ if (isCheckedWorkspace) {
                 selected = { type: state.selected.type, id: state.selected.id };
             if ([...document.querySelectorAll<HTMLElement>('[data-tool]')].some(button => button.dataset.tool === state.tool)) tool = state.tool;
             restoreCheckerControls = () => {
+                if (state.practiceView && typeof state.practiceView.answer === 'string' && typeof state.practiceView.units === 'string')
+                    practiceView = { ...state.practiceView, pending: false };
                 if (state.solutionStep in stepDefinitions) solutionStep = state.solutionStep;
                 solutionRevealed = state.solutionRevealed === true;
                 hintUsed = state.hintUsed === true;
@@ -173,6 +175,8 @@ function updateEvidenceBinding(preview = false) {
     }
 }
 let solutionStep = 'reaction_left', solutionRevealed = false, hintUsed = false, practiceResultsVisible = false;
+interface PracticeView { key: string; answer: string; units: string; submission?: string; pending?: boolean }
+let practiceView: PracticeView | undefined;
 let proofStatus = { lean: 'pending', scope: 'Scaled reaction equilibrium identities and plotting-side inversion.' };
 const svg = $('canvas') as unknown as SVGSVGElement;
 // Redraw the geometry independently so the cut grip retains keyboard focus
@@ -723,7 +727,21 @@ function sectionSample(): Sample | undefined {
 function render(keepInspector = false, previewCut = false) {
     const member = model.members.find(m => m.id === currentMember) ?? model.members[0];
     currentMember = member?.id ?? '';
+    // The course verifier grades the right-hand limit except at the member end.
+    const face = document.querySelector<HTMLSelectElement>('#frame-side');
+    if (face) {
+        face.disabled = mode === 'practice';
+        if (face.disabled) face.value = sectionT === 1 ? 'left' : 'right';
+    }
     updateEvidenceBinding(previewCut);
+    if (mode === 'practice') {
+        const key = JSON.stringify([model, currentMember, sectionT, cutSide(), solutionStep, session.courseId]);
+        if (practiceView?.key !== key) {
+            practiceView = { key, answer: '', units: stepDefinitions[solutionStep].units };
+            practiceResultsVisible = solutionRevealed = hintUsed = false;
+        }
+    }
+    document.body.classList.toggle('practice-predicting', mode === 'practice' && !!problem() && !practiceResultsVisible);
     const section = renderResponses({ model, analysis, currentMember, sectionT, layer, cutSide: cutSide(),
         resultsVisible: responsesVisible() });
     drawingWorkspace.update(model, selected, section.sample, section.stationMath, section.face);
@@ -1167,46 +1185,60 @@ function renderPractice() {
         return;
     }
     const step = stepDefinitions[solutionStep];
-    panel.innerHTML = `<div class="panel-label">STEP-BY-STEP WORKSPACE</div><h2>From equilibrium to displacement</h2><p class="small">Submit a value or an arithmetic expression. Use +, −, *, /, parentheses, and ^. Numeric inputs are checked against the current model and cut. Upward reactions and displacements are positive.</p><div class="steps">${Object.entries(stepDefinitions).map(([key, value], index) => `<button data-step="${key}" class="${solutionStep === key ? 'active' : ''}">${index + 1}. ${value.title.split(' at ')[0]}</button>`).join('')}</div><h2>${step.title}</h2><p class="small">Current cut: ${math('x = ' + quantity(number(p.section), measureUnits.length))} from the member start. ${['normal', 'shear', 'moment'].includes(solutionStep) ? 'Use the right-hand limit at an interior point action.' : ''}</p><div class="answer-row"><input id="answer" aria-label="Your answer" placeholder="Enter a value or expression"><select id="answer-units" aria-label="Answer units">${['kN', 'N', 'kN m', 'N m', 'mm', 'm'].map(u => `<option ${u === step.units ? 'selected' : ''}>${u}</option>`).join('')}</select><button class="primary" id="check-answer">Check step</button></div><button id="hint">Show hint</button> <button id="reveal">Reveal derivation</button><div id="step-feedback" aria-live="polite"></div>`;
-    panel.insertAdjacentHTML('beforeend', `<div class="dialog-buttons"><button id="show-computed">${practiceResultsVisible ? 'Hide computed response' : 'Reveal computed response'}</button></div><details class="small"><summary>Verification scope</summary><p>Symbolic checks run on the connected course verifier. Formal library: ${escape(proofStatus.lean === 'checked' ? 'Lean build passed' : 'Lean build status pending')}. ${escape(proofStatus.scope)} The drawing-to-model conversion and numerical solver are checked separately.</p></details>`);
-    $('show-computed').onclick = () => { practiceResultsVisible = !practiceResultsVisible; if (practiceResultsVisible) {
-        solutionRevealed = true;
-        void record('reveal', '', step.units);
-    } render(); };
-    panel.querySelectorAll<HTMLButtonElement>('[data-step]').forEach(button => button.onclick = () => { solutionStep = button.dataset.step!; hintUsed = false; renderPractice(); });
-    $('hint').onclick = () => { hintUsed = true; $('step-feedback').innerHTML = `<div class="feedback">${step.hint}</div>`; void record('hint', '', step.units); };
-    $('reveal').onclick = async () => {
-        solutionRevealed = true;
-        const attempt = await record('reveal', '', step.units);
-        if (attempt.step !== solutionStep || attempt.section !== sectionT || JSON.stringify(attempt.model) !== JSON.stringify(model) || mode !== 'practice') return;
-        if (isCheckedWorkspace) {
-            document.getElementById('frame-generate')?.click();
-            document.getElementById('worked-panel')?.scrollIntoView({ behavior: 'smooth' });
-        } else if (session.connected) {
-            showWorkedSolution(solutionStep === 'deflection' ? 'integration' : 'sections');
-        } else {
-            const expected = expectedValue(p);
-            $('step-feedback').innerHTML = `<div class="feedback">Numerical reference: ${number(expected, 5)} ${step.units}. Connect the verifier for a symbolic derivation.<p>${step.hint}</p></div>`;
-        }
+    const view = practiceView!;
+    const attempt = view.submission ? session.practiceAttempt(view.submission) : undefined;
+    const questions = Object.keys(stepDefinitions);
+    const options = questions.map((key, i) => {
+        const title = key === 'deflection' ? 'Vertical displacement at the cut' : stepDefinitions[key].title;
+        return `<option value="${key}" ${key === solutionStep ? 'selected' : ''}>${i + 1}. ${title}</option>`;
+    }).join('');
+    const result = attempt?.result;
+    const grade = !attempt?.synced ? 'Saved on this device · awaiting verification' :
+        result?.status === 'correct' ? 'Correct' : result?.status === 'incorrect' ? 'Check your prediction' : 'Verifier could not grade this expression';
+    const unitLabel = (u: string) => u.replace(' m', '·m');
+    const feedback = attempt ? `<div class="feedback" id="step-feedback" tabindex="-1" role="status"><strong>Your prediction: ${escape(attempt.answer)} ${escape(unitLabel(attempt.units))}</strong><p>${grade}</p>${attempt.synced && result ? '<p>' + escape(result.message) + '</p>' : ''}</div>` : '';
+    const entry = `<form id="practice-entry"><label for="answer">Your prediction</label><div class="answer-row"><input id="answer" required placeholder="Value or expression"><select id="answer-units" aria-label="Answer units">${['kN','N','kN m','N m','mm','m'].map(u => `<option value="${u}">${unitLabel(u)}</option>`).join('')}</select></div><button class="primary" id="check-answer" ${view.pending ? 'disabled' : ''}>Submit prediction</button></form>`;
+    const solution = practiceResultsVisible ? `<section aria-label="Worked solution"><h3>Calculated answer</h3><strong>${number(expectedValue(p), 5)} ${unitLabel(step.units)}</strong><p>${step.hint}</p><p class="small">This numerical value comes from the current drawing. The worked panel gives the scope of the structural model check.</p></section>` : '';
+    panel.innerHTML = `<label for="practice-step">Practice question</label><select id="practice-step">${options}</select><h2>${step.title}</h2><p>Cut at ${math('x = ' + quantity(number(p.section), measureUnits.length))} from the member start. ${['normal','shear','moment'].includes(solutionStep) ? 'Use the right-hand limit at an interior point action.' : 'Upward is positive.'}</p>${feedback}${attempt ? '' : entry}${solution}
+        ${!attempt && !hintUsed ? '<button id="hint">Hint</button>' : ''}
+        ${hintUsed && !practiceResultsVisible ? '<p class="feedback">' + step.hint + '</p>' : ''}
+        ${attempt && !practiceResultsVisible ? '<button class="primary" id="reveal">Show worked solution</button>' : ''}
+        ${attempt ? '<button id="practice-retry">Revise prediction</button>' : ''}
+        <details><summary>How this prediction is checked</summary><p>The course verifier grades your expression and units. Offline submissions stay in this browser until you connect and sync them from Insights.</p><p>${escape(proofStatus.scope)}</p></details>`;
+    const selector = $<HTMLSelectElement>('practice-step');
+    selector.onchange = () => { solutionStep = selector.value; render(); $('practice-step').focus(); };
+    if (attempt) {
+        $('practice-retry').onclick = () => {
+            view.submission = undefined;
+            practiceResultsVisible = false;
+            render(); $('answer').focus();
+        };
+        if (!practiceResultsVisible) $('reveal').onclick = () => {
+            practiceResultsVisible = solutionRevealed = true;
+            void record('reveal', '', step.units);
+            render();
+            if (isCheckedWorkspace) document.getElementById('frame-generate')?.click();
+            else if (session.connected) showWorkedSolution(solutionStep === 'deflection' ? 'integration' : 'sections');
+            $('step-feedback').focus();
+        };
+        return;
+    }
+    const answer = $<HTMLInputElement>('answer'), units = $<HTMLSelectElement>('answer-units');
+    answer.value = view.answer; units.value = view.units;
+    answer.oninput = () => { view.answer = answer.value; };
+    units.onchange = () => { view.units = units.value; };
+    if (!hintUsed) $('hint').onclick = () => {
+        hintUsed = true; void record('hint', '', step.units); renderPractice(); $('answer').focus();
     };
-    $('check-answer').onclick = async () => {
-        const answer = $<HTMLInputElement>('answer').value.trim(), units = $<HTMLSelectElement>('answer-units').value;
-        if (!answer) {
-            toast('Enter an answer first.');
-            return;
-        }
+    $<HTMLFormElement>('practice-entry').onsubmit = async event => {
+        event.preventDefault();
+        if (view.pending || !answer.value.trim()) return;
+        view.answer = answer.value.trim(); view.units = units.value; view.pending = true;
         $<HTMLButtonElement>('check-answer').disabled = true;
-        const attempt = await record('submit', answer, units);
-        if (attempt.step !== solutionStep || attempt.section !== sectionT || JSON.stringify(attempt.model) !== JSON.stringify(model) || mode !== 'practice') {
-            toast('The result was recorded for the model and step you submitted.');
-            return;
-        }
-        const result = attempt.result!;
-        $('step-feedback').innerHTML = `<div class="feedback ${result.status === 'incorrect' ? 'incorrect' : ''}"><b>${escape(result.status === 'correct' ? 'Correct' : result.status === 'incorrect' ? 'Check this step' : 'Your answer awaits verification')}</b><p>${escape(result.message)}</p><span class="small">${attempt.synced ? 'Recorded by the verifier.' : 'Answer saved on this device. The course verifier grades this submission separately from the structural model check.'}</span></div>`;
-        $<HTMLButtonElement>('check-answer').disabled = false;
+        const saved = await record('submit', view.answer, view.units);
+        view.pending = false; view.submission = saved.id;
+        if (practiceView === view && mode === 'practice') { renderPractice(); $('step-feedback').focus(); }
     };
-    $<HTMLInputElement>('answer').onkeydown = event => { if (event.key === 'Enter')
-        $('check-answer').click(); };
 }
 function expectedValue(p: NonNullable<ReturnType<typeof problem>>) { return { reaction_left: p.left.fy, reaction_right: p.right.fy, normal: p.N, shear: p.V, moment: p.M, deflection: p.deflection }[solutionStep]!; }
 function record(event: string, answer: string, units: string): Promise<Attempt> {

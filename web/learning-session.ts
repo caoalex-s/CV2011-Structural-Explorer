@@ -280,6 +280,7 @@ export function createLearningSession({ notify: toast, onConnectionChange, exerc
         get courseId() { return config.courseId || 'local-unassigned'; },
         request: api,
         record,
+        practiceAttempt: (id: string) => attempts.find(a => a.id === id && a.event === 'submit' && a.courseId === (config.courseId || 'local-unassigned')),
         beamEvents: () => attempts.filter(a => a.step === 'simple_beams' && a.courseId === (config.courseId || 'local-unassigned')),
         sectionEvents: () => attempts.filter(a => a.step === 'week04_sections' && a.courseId === (config.courseId || 'local-unassigned')),
         portalHistory(model:Model) {

@@ -1537,3 +1537,9 @@ dialog { background:var(--paper); color:var(--ink); border:1px solid var(--line)
     #insights-panel td::before { content:attr(data-heading); color:var(--muted); }
     #insights-panel pre { white-space:pre-wrap; overflow-wrap:anywhere; }
 }
+
+.practice-predicting #worked-panel { display: none; }
+#practice-panel > select { max-width: 100%; display: block; }
+#practice-entry .answer-row { margin-block: .4rem .75rem; }
+#practice-panel details { margin-top: 1rem; }
+#truss-add-joint[hidden], #truss-connect[hidden], #joint-edit label[hidden] { display: none; }

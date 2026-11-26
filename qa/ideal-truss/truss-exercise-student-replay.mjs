@@ -43,6 +43,7 @@ async function moveToSvg(x, y) {
 }
 
 async function chooseJoint(joint) {
+    await tool('edit');
     await page.locator('#choose').selectOption(joint);
 }
 
@@ -201,9 +202,19 @@ try {
     await locked();
     assert.equal(await canvas.locator('[data-node]').count(), 0);
     await tool('joint');
-    const bottom = 285, top = 65, left = 80, right = 80 + 4 * 220 / 3;
-    for (const [x, y] of [[left, bottom], [right, bottom], [right, top], [left, top]]) await moveToSvg(x, y);
-    for (const bar of names) await connect(...bar);
+    const top = 65, left = 80, right = 80 + 4 * 220 / 3;
+    for (const x of ['0', '4']) {
+        await page.locator('#truss-x').fill(x);
+        await page.locator('#truss-y').fill('0');
+        await page.locator('#truss-y').press('Enter');
+        assert.equal(await page.locator('#truss-x').evaluate(input => input === document.activeElement), true);
+    }
+    for (const x of [right, left]) await moveToSvg(x, top);
+    await tool('bar');
+    await page.locator('#bar-start').selectOption(names[0][0]);
+    await page.locator('#bar-end').selectOption(names[0][1]);
+    await page.locator('#truss-connect button').press('Enter');
+    for (const bar of names.slice(1)) await connect(...bar);
     assert.equal(await canvas.locator('[data-edge]').count(), 5);
     await editJoint('A', { support: 'pin' });
     await editJoint('B', { support: 'roller', rx: 0, ry: 1 });
