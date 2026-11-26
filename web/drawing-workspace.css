@@ -302,3 +302,11 @@
     .drawing-workspace .selection-editor { border-block:1px solid var(--line); background:var(--paper); }
     .drawing-workspace .selection-editor .inspector-panel { padding:.5rem .75rem; }
 }
+#canvas [data-diagram="pinned"] { fill:none; stroke:#82492f; stroke-width:2; stroke-dasharray:7 4; }
+#diagram-comparison { padding:.45rem .85rem; border-block:1px solid var(--line); font-size:.9rem; }
+#diagram-comparison p { margin:.2rem 0; }
+#diagram-comparison pre { max-height:12rem; overflow:auto; }
+#diagram-comparison b::before { content:""; display:inline-block; vertical-align:middle; width:1.45rem; margin-right:.35rem; border-top:2px solid #087f78; }
+#diagram-comparison .pin-key::before { border-top:2px dashed #82492f; }
+#diagram-comparison details { margin-top:.35rem; }
+#diagram-comparison #pin-diagram { float:right; margin:0 0 .25rem .5rem; }

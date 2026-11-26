@@ -20,6 +20,7 @@ import { pointAngle, setPointForce } from './point-force-edit.js';
 import { renderInspector } from './inspector.js';
 import { renderResponses, sampleSection } from './responses.js';
 import { sectionFreeBody } from './section-free-body.js';
+import { createDiagramPin } from './diagram-pin.js';
 import { createSandboxCut } from './sandbox-cut.js';
 import { createDrawingWorkspace } from './drawing-workspace.js';
 import { createWorkspaceControls } from './workspace-controls.js';
@@ -76,6 +77,8 @@ catch { /* Recover from stale browser storage with the default model. */ }
 assignLoadLabels(model);
 let analysis: Analysis = analyse(model);
 let tool = 'select', layer = 'M', mode = 'sandbox', side = 'tension';
+const diagramPin = createDiagramPin(modelStorageKey + '/pinned-diagram');
+$('pin-diagram').onclick = () => { diagramPin.toggle(model,layer); renderCanvas(); };
 let selected: Selection | null = null;
 let start: Snap | null = null, hover: Snap | null = null;
 let view = { scale: 85, cx: 4, cy: 0 };
@@ -493,25 +496,30 @@ function renderCanvas() {
     const spacing = grid * view.scale;
     const origin = screen({ x: 0, y: 0 });
     let drawing = `<defs><pattern id="grid" width="${spacing}" height="${spacing}" patternUnits="userSpaceOnUse" x="${origin.x % spacing}" y="${origin.y % spacing}"><circle cx="0" cy="0" r="1" fill="#dce5df"/></pattern></defs><rect width="${canvasWidth}" height="${canvasHeight}" fill="url(#grid)"/>`;
+    const pinned = diagramPin.update(isDrawingSandbox(),model,analysis,layer,currentMember,sectionT,cutSide());
+    const comparison = $('diagram-comparison');
+    if (!comparison.hidden && diagramNote.nextElementSibling !== comparison) diagramNote.after(comparison);
+    const plots = pinned ? [{solution:analysis, reference:false},{solution:pinned.analysis, reference:true}] :
+        [{solution:analysis,reference:false}];
     const all = analysis.elements.flatMap(e => e.samples);
     if (analysis.status === 'stable' && layer !== 'none' && responsesVisible()) {
         if (layer === 'displacement') {
-            const maximum = Math.max(...all.map(p => Math.hypot(p.ux, p.uy)), 1e-12), magnification = 55 / (view.scale * maximum);
-            for (const element of analysis.elements) {
+            const maximum = Math.max(...all.map(p => Math.hypot(p.ux, p.uy)), pinned?.peak ?? 0, 1e-12), magnification = 55 / (view.scale * maximum);
+            for (const plot of plots) for (const element of plot.solution.elements) {
                 const path = element.samples.map((p, i) => { const q = screen({ x: p.x + p.ux * magnification, y: p.y + p.uy * magnification }); return `${i ? 'L' : 'M'} ${q.x} ${q.y}`; }).join(' ');
-                drawing += `<path d="${path}" fill="none" stroke="${courseColors.reaction}" stroke-width="2.5"/>`;
+                drawing += `<path data-diagram="${plot.reference ? 'pinned' : 'current'}" d="${path}" fill="none" stroke="${courseColors.reaction}" stroke-width="2.5" pointer-events="none"/>`;
             }
             diagramNote.textContent = 'Displacement magnification ×' + number(magnification) + '. Reported displacements are unscaled.';
             diagramNote.hidden = false;
         }
         else {
-            const field = layer as 'N' | 'V' | 'M', maximum = Math.max(...all.map(p => Math.abs(p[field])), 1e-10), scale = 70 / maximum;
-            for (const element of analysis.elements) {
+            const field = layer as 'N' | 'V' | 'M', maximum = Math.max(...all.map(p => Math.abs(p[field])), pinned?.peak ?? 0, 1e-10), scale = 70 / maximum;
+            for (const plot of plots) for (const element of plot.solution.elements) {
                 const direction = field === 'M' ? (side === 'tension' ? -1 : 1) : 1;
                 const points = element.samples.map(p => screen({ x: p.x - element.s * p[field] * scale / view.scale * direction, y: p.y + element.c * p[field] * scale / view.scale * direction }));
                 const a = screen(element.samples[0]), b = screen(element.samples.at(-1)!);
                 const path = `M ${a.x} ${a.y} ` + points.map(p => `L ${p.x} ${p.y}`).join(' ') + ` L ${b.x} ${b.y} Z`;
-                drawing += `<path d="${path}" fill="#087f781c" stroke="#087f78" stroke-width="1.3" pointer-events="none"/>`;
+                drawing += `<path data-diagram="${plot.reference ? 'pinned' : 'current'}" d="${path}" fill="#087f781c" stroke="#087f78" stroke-width="1.3" pointer-events="none"/>`;
             }
             const section = sectionSample();
             if (section && document.body.classList.contains('drawing-workspace')) {
@@ -527,7 +535,7 @@ function renderCanvas() {
             // Retain the scale note at zero response so a load edit cannot shift the inspector dial.
             if (all.length) {
                 const peak = all.reduce((a, b) => Math.abs(a[field]) > Math.abs(b[field]) ? a : b);
-                diagramNote.innerHTML = 'Peak ' + math('|' + field + '|=' + quantity(number(Math.abs(peak[field])), field === 'M' ? measureUnits.moment : measureUnits.force)) + ' · Diagram scaled to fit';
+                diagramNote.innerHTML = 'Peak ' + math('|' + field + '|=' + quantity(number(Math.abs(peak[field])), field === 'M' ? measureUnits.moment : measureUnits.force)) + (pinned ? ' · Shared diagram scale' : ' · Diagram scaled to fit');
                 diagramNote.hidden = false;
             }
         }
