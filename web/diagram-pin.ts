@@ -1,14 +1,16 @@
 import { analyse, position, type Analysis, type Model, type Sample } from './engine.js';
-import { loadLabels, loadLabelText } from './load-labels.js';
+import { loadLabels, loadLabelLatex } from './load-labels.js';
 import { sampleSection } from './responses.js';
-import { formatNumber, formatSectionResult } from './ui.js';
+import { math, measureUnits, quantity } from './math.js';
+import { courseColors } from './symbols.js';
+import { escapeHtml, formatNumber, formatSectionResult } from './ui.js';
 
 export type DiagramField = 'M' | 'V' | 'N' | 'displacement';
 export function isDiagramField(field: string): field is DiagramField {
     return ['M', 'V', 'N', 'displacement'].includes(field);
 }
 const titles = { M: 'bending moment', V: 'shear force', N: 'axial force', displacement: 'deflected shape' };
-const units = { M: 'kN·m', V: 'kN', N: 'kN', displacement: 'mm' };
+const units = { M: measureUnits.moment, V: measureUnits.force, N: measureUnits.force, displacement: '\\mathrm{mm}' };
 
 function geometry(model: Model) {
     // Releases, loads, restraints and stiffness can change on the same geometry.
@@ -19,12 +21,15 @@ function geometry(model: Model) {
 }
 function sourceLabel(model: Model) {
     if (model.loads.length !== 1) return model.loads.length + ' applied loads';
-    const load = model.loads[0], label = loadLabelText(loadLabels(model).get(load.id)!);
-    if (load.kind === 'moment') return label + ' = ' + formatNumber(load.mz) + ' kN·m';
-    if (load.kind === 'distributed') return label + ' · distributed load';
+    const load = model.loads[0], label = loadLabelLatex(loadLabels(model).get(load.id)!);
+    if (load.kind === 'moment') return math(label + '=' + quantity(formatNumber(load.mz),measureUnits.moment));
+    if (load.kind === 'distributed') return math(label) + ' distributed load';
+    const magnitude = Math.hypot(load.fx,load.fy);
+    const source = math(label + '=' + quantity(formatNumber(magnitude),measureUnits.force));
+    if (!magnitude) return source;
+    if (!load.fx) return source + (load.fy < 0 ? ' down' : ' up');
     const angle = Math.atan2(load.fy,load.fx) * 180 / Math.PI;
-    const direction = load.fx === 0 ? (load.fy < 0 ? 'down' : 'up') : formatNumber(angle) + '°';
-    return label + ' · ' + formatNumber(Math.hypot(load.fx,load.fy)) + ' kN ' + direction;
+    return source + ' at ' + math(formatNumber(angle) + '^\\circ');
 }
 export function amplitude(sample: Sample, field: DiagramField) {
     return field === 'displacement' ? Math.hypot(sample.ux,sample.uy) : Math.abs(sample[field]);
@@ -73,21 +78,27 @@ export function createDiagramPin(storageKey: string) {
         if (pinned.field !== layer) reason = 'Select ' + titles[pinned.field] + ' to compare this pin.';
         else if (!available) reason = 'Comparison paused. The current drawing has no stable numerical solution.';
         else if (geometry(model) !== pinned.geometry) reason = 'Comparison paused. Member geometry or orientation has changed.';
+        panel.style.setProperty('--current-curve',layer === 'displacement' ? courseColors.reaction : '#087f78');
         const fields = (id: string, value: string) => { document.getElementById(id)!.textContent = value; };
         const result = (drawing: Model, solution: Analysis) => {
             const sample = sampleSection(solution,member,t,side,drawing);
             if (!sample) return 'Cut value unavailable';
             const field = pinned!.field;
             const value = field === 'displacement' ? 1000 * Math.hypot(sample.ux,sample.uy) : sample[field];
-            return (field === 'displacement' ? '|u|' : field) + ' = ' + formatSectionResult(value) + ' ' + units[field];
+            return math((field === 'displacement' ? '|u|' : field) + '=' + quantity(formatSectionResult(value),units[field]));
         };
-        fields('pin-reference',sourceLabel(pinned.model) + (reason ? '' : ' · ' + result(pinned.model,pinned.analysis)));
-        fields('pin-current',sourceLabel(model) + (reason ? '' : ' · ' + result(model,analysis)));
+        function showSeries(id: string, drawing: Model, solution: Analysis) {
+            const value = reason ? '' : '<span class="pin-value">' + result(drawing,solution) + '</span>';
+            document.getElementById(id)!.innerHTML = '<span>' + sourceLabel(drawing) + '</span>' + value;
+        }
+        showSeries('pin-reference',pinned.model,pinned.analysis);
+        showSeries('pin-current',model,analysis);
         const station = model.members.find(m => m.id === member);
         if (!reason && station) {
             const a = position(model,member,0), b = position(model,member,1);
-            fields('pin-status','Numerical ' + titles[pinned.field] + ' · shared scale · ' + member + ', x = ' +
-                formatNumber(t*Math.hypot(b.x-a.x,b.y-a.y)) + ' m, just ' + side);
+            const distance = quantity(formatNumber(t*Math.hypot(b.x-a.x,b.y-a.y)),measureUnits.length);
+            document.getElementById('pin-status')!.innerHTML = 'Numerical ' + titles[pinned.field] + ' on a shared scale. Member ' +
+                escapeHtml(member) + ', ' + math('x=' + distance) + ', just ' + side + '.';
         } else fields('pin-status',reason);
         fields('pin-reference-source',JSON.stringify(pinned.model,null,2));
         fields('pin-current-source',JSON.stringify(model,null,2));

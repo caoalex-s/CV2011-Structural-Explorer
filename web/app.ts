@@ -535,7 +535,7 @@ function renderCanvas() {
             // Retain the scale note at zero response so a load edit cannot shift the inspector dial.
             if (all.length) {
                 const peak = all.reduce((a, b) => Math.abs(a[field]) > Math.abs(b[field]) ? a : b);
-                diagramNote.innerHTML = 'Peak ' + math('|' + field + '|=' + quantity(number(Math.abs(peak[field])), field === 'M' ? measureUnits.moment : measureUnits.force)) + (pinned ? ' · Shared diagram scale' : ' · Diagram scaled to fit');
+                diagramNote.innerHTML = (pinned ? 'Current peak ' : 'Peak ') + math('|' + field + '|=' + quantity(number(Math.abs(peak[field])), field === 'M' ? measureUnits.moment : measureUnits.force)) + (pinned ? ' · Shared diagram scale' : ' · Diagram scaled to fit');
                 diagramNote.hidden = false;
             }
         }

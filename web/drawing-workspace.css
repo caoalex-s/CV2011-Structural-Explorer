@@ -310,3 +310,7 @@
 #diagram-comparison .pin-key::before { border-top:2px dashed #82492f; }
 #diagram-comparison details { margin-top:.35rem; }
 #diagram-comparison #pin-diagram { float:right; margin:0 0 .25rem .5rem; }
+#diagram-comparison .current-key::before { border-color:var(--current-curve); }
+#diagram-comparison > div { display:grid; grid-template-columns:5.5rem minmax(0,1fr); align-items:baseline; }
+#pin-reference,#pin-current { display:flex; flex-wrap:wrap; justify-content:space-between; gap:.1rem .85rem; }
+#diagram-comparison .pin-value { font-weight:600; }

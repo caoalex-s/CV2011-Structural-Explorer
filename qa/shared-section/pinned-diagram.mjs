@@ -17,8 +17,11 @@ try {
         const magnitude = page.locator('[data-property="magnitude"]');
         await magnitude.fill('30');
         await magnitude.press('Tab');
-        assert.match(await page.locator('#pin-reference').textContent(), /20 kN down.*40 kN·m/);
-        assert.match(await page.locator('#pin-current').textContent(), /30 kN down.*60 kN·m/);
+        const notation = 'annotation[encoding="application/x-tex"]';
+        assert.deepEqual(await page.locator('#pin-reference ' + notation).allTextContents(),
+            [String.raw`P_{1}=20\,\mathrm{kN}`,String.raw`M=40\,\mathrm{kN}\,\mathrm{m}`]);
+        assert.deepEqual(await page.locator('#pin-current ' + notation).allTextContents(),
+            [String.raw`P_{1}=30\,\mathrm{kN}`,String.raw`M=60\,\mathrm{kN}\,\mathrm{m}`]);
         // The two paths have the same baseline. Their screen ordinates must
         // have the physical amplitude ratio, even when the moment side flips.
         async function ordinate(which) {
