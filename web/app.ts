@@ -737,7 +737,8 @@ function render(keepInspector = false, previewCut = false) {
         const key = JSON.stringify([model, currentMember, sectionT, cutSide(), solutionStep, session.courseId]);
         if (practiceView?.key !== key) {
             practiceView = { key, answer: '', units: stepDefinitions[solutionStep].units };
-            practiceResultsVisible = solutionRevealed = hintUsed = false;
+            practiceResultsVisible = solutionRevealed = false;
+            hintUsed = session.sawPracticeAid(model, [solutionStep], 'hint');
         }
     }
     document.body.classList.toggle('practice-predicting', mode === 'practice' && !!problem() && !practiceResultsVisible);
@@ -759,8 +760,12 @@ function render(keepInspector = false, previewCut = false) {
     (document.querySelector('.right-panel') as HTMLElement).hidden = !selected;
     $('moment-options').hidden = layer !== 'M';
     renderCanvas();
-    if (mode === 'practice')
+    if (mode === 'practice') {
+        const previous = document.activeElement;
+        const focusedId = previous && $('practice-panel').contains(previous) ? previous.id : '';
         renderPractice();
+        if (focusedId) document.getElementById(focusedId)?.focus({ preventScroll: true });
+    }
     session.updateStatus();
     if (!isCheckedWorkspace) renderWorked({ model, section: sectionT, practice: mode === 'practice', connected: session.connected,
         request: payload => session.request('/api/worked-solution', payload),
@@ -1249,7 +1254,7 @@ function record(event: string, answer: string, units: string): Promise<Attempt> 
         // Revealing the full model exposes reactions and diagram values for
         // other questions and stations on the same drawing.
         solutionRevealed: solutionRevealed || practiceResultsVisible ||
-            session.sawPracticeSolution(model, Object.keys(stepDefinitions)) }, event, answer, units);
+            session.sawPracticeAid(model, Object.keys(stepDefinitions), 'reveal') }, event, answer, units);
 }
 // Components bind once. Model edits and navigation still share this controller.
 const drawingWorkspace = createDrawingWorkspace(object => {
@@ -1288,7 +1293,10 @@ if (portalExercise) {
 restoreCheckerControls?.();
 portalPanel = createPortalPanel(() => model, value => commit(() => {
     if (model.loads.length === 1) { model.loads[0].fy = value; model.loads[0].qEnd = value; }
-}), value => { sectionT = value; render(); }, modelStorageKey, preserveCheckerView, (drawing, member, rows) => momentExercise?.checked(drawing,member,rows), message => momentExercise?.status(message));
+}), value => { sectionT = value; render(); }, modelStorageKey, () => {
+    preserveCheckerView();
+    if (mode === 'practice' && practiceResultsVisible) sessionStorage.setItem(modelStorageKey + '/practice-focus', '1');
+}, (drawing, member, rows) => momentExercise?.checked(drawing,member,rows), message => momentExercise?.status(message));
 
 if (!restoredPortalView) fit();
 controls.showLayer(layer);
@@ -1296,4 +1304,8 @@ setMode(location.hash.slice(1) || (restoredPortalView ? mode : 'sandbox'));
 modelFile.onchange = openSelectedModel;
 if (modelFile.files?.length) void openSelectedModel();
 else setWorkspaceBusy(false);
+if (sessionStorage.getItem(modelStorageKey + '/practice-focus')) {
+    sessionStorage.removeItem(modelStorageKey + '/practice-focus');
+    if (mode === 'practice' && practiceResultsVisible) document.getElementById('step-feedback')?.focus();
+}
 void session.connect();

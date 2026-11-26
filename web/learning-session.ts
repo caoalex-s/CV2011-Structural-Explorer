@@ -281,10 +281,10 @@ export function createLearningSession({ notify: toast, onConnectionChange, exerc
         get courseId() { return config.courseId || 'local-unassigned'; },
         request: api,
         record,
-        sawPracticeSolution: (model: Model, steps: string[]) => {
+        sawPracticeAid: (model: Model, steps: string[], event: 'hint' | 'reveal') => {
             const source = JSON.stringify(model);
             return attempts.some(a => a.courseId === (config.courseId || 'local-unassigned') &&
-                a.event === 'reveal' && steps.includes(a.step) && JSON.stringify(a.model) === source);
+                a.event === event && steps.includes(a.step) && JSON.stringify(a.model) === source);
         },
         practiceAttempt: (id: string) => attempts.find(a => a.id === id && a.event === 'submit' && a.courseId === (config.courseId || 'local-unassigned')),
         beamEvents: () => attempts.filter(a => a.step === 'simple_beams' && a.courseId === (config.courseId || 'local-unassigned')),
