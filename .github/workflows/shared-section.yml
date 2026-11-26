@@ -33,6 +33,7 @@ jobs:
           node qa/shared-section/section-notation.mjs "file://$PWD/.data/student-tools/node_modules/playwright/index.mjs" http://127.0.0.1:8765/ .data/shared-evidence/notation
           node qa/shared-section/load-directions.mjs "file://$PWD/.data/student-tools/node_modules/playwright/index.mjs" http://127.0.0.1:8765/ .data/shared-evidence/directions
           node qa/shared-section/on-drawing-force.mjs "file://$PWD/.data/student-tools/node_modules/playwright/index.mjs" http://127.0.0.1:8765/ .data/shared-evidence/on-drawing
+          node qa/shared-section/pinned-diagram.mjs "file://$PWD/.data/student-tools/node_modules/playwright/index.mjs" http://127.0.0.1:8765/ .data/shared-evidence/pin
       - name: Check course and import routes
         run: |
           playwright="file://$PWD/.data/student-tools/node_modules/playwright/index.mjs"
