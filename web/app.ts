@@ -177,7 +177,6 @@ function updateEvidenceBinding(preview = false) {
 let solutionStep = 'reaction_left', solutionRevealed = false, hintUsed = false, practiceResultsVisible = false;
 interface PracticeView { key: string; answer: string; units: string; submission?: string; pending?: boolean }
 let practiceView: PracticeView | undefined;
-let proofStatus = { lean: 'pending', scope: 'Scaled reaction equilibrium identities and plotting-side inversion.' };
 const svg = $('canvas') as unknown as SVGSVGElement;
 // Redraw the geometry independently so the cut grip retains keyboard focus
 // and pointer capture while inspection updates the free body and checked query.
@@ -1204,7 +1203,7 @@ function renderPractice() {
         ${hintUsed && !practiceResultsVisible ? '<p class="feedback">' + step.hint + '</p>' : ''}
         ${attempt && !practiceResultsVisible ? '<button class="primary" id="reveal">Show worked solution</button>' : ''}
         ${attempt ? '<button id="practice-retry">Revise prediction</button>' : ''}
-        <details><summary>How this prediction is checked</summary><p>The course verifier grades your expression and units. Offline submissions stay in this browser until you connect and sync them from Insights.</p><p>${escape(proofStatus.scope)}</p></details>`;
+        <details><summary>How this prediction is checked</summary><p>The course verifier grades your expression and units. Offline submissions stay in this browser until you connect and sync them from Insights.</p></details>`;
     const selector = $<HTMLSelectElement>('practice-step');
     selector.onchange = () => { solutionStep = selector.value; render(); $('practice-step').focus(); };
     if (attempt) {
@@ -1213,13 +1212,17 @@ function renderPractice() {
             practiceResultsVisible = false;
             render(); $('answer').focus();
         };
-        if (!practiceResultsVisible) $('reveal').onclick = () => {
+        if (!practiceResultsVisible) $('reveal').onclick = async () => {
             practiceResultsVisible = solutionRevealed = true;
-            void record('reveal', '', step.units);
+            const recorded = record('reveal', '', step.units);
             render();
+            $('step-feedback').focus();
+            // Activating the checker can reload the page. Finish recording this
+            // reveal first, and abandon generation if the learner moved on.
+            await recorded;
+            if (practiceView !== view || mode !== 'practice' || !practiceResultsVisible) return;
             if (isCheckedWorkspace) document.getElementById('frame-generate')?.click();
             else if (session.connected) showWorkedSolution(solutionStep === 'deflection' ? 'integration' : 'sections');
-            $('step-feedback').focus();
         };
         return;
     }
@@ -1291,4 +1294,3 @@ modelFile.onchange = openSelectedModel;
 if (modelFile.files?.length) void openSelectedModel();
 else setWorkspaceBusy(false);
 void session.connect();
-void fetch('verification.json').then(r => r.json()).then(v => { proofStatus = v; }).catch(() => { });

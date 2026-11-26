@@ -170,7 +170,8 @@ export function createLearningSession({ notify: toast, onConnectionChange, exerc
                     if (identity.courseId !== config.courseId && config.courseId)
                         throw Error('Course ID does not correspond to this access token.');
                     config.courseId = identity.courseId;
-                    if(exercise)localStorage.setItem('cv2011-id', config.courseId);
+                    // The checker can reload Practice after the local verifier assigns an ID.
+                    localStorage.setItem('cv2011-id', config.courseId);
                 }
             }
             catch {
