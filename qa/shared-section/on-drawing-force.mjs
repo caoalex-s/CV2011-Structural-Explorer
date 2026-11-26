@@ -67,7 +67,8 @@ try {
         assert.equal(await page.locator('#canvas .rotate-angle').count(),0);
         const annotation=load.locator('[data-force-annotation]');
         if(touch) await annotation.tap(); else await annotation.click();
-        assert.ok(await page.locator('body').evaluate(el=>el.classList.contains('point-quick-edit')));
+        assert.equal(await page.locator('.selection-editor #inspector').count(),1);
+        assert.ok(await page.locator('#inspector .direction-dial').isVisible());
         const field=key=>page.locator('#inspector [data-property="'+key+'"]');
         await field('pointAngle').fill('30');
         await field('pointAngle').press('Tab');
@@ -78,7 +79,6 @@ try {
         assert.equal(final.t,.5);
         assert.ok(await page.locator('#inspector [data-range=magnitude]').isVisible());
         await page.screenshot({path:join(output,'exact-'+width+'.png')});
-        await page.locator('#full-point-properties').click();
         assert.ok(await page.locator('#inspector .direction-dial').isVisible());
         await page.reload();
         assert.deepEqual(await model(),final);

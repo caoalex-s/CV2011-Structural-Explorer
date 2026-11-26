@@ -139,7 +139,7 @@ export function renderInspector(options: InspectorOptions): void {
             html += `<label class="field">Support type<select data-property="kind">${['pin', 'roller', 'fixed', 'guided', 'custom'].map(k => `<option ${item.kind === k ? 'selected' : ''}>${k}</option>`).join('')}</select></label>` + field('t', 'Position / member length', '0.01') + (['roller', 'guided'].includes(String(item.kind)) ? field('angle', `Restrained translation angle from ${math('+x')} (°)`) : '') + (item.kind === 'custom' ? [['fixX', `Restrain global ${math('x')}`], ['fixY', `Restrain global ${math('y')}`], ['fixRotation', `Restrain rotation ${math('\\theta')}`]].map(([key, label]) => `<label class="check"><input type="checkbox" data-property="${key}" ${item[key] ? 'checked' : ''}>${label}</label>`).join('') : '') + '<p class="small">Ground restraints act on the selected member side. A pin support does not release continuity between connected members.</p>';
         if (selected.type === 'load') {
             html += `<label class="field">Load label<input type="text" data-property="label" maxlength="10" value="${escape(loadLabels(model).get(selected.id))}" placeholder="${item.kind === 'moment' ? 'M_0' : item.kind === 'distributed' ? 'w_1' : 'P_1'}"></label>`;
-            html += field('t', 'Start / member length', 'any');
+            html += field('t', item.kind === 'distributed' ? 'Start / member length' : 'Position / member length', 'any');
             const load = model.loads.find(load => load.id === selected.id)!;
             const angleField = (key: string, caption: string, value: number) =>
                 `<label class="field">${caption}<input type="number" step="any" data-property="${key}" value="${value}"></label>`;
@@ -197,9 +197,13 @@ export function renderInspector(options: InspectorOptions): void {
             const settings = document.createElement('details');
             settings.className = 'load-settings';
             settings.open = !!expanded;
-            settings.innerHTML = '<summary>Position and load settings</summary>';
+            settings.innerHTML = '<summary>Attachment and notation</summary>';
             for (const child of [...container.children])
-                if (child !== heading && child !== directions && child !== components) settings.append(child);
+                if (child !== heading && child !== directions && child !== components &&
+                    !child.querySelector('[data-property="t"], [data-property="end"]')) settings.append(child);
+            // Place exact station entries after the load's direction and strength.
+            for (const input of container.querySelectorAll('[data-property="t"], [data-property="end"]'))
+                container.append(input.closest('label')!);
             if (components) components.open = !!componentsOpen;
             container.append(settings);
         }

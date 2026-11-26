@@ -344,7 +344,6 @@ function supportDrawing(support: Support) {
     const custom = support.kind === 'custom' ? `<text y="29" text-anchor="middle" stroke="none" fill="${courseColors.ink}" font-size="8">${support.fixX ? 'x' : ''}${support.fixY ? 'y' : ''}${support.fixRotation ? 'θ' : ''}</text>` : '';
     return `<g class="clickable" data-object="support" data-id="${escape(support.id)}" transform="translate(${p.x} ${p.y}) rotate(${rotation})" stroke="${courseColors.member}" stroke-width="1.6" fill="none"><title>${escape(support.kind)} ground support</title><circle cy="15" r="25" class="node-hit" stroke="none"/>${selectedRing}${supportShape(support.kind)}${custom}</g>`;
 }
-let exactPointId: string | undefined;
 let rotation: {
     load: Load; pointer: number; offset: number; snap: (raw: number) => number;
     outward: boolean; startX: number; startY: number; changed: boolean;
@@ -753,9 +752,6 @@ function render(keepInspector = false, previewCut = false) {
     if (checkedScope) checkedScope.innerHTML = member ? `${escape(memberLabel(model, member))} at ${section.stationMath.join(', ')} (just ${cutSide()})` : 'Choose a member.';
     controls.setHistory(history.length > 0, future.length > 0);
     if (!keepInspector) inspector();
-    if (!isDrawingSandbox() || selected?.type !== 'load' || selected.id !== exactPointId) exactPointId = undefined;
-    document.body.classList.toggle('point-quick-edit',!!exactPointId);
-    $('full-point-properties').hidden = !exactPointId;
     $('edit-selection').hidden = !selected;
     (document.querySelector('.right-panel') as HTMLElement).hidden = !selected;
     $('moment-options').hidden = layer !== 'M';
@@ -808,14 +804,12 @@ svg.addEventListener('pointerdown', event => {
         return;
     }
     if (target.closest('[data-force-annotation]') && object && isDrawingSandbox() && (tool === 'select' || selected?.id === object.dataset.id)) {
-        exactPointId = object.dataset.id;
-        selected = {type:'load',id:exactPointId!};
+        selected = {type:'load',id:object.dataset.id!};
         controls.setFocus(false);
         render();
-        document.querySelector('.inspector-panel')!.scrollIntoView({block:'nearest',behavior:'instant'});
+        focusSelectedEditor();
         return;
     }
-    exactPointId = undefined;
     if (tool === 'delete' && object) {
         selected = { type: object.dataset.object!, id: object.dataset.id! };
         removeSelected();
@@ -1057,11 +1051,13 @@ $('focus-workspace').onclick = () => {
     controls.setFocus($('focus-workspace').getAttribute('aria-pressed') !== 'true');
     renderCanvas();
 };
-$('full-point-properties').onclick = () => {
-    exactPointId = undefined;
-    render();
-    document.querySelector<SVGSVGElement>('.direction-dial')?.focus({preventScroll:true});
-};
+function focusSelectedEditor() {
+    const panel = document.querySelector<HTMLElement>('.inspector-panel')!;
+    panel.scrollIntoView({block:'nearest'});
+    const control = panel.querySelector<HTMLElement>('[data-property="magnitude"], [data-property="momentMagnitude"], .line-strengths input') ??
+        panel.querySelector<HTMLElement>('[data-property]');
+    control?.focus({preventScroll:true});
+}
 $('close-inspector').onclick = () => {
     selected = null;
     render();
@@ -1070,7 +1066,7 @@ $('close-inspector').onclick = () => {
 $('help-button').onclick = () => $<HTMLDialogElement>('workspace-help').showModal();
 $('edit-selection').onclick = () => {
     controls.setFocus(false);
-    document.querySelector('.inspector-panel')!.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    focusSelectedEditor();
 };
 $('undo').onclick = () => { if (!history.length)
     return; future.push(clone(model)); model = history.pop()!; selected = null; start = null; changed(); };
@@ -1265,6 +1261,18 @@ const drawingWorkspace = createDrawingWorkspace(object => {
     selected = object;
     if (object?.type === 'member') currentMember = object.id;
     render();
+}, () => {
+    if (!selected) return;
+    const attachment = selected.type === 'load' ? model.loads.find(load => load.id === selected!.id) :
+        selected.type === 'support' ? model.supports.find(support => support.id === selected!.id) : undefined;
+    if (attachment) {
+        currentMember = attachment.member;
+        sectionT = attachment.t;
+        $<HTMLSelectElement>('frame-side').value = sectionT === 1 ? 'left' : 'right';
+    } else if (selected.type === 'member') currentMember = selected.id;
+    selected = null;
+    render();
+    $('frame-side').focus();
 });
 const controls = createWorkspaceControls({
     selectTool: next => {
