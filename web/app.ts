@@ -772,6 +772,16 @@ function render(keepInspector = false, previewCut = false) {
         },
         reveal: () => { solutionRevealed = true; void record('reveal', '', stepDefinitions[solutionStep].units); } });
 }
+svg.addEventListener('click', event => {
+    if (!isDrawingSandbox()) return;
+    const caption = (event.target as Element).closest('[data-force-annotation]');
+    const load = caption?.closest<SVGElement>('[data-point-force]');
+    if (!load?.dataset.id || (tool !== 'select' && selected?.id !== load.dataset.id)) return;
+    selected = {type:'load', id:load.dataset.id};
+    controls.setFocus(false);
+    render();
+    focusSelectedEditor();
+});
 svg.addEventListener('pointerdown', event => {
     if (mode === 'insights')
         return;
@@ -804,10 +814,9 @@ svg.addEventListener('pointerdown', event => {
         return;
     }
     if (target.closest('[data-force-annotation]') && object && isDrawingSandbox() && (tool === 'select' || selected?.id === object.dataset.id)) {
-        selected = {type:'load',id:object.dataset.id!};
-        controls.setFocus(false);
-        render();
-        focusSelectedEditor();
+        // A caption activates on click. Keep the drawing and scroll position
+        // stable until release, especially for a tap over the phone editor.
+        event.preventDefault();
         return;
     }
     if (tool === 'delete' && object) {

@@ -70,6 +70,7 @@ try {
         assert.equal(await page.locator('.selection-editor #inspector').count(),1);
         assert.ok(await page.locator('#inspector .direction-dial').isVisible());
         const field=key=>page.locator('#inspector [data-property="'+key+'"]');
+        assert.ok(await field('magnitude').evaluate(input => input === document.activeElement));
         await field('pointAngle').fill('30');
         await field('pointAngle').press('Tab');
         await field('magnitude').fill('40');
