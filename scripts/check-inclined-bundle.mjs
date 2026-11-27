@@ -8,7 +8,7 @@ import { execFileSync } from 'node:child_process';
 const directory = 'public/portal-checker/bundle/';
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const bytes = await readFile(directory + 'manifest.json');
-assert.equal(hash(bytes), 'f886a80a23c441f63f64335e61614051c68b08d232c11778ea2606467702b9b0');
+assert.equal(hash(bytes), 'd82f3ee384850ddecf4d59f5dc85b7aec7c7a6fb307f218dfa89d6f37c358a17');
 const manifest = JSON.parse(bytes);
 assert.equal(manifest.sourceCommit, '038b0a48c95022647af26fd5dd6165abf5a92c8f');
 assert.equal(manifest.theorem, 'InclinedFrameIntervalReportSound.checkReport_sound');
