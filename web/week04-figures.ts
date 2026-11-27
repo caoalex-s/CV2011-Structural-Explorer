@@ -62,5 +62,9 @@ export function diagram(d: Drawing, q: Query, section?: CheckedSection) {
     const cut = line({ x: q.cut, y: .6 }, { x: q.cut, y: -2.55 }, 'stroke="#9d5225" stroke-dasharray="6 5" stroke-width="2"');
     const dimensions = section ? '' : `<g fill="#415762">${[0, 2, 4].map(x => line({ x, y: -2.88 }, { x: x + 2, y: -2.88 }, 'stroke="#809699"') + text(sx(x + 1), sy(-2.88) - 5, '2 m', 'middle')).join('')}
         ${line({ x: 6.9, y: 0 }, { x: 6.9, y: -2 }, 'stroke="#809699"')}${text(sx(6.9) + 4, sy(-1), '2 m')}</g>`;
-    return `<svg id="${section ? 'section-fbd' : 'section-drawing'}" viewBox="0 0 680 335" role="img" aria-label="${section ? q.side + ' free body with cut forces assumed tensile' : 'Seven-joint truss with selected vertical cut'}">${dimensions}${cut}${text(sx(q.cut), sy(.6) - 7, 'a–a', 'middle')}${bars.join('')}${pivot}${joints}${actions.join('')}</svg>`;
+    // Frame the retained body, its cut arrows and the chosen moment centre.
+    // Coordinates and force lines stay in the original drawing system.
+    const left = section && q.side === 'right' ? Math.min(sx(q.cut) - 90, sx(centre.x) - 20) : 0;
+    const right = section && q.side === 'left' ? Math.max(sx(q.cut) + 100, sx(centre.x) + 24) : 680;
+    return `<svg id="${section ? 'section-fbd' : 'section-drawing'}" viewBox="${left} 0 ${right-left} ${section ? 305 : 335}" role="img" aria-label="${section ? q.side + ' free body with cut forces assumed tensile' : 'Seven-joint truss with selected vertical cut'}">${dimensions}${cut}${text(sx(q.cut), sy(.6) - 7, 'a–a', 'middle')}${bars.join('')}${pivot}${joints}${actions.join('')}</svg>`;
 }

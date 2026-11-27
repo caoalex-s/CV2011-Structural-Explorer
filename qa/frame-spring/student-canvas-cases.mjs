@@ -134,7 +134,9 @@ export async function runSpringStudentCases({ page, base, output, validateWorked
         if (await reactions.isVisible() && !await reactions.evaluate(details => details.open)) {
             await reactions.locator('summary').click();
         }
-        const rows = await page.locator('#reactions .reaction-row').allTextContents();
+        const rows = await page.locator('#reactions .reaction-row').evaluateAll(reactions => reactions.map(row =>
+            [...row.querySelectorAll('span > .katex annotation[encoding="application/x-tex"]')]
+                .map(formula => formula.textContent).filter(formula => formula.includes(' = '))));
         const properties = await inspector.innerText();
         const entry = { name, expected, status, response, rows, properties };
         records.push(entry);
@@ -145,16 +147,19 @@ export async function runSpringStudentCases({ page, base, output, validateWorked
         });
         assert.equal(rows.length, expected.reactions.length);
         for (const [i, row] of rows.entries()) {
-            // KaTeX labels contain duplicate accessible math text; only text
-            // after the explicit separator colon represents a displayed value.
-            const values = [...row.matchAll(/:\s*(-?[\d.]+(?:e[+-]?\d+)?)/gi)].map(match => Number(match[1]));
+            const values = row.map(formula => {
+                const value = formula.split(' = ')[1].split('\\,')[0];
+                return Number(value.replace(/\\times10\^\{(-?\d+)\}/, 'e$1'));
+            });
             assert.ok(values.length === 2 || values.length === 3, `Could not read reaction row: ${row}`);
             expected.reactions[i].forEach((value, j) => closeTo(values[j] ?? 0, value, `${name} reaction ${i}/${j}`));
         }
-        const shownJump = /Relative rotation Δθ =\s*(-?[\d.]+(?:e[+-]?\d+)?)/i.exec(properties);
         if (expected.stiffness !== 'continuous') {
+            const formulas = await inspector.locator('annotation[encoding="application/x-tex"]').allTextContents();
+            const shownJump = formulas.find(formula => formula.startsWith('\\Delta\\theta = '));
             assert.ok(shownJump, 'The joint inspector did not display relative rotation');
-            closeTo(Number(shownJump[1]), expected.rotationJump, `${name} relative rotation`);
+            const rotation = shownJump.split(' = ')[1].split('\\,')[0].replace(/\\times10\^\{(-?\d+)\}/, 'e$1');
+            closeTo(Number(rotation), expected.rotationJump, `${name} relative rotation`);
         }
         await page.getByRole('button', { name: 'Generate worked solution' }).click();
         const checker = page.locator('#portal-status');
@@ -331,7 +336,7 @@ export async function runSpringStudentCases({ page, base, output, validateWorked
         await couples.nth(1).locator('text').click();
         assert.equal(Number(await field('mz').inputValue()), -4);
         assert.equal(Number(await field('t').inputValue()), 0);
-        assert.equal(await field('member').locator('option:checked').textContent(), 'B–C');
+        assert.equal(await field('member').locator('option:checked').textContent(), 'BC');
         await page.screenshot({ path: join(output, `${name}.png`), fullPage: true });
     }
     for (const [name, height] of [['coincident-couples', 0], ['coincident-couples-near-top', 2]]) {

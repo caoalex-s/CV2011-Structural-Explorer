@@ -61,10 +61,17 @@ function unique(ids: string[], name: string): void {
 
 /** Strictly parse the existing local Model or its version-2 export, without solving it. */
 export function parseEvidenceModel(input: unknown): Model {
+    const model = parseDrawing(input, 2);
+    if (model.loads.some(load => load.direction !== undefined))
+        throw Error('The compiled checker supports vertical distributed loads in the original global-y format.');
+    return model;
+}
+
+export function parseDrawing(input: unknown, maxVersion = 3): Model {
     const root = object(input, 'input', ['version', 'model', 'nodes', 'members', 'supports', 'loads']);
     let raw: ObjectValue;
     if ('version' in root || 'model' in root) {
-        if (root.version !== 2 || !('model' in root) || Object.keys(root).some(key => key !== 'version' && key !== 'model')) throw Error('Expected a version-2 model export');
+        if ((root.version !== 2 && !(maxVersion === 3 && root.version === 3)) || !('model' in root) || Object.keys(root).some(key => key !== 'version' && key !== 'model')) throw Error('Expected a version-2 model export');
         raw = object(root.model, 'model', ['nodes', 'members', 'supports', 'loads']);
     } else raw = root;
     const nodes = array(raw.nodes, 'nodes').map((value, index) => {
@@ -95,12 +102,14 @@ export function parseEvidenceModel(input: unknown): Model {
         return { id: text(item.id, `${name}.id`), member: memberReference(item.member, `${name}.member`), t: parameter(item.t, `${name}.t`), kind: choice(item.kind, `${name}.kind`, ['pin', 'roller', 'fixed', 'guided', 'custom'] as const), angle: number(item.angle, `${name}.angle`), fixX: flag(item.fixX, `${name}.fixX`), fixY: flag(item.fixY, `${name}.fixY`), fixRotation: flag(item.fixRotation, `${name}.fixRotation`) };
     });
     unique(supports.map(item => item.id), 'Support');
-    const loads = array(raw.loads, 'loads').map((value, index) => {
-        const name = `loads[${index}]`, item = object(value, name, ['id', 'label', 'member', 'kind', 't', 'end', 'fx', 'fy', 'mz', 'qEnd']);
+    const loads = array(raw.loads, 'loads').map<Model['loads'][number]>((value, index) => {
+        const name = `loads[${index}]`, item = object(value, name, ['id', 'label', 'member', 'kind', 't', 'end', 'fx', 'fy', 'mz', 'qEnd', 'direction']);
         const kind = choice(item.kind, `${name}.kind`, ['force', 'moment', 'distributed'] as const), t = parameter(item.t, `${name}.t`), end = parameter(item.end, `${name}.end`);
         if (kind === 'distributed' && end <= t) throw Error(`${name} must have a positive interval`);
+        const direction = item.direction === undefined || item.direction === 'member-normal' ? item.direction : number(item.direction, name + '.direction');
+        if (direction !== undefined && kind !== 'distributed') throw Error(name + ': only line loads have a direction field');
         const label = item.label === undefined ? undefined : text(item.label, `${name}.label`);
-        return { id: text(item.id, `${name}.id`), ...(label === undefined ? {} : { label }), member: memberReference(item.member, `${name}.member`), kind, t, end, fx: number(item.fx, `${name}.fx`), fy: number(item.fy, `${name}.fy`), mz: number(item.mz, `${name}.mz`), qEnd: number(item.qEnd, `${name}.qEnd`) };
+        return { id: text(item.id, `${name}.id`), ...(label === undefined ? {} : { label }), ...(direction === undefined ? {} : { direction }), member: memberReference(item.member, `${name}.member`), kind, t, end, fx: number(item.fx, `${name}.fx`), fy: number(item.fy, `${name}.fy`), mz: number(item.mz, `${name}.mz`), qEnd: number(item.qEnd, `${name}.qEnd`) };
     });
     unique(loads.map(item => item.id), 'Load');
     return { nodes, members, supports, loads };
@@ -139,9 +148,9 @@ function partition(model: Model) {
 
 /** Capture only local data. Binary64 JSON numbers denote their exact parsed binary values. */
 export async function createEvidenceEnvelope(input: unknown, query: EvidenceQuery, rawSource?: string) {
-    const model = parseEvidenceModel(input);
+    const model = parseDrawing(input);
     const checkedQuery = validateQuery(query, model);
-    if (rawSource !== undefined && canonical(parseEvidenceModel(JSON.parse(rawSource))) !== canonical(model)) throw Error('Raw source does not match the snapshot');
+    if (rawSource !== undefined && canonical(parseDrawing(JSON.parse(rawSource))) !== canonical(model)) throw Error('Raw source does not match the snapshot');
     const { mechanics, display } = partition(model);
     const [mechanical, presentation, queryHash, raw] = await Promise.all([
         digest(canonical(mechanics)), digest(canonical(display)), digest(canonical(checkedQuery)),
@@ -158,7 +167,7 @@ export class EvidenceRequests {
     private signature = '';
     /** Ignore presentation-only edits, but retain the history of mechanical/query edits. */
     update(input: unknown, query: EvidenceQuery): void {
-        const model = parseEvidenceModel(input);
+        const model = parseDrawing(input);
         const signature = canonical({ mechanics: partition(model).mechanics, query: validateQuery(query, model) });
         if (this.signature !== signature) { this.signature = signature; this.revision++; }
     }

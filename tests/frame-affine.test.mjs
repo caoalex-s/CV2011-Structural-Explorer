@@ -106,8 +106,10 @@ test('synthetic screenshot-like portal balances signed reactions and renders aff
         bindings: {}, artifact: 'unit-fixture', bundle: 'unit-fixture', inputDigest: 'unit-fixture', packetDigest: 'unit-fixture' });
     const html = renderFrameWorked(report);
     assert.doesNotMatch(html, /math-error/);
-    assert.match(html, /upward-positive intensity = -5 to 5/);
-    assert.match(html, /drawing w = 5 to -5/);
+    const action = html.split('Upward-positive intensity ')[1].split('</td>')[0];
+    const formulas = [...action.matchAll(/<annotation[^>]*>([^<]+)<\/annotation>/g)].map(match => match[1]);
+    assert.deepEqual(formulas, [String.raw`-5\,\mathrm{kN/m}`, String.raw`5\,\mathrm{kN/m}`, 'w',
+        String.raw`5\,\mathrm{kN/m}`, String.raw`-5\,\mathrm{kN/m}`]);
     assert.ok(report.steps.find(step => step.id === 'uy').symbolicExpression.includes('^{5}/120'));
     assert.ok(report.steps.every(step => step.evidence === 'explanatory-rule'));
 });

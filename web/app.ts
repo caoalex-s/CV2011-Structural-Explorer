@@ -4,21 +4,28 @@
  * New lesson pages can supply models through this boundary without changing engine.ts.
  */
 import { setWorkspaceBusy } from './workspace-readiness.js';
-import { analyse, example, position, splitMember, nodeLabels, referenceMember } from './engine.js';
+import { analyse, example, lineLoadAxis, position, splitMember, nodeLabels, referenceMember } from './engine.js';
 import type { Model, Analysis, Point, Member, Support, Load, Sample } from './engine.js';
 import { courseColors, forceSymbol, momentSymbol, rotationalSpring, supportShape, symbolLabel } from './symbols.js';
 import { renderWorked, showWorkedSolution } from './worked.js';
 import { renderCourseConventions } from './course.js';
 import { assignLoadLabels, loadLabels } from './load-labels.js';
 import { workspaceConventions } from './axes.js';
-import { element as $, escapeHtml as escape, formatNumber as number, downloadJson as download } from './ui.js';
-import { jointConnections } from './model-view.js';
+import { math, measureUnits, quantity } from './math.js';
+import { element as $, escapeHtml as escape, formatNumber as number, formatSectionResult, downloadJson as download } from './ui.js';
+import { jointConnections, memberLabel } from './model-view.js';
 import type { Selection } from './model-view.js';
+import { angleSnap, wrap } from './direction-dial.js';
+import { pointAngle, setPointForce } from './point-force-edit.js';
 import { renderInspector } from './inspector.js';
 import { renderResponses, sampleSection } from './responses.js';
+import { sectionFreeBody } from './section-free-body.js';
+import { createDiagramPin } from './diagram-pin.js';
+import { createSandboxCut } from './sandbox-cut.js';
+import { createDrawingWorkspace } from './drawing-workspace.js';
 import { createWorkspaceControls } from './workspace-controls.js';
 import { createLearningSession } from './learning-session.js';
-import { createEvidenceEnvelope, EvidenceRequests, parseEvidenceModel } from './model-evidence.js';
+import { createEvidenceEnvelope, EvidenceRequests, parseDrawing } from './model-evidence.js';
 import type { Attempt } from './learning-session.js';
 import { lessonContext } from './lesson-beam.js';
 import { createPortalPanel, isPortalWorkspace, isCheckedWorkspace, portalStorageKey } from './portal-live.js';
@@ -28,6 +35,20 @@ let momentExercise: ReturnType<typeof createMomentExercise> | undefined;
 const clone = <T>(value: T): T => structuredClone(value);
 const id = (prefix: string) => `${prefix}${crypto.randomUUID().slice(0, 6)}`;
 renderCourseConventions();
+// On a phone the model comes first. Keep the DOM order and keyboard order together.
+const narrowWorkspace = matchMedia('(max-width: 750px)');
+function arrangeWorkspace() {
+    for (const disclosure of document.querySelectorAll<HTMLDetailsElement>('#drawing-toolbox, .exercise-directory, .model-files')) {
+        disclosure.open = !narrowWorkspace.matches && (disclosure.id === 'drawing-toolbox' || !document.body.classList.contains('drawing-workspace'));
+    }
+    const canvas = document.getElementById('canvas')!;
+    const toolbar = document.querySelector('.response-toolbar')!;
+    const canvasHeader = document.querySelector('.canvas-header')!;
+    if (narrowWorkspace.matches) canvas.after(toolbar, canvasHeader);
+    else canvas.before(toolbar, canvasHeader);
+}
+arrangeWorkspace();
+narrowWorkspace.addEventListener('change', arrangeWorkspace);
 const lesson = lessonContext(location.search);
 if (isPortalWorkspace) {
     const exerciseLink = $('portal-exercise-link').querySelector('a')!;
@@ -46,7 +67,7 @@ try {
         if (isPortalWorkspace) {
             // The numerical diagram engine has its own length/tolerance
             // limits. Exact checker inputs use the strict source schema.
-            parseEvidenceModel(candidate);
+            parseDrawing(candidate);
             model = candidate;
         } else if (analyse(candidate).status !== 'invalid')
             model = candidate;
@@ -56,6 +77,8 @@ catch { /* Recover from stale browser storage with the default model. */ }
 assignLoadLabels(model);
 let analysis: Analysis = analyse(model);
 let tool = 'select', layer = 'M', mode = 'sandbox', side = 'tension';
+const diagramPin = createDiagramPin(modelStorageKey + '/pinned-diagram');
+$('pin-diagram').onclick = () => { diagramPin.toggle(model,layer); renderCanvas(); };
 let selected: Selection | null = null;
 let start: Snap | null = null, hover: Snap | null = null;
 let view = { scale: 85, cx: 4, cy: 0 };
@@ -75,7 +98,7 @@ let restoreCheckerControls: (() => void) | undefined;
 function preserveCheckerView() {
     sessionStorage.setItem(modelStorageKey + '/view', JSON.stringify({ model: JSON.stringify(model),
         member: currentMember, parameter: sectionT, layer, mode, side, view, selected, tool,
-        history, future, solutionStep, solutionRevealed, hintUsed, practiceResultsVisible,
+        history, future, solutionStep, solutionRevealed, hintUsed, practiceResultsVisible, practiceView,
         gridSpacing: $<HTMLInputElement>('grid-spacing').value,
         focused: document.querySelector('.work-grid')!.classList.contains('is-focused'),
         checkboxes: Object.fromEntries([...document.querySelectorAll<HTMLInputElement>('input[type=checkbox][id]')]
@@ -101,7 +124,7 @@ if (isCheckedWorkspace) {
             // History contains drawings only; accepted reports are never restored.
             for (const [target, snapshots] of [[history, state.history], [future, state.future]] as const) {
                 if (Array.isArray(snapshots) && snapshots.length <= 60) {
-                    snapshots.forEach(snapshot => parseEvidenceModel(snapshot));
+                    snapshots.forEach(snapshot => parseDrawing(snapshot));
                     target.push(...snapshots);
                 }
             }
@@ -112,6 +135,8 @@ if (isCheckedWorkspace) {
                 selected = { type: state.selected.type, id: state.selected.id };
             if ([...document.querySelectorAll<HTMLElement>('[data-tool]')].some(button => button.dataset.tool === state.tool)) tool = state.tool;
             restoreCheckerControls = () => {
+                if (state.practiceView && typeof state.practiceView.answer === 'string' && typeof state.practiceView.units === 'string')
+                    practiceView = { ...state.practiceView, pending: false };
                 if (state.solutionStep in stepDefinitions) solutionStep = state.solutionStep;
                 solutionRevealed = state.solutionRevealed === true;
                 hintUsed = state.hintUsed === true;
@@ -132,27 +157,60 @@ if (isCheckedWorkspace) {
 }
 let portalPanel: ReturnType<typeof createPortalPanel> | undefined;
 let portalSignature = '';
+let previewingCut = false;
 const evidenceRequests = new EvidenceRequests();
 let evidenceRawSource: string | undefined;
-const evidenceQuery = () => ({ member: currentMember, parameter: sectionT, cutSide: 'unspecified' as const, quantity: 'section-response', units: 'kN, kN m, m, rad', signConvention: 'global y upward; rotation counterclockwise; tension N positive; sagging M positive; dM/dx = V' });
-function updateEvidenceBinding() {
+const cutSide = (): 'left' | 'right' => sectionT === 0 ? 'right' : sectionT === 1 ? 'left'
+    : document.querySelector<HTMLSelectElement>('#frame-side')?.value === 'left' ? 'left' : 'right';
+const evidenceQuery = () => ({ member: currentMember, parameter: sectionT, cutSide: cutSide(), quantity: 'section-response', units: 'kN, kN m, m, rad', signConvention: 'global y upward; rotation counterclockwise; tension N positive; sagging M positive; dM/dx = V' });
+function updateEvidenceBinding(preview = false) {
     if (isCheckedWorkspace) $<HTMLInputElement>('section-position').value = String(sectionT * 1000);
     try { evidenceRequests.update(model, evidenceQuery()); }
     catch { evidenceRequests.invalidate(); }
     // Render-only changes do not repeatedly launch checks. Mechanical/query
     // changes, including a revert, synchronously remove the previous result.
-    const signature = JSON.stringify([model, currentMember, sectionT]);
+    const signature = JSON.stringify([model, currentMember, sectionT, cutSide()]);
     if (signature !== portalSignature) {
         portalSignature = signature;
         momentExercise?.bind(signature + ($<HTMLSelectElement>('frame-side')?.value || ''));
-        portalPanel?.update(currentMember, sectionT);
+        previewingCut = preview;
+        portalPanel?.update(currentMember, sectionT, preview);
     }
 }
 let solutionStep = 'reaction_left', solutionRevealed = false, hintUsed = false, practiceResultsVisible = false;
-let proofStatus = { lean: 'pending', scope: 'Scaled reaction equilibrium identities and plotting-side inversion.' };
+interface PracticeView { key: string; answer: string; units: string; submission?: string; pending?: boolean }
+let practiceView: PracticeView | undefined;
 const svg = $('canvas') as unknown as SVGSVGElement;
+// Redraw the geometry independently so the cut grip retains keyboard focus
+// and pointer capture while inspection updates the free body and checked query.
+const geometry = document.createElementNS('http://www.w3.org/2000/svg','g');
+svg.append(geometry);
+const updateCutGrip = createSandboxCut(svg,(parameter, face, preview) => {
+    const nextFace = parameter === 0 ? 'right' : parameter === 1 ? 'left' : face;
+    if (parameter === sectionT && nextFace === cutSide()) {
+        if (!preview && previewingCut) {
+            previewingCut = false;
+            portalPanel?.update(currentMember,sectionT);
+        }
+        return;
+    }
+    sectionT = parameter;
+    $<HTMLSelectElement>('frame-side').value = nextFace;
+    render(true,preview);
+});
 // Shared drawing dimensions keep pointer mapping, fitting and annotations aligned.
-const canvasWidth = 1000, canvasHeight = 400;
+let canvasWidth = 1000;
+let canvasHeight = 400;
+function sizeDrawing() {
+    const width = narrowWorkspace.matches && (isDrawingSandbox() || isPortalWorkspace || portalExercise) ? 640 : 1000;
+    const height = width === 640 && document.querySelector('.work-grid.is-focused') ? 640 : 400;
+    if (width === canvasWidth && height === canvasHeight) return;
+    canvasHeight = height;
+    // Preserve the visible span and pan centre when the drawing sheet changes width.
+    view.scale *= width / canvasWidth;
+    canvasWidth = width;
+    svg.setAttribute('viewBox', `0 0 ${width} ${canvasHeight}`);
+}
 svg.setAttribute('viewBox', `0 0 ${canvasWidth} ${canvasHeight}`);
 interface Snap {
     x: number;
@@ -164,8 +222,26 @@ interface Snap {
 function toast(message: string) { $('toast').textContent = message; $('toast').classList.add('show'); setTimeout(() => $('toast').classList.remove('show'), 4200); }
 function checkpoint(before = model) { history.push(clone(before)); if (history.length > 60)
     history.shift(); future.length = 0; }
-function changed() { $('workspace-operation').hidden = true; evidenceRawSource = undefined; assignLoadLabels(model); updateEvidenceBinding(); analysis = analyse(model); localStorage.setItem(modelStorageKey, JSON.stringify(model)); render(); }
-function commit(action: () => void) { checkpoint(); action(); solutionRevealed = false; hintUsed = false; practiceResultsVisible = false; changed(); }
+function changed(keepInspector = false) {
+    // Removing the import status above the drawing would shift the pivot
+    // beneath an active pointer. Dismiss it once the rotation finishes.
+    if (!rotation) $('workspace-operation').hidden = true;
+    evidenceRawSource = undefined;
+    assignLoadLabels(model);
+    updateEvidenceBinding();
+    analysis = analyse(model);
+    localStorage.setItem(modelStorageKey, JSON.stringify(model));
+    render(keepInspector);
+}
+function editModel(action: () => void, startUndo: boolean, keepInspector: boolean) {
+    if (startUndo) checkpoint();
+    action();
+    solutionRevealed = false;
+    hintUsed = false;
+    practiceResultsVisible = false;
+    changed(keepInspector);
+}
+function commit(action: () => void) { editModel(action, true, false); }
 function screen(point: {
     x: number;
     y: number;
@@ -271,11 +347,67 @@ function supportDrawing(support: Support) {
     const custom = support.kind === 'custom' ? `<text y="29" text-anchor="middle" stroke="none" fill="${courseColors.ink}" font-size="8">${support.fixX ? 'x' : ''}${support.fixY ? 'y' : ''}${support.fixRotation ? 'θ' : ''}</text>` : '';
     return `<g class="clickable" data-object="support" data-id="${escape(support.id)}" transform="translate(${p.x} ${p.y}) rotate(${rotation})" stroke="${courseColors.member}" stroke-width="1.6" fill="none"><title>${escape(support.kind)} ground support</title><circle cy="15" r="25" class="node-hit" stroke="none"/>${selectedRing}${supportShape(support.kind)}${custom}</g>`;
 }
+let rotation: {
+    load: Load; pointer: number; offset: number; snap: (raw: number) => number;
+    outward: boolean; startX: number; startY: number; changed: boolean;
+} | undefined;
+
+function isDrawingSandbox() { return mode === 'sandbox' && document.body.classList.contains('drawing-workspace'); }
+
+function pointHandle(load: Load) {
+    const origin = screen(position(model,load.member,load.t));
+    const magnitude = Math.hypot(load.fx,load.fy);
+    const ux = load.fx/magnitude, uy = -load.fy/magnitude;
+    const scale = svg.getScreenCTM()?.a || 1;
+    const radius = 22/scale;
+    function room(dx: number, dy: number) {
+        const x = dx > 0 ? (canvasWidth-radius-origin.x)/dx : dx < 0 ? (radius-origin.x)/dx : Infinity;
+        const y = dy > 0 ? (canvasHeight-radius-origin.y)/dy : dy < 0 ? (radius-origin.y)/dy : Infinity;
+        return Math.min(x,y);
+    }
+    // Near a sheet edge the free tip may have more room than the tail. Keep
+    // that choice fixed during rotation so the free end follows the pointer.
+    const tail = room(-ux,-uy), tip = room(ux,uy);
+    const outward = rotation?.load === load ? rotation.outward : tail < 65 && tip > tail;
+    const reach = Math.max(12,Math.min(65,outward ? tip : tail));
+    const sign = outward ? 1 : -1;
+    return {x:origin.x+sign*reach*ux,y:origin.y+sign*reach*uy,reach,outward,radius};
+}
+
+/** Keep the annotation touch target clear of the shaft, handle and section marker. */
+function placePointCaption(label: SVGTextElement, load: Load, h: ReturnType<typeof pointHandle>) {
+    const box = label.getBBox();
+    const origin = screen(position(model,load.member,load.t));
+    const clearance = 5/(svg.getScreenCTM()?.a || 1);
+    const obstacles = [...svg.querySelectorAll<SVGGraphicsElement>('.cut-marker,.cut-face-label,[data-horizontal-reaction] text')]
+        .map(element => element.getBBox());
+    obstacles.push(new DOMRect(Math.min(origin.x,h.x),Math.min(origin.y,h.y),
+        Math.abs(origin.x-h.x),Math.abs(origin.y-h.y)));
+    const left = h.x-h.radius-clearance-box.width, right = h.x+h.radius+clearance;
+    const above = Math.min(h.y,origin.y)-box.height-clearance, below = Math.max(h.y,origin.y)+clearance;
+    const sides = h.x < origin.x ? [left,right] : [right,left];
+    const levels = h.y > origin.y ? [below,above] : [above,below];
+    let best = {x:0,y:0,score:Infinity};
+    for (const x of sides) for (const y of levels) {
+        const px = Math.max(clearance, Math.min(x,canvasWidth-box.width-clearance));
+        const py = Math.max(clearance, Math.min(y,canvasHeight-box.height-clearance));
+        let score = Math.abs(px-x) + Math.abs(py-y);
+        for (const blocked of obstacles) {
+            const w = Math.min(px+box.width,blocked.x+blocked.width+clearance)-Math.max(px,blocked.x-clearance);
+            const ht = Math.min(py+box.height,blocked.y+blocked.height+clearance)-Math.max(py,blocked.y-clearance);
+            if (w>0 && ht>0) score += w*ht;
+        }
+        if (score < best.score) best={x:px,y:py,score};
+    }
+    label.setAttribute('x',String(Number(label.getAttribute('x'))+best.x-box.x));
+    label.setAttribute('y',String(Number(label.getAttribute('y'))+best.y-box.y));
+}
+
 function loadDrawing(load: Load) {
     const p = screen(position(model, load.member, load.t));
     const label = loadLabels(model).get(load.id)!;
     const color = courseColors.force;
-    const tag = `class="clickable" data-object="load" data-id="${escape(load.id)}"`;
+    const tag = `class="clickable" ${load.kind === 'force' && isDrawingSandbox() ? 'data-point-force' : ''} data-object="load" data-id="${escape(load.id)}"`;
     // Concentric arcs keep each applied couple centred on its attachment.
     const labelBelow = p.y < canvasHeight / 2;
     const preceding = model.loads.slice(0, model.loads.indexOf(load));
@@ -288,22 +420,31 @@ function loadDrawing(load: Load) {
         return `<g ${tag}><circle cx="${p.x}" cy="${p.y}" r="16" class="node-hit"/><text x="${p.x + 8}" y="${load.kind === 'moment' ? (labelBelow ? p.y + 49 + 10 * coupleLane : p.y - 35 - 10 * coupleLane) : p.y - 15}" dy="${labelBelow ? coupleLane : -coupleLane}em" class="svg-label">${symbolLabel(label)} = 0 ${load.kind === 'force' ? 'kN' : 'kN m'}</text></g>`;
     if (load.kind === 'force') {
         const magnitude = Math.hypot(load.fx, load.fy);
-        return `<g ${tag}>${forceSymbol(p.x, p.y, load.fx, load.fy, color, `${label} = ${number(magnitude)} kN`)}</g>`;
+        const handle = selected?.type === 'load' && selected.id === load.id && isDrawingSandbox() ? pointHandle(load) : undefined;
+        return `<g ${tag}>${forceSymbol(p.x, p.y, load.fx, load.fy, color, `${label} = ${number(magnitude)} kN`, handle ? handle.reach-5 : 60, 5, handle?.outward)}</g>`;
     }
     if (load.kind === 'moment') {
         return `<g ${tag}>${momentSymbol(p.x, p.y, load.mz, color, `${label} = ${number(Math.abs(load.mz))} kN m`, 25 + 10 * coupleLane, coupleLane, labelBelow)}</g>`;
     }
     const end = screen(position(model, load.member, load.end));
+    const dx = end.x - p.x, dy = p.y - end.y;
+    const length = Math.hypot(dx, dy);
+    const axis = lineLoadAxis(load, dx / length, dy / length);
     const max = Math.max(Math.abs(load.fy), Math.abs(load.qEnd), 1);
-    let result = `<g ${tag}><path class="hit" d="M ${p.x} ${p.y + load.fy / max * 53} L ${end.x} ${end.y + load.qEnd / max * 53}"/>`;
+    const tail = (point: {x:number; y:number}, intensity: number) =>
+        (point.x - axis.x * intensity / max * 53) + ' ' + (point.y + axis.y * intensity / max * 53);
+    const envelope = 'M ' + tail(p, load.fy) + ' L ' + tail(end, load.qEnd);
+    let result = `<g ${tag}><path class="hit" d="${envelope}"/>`;
     const count = Math.max(3, Math.ceil(Math.hypot(end.x - p.x, end.y - p.y) / 27));
     for (let i = 0; i <= count; i++) {
         const t = i / count, q = load.fy + (load.qEnd - load.fy) * t;
-        result += drawArrow(p.x + (end.x - p.x) * t, p.y + (end.y - p.y) * t, 0, -q / max * 53, color);
+        result += drawArrow(p.x + (end.x - p.x) * t, p.y + (end.y - p.y) * t, axis.x * q / max * 53, -axis.y * q / max * 53, color);
     }
     const endpointLabel = (end: string) => `${label}${label.includes('_') ? ',' : '_'}${end}`;
-    const intensityLabel = load.qEnd === load.fy ? `${label} = ${number(-load.fy)}` : `${endpointLabel('a')} = ${number(-load.fy)} → ${endpointLabel('b')} = ${number(-load.qEnd)}`;
-    result += `<path d="M ${p.x} ${p.y + load.fy / max * 53} L ${end.x} ${end.y + load.qEnd / max * 53}" stroke="${color}" fill="none"/><text class="svg-label" x="${(p.x + end.x) / 2}" y="${Math.min(p.y, end.y) - 67}" text-anchor="middle">${symbolLabel(intensityLabel)} kN/m (↓ +)</text></g>`;
+    const sign = load.direction === undefined ? -1 : 1;
+    const axisLabel = load.direction === undefined ? '↓ +' : load.direction === 'member-normal' ? '+local y' : number(load.direction) + '° global';
+    const intensityLabel = load.qEnd === load.fy ? `${label} = ${number(sign * load.fy)}` : `${endpointLabel('a')} = ${number(sign * load.fy)} → ${endpointLabel('b')} = ${number(sign * load.qEnd)}`;
+    result += `<path d="${envelope}" stroke="${color}" fill="none"/><text class="svg-label" x="${(p.x + end.x) / 2}" y="${Math.min(p.y, end.y) - 67}" text-anchor="middle">${symbolLabel(intensityLabel)} kN/m (${axisLabel})</text></g>`;
     return result;
 }
 function jointDrawing(node: Point) {
@@ -344,35 +485,58 @@ function responsesVisible() {
     return (mode !== 'practice' || practiceResultsVisible) && (!portalExercise || momentExercise?.visible === true);
 }
 function renderCanvas() {
+    sizeDrawing();
+    const diagramNote = $('frame-diagram-note');
+    diagramNote.hidden = true;
+    if (svg.nextElementSibling !== diagramNote) svg.after(diagramNote);
     const signsExpanded = $('workspace-conventions').querySelector('details')?.open ?? false;
     $('workspace-conventions').innerHTML = workspaceConventions(model, currentMember);
     $('workspace-conventions').querySelector('details')!.open = signsExpanded;
     const grid = Math.max(0.05, Number($<HTMLInputElement>('grid-spacing').value) || 0.5);
     const spacing = grid * view.scale;
     const origin = screen({ x: 0, y: 0 });
-    let drawing = `<defs><pattern id="grid" width="${spacing}" height="${spacing}" patternUnits="userSpaceOnUse" x="${origin.x % spacing}" y="${origin.y % spacing}"><circle cx="0" cy="0" r="1" fill="#dce5df"/></pattern></defs><rect width="1000" height="400" fill="url(#grid)"/>`;
+    let drawing = `<defs><pattern id="grid" width="${spacing}" height="${spacing}" patternUnits="userSpaceOnUse" x="${origin.x % spacing}" y="${origin.y % spacing}"><circle cx="0" cy="0" r="1" fill="#dce5df"/></pattern></defs><rect width="${canvasWidth}" height="${canvasHeight}" fill="url(#grid)"/>`;
+    const pinned = diagramPin.update(isDrawingSandbox(),model,analysis,layer,currentMember,sectionT,cutSide());
+    const comparison = $('diagram-comparison');
+    if (!comparison.hidden && diagramNote.nextElementSibling !== comparison) diagramNote.after(comparison);
+    const plots = pinned ? [{solution:analysis, reference:false},{solution:pinned.analysis, reference:true}] :
+        [{solution:analysis,reference:false}];
     const all = analysis.elements.flatMap(e => e.samples);
     if (analysis.status === 'stable' && layer !== 'none' && responsesVisible()) {
         if (layer === 'displacement') {
-            const maximum = Math.max(...all.map(p => Math.hypot(p.ux, p.uy)), 1e-12), magnification = 55 / (view.scale * maximum);
-            for (const element of analysis.elements) {
+            const maximum = Math.max(...all.map(p => Math.hypot(p.ux, p.uy)), pinned?.peak ?? 0, 1e-12), magnification = 55 / (view.scale * maximum);
+            for (const plot of plots) for (const element of plot.solution.elements) {
                 const path = element.samples.map((p, i) => { const q = screen({ x: p.x + p.ux * magnification, y: p.y + p.uy * magnification }); return `${i ? 'L' : 'M'} ${q.x} ${q.y}`; }).join(' ');
-                drawing += `<path d="${path}" fill="none" stroke="${courseColors.reaction}" stroke-width="2.5"/>`;
+                drawing += `<path data-diagram="${plot.reference ? 'pinned' : 'current'}" d="${path}" fill="none" stroke="${courseColors.reaction}" stroke-width="2.5" pointer-events="none"/>`;
             }
-            drawing += `<text x="22" y="375" class="svg-value">Displacement magnification ×${number(magnification)} · values are unscaled</text>`;
+            diagramNote.textContent = 'Displacement magnification ×' + number(magnification) + '. Reported displacements are unscaled.';
+            diagramNote.hidden = false;
         }
         else {
-            const field = layer as 'N' | 'V' | 'M', maximum = Math.max(...all.map(p => Math.abs(p[field])), 1e-10), scale = 70 / maximum;
-            for (const element of analysis.elements) {
+            const field = layer as 'N' | 'V' | 'M', maximum = Math.max(...all.map(p => Math.abs(p[field])), pinned?.peak ?? 0, 1e-10), scale = 70 / maximum;
+            for (const plot of plots) for (const element of plot.solution.elements) {
                 const direction = field === 'M' ? (side === 'tension' ? -1 : 1) : 1;
                 const points = element.samples.map(p => screen({ x: p.x - element.s * p[field] * scale / view.scale * direction, y: p.y + element.c * p[field] * scale / view.scale * direction }));
                 const a = screen(element.samples[0]), b = screen(element.samples.at(-1)!);
                 const path = `M ${a.x} ${a.y} ` + points.map(p => `L ${p.x} ${p.y}`).join(' ') + ` L ${b.x} ${b.y} Z`;
-                drawing += `<path d="${path}" fill="#087f781c" stroke="#087f78" stroke-width="1.3" pointer-events="none"/>`;
+                drawing += `<path data-diagram="${plot.reference ? 'pinned' : 'current'}" d="${path}" fill="#087f781c" stroke="#087f78" stroke-width="1.3" pointer-events="none"/>`;
             }
-            if (maximum > 1e-8) {
+            const section = sectionSample();
+            if (section && document.body.classList.contains('drawing-workspace')) {
+                const member = model.members.find(item => item.id === currentMember)!;
+                const a = position(model, member.id, 0), b = position(model, member.id, 1);
+                const length = Math.hypot(b.x - a.x, b.y - a.y);
+                const sense = field === 'M' && side === 'tension' ? -1 : 1;
+                const offset = section[field] * scale * sense / view.scale;
+                const station = position(model, member.id, sectionT);
+                const dot = screen({x: station.x - (b.y-a.y)/length*offset, y: station.y + (b.x-a.x)/length*offset});
+                drawing += `<circle class="cut-ordinate" data-side="${cutSide()}" cx="${dot.x}" cy="${dot.y}" r="5"><title>Selected ${field} = ${formatSectionResult(section[field])} ${field === 'M' ? 'kN m' : 'kN'}</title></circle>`;
+            }
+            // Retain the scale note at zero response so a load edit cannot shift the inspector dial.
+            if (all.length) {
                 const peak = all.reduce((a, b) => Math.abs(a[field]) > Math.abs(b[field]) ? a : b);
-                drawing += `<text x="22" y="375" class="svg-value">${symbolLabel(`Peak |${field}| = ${number(Math.abs(peak[field]))} ${field === 'M' ? 'kN m' : 'kN'} · diagrams scaled to fit`)}</text>`;
+                diagramNote.innerHTML = (pinned ? 'Current peak ' : 'Peak ') + math('|' + field + '|=' + quantity(number(Math.abs(peak[field])), field === 'M' ? measureUnits.moment : measureUnits.force)) + (pinned ? ' · Shared diagram scale' : ' · Diagram scaled to fit');
+                diagramNote.hidden = false;
             }
         }
     }
@@ -382,8 +546,13 @@ function renderCanvas() {
     }
     for (const support of model.supports)
         drawing += supportDrawing(support);
-    for (const load of model.loads)
+    for (const load of model.loads) {
+        if (selected?.type === 'load' && selected.id === load.id && document.body.classList.contains('drawing-workspace')) {
+            const attachment = screen(position(model, load.member, load.t));
+            drawing += `<circle class="attachment-ring" cx="${attachment.x}" cy="${attachment.y}" r="11" pointer-events="none"/>`;
+        }
         drawing += loadDrawing(load);
+    }
     for (const node of model.nodes) drawing += jointDrawing(node);
     if ($<HTMLInputElement>('show-reactions').checked && responsesVisible())
         for (const reaction of analysis.reactions) {
@@ -393,9 +562,9 @@ function renderCanvas() {
             if (Math.abs(reaction.fy) > 1e-7)
                 drawing += `<g pointer-events="none" class="${p.x > canvasWidth * .75 ? 'reaction-label-left' : ''}">${forceSymbol(p.x, p.y, 0, reaction.fy, courseColors.reaction, `${label}ᵧ = ${number(Math.abs(reaction.fy))} kN`, 42, 44)}</g>`;
             if (Math.abs(reaction.fx) > 1e-7)
-                drawing += `<g pointer-events="none">${forceSymbol(p.x, p.y, reaction.fx, 0, courseColors.reaction, `${label}ₓ = ${number(Math.abs(reaction.fx))} kN`, 42, 20)}</g>`;
+                drawing += `<g pointer-events="none" data-horizontal-reaction>${forceSymbol(p.x, p.y, reaction.fx, 0, courseColors.reaction, `${label}ₓ = ${number(Math.abs(reaction.fx))} kN`, 42, 20)}</g>`;
             if (Math.abs(reaction.mz) > 1e-7)
-                drawing += `<g pointer-events="none">${momentSymbol(p.x, p.y, reaction.mz, courseColors.reaction, `M(${label}) = ${number(Math.abs(reaction.mz))} kN m`, 37)}</g>`;
+                drawing += `<g pointer-events="none" data-moment-reaction>${momentSymbol(p.x, p.y, reaction.mz, courseColors.reaction, `M_${label} = ${number(Math.abs(reaction.mz))} kN m`, 37)}</g>`;
         }
     if (analysis.mechanism)
         for (const motion of analysis.mechanism) {
@@ -405,7 +574,11 @@ function renderCanvas() {
     if (currentMember && model.members.some(m => m.id === currentMember) && analysis.status === 'stable') {
         const a = position(model, currentMember, 0), b = position(model, currentMember, 1), p = screen(position(model, currentMember, sectionT));
         const length = Math.hypot(b.x - a.x, b.y - a.y), nx = -(b.y - a.y) / length, ny = -(b.x - a.x) / length;
-        drawing += `<path d="M ${p.x - nx * 40} ${p.y - ny * 40} L ${p.x + nx * 40} ${p.y + ny * 40}" stroke="#bf7650" stroke-width="1.5" stroke-dasharray="4 4" pointer-events="none"/><circle cx="${p.x}" cy="${p.y}" r="3" fill="#bf7650"/>`;
+        drawing += `<path class="cut-marker" d="M ${p.x - nx * 40} ${p.y - ny * 40} L ${p.x + nx * 40} ${p.y + ny * 40}" stroke="#bf7650" stroke-width="1.5" stroke-dasharray="4 4" pointer-events="none"/><circle cx="${p.x}" cy="${p.y}" r="3" fill="#bf7650"/>`;
+    }
+    if (currentMember && analysis.status === 'stable' && document.body.classList.contains('drawing-workspace')) {
+        const p = screen(position(model, currentMember, sectionT));
+        drawing += '<text class="cut-face-label" x="' + p.x + '" y="' + (p.y + 58) + '" text-anchor="middle">Cut · ' + cutSide() + '</text>';
     }
     if (start && hover) {
         const a = screen(start), b = screen(hover);
@@ -416,9 +589,53 @@ function renderCanvas() {
         drawing += `<circle cx="${p.x}" cy="${p.y}" r="8" fill="none" stroke="#087f78" stroke-width="1.5"/>`;
     }
     if (!model.members.length)
-        drawing += `<text x="500" y="180" text-anchor="middle" class="svg-label" style="font-size:23px">Your structure starts here.</text><text x="500" y="215" text-anchor="middle" class="svg-value">Choose Draw member. Click a start point and an end point.</text>`;
-    svg.innerHTML = drawing;
+        drawing += `<text x="${canvasWidth / 2}" y="${canvasHeight / 2 - 20}" text-anchor="middle" class="svg-label" style="font-size:23px">Your structure starts here.</text><text x="${canvasWidth / 2}" y="${canvasHeight / 2 + 15}" text-anchor="middle" class="svg-value">Choose Draw member, then its two endpoints.</text>`;
+    if (model.members.length && document.body.classList.contains('drawing-workspace')) {
+        // The scale bar measures undeformed model length, independently of diagram magnification.
+        const metres = 2 ** Math.floor(Math.log2(90 / view.scale));
+        const end = canvasWidth - 25, begin = end - metres * view.scale;
+        drawing += `<g class="drawing-scale" aria-label="Drawing scale"><path d="M${begin} ${canvasHeight - 34}v6H${end}v-6"/><text x="${(begin + end) / 2}" y="${canvasHeight - 39}" text-anchor="middle">${number(metres)} m</text></g>`;
+    }
+    geometry.innerHTML = drawing;
+    if (selected && document.body.classList.contains('drawing-workspace')) {
+        const target = svg.querySelector('[data-object="' + CSS.escape(selected.type) + '"][data-id="' + CSS.escape(selected.id) + '"]');
+        target?.classList.add('drawing-selection');
+    }
+    if (isDrawingSandbox()) {
+        const point = selected?.type === 'load' ? model.loads.find(l => l.id === selected?.id && l.kind === 'force') : undefined;
+        if (point && Math.hypot(point.fx,point.fy) >= 1e-12) {
+            const h = pointHandle(point);
+            const caption = svg.querySelector<SVGTextElement>(`[data-point-force][data-id="${CSS.escape(point.id)}"] text`);
+            if (caption) placePointCaption(caption,point,h);
+            const angle = number(wrap(pointAngle(point)));
+            const textX = Math.max(45,Math.min(canvasWidth-45,h.x));
+            const textY = h.y > canvasHeight-65 ? h.y-h.radius-8 : h.y+h.radius+21;
+            geometry.insertAdjacentHTML('beforeend',`<g data-rotate-force="${escape(point.id)}" class="rotate-handle"><title>Rotate point force</title>
+                <circle cx="${h.x}" cy="${h.y}" r="${h.radius}" fill="transparent"/>
+                <circle cx="${h.x}" cy="${h.y}" r="${h.radius*.26}" fill="#fffdf6" stroke="${courseColors.force}" stroke-width="2"/>
+                </g>${rotation?.changed ? `<text class="rotate-angle svg-value" x="${textX}" y="${textY}" text-anchor="middle" pointer-events="none">${angle}°</text>` : ''}`);
+        }
+    }
     fitCanvasAnnotations();
+    for (const label of svg.querySelectorAll<SVGTextElement>('[data-point-force] text')) {
+        const box = label.getBBox();
+        const hit = document.createElementNS('http://www.w3.org/2000/svg','rect');
+        hit.setAttribute('data-force-annotation','');
+        hit.setAttribute('x',String(box.x-2)); hit.setAttribute('y',String(box.y-2));
+        hit.setAttribute('width',String(box.width+4)); hit.setAttribute('height',String(box.height+4));
+        hit.setAttribute('fill','transparent');
+        label.after(hit);
+    }
+    const member = model.members.find(m => m.id === currentMember);
+    const inspect = isDrawingSandbox() && tool === 'select' && analysis.status === 'stable' && member;
+    svg.setAttribute('role',inspect ? 'group' : 'img');
+    updateCutGrip(inspect ? {
+        member:member.id, start:screen(position(model,member.id,0)), end:screen(position(model,member.id,1)),
+        parameter:sectionT, face:cutSide(), stations:[0,1,
+            ...model.supports.filter(s=>s.member===member.id).map(s=>s.t),
+            ...model.loads.filter(l=>l.member===member.id).flatMap(l=>l.kind==='distributed' ? [l.t,l.end] : [l.t])]
+    } : undefined);
+
 }
 
 /** Keep labels legible at the canvas edges without moving their force vectors.
@@ -428,24 +645,62 @@ function fitCanvasAnnotations(): void {
     const bounds = svg.getBoundingClientRect();
     const pixelScale = svg.getScreenCTM()?.a;
     if (!pixelScale || bounds.width === 0) return;
+    // On the phone portal sheet use the space outside each column. Keep the
+    // caption above its reaction shaft and the base moment beside its arc.
+    if (narrowWorkspace.matches && (isPortalWorkspace || portalExercise)) {
+        for (const label of svg.querySelectorAll<SVGTextElement>('[data-horizontal-reaction] text')) {
+            const vector = label.closest<SVGElement>('[data-vector]')!;
+            const x = Number(vector.dataset.originX), left = x <= canvasWidth/2;
+            label.setAttribute('text-anchor',left ? 'end' : 'start');
+            label.setAttribute('x',String(x + (left ? -38 : 38)));
+            label.setAttribute('y',String(Number(vector.dataset.originY)-10));
+        }
+    }
     const adjustments = Array.from(svg.querySelectorAll<SVGTextElement>('.svg-label, .svg-value')).map(label => {
         const box = label.getBoundingClientRect();
         const shift = box.left < bounds.left + 8 ? bounds.left + 8 - box.left
             : box.right > bounds.right - 8 ? bounds.right - 8 - box.right : 0;
-        return { label, x: Number(label.getAttribute('x')) + shift / pixelScale, shift };
+        return { label, shift, left: box.left + shift, right: box.right + shift, top: box.top, bottom: box.bottom };
     });
-    for (const { label, x, shift } of adjustments) {
-        if (shift) label.setAttribute('x', String(x));
+    const forceLabels = adjustments.filter(({label}) => label.closest('[data-object="load"] [data-vector="force"]'));
+    const fixedCaptions = adjustments.filter(({label}) => label.closest('[data-moment-reaction]'));
+    const obstacles = [...forceLabels, ...fixedCaptions, ...[...svg.querySelectorAll('.node-label')].map(label=>label.getBoundingClientRect())]
+        .sort((a,b)=>b.bottom-a.bottom);
+    for (const annotation of adjustments) {
+        const {label, shift} = annotation;
+        if (shift) label.setAttribute('x', String(Number(label.getAttribute('x')) + shift / pixelScale));
+        if (!label.closest('[data-horizontal-reaction]')) continue;
+        // When the two text boxes meet, lift only the reaction caption.
+        // Keep both force vectors on their original lines of action.
+        let bottom = annotation.bottom;
+        for (const force of obstacles) {
+            if (force.right + 6 <= annotation.left || force.left >= annotation.right + 6) continue;
+            const top = bottom - (annotation.bottom - annotation.top);
+            if (bottom > force.top - 6 && top < force.bottom + 6) bottom = force.top - 6;
+        }
+        if (bottom < annotation.bottom) {
+            const delta = (bottom - annotation.bottom) / pixelScale;
+            const x = Number(label.getAttribute('x')), y = Number(label.getAttribute('y'));
+            label.setAttribute('y', String(y + delta));
+            if (isPortalWorkspace || portalExercise) {
+                const leader = document.createElementNS(svg.namespaceURI,'path');
+                leader.setAttribute('d', `M${x} ${y}v${delta + 3}`);
+                leader.setAttribute('stroke',courseColors.reaction);
+                leader.setAttribute('stroke-width','1');
+                label.before(leader);
+            }
+        }
     }
 }
 // Re-establish original label anchors after a viewport or font-metric change.
 window.addEventListener('resize', renderCanvas);
+document.fonts.addEventListener('loadingdone', renderCanvas);
 void document.fonts.ready.then(renderCanvas);
 function inspector(): void {
     renderInspector({
         container: $('inspector'), model, analysis, selected,
         resultsVisible: responsesVisible(),
-        commit, clearSelection: () => { selected = null; inspector(); },
+        commit, adjustLoad: (edit, first) => editModel(edit, first, true), clearSelection: () => { selected = null; inspector(); },
         removeSelected, projectToMember: projection, notify: toast,
     });
 }
@@ -473,22 +728,48 @@ function removeSelected() {
     });
 }
 function sectionSample(): Sample | undefined {
-    return sampleSection(analysis, currentMember, sectionT);
+    return sampleSection(analysis, currentMember, sectionT, cutSide(), model);
 }
-function render() {
-    if (!model.members.some(m => m.id === currentMember))
-        currentMember = model.members[0]?.id || '';
-    updateEvidenceBinding();
-    renderResponses({ model, analysis, currentMember, sectionT, layer,
+function render(keepInspector = false, previewCut = false) {
+    const member = model.members.find(m => m.id === currentMember) ?? model.members[0];
+    currentMember = member?.id ?? '';
+    // The course verifier grades the right-hand limit except at the member end.
+    const face = document.querySelector<HTMLSelectElement>('#frame-side');
+    if (face) {
+        face.disabled = mode === 'practice';
+        if (face.disabled) face.value = sectionT === 1 ? 'left' : 'right';
+    }
+    updateEvidenceBinding(previewCut);
+    if (mode === 'practice') {
+        const key = JSON.stringify([model, currentMember, sectionT, cutSide(), solutionStep, session.courseId]);
+        if (practiceView?.key !== key) {
+            practiceView = { key, answer: '', units: stepDefinitions[solutionStep].units };
+            practiceResultsVisible = solutionRevealed = false;
+            hintUsed = session.sawPracticeAid(model, [solutionStep], 'hint');
+        }
+    }
+    document.body.classList.toggle('practice-predicting', mode === 'practice' && !!problem() && !practiceResultsVisible);
+    const section = renderResponses({ model, analysis, currentMember, sectionT, layer, cutSide: cutSide(),
         resultsVisible: responsesVisible() });
+    drawingWorkspace.update(model, selected, section.sample, section.stationMath, section.face);
+    const fbd = $('section-free-body');
+    fbd.hidden = mode !== 'sandbox' || !section.sample;
+    $('section-free-body-content').innerHTML = !fbd.hidden && section.sample
+        ? sectionFreeBody(model, analysis, currentMember, sectionT, cutSide(), section.sample) : '';
+    const checkedScope = document.getElementById('checked-section');
+    if (checkedScope) checkedScope.innerHTML = member ? `${escape(memberLabel(model, member))} at ${section.stationMath.join(', ')} (just ${cutSide()})` : 'Choose a member.';
     controls.setHistory(history.length > 0, future.length > 0);
-    inspector();
+    if (!keepInspector) inspector();
     $('edit-selection').hidden = !selected;
     (document.querySelector('.right-panel') as HTMLElement).hidden = !selected;
     $('moment-options').hidden = layer !== 'M';
     renderCanvas();
-    if (mode === 'practice')
+    if (mode === 'practice') {
+        const previous = document.activeElement;
+        const focusedId = previous && $('practice-panel').contains(previous) ? previous.id : '';
         renderPractice();
+        if (focusedId) document.getElementById(focusedId)?.focus({ preventScroll: true });
+    }
     session.updateStatus();
     if (!isCheckedWorkspace) renderWorked({ model, section: sectionT, practice: mode === 'practice', connected: session.connected,
         request: payload => session.request('/api/worked-solution', payload),
@@ -499,13 +780,51 @@ function render() {
         },
         reveal: () => { solutionRevealed = true; void record('reveal', '', stepDefinitions[solutionStep].units); } });
 }
+svg.addEventListener('click', event => {
+    if (!isDrawingSandbox()) return;
+    const caption = (event.target as Element).closest('[data-force-annotation]');
+    const load = caption?.closest<SVGElement>('[data-point-force]');
+    if (!load?.dataset.id || (tool !== 'select' && selected?.id !== load.dataset.id)) return;
+    selected = {type:'load', id:load.dataset.id};
+    controls.setFocus(false);
+    render();
+    focusSelectedEditor();
+});
 svg.addEventListener('pointerdown', event => {
     if (mode === 'insights')
         return;
-    const p = world(event), object = (event.target as Element).closest<SVGElement>('[data-object]');
+    let target = event.target as Element;
+    // Touch browsers may retarget a shaft press to the nearby draggable circle.
+    // Use the physical contact point to distinguish the two editing gestures.
+    if (event.pointerType === 'touch' && isDrawingSandbox()) {
+        const contact = document.elementFromPoint(event.clientX,event.clientY);
+        if (contact && svg.contains(contact) &&
+            (target.closest('[data-rotate-force],[data-point-force]') || contact.closest('[data-rotate-force],[data-point-force]')))
+            target = contact;
+    }
+    const p = world(event), object = target.closest<SVGElement>('[data-object]');
     if (event.button === 1 || event.button === 2) {
         drag = { kind: 'pan', x: event.clientX, y: event.clientY, cx: view.cx, cy: view.cy };
         svg.setPointerCapture(event.pointerId);
+        return;
+    }
+    if (rotation) return;
+    const handle = target.closest<SVGElement>('[data-rotate-force]');
+    if (handle && isDrawingSandbox() && tool !== 'delete') {
+        const load = model.loads.find(load => load.id === handle.dataset.rotateForce)!;
+        const origin = position(model,load.member,load.t);
+        const raw = Math.atan2(p.y-origin.y,p.x-origin.x)*180/Math.PI;
+        const angle = wrap(pointAngle(load));
+        rotation = {load,pointer:event.pointerId,offset:angle-raw,snap:angleSnap(angle,true),
+            outward:pointHandle(load).outward,startX:event.clientX,startY:event.clientY,changed:false};
+        svg.setPointerCapture(event.pointerId);
+        event.preventDefault();
+        return;
+    }
+    if (target.closest('[data-force-annotation]') && object && isDrawingSandbox() && (tool === 'select' || selected?.id === object.dataset.id)) {
+        // A caption activates on click. Keep the drawing and scroll position
+        // stable until release, especially for a tap over the phone editor.
+        event.preventDefault();
         return;
     }
     if (tool === 'delete' && object) {
@@ -585,9 +904,13 @@ svg.addEventListener('pointerdown', event => {
             return;
         }
         const loadId = id('q');
-        commit(() => model.loads.push({ id: loadId, member: attachment.member, kind: 'distributed', t: Math.min(start!.t!, attachment.t), end: Math.max(start!.t!, attachment.t), fx: 0, fy: -5, mz: 0, qEnd: -5 }));
+        const editing = document.body.classList.contains('drawing-workspace');
+        commit(() => {
+            model.loads.push({ id: loadId, member: attachment.member, kind: 'distributed', t: Math.min(start!.t!, attachment.t), end: Math.max(start!.t!, attachment.t), fx: 0, fy: -5, mz: 0, qEnd: -5 });
+            if (editing) selected = { type: 'load', id: loadId };
+        });
         const placed = model.loads.find(l => l.id === loadId)!;
-        toast('Load stations ' + stationLabel(placed.t) + ' to ' + stationLabel(placed.end) + '. Select the load to edit either boundary.');
+        toast('Load stations ' + stationLabel(placed.t) + ' to ' + stationLabel(placed.end) + (editing ? '. Edit the intensities and direction in Properties.' : '. Select the load to edit either boundary.'));
         start = null;
         renderCanvas();
         return;
@@ -615,14 +938,33 @@ svg.addEventListener('pointerdown', event => {
         }
     });
 });
+function rotateToPointer(event: PointerEvent) {
+    const gesture = rotation;
+    if (!gesture || gesture.pointer !== event.pointerId) return;
+    if (selected?.id !== gesture.load.id || !model.loads.includes(gesture.load)) { finishRotation(); return; }
+    if (!gesture.changed && Math.hypot(event.clientX-gesture.startX,event.clientY-gesture.startY)<3) return;
+    const origin = position(model,gesture.load.member,gesture.load.t);
+    const p = world(event);
+    const dx = p.x-origin.x, dy = p.y-origin.y;
+    if (Math.hypot(dx,dy)*view.scale*(svg.getScreenCTM()?.a || 1)<6) return;
+    const angle = gesture.snap(Math.atan2(dy,dx)*180/Math.PI + gesture.offset);
+    if (Math.abs(wrap(angle-pointAngle(gesture.load)+180)-180)<1e-9) return;
+    const first = !gesture.changed;
+    gesture.changed = true;
+    editModel(() => setPointForce(gesture.load,angle),first,false);
+}
 svg.addEventListener('pointermove', event => {
+    if (rotation) {
+        rotateToPointer(event);
+        return;
+    }
     // Re-rendering the SVG can detach the original pointer target. A released
     // button must end a drag even when the browser omits the expected up event.
     if (drag && event.buttons === 0) {
         endDrag();
     }
     const p = world(event);
-    $('coordinates').textContent = `x ${p.x.toFixed(2)} m · y ${p.y.toFixed(2)} m`;
+    $('coordinates').textContent = `x = ${p.x.toFixed(2)} m, y = ${p.y.toFixed(2)} m`;
     if (drag?.kind === 'pan') {
         const pixelScale = svg.getScreenCTM()!.a;
         view.cx = drag.cx - (event.clientX - drag.x) / (pixelScale * view.scale);
@@ -667,6 +1009,18 @@ svg.addEventListener('pointermove', event => {
     if (start || tool !== 'select')
         renderCanvas();
 });
+function finishRotation(event?: PointerEvent) {
+    if (!rotation || (event && rotation.pointer !== event.pointerId)) return;
+    const {pointer,changed} = rotation;
+    rotation = undefined;
+    if (changed) $('workspace-operation').hidden = true;
+    if (svg.hasPointerCapture(pointer)) svg.releasePointerCapture(pointer);
+    renderCanvas();
+}
+svg.addEventListener('pointerup',event => { rotateToPointer(event); finishRotation(event); });
+svg.addEventListener('pointercancel',finishRotation);
+svg.addEventListener('lostpointercapture',finishRotation);
+window.addEventListener('blur',() => finishRotation());
 function endDrag() {
     const completed = drag;
     drag = null;
@@ -685,9 +1039,15 @@ svg.addEventListener('wheel', event => { event.preventDefault(); view.scale = Ma
 function setMode(next: string) {
     mode = ['sandbox', 'practice', 'insights'].includes(next) ? next : 'sandbox';
     location.hash = mode;
+    const wasDrawing = document.body.classList.contains('drawing-workspace');
+    drawingWorkspace.activate(mode === 'sandbox' && !isPortalWorkspace && !portalExercise);
+    if (wasDrawing && !document.body.classList.contains('drawing-workspace')) arrangeWorkspace();
     controls.showMode(mode);
-    $('page-title').textContent = mode === 'sandbox' ? 'Explore a structure' : mode === 'practice' ? 'Work through a problem' : 'Review learning progress';
-    $('page-description').textContent = mode === 'sandbox' ? 'Draw a system. Change a load. Follow the response.' : mode === 'practice' ? 'Build the model, submit a step, and examine the reasoning.' : 'Review submitted steps and the evidence behind recurring errors.';
+    sizeDrawing();
+    const sandboxTitle = portalExercise ? 'Portal frame exercise' : isPortalWorkspace ? 'Checked portal workspace' : 'Structural sandbox';
+    $('page-title').textContent = mode === 'sandbox' ? sandboxTitle : mode === 'practice' ? 'Practice problems' : 'Review learning progress';
+    $('page-description').innerHTML = mode === 'sandbox' && portalExercise ? `Draw the three-member portal, then predict every location where ${math('|M|')} is greatest on BC.` : mode === 'sandbox' ? 'Draw a structure or open a model to inspect its response.' : mode === 'practice' ? 'Build the model, submit a step, and examine the reasoning.' : 'Review submitted steps and the evidence behind recurring errors.';
+    $('page-description').hidden = mode === 'sandbox' && !portalExercise;
     $('practice-panel').hidden = mode !== 'practice';
     $('insights-panel').hidden = mode !== 'insights';
     $('portal-exercise').hidden = !portalExercise || mode === 'insights';
@@ -704,12 +1064,26 @@ $<HTMLInputElement>('grid-spacing').onchange = renderCanvas;
 $('zoom-in').onclick = () => { view.scale = Math.min(500, view.scale * 1.25); renderCanvas(); };
 $('zoom-out').onclick = () => { view.scale = Math.max(10, view.scale / 1.25); renderCanvas(); };
 $('fit').onclick = () => { fit(); renderCanvas(); };
-$('focus-workspace').onclick = () => controls.setFocus($('focus-workspace').getAttribute('aria-pressed') !== 'true');
-$('close-inspector').onclick = () => { selected = null; render(); };
+$('focus-workspace').onclick = () => {
+    controls.setFocus($('focus-workspace').getAttribute('aria-pressed') !== 'true');
+    renderCanvas();
+};
+function focusSelectedEditor() {
+    const panel = document.querySelector<HTMLElement>('.inspector-panel')!;
+    panel.scrollIntoView({block:'nearest'});
+    const control = panel.querySelector<HTMLElement>('[data-property="magnitude"], [data-property="momentMagnitude"], .line-strengths input') ??
+        panel.querySelector<HTMLElement>('[data-property]');
+    control?.focus({preventScroll:true});
+}
+$('close-inspector').onclick = () => {
+    selected = null;
+    render();
+    document.getElementById('drawing-object')?.focus({ preventScroll: true });
+};
 $('help-button').onclick = () => $<HTMLDialogElement>('workspace-help').showModal();
 $('edit-selection').onclick = () => {
     controls.setFocus(false);
-    document.querySelector('.inspector-panel')!.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    focusSelectedEditor();
 };
 $('undo').onclick = () => { if (!history.length)
     return; future.push(clone(model)); model = history.pop()!; selected = null; start = null; changed(); };
@@ -731,8 +1105,13 @@ document.addEventListener('keydown', event => { if ($('workspace').inert || (eve
 } });
 $('load-preset').onclick = () => commit(() => { const preset = $<HTMLSelectElement>('preset').value; model = preset === 'empty' ? { nodes: [], members: [], supports: [], loads: [] } : example(preset); selected = null; start = null; currentMember = model.members[0]?.id || ''; fit(); });
 $<HTMLSelectElement>('section-member').onchange = () => { currentMember = $<HTMLSelectElement>('section-member').value; updateEvidenceBinding(); render(); };
-$<HTMLInputElement>('section-position').oninput = () => { sectionT = Number($<HTMLInputElement>('section-position').value) / 1000; updateEvidenceBinding(); render(); };
-$('export-model').onclick = () => download('cv2011-model.json', { version: 2, model });
+const stationSlider = $<HTMLInputElement>('section-position');
+// Pointer movement uses 1000 steps. An exact typed station can lie between them.
+stationSlider.oninput = () => {
+    sectionT = Math.round(stationSlider.valueAsNumber) / 1000;
+    render();
+};
+$('export-model').onclick = () => download('cv2011-model.json', { version: model.loads.some(load => load.direction !== undefined) ? 3 : 2, model });
 $('export-evidence').onclick = async () => {
     try {
         updateEvidenceBinding();
@@ -760,15 +1139,15 @@ async function openSelectedModel() {
         const source = await file.text();
         if (revision !== importRevision) return;
         const parsed = JSON.parse(source), candidate = parsed.model || parsed;
-        if (parsed.version && parsed.version > 2) throw Error('This model uses a newer file format. Update Structural Explorer before opening it.');
+        if (parsed.version && parsed.version > 3) throw Error('This model uses a newer file format. Update Structural Explorer before opening it.');
         const checked = analyse(candidate);
         if (checked.status === 'invalid') {
             if (!isPortalWorkspace) throw Error(checked.message);
-            parseEvidenceModel(candidate);
+            parseDrawing(candidate);
         }
         commit(() => { model = candidate; selected = null; start = null; fit(); });
         try {
-            if (JSON.stringify(parseEvidenceModel(JSON.parse(source))) === JSON.stringify(parseEvidenceModel(model))) evidenceRawSource = source;
+            if (JSON.stringify(parseDrawing(JSON.parse(source))) === JSON.stringify(parseDrawing(model))) evidenceRawSource = source;
         } catch { /* The ordinary importer accepts drawings outside the strict snapshot schema. */ }
         const member = model.members.find(item => item.id === currentMember);
         let geometry = '';
@@ -786,6 +1165,7 @@ async function openSelectedModel() {
 // Guided derivations currently cover a single horizontal, prismatic beam with
 // one pin and one vertical roller. The sandbox accepts a wider model class.
 function problem() {
+    if (model.loads.some(load => load.direction !== undefined)) return null;
     if (model.members.length !== 1 || model.supports.length !== 2 || analysis.status !== 'stable')
         return null;
     const member = model.members[0], a = position(model, member.id, 0), b = position(model, member.id, 1);
@@ -813,7 +1193,7 @@ const stepDefinitions: Record<string, {
     normal: { title: 'Normal force at the cut', units: 'kN', hint: 'Isolate the left segment. Positive normal force acts away from the cut. Resolve all horizontal forces on this segment.' },
     shear: { title: 'Shear force at the cut', units: 'kN', hint: 'For a left segment, positive shear acts downward at its right cut. Include only the portion of each distributed load to the left of the cut.' },
     moment: { title: 'Moment at the cut', units: 'kN m', hint: 'Sum moments about the cut. Keep every load at its own lever arm. A positive applied couple contributes a negative jump in the sagging-positive moment diagram.' },
-    deflection: { title: 'Vertical displacement v at the cut (upward +)', units: 'mm', hint: 'Integrate the moment equation EI v″ = M twice on each interval. Apply the displacement boundary conditions at both supports and continuity of displacement v and physical slope θ = v′ at each continuous section. If using downward-positive virtual-work displacement Δ, enter v = −Δ.' },
+    deflection: { title: `Global vertical displacement ${math('u_y')} at the cut (upward +)`, units: 'mm', hint: `Integrate the moment equation ${math("EI\\,v''=M")} twice on each interval. Apply the displacement boundary conditions at both supports and continuity of displacement ${math('v')} and physical slope ${math("\\theta=v'")} at each continuous section. On this rightward horizontal beam, ${math('u_y=v')}. If using downward-positive virtual-work displacement ${math('\\Delta')}, enter ${math('u_y=-\\Delta')}.` },
 };
 function renderPractice() {
     const p = problem(), panel = $('practice-panel');
@@ -822,53 +1202,95 @@ function renderPractice() {
         return;
     }
     const step = stepDefinitions[solutionStep];
-    panel.innerHTML = `<div class="panel-label">STEP-BY-STEP WORKSPACE</div><h2>From equilibrium to displacement</h2><p class="small">Submit a value or an arithmetic expression. Use +, −, *, /, parentheses, and ^. Numeric inputs are checked against the current model and cut. Upward reactions and displacements are positive.</p><div class="steps">${Object.entries(stepDefinitions).map(([key, value], index) => `<button data-step="${key}" class="${solutionStep === key ? 'active' : ''}">${index + 1}. ${value.title.split(' at ')[0]}</button>`).join('')}</div><h2>${step.title}</h2><p class="small">Current cut: x = ${number(p.section)} m from the member start. ${['normal', 'shear', 'moment'].includes(solutionStep) ? 'Use the right-hand limit at an interior point action.' : ''}</p><div class="answer-row"><input id="answer" aria-label="Your answer" placeholder="Enter a value or expression"><select id="answer-units" aria-label="Answer units">${['kN', 'N', 'kN m', 'N m', 'mm', 'm'].map(u => `<option ${u === step.units ? 'selected' : ''}>${u}</option>`).join('')}</select><button class="primary" id="check-answer">Check step</button></div><button id="hint">Show hint</button> <button id="reveal">Reveal derivation</button><div id="step-feedback" aria-live="polite"></div>`;
-    panel.insertAdjacentHTML('beforeend', `<div class="dialog-buttons"><button id="show-computed">${practiceResultsVisible ? 'Hide computed response' : 'Reveal computed response'}</button></div><details class="small"><summary>Verification scope</summary><p>Symbolic checks run on the connected course verifier. Formal library: ${escape(proofStatus.lean === 'checked' ? 'Lean build passed' : 'Lean build status pending')}. ${escape(proofStatus.scope)} The drawing-to-model conversion and numerical solver are checked separately.</p></details>`);
-    $('show-computed').onclick = () => { practiceResultsVisible = !practiceResultsVisible; if (practiceResultsVisible) {
-        solutionRevealed = true;
-        void record('reveal', '', step.units);
-    } render(); };
-    panel.querySelectorAll<HTMLButtonElement>('[data-step]').forEach(button => button.onclick = () => { solutionStep = button.dataset.step!; hintUsed = false; renderPractice(); });
-    $('hint').onclick = () => { hintUsed = true; $('step-feedback').innerHTML = `<div class="feedback">${escape(step.hint)}</div>`; void record('hint', '', step.units); };
-    $('reveal').onclick = async () => {
-        solutionRevealed = true;
-        const attempt = await record('reveal', '', step.units);
-        if (attempt.step !== solutionStep || attempt.section !== sectionT || JSON.stringify(attempt.model) !== JSON.stringify(model) || mode !== 'practice') return;
-        if (isCheckedWorkspace) {
-            document.getElementById('frame-generate')?.click();
-            document.getElementById('worked-panel')?.scrollIntoView({ behavior: 'smooth' });
-        } else if (session.connected) {
-            showWorkedSolution(solutionStep === 'deflection' ? 'integration' : 'sections');
-        } else {
-            const expected = expectedValue(p);
-            $('step-feedback').innerHTML = `<div class="feedback">Numerical reference: ${number(expected, 5)} ${step.units}. Connect the verifier for a symbolic derivation.<p>${escape(step.hint)}</p></div>`;
-        }
+    const view = practiceView!;
+    const attempt = view.submission ? session.practiceAttempt(view.submission) : undefined;
+    const questions = Object.keys(stepDefinitions);
+    const options = questions.map((key, i) => {
+        const title = key === 'deflection' ? 'Vertical displacement at the cut' : stepDefinitions[key].title;
+        return `<option value="${key}" ${key === solutionStep ? 'selected' : ''}>${i + 1}. ${title}</option>`;
+    }).join('');
+    const result = attempt?.result;
+    const grade = !attempt?.synced ? 'Saved on this device · awaiting verification' :
+        result?.status === 'correct' ? 'Correct' : result?.status === 'incorrect' ? 'Check your prediction' : 'Verifier could not grade this expression';
+    const unitLabel = (u: string) => u.replace(' m', '·m');
+    const feedback = attempt ? `<div class="feedback" id="step-feedback" tabindex="-1" role="status"><strong>Your prediction: ${escape(attempt.answer)} ${escape(unitLabel(attempt.units))}</strong><p>${grade}</p>${attempt.synced && result ? '<p>' + escape(result.message) + '</p>' : ''}</div>` : '';
+    const entry = `<form id="practice-entry"><label for="answer">Your prediction</label><div class="answer-row"><input id="answer" required placeholder="Value or expression"><select id="answer-units" aria-label="Answer units">${['kN','N','kN m','N m','mm','m'].map(u => `<option value="${u}">${unitLabel(u)}</option>`).join('')}</select></div><button class="primary" id="check-answer" ${view.pending ? 'disabled' : ''}>Submit prediction</button></form>`;
+    const solution = practiceResultsVisible ? `<section aria-label="Worked solution"><h3>Calculated answer</h3><strong>${number(expectedValue(p), 5)} ${unitLabel(step.units)}</strong><p>${step.hint}</p><p class="small">This numerical value comes from the current drawing. The worked panel gives the scope of the structural model check.</p></section>` : '';
+    panel.innerHTML = `<label for="practice-step">Practice question</label><select id="practice-step">${options}</select><h2>${step.title}</h2><p>Cut at ${math('x = ' + quantity(number(p.section), measureUnits.length))} from the member start. ${['normal','shear','moment'].includes(solutionStep) ? 'Use the right-hand limit at an interior point action.' : 'Upward is positive.'}</p>${feedback}${attempt ? '' : entry}${solution}
+        ${!attempt && !hintUsed ? '<button id="hint">Hint</button>' : ''}
+        ${hintUsed && !practiceResultsVisible ? '<p class="feedback">' + step.hint + '</p>' : ''}
+        ${attempt && !practiceResultsVisible ? '<button class="primary" id="reveal">Show worked solution</button>' : ''}
+        ${attempt ? '<button id="practice-retry">Revise prediction</button>' : ''}
+        <details><summary>How this prediction is checked</summary><p>The course verifier grades your expression and units. Offline submissions stay in this browser until you connect and sync them from Insights.</p></details>`;
+    const selector = $<HTMLSelectElement>('practice-step');
+    selector.onchange = () => { solutionStep = selector.value; render(); $('practice-step').focus(); };
+    if (attempt) {
+        $('practice-retry').onclick = () => {
+            view.submission = undefined;
+            practiceResultsVisible = false;
+            render(); $('answer').focus();
+        };
+        if (!practiceResultsVisible) $('reveal').onclick = async () => {
+            practiceResultsVisible = solutionRevealed = true;
+            const recorded = record('reveal', '', step.units);
+            render();
+            $('step-feedback').focus();
+            // Activating the checker can reload the page. Finish recording this
+            // reveal first, and abandon generation if the learner moved on.
+            await recorded;
+            if (practiceView !== view || mode !== 'practice' || !practiceResultsVisible) return;
+            if (isCheckedWorkspace) document.getElementById('frame-generate')?.click();
+            else if (session.connected) showWorkedSolution(solutionStep === 'deflection' ? 'integration' : 'sections');
+        };
+        return;
+    }
+    const answer = $<HTMLInputElement>('answer'), units = $<HTMLSelectElement>('answer-units');
+    answer.value = view.answer; units.value = view.units;
+    answer.oninput = () => { view.answer = answer.value; };
+    units.onchange = () => { view.units = units.value; };
+    if (!hintUsed) $('hint').onclick = () => {
+        hintUsed = true; void record('hint', '', step.units); renderPractice(); $('answer').focus();
     };
-    $('check-answer').onclick = async () => {
-        const answer = $<HTMLInputElement>('answer').value.trim(), units = $<HTMLSelectElement>('answer-units').value;
-        if (!answer) {
-            toast('Enter an answer first.');
-            return;
-        }
+    $<HTMLFormElement>('practice-entry').onsubmit = async event => {
+        event.preventDefault();
+        if (view.pending || !answer.value.trim()) return;
+        view.answer = answer.value.trim(); view.units = units.value; view.pending = true;
         $<HTMLButtonElement>('check-answer').disabled = true;
-        const attempt = await record('submit', answer, units);
-        if (attempt.step !== solutionStep || attempt.section !== sectionT || JSON.stringify(attempt.model) !== JSON.stringify(model) || mode !== 'practice') {
-            toast('The result was recorded for the model and step you submitted.');
-            return;
-        }
-        const result = attempt.result!;
-        $('step-feedback').innerHTML = `<div class="feedback ${result.status === 'incorrect' ? 'incorrect' : ''}"><b>${escape(result.status === 'correct' ? 'Correct' : result.status === 'incorrect' ? 'Check this step' : 'Awaiting verification')}</b><p>${escape(result.message)}</p><span class="small">${attempt.synced ? 'Recorded by the verifier.' : 'Saved on this device; not yet verified by the server.'}</span></div>`;
-        $<HTMLButtonElement>('check-answer').disabled = false;
+        const saved = await record('submit', view.answer, view.units);
+        view.pending = false; view.submission = saved.id;
+        if (practiceView === view && mode === 'practice') { renderPractice(); $('step-feedback').focus(); }
     };
-    $<HTMLInputElement>('answer').onkeydown = event => { if (event.key === 'Enter')
-        $('check-answer').click(); };
 }
 function expectedValue(p: NonNullable<ReturnType<typeof problem>>) { return { reaction_left: p.left.fy, reaction_right: p.right.fy, normal: p.N, shear: p.V, moment: p.M, deflection: p.deflection }[solutionStep]!; }
 function record(event: string, answer: string, units: string): Promise<Attempt> {
     return session.record({ model, section: sectionT, step: solutionStep, side, hintUsed,
-        solutionRevealed: solutionRevealed || practiceResultsVisible }, event, answer, units);
+        // Revealing the full model exposes reactions and diagram values for
+        // other questions and stations on the same drawing.
+        solutionRevealed: solutionRevealed || practiceResultsVisible ||
+            session.sawPracticeAid(model, Object.keys(stepDefinitions), 'reveal') }, event, answer, units);
 }
 // Components bind once. Model edits and navigation still share this controller.
+const drawingWorkspace = createDrawingWorkspace(object => {
+    tool = 'select';
+    controls.showTool(tool);
+    $('tool-hint').textContent = 'Select an object to edit. Drag to move.';
+    start = null;
+    selected = object;
+    if (object?.type === 'member') currentMember = object.id;
+    render();
+}, () => {
+    if (!selected) return;
+    const attachment = selected.type === 'load' ? model.loads.find(load => load.id === selected!.id) :
+        selected.type === 'support' ? model.supports.find(support => support.id === selected!.id) : undefined;
+    if (attachment) {
+        currentMember = attachment.member;
+        sectionT = attachment.t;
+        $<HTMLSelectElement>('frame-side').value = sectionT === 1 ? 'left' : 'right';
+    } else if (selected.type === 'member') currentMember = selected.id;
+    selected = null;
+    render();
+    $('frame-side').focus();
+});
 const controls = createWorkspaceControls({
     selectTool: next => {
         tool = next; start = null;
@@ -896,16 +1318,19 @@ if (portalExercise) {
 restoreCheckerControls?.();
 portalPanel = createPortalPanel(() => model, value => commit(() => {
     if (model.loads.length === 1) { model.loads[0].fy = value; model.loads[0].qEnd = value; }
-}), value => { sectionT = value; updateEvidenceBinding(); render(); }, modelStorageKey, preserveCheckerView, (drawing, member, rows) => momentExercise?.checked(drawing,member,rows), message => momentExercise?.status(message));
-if (portalExercise) $('frame-side').addEventListener('change', () => {
-    momentExercise?.bind(portalSignature + $<HTMLSelectElement>('frame-side').value);
-    render();
-});
+}), value => { sectionT = value; render(); }, modelStorageKey, () => {
+    preserveCheckerView();
+    if (mode === 'practice' && practiceResultsVisible) sessionStorage.setItem(modelStorageKey + '/practice-focus', '1');
+}, (drawing, member, rows) => momentExercise?.checked(drawing,member,rows), message => momentExercise?.status(message));
+
 if (!restoredPortalView) fit();
 controls.showLayer(layer);
-setMode(restoredPortalView ? mode : location.hash.slice(1) || 'sandbox');
+setMode(location.hash.slice(1) || (restoredPortalView ? mode : 'sandbox'));
 modelFile.onchange = openSelectedModel;
 if (modelFile.files?.length) void openSelectedModel();
 else setWorkspaceBusy(false);
+if (sessionStorage.getItem(modelStorageKey + '/practice-focus')) {
+    sessionStorage.removeItem(modelStorageKey + '/practice-focus');
+    if (mode === 'practice' && practiceResultsVisible) document.getElementById('step-feedback')?.focus();
+}
 void session.connect();
-void fetch('verification.json').then(r => r.json()).then(v => { proofStatus = v; }).catch(() => { });

@@ -78,7 +78,7 @@ async function waitForReceipt(model) {
 try {
     // 1. Hold startup until after file selection, as in the original failure.
     const appResponse = gate(), appRequested = gate();
-    await page.route('**/app.js', async route => {
+    await page.route(url => url.pathname.endsWith('/app.js'), async route => {
         appRequested.open();
         await appResponse.pending;
         await route.continue();

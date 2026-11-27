@@ -35,7 +35,7 @@ test('two-span explanation follows exact source ownership and checked-result ref
     assert.ok(report.steps.filter(step => step.result).every(step => step.result.evidence === 'verified-result'));
     const html = renderFrameWorked(report);
     assert.doesNotMatch(html, /math-error/);
-    assert.match(html, /w₇/);
+    assert.match(html, /w_\{7\}/);
     assert.match(html, /Rounded substitution \(explanatory\)/);
     assert.match(html, /not separately Lean-checked/);
 });
@@ -76,9 +76,9 @@ test('unusual source identifiers remain text and load renames rebind presentatio
     const renamed = fixture(model, query(id));
     assert.deepEqual(first.values.readouts, renamed.values.readouts);
     const html = renderFrameWorked(renamed);
-    assert.doesNotMatch(html, /<img|math-error|w₇/);
+    assert.doesNotMatch(html, /<img|math-error|w_\{7\}/);
     assert.match(html, /&lt;img/);
-    assert.match(html, /q_A/);
+    assert.match(html, /q_\{A\}/);
 });
 
 test('tampered intermediate claims, rules, exact substitutions and returned values fail presentation validation', () => {

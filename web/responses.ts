@@ -2,9 +2,9 @@
 import { nodeLabels, position } from './engine.js';
 import type { Analysis, Model, Sample } from './engine.js';
 import { courseColors } from './symbols.js';
-import { memberLabel } from './model-view.js';
-import { math } from './math.js';
-import { element as $, escapeHtml as escape, formatNumber as number } from './ui.js';
+import { memberLabel, reactionSymbols } from './model-view.js';
+import { math, measureUnits, quantity } from './math.js';
+import { element as $, escapeHtml as escape, formatNumber as number, formatSectionResult } from './ui.js';
 
 interface ResponseOptions {
     model: Model;
@@ -12,17 +12,49 @@ interface ResponseOptions {
     currentMember: string;
     sectionT: number;
     layer: string;
+    cutSide: 'left' | 'right';
     resultsVisible: boolean;
 }
 
-/** Interpolate the displayed sample, retaining the right-hand convention at jumps. */
-export function sampleSection(analysis: Analysis, currentMember: string, sectionT: number): Sample | undefined {
+const descriptions: Record<string, [
+    string,
+    string
+]> = {
+    M: ['Bending moment', `For a horizontal member directed rightward, positive ${math('M')} is sagging with tension at the bottom. The Week 4 lecture plots on the tension side; worked tutorials plot on the compression side. Changing the plotting side preserves the signed moment. For an inclined member, use its local axis from the first joint to the second.`],
+    V: ['Shear force', `Positive ${math('V')} acts downward on the right cut face of the retained left portion. On the opposite cut face its arrow reverses. Between concentrated actions, ${math(String.raw`\mathrm{d}M/\mathrm{d}x = V`)} and ${math(String.raw`\mathrm{d}V/\mathrm{d}x = -w`)} for downward-positive distributed intensity ${math('w')}.`],
+    N: ['Normal force', `Positive normal force ${math('N')} represents tension. Negative values represent compression. The local member axis runs from the first joint to the second.`],
+    displacement: ['Deflected shape and elastic curve', `The section readout gives global vertical displacement ${math('u_y')}, positive upward. The member's transverse displacement ${math('v')} is measured along its local normal. The slope ${math(String.raw`\theta = \mathrm{d}v/\mathrm{d}x`)} is positive counterclockwise in the local axes for small rotations. Global ${math('u_y')} equals local ${math('v')} for a rightward horizontal member. The drawing magnifies displacement; numerical values retain their actual magnitude.`],
+    none: ['Structural model', 'Click a joint, support, load, or member to inspect it. Snap to a member interior while drawing to create a rigid connection. Crossing members remain separate.'],
+};
+
+/** Select the adjoining segment first, then interpolate its numerical response. */
+export function sampleSection(analysis: Analysis, currentMember: string, sectionT: number, side: 'left' | 'right' = 'right', model?: Model): Sample | undefined {
     const elements = analysis.elements.filter(e => e.member === currentMember);
-    // At a point action use the right-hand section, except at the member end.
-    const element = elements.find(e => sectionT >= e.t0 - 1e-9 && sectionT < e.t1 - 1e-9) || elements.at(-1);
-    if (!element)
-        return;
-    const u = Math.max(0, Math.min(40, (sectionT - element.t0) / (element.t1 - element.t0) * 40));
+    // Several distinct source stations can fall on one rounded mesh node.
+    // Only the exterior faces of that group have numerical samples.
+    const bounds = new Map<number, { first: number, last: number }>();
+    function include(station: number) {
+        const key = Number(station.toFixed(8));
+        const group = bounds.get(key);
+        bounds.set(key, { first: Math.min(group?.first ?? station, station),
+            last: Math.max(group?.last ?? station, station) });
+    }
+    include(0);
+    include(1);
+    if (model) for (const action of [...model.loads, ...model.supports]) {
+        if (action.member !== currentMember) continue;
+        include(action.t);
+        if ('end' in action && action.kind === 'distributed') include(action.end);
+    }
+    const start = (t: number) => bounds.get(t)?.last ?? t;
+    const end = (t: number) => bounds.get(t)?.first ?? t;
+    const useLeft = sectionT === 1 || (sectionT !== 0 && side === 'left');
+    const element = elements.find(e => useLeft
+        ? start(e.t0) < sectionT && sectionT <= end(e.t1)
+        : start(e.t0) <= sectionT && sectionT < end(e.t1));
+    if (!element) return;
+    const a = start(element.t0), b = end(element.t1);
+    const u = Math.max(0, Math.min(40, (sectionT - a) / (b - a) * 40));
     const left = element.samples[Math.floor(u)], right = element.samples[Math.min(40, Math.ceil(u))], fraction = u - Math.floor(u);
     const sample = { ...left };
     for (const key of ['N', 'V', 'M', 'ux', 'uy', 'rotation'] as const)
@@ -31,15 +63,38 @@ export function sampleSection(analysis: Analysis, currentMember: string, section
 }
 
 /** Present the current analysis without recalculating or modifying the model. */
-export function renderResponses(options: ResponseOptions): void {
-    const { model, analysis, currentMember, sectionT, layer, resultsVisible } = options;
+export function renderResponses(options: ResponseOptions) {
+    const { model, analysis, currentMember, sectionT, layer, cutSide, resultsVisible } = options;
     $<HTMLSelectElement>('section-member').innerHTML = model.members.map(m => `<option value="${escape(m.id)}" ${m.id === currentMember ? 'selected' : ''}>${memberLabel(model, m)}</option>`).join('');
     const member = model.members.find(m => m.id === currentMember);
     const length = member ? Math.hypot(position(model, member.id, 1).x - position(model, member.id, 0).x, position(model, member.id, 1).y - position(model, member.id, 0).y) : 0;
-    $('section-distance').textContent = `x = ${number(sectionT * length)} / ${number(length)} m`;
-    const sample = sampleSection(analysis, currentMember, sectionT);
+    const station = member ? `x = ${number(sectionT * length)} m, L = ${number(length)} m` : '—';
+    const stationMath = member ? [
+        math('x = ' + quantity(number(sectionT * length), measureUnits.length)),
+        math('L = ' + quantity(number(length), measureUnits.length)),
+    ] : ['—'];
+    $('section-distance').innerHTML = stationMath.join(', ');
+    const sample = sampleSection(analysis, currentMember, sectionT, cutSide, model);
+    const note = document.getElementById('frame-overview-convention');
+    const numericalOnly = model.loads.some(load => load.direction !== undefined);
+    if (note) note.textContent = numericalOnly
+        ? 'Section values use the numerical frame analysis. Show the worked solution for the load projections and section equilibrium.'
+        : !sample && member && analysis.status === 'stable'
+        ? 'The numerical mesh combines nearby stations here. Show the worked solution to check the selected face on the original drawing.'
+        : 'Numerical section values are interpolated between diagram samples. Show the worked solution to check this member, station and cut face.';
+    const atBoundary = sectionT === 0 || sectionT === 1 || model.loads.some(l => l.member === currentMember && l.kind !== 'distributed' && l.t === sectionT)
+        || model.supports.some(s => s.member === currentMember && s.t === sectionT);
+    const face = atBoundary ? 'Just ' + cutSide : '';
+    $('section-position').setAttribute('aria-valuetext', station + (face ? ', ' + face : ''));
     const responseFields = ['N', 'V', 'M', 'rotation', 'displacement'];
-    $('section-results').innerHTML = [['Normal force N', sample?.N, 'kN'], ['Shear force V', sample?.V, 'kN'], ['Bending moment M', sample?.M, 'kN m'], ['Physical rotation θ (CCW +)', sample ? sample.rotation * 1000 : undefined, 'mrad'], ['Vertical displacement v (upward +)', sample ? sample.uy * 1000 : undefined, 'mm']].map(([label, value, unit], index) => `<div class="metric ${responseFields[index] === layer ? 'is-current' : ''}"><small>${label}</small><strong>${value === undefined ? '—' : number(Number(value), 4)} <em>${unit}</em></strong></div>`).join('');
+    const metrics = [
+        ['Normal force ' + math('N'), sample?.N, 'kN'],
+        ['Shear force ' + math('V'), sample?.V, 'kN'],
+        ['Bending moment ' + math('M'), sample?.M, 'kN m'],
+        ['Physical rotation ' + math('\\theta') + ' (CCW +)', sample ? sample.rotation * 1000 : undefined, 'mrad'],
+        ['Global vertical displacement ' + math('u_y') + ' (upward +)', sample ? sample.uy * 1000 : undefined, 'mm'],
+    ];
+    $('section-results').innerHTML = metrics.map(([label, value, unit], index) => `<div class="metric ${responseFields[index] === layer ? 'is-current' : ''}"><small>${label}${face && index < 3 ? ' (' + face.toLowerCase() + ')' : ''}</small><strong>${value === undefined ? '—' : formatSectionResult(Number(value))} <em>${unit}</em></strong></div>`).join('');
     // Classification stays visible; solver diagnostics are available on demand.
     const statusExpanded = $('status').querySelector('details')?.open ?? false;
     const classification = analysis.degree === 0 ? 'Statically determinate' : `Statically indeterminate (${analysis.degree})`;
@@ -48,19 +103,19 @@ export function renderResponses(options: ResponseOptions): void {
         : `<span class="status-pill ${analysis.status}">${analysis.status === 'unstable' ? 'Unstable (mechanism)' : analysis.status === 'empty' ? 'Start drawing' : 'Check model'}</span><span class="status-message">${escape(analysis.message)}</span>`;
     $('reactions').innerHTML = analysis.reactions.map((r, i) => {
         const node = model.nodes.find(node => Math.hypot(node.x - r.x, node.y - r.y) < 1e-7);
-        const name = node ? `Node ${nodeLabels(model).get(node.id)}` : `Support ${i + 1}`;
-        const label = node ? nodeLabels(model).get(node.id)! : 'R';
-        const component = (direction: string) => `${label}_{${node ? '' : i + 1}${direction}}`;
-        return `<div class="reaction-row"><b>${name} · (${number(r.x)}, ${number(r.y)}) m</b><span>${math(component('x'))}: ${number(r.fx)} · ${math(component('y'))}: ${number(r.fy)} kN</span>${Math.abs(r.mz) > 1e-7 ? `<span>${math(`M_{${node ? label : `R${i+1}`}}`)}: ${number(r.mz)} kN m (CCW +)</span>` : ''}</div>`;
+        const joint = node ? nodeLabels(model).get(node.id) : undefined;
+        const name = joint ? `Node ${joint}` : `Support ${i + 1}`;
+        const [horizontalSymbol, verticalSymbol, momentSymbol] = reactionSymbols(joint);
+        const horizontal = math(horizontalSymbol + ' = ' + quantity(number(r.fx), measureUnits.force));
+        const vertical = math(verticalSymbol + ' = ' + quantity(number(r.fy), measureUnits.force));
+        const moment = math(momentSymbol + ' = ' + quantity(number(r.mz), measureUnits.moment));
+        return `<div class="reaction-row"><b>${name} at ${math(quantity(`(${number(r.x)}, ${number(r.y)})`, measureUnits.length))}</b><span>${horizontal}, ${vertical}</span>${Math.abs(r.mz) > 1e-7 ? `<span>${moment} (CCW +)</span>` : ''}</div>`;
     }).join('');
     $('reactions').hidden = !resultsVisible;
     (document.querySelector('.support-reactions') as HTMLElement).hidden = analysis.status !== 'stable' || (!resultsVisible);
     $('section-results').hidden = !resultsVisible;
-    const descriptions: Record<string, [
-        string,
-        string
-    ]> = { M: ['Bending moment', 'For a horizontal member directed rightward, positive M is sagging with tension at the bottom. The Week 4 lecture plots on the tension side; worked tutorials plot on the compression side. Changing the plotting side preserves the signed moment. For an inclined member, use its local axis from the first joint to the second.'], V: ['Shear force', 'Positive V acts downward on the right cut face of the retained left portion. On the opposite cut face its arrow reverses. Between concentrated actions, dM/dx = V and dV/dx = −w for downward-positive distributed intensity w.'], N: ['Normal force', 'Positive normal force N represents tension. Negative values represent compression. The local member axis runs from the first joint to the second.'], displacement: ['Deflected shape and elastic curve', 'The elastic curve gives signed displacement, with vertical v positive upward. Physical slope θ = dv/dx is counterclockwise-positive for rightward x and small rotations. The drawing magnifies displacement; numerical values retain their actual magnitude. The frame solver includes bending and axial deformation.'], none: ['Structural model', 'Click a joint, support, load, or member to inspect it. Snap to a member interior while drawing to create a rigid connection. Crossing members remain separate.'] };
     $('response-title').textContent = descriptions[layer][0];
-    $('response-description').textContent = descriptions[layer][1];
-    $('legend').innerHTML = `<div class="legend-item"><span class="swatch" style="background:${courseColors.force}"></span>Applied forces and moments</div><div class="legend-item"><span class="swatch" style="background:${courseColors.reaction}"></span>Reactions and displaced shape</div><p class="small">● Rigid continuity · ○ Pin / hinge<br>Spiral: rotational spring<br>Circle between rails: sliding joint<br>◇ Member-specific constraints</p><p class="small">Forces stay on their lines of action. Moment arcs are centred at their application points. A ground pin does not create an internal hinge.</p><p class="small">At a point action the section readout uses the right-hand limit, except at the member end. Values between plotted samples are interpolated.</p>`;
+    $('response-description').innerHTML = descriptions[layer][1];
+    $('legend').innerHTML = `<div class="legend-item"><span class="swatch" style="background:${courseColors.force}"></span>Applied forces and moments</div><div class="legend-item"><span class="swatch" style="background:${courseColors.reaction}"></span>Reactions and displaced shape</div><p class="small">● Rigid continuity · ○ Pin / hinge<br>Spiral: rotational spring<br>Circle between rails: sliding joint<br>◇ Member-specific constraints</p><p class="small">Forces stay on their lines of action. Moment arcs are centred at their application points. A ground pin does not create an internal hinge.</p><p class="small">At a point action, choose the section immediately to its left or right. The member endpoints use their inward limits. Values between plotted samples are interpolated.</p>`;
+    return { sample, stationMath, face };
 }

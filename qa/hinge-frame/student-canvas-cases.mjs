@@ -139,7 +139,7 @@ export async function runStudentCanvasCases({ page, base, output, target = 'publ
 
     async function checkInclinedRelease(name, memberIndex, parameter, memberName, expected) {
         await selected.selectOption({ index: memberIndex });
-        const parameterInput = page.getByLabel('Member parameter t');
+        const parameterInput = page.locator('#frame-parameter');
         await parameterInput.fill(String(parameter));
         assert.equal(Number(await parameterInput.inputValue()), parameter);
         await worked();
@@ -196,7 +196,7 @@ export async function runStudentCanvasCases({ page, base, output, target = 'publ
         const entry = await capture('inclined-roller-worked', 'Accepted checked intervals containing the hand reactions');
         if (target === 'stage3') {
             assert.match(entry.checker, /^Accepted/i);
-            assertCanvasMemberName(entry, 'A–B');
+            assertCanvasMemberName(entry, 'AB');
         }
     });
 
@@ -271,7 +271,7 @@ export async function runStudentCanvasCases({ page, base, output, target = 'publ
 
     if (target === 'stage3') for (const reversed of [false, true]) {
         const direction = reversed ? 'reversed' : 'forward';
-        const inclinedName = reversed ? 'C–B' : 'B–C';
+        const inclinedName = reversed ? 'CB' : 'BC';
         const hingeParameter = reversed ? 1 : 0;
         const quarterParameter = reversed ? 0.75 : 0.25;
         const orientation = reversed ? -1 : 1;
@@ -305,7 +305,7 @@ export async function runStudentCanvasCases({ page, base, output, target = 'publ
             await setNumber('t', 1);
             await setNumber('mz', 10);
             const onAB = { reactionA: [-10, 0, -10], reactionC: [10, 10, 0] };
-            await checkInclinedRelease(`${direction}-couple-ab-loaded-face`, 0, 1, 'A–B',
+            await checkInclinedRelease(`${direction}-couple-ab-loaded-face`, 0, 1, 'AB',
                 { ...onAB, sectionNVM: [10, 0, 10] });
             await checkInclinedRelease(`${direction}-couple-ab-released-face`, 1, hingeParameter, inclinedName,
                 { ...onAB, sectionNVM: [baseline.sectionNVM[0], baseline.sectionNVM[1], 0] });
@@ -315,7 +315,7 @@ export async function runStudentCanvasCases({ page, base, output, target = 'publ
             const onIncline = { reactionA: [-5, 5, 20], reactionC: [5, 5, 0] };
             const inclinedAxial = Math.sqrt(5);
             const inclinedShear = 15 / Math.sqrt(5);
-            await checkInclinedRelease(`${direction}-couple-incline-unloaded-face`, 0, 1, 'A–B',
+            await checkInclinedRelease(`${direction}-couple-incline-unloaded-face`, 0, 1, 'AB',
                 { ...onIncline, sectionNVM: [5, 5, 0] });
             await checkInclinedRelease(`${direction}-couple-incline-loaded-face`, 1, hingeParameter, inclinedName,
                 { ...onIncline, sectionNVM: [inclinedAxial, inclinedShear, -10 * orientation] });

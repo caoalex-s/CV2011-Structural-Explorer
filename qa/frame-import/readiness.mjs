@@ -28,7 +28,7 @@ const release = name => page.evaluate(name => window.releaseFile[name](), name);
 try {
     const moduleRequested = Promise.withResolvers();
     const moduleReady = Promise.withResolvers();
-    await page.route('**/app.js', async route => {
+    await page.route(url => url.pathname.endsWith('/app.js'), async route => {
         moduleRequested.resolve();
         await moduleReady.promise;
         await route.continue();

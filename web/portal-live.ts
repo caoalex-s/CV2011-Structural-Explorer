@@ -1,9 +1,12 @@
+import { directedLoadWorked } from './directed-load-worked.js';
 /** Dedicated checked portal panel, sharing the ordinary workspace and edit lifecycle. */
 import { EvidenceRequests, createEvidenceEnvelope } from './model-evidence.js';
 import { portalAmplitude, portalCandidate, encodeCandidate, portalQuery, outputIds, roundedDecimal, profileId } from './portal-candidate.js';
 import type { Model } from './engine.js';
 import { endConnection, nodeLabels, referenceMember } from './engine.js';
 import { memberLabel } from './model-view.js';
+import { math, measureUnits, numberLatex, quantity } from './math.js';
+import { escapeHtml } from './ui.js';
 import { decodeAcceptedHingePacket } from './frame-hinge-result.js';
 import { decodeInclinedReleaseReport } from './frame-inclined-release-result.js';
 import { renderInclinedMemberDiagram, renderMemberDiagram } from './member-diagram.js';
@@ -65,14 +68,14 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
     host.className = 'portal-certificate';
     host.innerHTML = `<h2>Worked solution</h2>
       <p id="portal-introduction">Generate a solution for the current drawing and selected section. Local checking supports rigid frames with horizontal and vertical members.</p>
-      <button id="frame-generate">Generate worked solution</button>
+      <p id="checked-section"></p><button id="frame-generate" aria-controls="frame-worked-output">Show worked solution</button>
       <button id="frame-collapse" hidden aria-expanded="true">Collapse solution</button>
       <label hidden>Uniform load (kN/m) <input id="portal-amplitude" type="number" step="any" value="-5"></label>
       <button id="portal-activate">Enable local checking</button><button id="portal-reset" hidden>Reset checker</button>
       <button id="portal-deactivate" hidden>Disable local checking</button>
-      <label id="frame-side-label">Section limit <select id="frame-side"><option value="right">Right</option><option value="left">Left</option></select></label>
-      <label id="frame-parameter-label">Member parameter t <input id="frame-parameter" type="number" min="0" max="1" step="any" value="0.5"></label>
-      <p id="portal-status" role="status">Local checking is off. Generate enables checking and reloads this workspace once.</p>
+      <label id="frame-side-label">Cut face <select id="frame-side"><option value="right">Just right</option><option value="left">Just left</option></select></label>
+      <label id="frame-parameter-label">Member parameter ${math('t')} <input id="frame-parameter" type="number" min="0" max="1" step="any" value="0.5"></label>
+      <p id="portal-status" role="status">Show worked solution enables local checking and reloads this workspace once.</p>
       <div id="frame-worked-output"></div>
       <details><summary>Verification, scope, and exact certificate</summary><div id="portal-readouts"></div>
       <button id="frame-export" hidden>Export exact certificate</button>
@@ -81,8 +84,11 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
     const overviewNote = document.createElement('p');
     overviewNote.id = 'frame-overview-convention';
     overviewNote.className = 'small frame-overview-note';
-    overviewNote.textContent = 'Numerical overview: interpolated values use the right-hand convention at interior jumps and the inward limit at member ends. The checked worked solution uses the section limit selected below.';
+    overviewNote.textContent = 'Numerical section values are interpolated between diagram samples. Show the worked solution to check this member, station and cut face.';
     document.getElementById('section-results')!.before(overviewNote);
+    const sectionControls = document.createElement('div');
+    sectionControls.className = 'cut-controls';
+    document.querySelector('.section-strip')!.after(sectionControls);
     const status = host.querySelector<HTMLElement>('#portal-status')!;
     const readouts = host.querySelector<HTMLElement>('#portal-readouts')!;
     const certificate = host.querySelector<HTMLElement>('#portal-certificate')!;
@@ -96,6 +102,10 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
     const generate = host.querySelector<HTMLButtonElement>('#frame-generate')!;
     const collapse = host.querySelector<HTMLButtonElement>('#frame-collapse')!;
     const workedOutput = host.querySelector<HTMLElement>('#frame-worked-output')!;
+    sectionControls.append(sectionParameter.closest('label')!, cutSide.closest('label')!);
+    const proofDetails = certificate.closest('details')!;
+    proofDetails.append(reset, deactivate);
+    activate.hidden = !isPortalWorkspace;
     const requests = new EvidenceRequests();
     let runtime: PortalRuntime | null = null;
     let debounce: ReturnType<typeof setTimeout> | undefined;
@@ -176,12 +186,12 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
             enabled = true; startingNow = false; activate.hidden = true; deactivate.hidden = false; reset.hidden = false;
             if (starting.supportsFrames) {
                 amplitude.closest('label')!.hidden = true;
-                host.querySelector<HTMLElement>('#frame-side-label')!.hidden = false;
-                host.querySelector<HTMLElement>('#frame-parameter-label')!.hidden = false;
-                host.querySelector('#portal-scope')!.textContent = 'The checker covers linear Euler–Bernoulli frames with positive EA and EI, fixed or pin supports, and rollers at 0, 90, 180, or 270 degrees. Point forces, couples, and linearly varying vertical loads may act over partial or overlapping member intervals. Distributed loads may change sign. Drawing labels are downward positive; the stored global-y forces are upward positive. Up to 8 members, 16 nodes, 16 active points, 16 segments, 16 supports, and 16 loads are supported within the arithmetic and one-second limits. Inputs retain their exact parsed binary64 values. Source and certificate rationals allow 128 digits, with 256 digits for normalized candidate intermediates and 513 before reduction. The packet limit is 1 MiB. A limit or timeout is inconclusive. N is positive in tension, M is positive in sagging, dM/dx = V, global y is upward, and rotation is counterclockwise. The main canvas draws numerical curves. In the whole-member worked solution, the sketch uses the checked polynomial coefficients. The tables give the checked section values and extrema. Acceptance relies on the proved compiled checker, its compiler and runtime, and the decoder and input binding. Edits are checked locally without invoking the Lean kernel.';
+                cutSide.closest('label')!.hidden = false;
+                sectionParameter.closest('label')!.hidden = false;
+                host.querySelector('#portal-scope')!.innerHTML = `The checker covers linear Euler–Bernoulli frames with positive ${math('EA')} and ${math('EI')}, fixed or pin supports, and rollers at 0, 90, 180, or 270 degrees. Point forces, couples, and linearly varying vertical loads may act over partial or overlapping member intervals. Distributed loads may change sign. Drawing labels are downward positive; the stored global-y forces are upward positive. Up to 8 members, 16 nodes, 16 active points, 16 segments, 16 supports, and 16 loads are supported within the arithmetic and one-second limits. Inputs retain their exact parsed binary64 values. Source and certificate rationals allow 128 digits, with 256 digits for normalized candidate intermediates and 513 before reduction. The packet limit is 1 MiB. A limit or timeout is inconclusive. ${math('N')} is positive in tension, ${math('M')} is positive in sagging, ${math(String.raw`\mathrm{d}M/\mathrm{d}x=V`)}, global ${math('y')} is upward, and rotation is counterclockwise. The main canvas draws numerical curves. In the whole-member worked solution, the sketch uses the checked polynomial coefficients. The tables give the checked section values and extrema. Acceptance relies on the proved compiled checker, its compiler and runtime, and the decoder and input binding. Edits are checked locally without invoking the Lean kernel.`;
                 if (starting.supportsInclinedFrames) {
                     host.querySelector('#portal-introduction')!.textContent = 'Generate a solution for the current rigid frame and selected section. For inclined members and rollers at arbitrary finite angles, the worked solution gives checked intervals for the selected section and whole-member shear and moment extrema.';
-                    host.querySelector('#portal-scope')!.textContent = `The checker covers linear Euler–Bernoulli frames with positive EA and EI and rigid joints. Supports may be fixed, pinned, or rollers at arbitrary finite degree angles. Point forces, couples, and linearly varying vertical loads may act over partial or overlapping member intervals. Original parsed binary64 coordinates, angles, and actions define the real model. Up to 8 members, 16 nodes, 16 active points, 16 segments, 16 supports, and 16 loads are admitted within the arithmetic budget and 1 MiB packet limit. The exact-cardinal route has a one-second deadline. Inclined requests have a ${inclinedDeadlineMilliseconds / 1000}-second deadline and original-coordinate partial-load checks allow up to 150 seconds per worker. Requests are cancelled when the drawing or selected section changes. A timeout or failed enclosure check is inconclusive and does not establish a mechanism. N is positive in tension, M is positive in sagging with dM/dx = V, global y is upward, and rotation is counterclockwise. The main canvas draws numerical curves. Acceptance relies on the proved compiled checker, its compiler and runtime, and the decoder and input binding.`;
+                    host.querySelector('#portal-scope')!.innerHTML = `The checker covers linear Euler–Bernoulli frames with positive ${math('EA')} and ${math('EI')} and rigid joints. Supports may be fixed, pinned, or rollers at arbitrary finite degree angles. Point forces, couples, and linearly varying vertical loads may act over partial or overlapping member intervals. Original parsed binary64 coordinates, angles, and actions define the real model. Up to 8 members, 16 nodes, 16 active points, 16 segments, 16 supports, and 16 loads are admitted within the arithmetic budget and 1 MiB packet limit. The exact-cardinal route has a one-second deadline. Inclined requests have a ${inclinedDeadlineMilliseconds / 1000}-second deadline and original-coordinate partial-load checks allow up to 150 seconds per worker. Requests are cancelled when the drawing or selected section changes. A timeout or failed enclosure check is inconclusive and does not establish a mechanism. ${math('N')} is positive in tension, ${math('M')} is positive in sagging with ${math(String.raw`\mathrm{d}M/\mathrm{d}x=V`)}, global ${math('y')} is upward, and rotation is counterclockwise. The main canvas draws numerical curves. Acceptance relies on the proved compiled checker, its compiler and runtime, and the decoder and input binding.`;
                 }
             }
             if (starting.supportsHingeFrames) {
@@ -310,7 +320,10 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
             const last = drawing.nodes.find(node => node.id === selected.b)!;
             const dx = last.x - first.x, dy = last.y - first.y;
             const length = Math.hypot(dx, dy);
-            const direction = `Local x runs from ${labels.get(first.id)} to ${labels.get(last.id)}. The member spans ΔX = ${dx} m and ΔY = ${dy} m. Its direction cosines are c ≈ ${(dx/length).toFixed(6)} and s ≈ ${(dy/length).toFixed(6)}. A global force (Fx, Fy) has local components cFx + sFy along the member and −sFx + cFy transverse to it.`;
+            const span = (axis: string, distance: number) => math(String.raw`\Delta ${axis}=${quantity(numberLatex(distance, 17), measureUnits.length)}`);
+            const direction = `Local ${math('x')} runs from ${escapeHtml(labels.get(first.id))} to ${escapeHtml(labels.get(last.id))}.
+                The member spans ${span('X', dx)} and ${span('Y', dy)}. Its direction cosines are ${math('c\\approx ' + (dx/length).toFixed(6))} and ${math('s\\approx ' + (dy/length).toFixed(6))}.
+                A global force ${math('(F_x,F_y)')} has local components ${math('cF_x+sF_y')} along the member and ${math('-sF_x+cF_y')} transverse to it.`;
             const faceLines = values.faces.map(face => {
                 const m = drawing.members.find(m => m.id === face.member);
                 const end = face.end === 0 ? 'a' : 'b';
@@ -339,7 +352,7 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
             acceptedGeneration = () => {
                 if (!requests.isCurrent(token) || checker !== runtime) return;
                 render(workedOutput); workedOutput.hidden = false; collapse.hidden = false;
-                const axes = document.createElement('p'); axes.textContent = direction;
+                const axes = document.createElement('p'); axes.innerHTML = direction;
                 workedOutput.prepend(axes);
                 collapse.textContent = 'Collapse solution'; collapse.setAttribute('aria-expanded', 'true');
                 drawDiagram(drawing, values.query.member, receipt, needsInclinedGeometry(drawing) ? 'inclined-diagram' : 'joint-diagram');
@@ -432,14 +445,15 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
             return;
         }
         const frame = decodeAcceptedFramePacket(packet);
+        const sourceRequest = JSON.parse(new TextDecoder().decode(sourceBytes));
         status.textContent = `${frameStatus(frame)} Checked section: ${frame.query.cutSide} limit.`;
-        readouts.replaceChildren(...frameDescriptions(frame).map(text => {
+        readouts.replaceChildren(...frameDescriptions(frame, sourceRequest.model).map(text => {
             const line = document.createElement('p'); line.textContent = text; return line;
         }));
         const receipt = { protocol: 'CV2011_FRAME_1', ...token, bindings: envelope.bindings,
             artifact: result.artifact, bundle: checker.bundle, inputDigest: result.inputDigest,
             packetDigest: result.packetDigest, theorem: 'RationalFrameSoundness.acceptance_actual_frame',
-            sourceRequest: JSON.parse(new TextDecoder().decode(sourceBytes)), values: frame,
+            sourceRequest, values: frame,
             packet: new TextDecoder().decode(packet) };
         exportText = JSON.stringify(receipt, null, 2);
         certificate.textContent = exportText; exportButton.hidden = false;
@@ -484,12 +498,22 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
             reactionTheorem: 'PortalSoundness.accepted_grouped_reactions',
             values: Object.fromEntries(outputIds.map((name, i) => [name, checked[i + 1]])) }, null, 2);
     }
-    function update(nextMember: string, nextParameter: number) {
+    function update(nextMember: string, nextParameter: number, preview = false) {
         member = nextMember; parameter = nextParameter;
         if (pendingGeneration !== generationKey()) pendingGeneration = null;
         sectionParameter.value = String(parameter);
+        generate.disabled = document.getElementById('workspace')!.inert;
+        if (parameter === 0) cutSide.value = 'right';
+        if (parameter === 1) cutSide.value = 'left';
+        cutSide.options[0].disabled = parameter === 1;
+        cutSide.options[1].disabled = parameter === 0;
         clearTimeout(debounce); runtime?.invalidate(); requests.invalidate();
-        clear(enabled ? 'Checking current drawing…' : 'Generate enables local checking and reloads this workspace once.');
+        if (preview) { clear('Numerical section preview. Release the cut to finish inspecting this station.'); return; }
+        clear(enabled ? 'Checking current drawing…' : 'This section has not been checked. The first check may reload the workspace.');
+        if (modelAtPresent().loads.some(load => load.direction !== undefined)) {
+            clear('Numerical analysis. The compiled checker covers distributed loads entered along global downward only.');
+            return;
+        }
         let snapshot: Model;
         let query: EvidenceQuery;
         let frameMode: 'exact' | 'inclined' | 'partial' | 'hinge' = 'exact';
@@ -502,10 +526,6 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
             if (enabled && runtime && (runtime.supportsHingeFrames !== hinge ||
                 runtime.supportsSprings !== spring || hinge && runtime.supportsInclinedReleases !== (spring || needsInclinedGeometry(snapshot)))) { void start(); return; }
             if (!runtime || runtime.supportsFrames) {
-                if (parameter === 0) cutSide.value = 'right';
-                if (parameter === 1) cutSide.value = 'left';
-                cutSide.options[0].disabled = parameter === 1;
-                cutSide.options[1].disabled = parameter === 0;
                 query = { member, parameter, cutSide: cutSide.value as 'left' | 'right', ...frameQueryConvention };
                 if (hinge) frameMode = 'hinge';
                 else try {
@@ -551,8 +571,18 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
             } catch (error) { if (requests.isCurrent(token)) clear(String(error)); }
         }, 150);
     }
-    cutSide.onchange = () => update(member, parameter);
+    cutSide.onchange = () => changeSectionParameter(parameter);
     generate.onclick = () => {
+        if (generate.disabled) return;
+        const drawing = modelAtPresent();
+        if (drawing.loads.some(load => load.direction !== undefined)) {
+            workedOutput.innerHTML = directedLoadWorked(drawing, member, parameter, cutSide.value as 'left' | 'right');
+            workedOutput.hidden = false;
+            collapse.hidden = false;
+            collapse.textContent = 'Collapse solution';
+            collapse.setAttribute('aria-expanded', 'true');
+            return;
+        }
         if (acceptedGeneration) { acceptedGeneration(); return; }
         pendingGeneration = generationKey();
         if (!enabled) {
@@ -572,10 +602,14 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
     sectionParameter.oninput = () => {
         const value = sectionParameter.valueAsNumber;
         if (!Number.isFinite(value) || value < 0 || value > 1) {
-            requests.invalidate(); runtime?.invalidate(); clear('Enter a member parameter from 0 to 1.'); return;
+            pendingGeneration = null;
+            clearTimeout(debounce); requests.invalidate(); runtime?.invalidate();
+            generate.disabled = true;
+            clear('Enter a member parameter from 0 to 1.'); return;
         }
+        const unchanged = parameter === value;
         changeSectionParameter(value);
-        update(member, value);
+        if (unchanged) update(member, value);
     };
     exportButton.onclick = () => {
         if (!exportText) return;
@@ -592,6 +626,8 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
         update(member, parameter);
     };
     activate.onclick = async () => {
+        const original = generationKey();
+        const requested = pendingGeneration === original;
         stop(); clear('Enabling local checking…');
         try {
             localStorage.setItem(storageKey, JSON.stringify(modelAtPresent()));
@@ -619,6 +655,11 @@ export function createPortalPanel(modelAtPresent: () => Model, changeUniformLoad
                 navigator.serviceWorker.addEventListener('controllerchange', changed);
                 changed();
             });
+            if (original !== generationKey() || (requested && pendingGeneration !== original)) {
+                clear('Section changed. Show the worked solution for the current section.');
+                return;
+            }
+            prepareReload();
             if (pendingGeneration === generationKey()) sessionStorage.setItem(generationStorage, pendingGeneration);
             location.reload();
         } catch (error) { clear(String(error)); }

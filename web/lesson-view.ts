@@ -1,7 +1,7 @@
 /** Course SVG symbols and concise formula/substitution views for the first unit. */
 import { forceSymbol, momentSymbol, supportShape, symbolLabel, courseColors } from './symbols.js';
-import { beamValues, lessonBeam } from './lesson-beam.js';
-import type { BeamInputs, SupportCase } from './lesson-beam.js';
+import { beamValues, lessonBeam, retainsPointLoad } from './lesson-beam.js';
+import type { BeamInputs, SupportCase, CutSide } from './lesson-beam.js';
 import { math } from './math.js';
 
 const number = (value: number) => Number(value.toPrecision(5)).toString();
@@ -64,13 +64,13 @@ export function beamDrawing(inputs: BeamInputs, section = 0.5, compression = fal
  * Geometry is fitted to the retained length; action points remain exact.
  * Cut actions are assumed positive, even when their calculated values are negative.
  */
-export function cutDrawing(inputs: BeamInputs, section: number): string {
+export function cutDrawing(inputs: BeamInputs, section: number, side: CutSide = 'right'): string {
     const { a, x } = beamValues(inputs, section);
-    const includesLoad = section >= inputs.position;
+    const includesLoad = retainsPointLoad(section, inputs.position, side);
     const atLoad = Math.abs(section - inputs.position) < 1e-9;
     const leftX = 100, cutX = 620, beamY = 100;
     const loadX = leftX + (cutX - leftX) * a / x;
-    const condition = atLoad ? 'x = a (right-hand cut)' : includesLoad ? 'x > a' : 'x < a';
+    const condition = atLoad ? 'x = a (' + side + '-hand cut)' : includesLoad ? 'x > a' : 'x < a';
     return `<title>Retained left free body: ${condition}. Positive cut actions are assumed.</title>
         <path d="M${leftX} ${beamY}H${cutX}" class="beam-stroke"/>
         ${forceSymbol(leftX, beamY, 0, 1, courseColors.reaction, '', 48, 0)}
@@ -88,8 +88,8 @@ export function cutDrawing(inputs: BeamInputs, section: number): string {
 }
 
 /** Equilibrium precedes substitution, with the same retained loads as the figure. */
-export function cutEquations(inputs: BeamInputs, section: number): string {
-    const after = section >= inputs.position;
+export function cutEquations(inputs: BeamInputs, section: number, side: CutSide = 'right'): string {
+    const after = retainsPointLoad(section, inputs.position, side);
     return math(String.raw`\begin{aligned}
         \sum F_x=0:&\quad N=0,\\
         \sum F_y=0:&\quad A_y${after ? '-P' : ''}-V=0,\\
@@ -122,8 +122,13 @@ export function sectionEquations(inputs: BeamInputs, section: number): string {
     const momentRule = after ? 'A_y x-P(x-a)' : 'A_y x';
     const shearNumbers = after ? `${number(left)}-${P}` : number(left);
     const momentNumbers = `${number(left)}(${number(x)})${after ? `-${P}(${number(x)}-${number(a)})` : ''}`;
-    return `<div class="section-readout">${math(`x=${number(x)}\\;\\mathrm{m}`, true)}
-        ${math(`N=0,\\quad V=${shearRule}=${shearNumbers}\\approx ${number(shear)}\\;\\mathrm{kN}.`, true)}
-        ${math(`M=${momentRule}=${momentNumbers}\\approx ${number(moment)}\\;\\mathrm{kN}\\,\\mathrm{m}.`, true)}</div>
-        <div class="peak-readout">${math(String.raw`M_{\max}=\frac{Pa(L-a)}{L}=\frac{${P}(${number(a)})(${L}-${number(a)})}{${L}}\approx ${number(peak)}\;\mathrm{kN}\,\mathrm{m}.`, true)}</div>`;
+    // Keep each substitution and its result together as the available width changes.
+    const row = (...terms: string[]) => '<div class="substitution-row">' +
+        terms.map(term => '<span>' + math(term) + '</span>').join(' ') + '</div>';
+    return `<div class="section-readout">${row(String.raw`x=${number(x)}\;\mathrm{m}`)}
+        ${row('N=0,', 'V=' + shearRule, '=' + shearNumbers, String.raw`\approx ${number(shear)}\;\mathrm{kN}`)}
+        ${row('M=' + momentRule, '=' + momentNumbers, String.raw`\approx ${number(moment)}\;\mathrm{kN}\,\mathrm{m}`)}</div>
+        <div class="peak-readout">${row(String.raw`M_{\max}=\frac{Pa(L-a)}{L}`,
+            String.raw`=\frac{${P}(${number(a)})(${L}-${number(a)})}{${L}}`,
+            String.raw`\approx ${number(peak)}\;\mathrm{kN}\,\mathrm{m}`)}</div>`;
 }

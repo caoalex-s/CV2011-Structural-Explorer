@@ -51,7 +51,11 @@ export function createWorkspaceControls(actions: ControlActions) {
         const hints: Record<string, string> = {
             select: 'Select an object to edit. Drag to move.',
             member: 'Click the start and end points. Snap to a member to create a rigid joint.',
-            distributed: 'Click both load boundaries on one member. Turn off snapping for a free station, or set either fraction in Properties.',
+            force: 'Place the force on a member. Set its magnitude and direction in Properties.',
+            moment: 'Place the moment on a member. Choose its magnitude and rotation in Properties.',
+            distributed: document.body.classList.contains('drawing-workspace')
+                ? 'Choose the start and end on one member. Set the intensities and direction in Properties.'
+                : 'Click both load boundaries on one member. Turn off snapping for a free station, or set either fraction in Properties.',
             delete: 'Click an object to delete it. Undo restores the previous model.',
         };
         element('tool-hint').textContent = hints[tool]

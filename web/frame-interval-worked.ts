@@ -75,13 +75,13 @@ export function renderIntervalExplanation(explanation: ReturnType<typeof createI
         ${math(`${labels[index]}\\approx ${expression(id, key => `\\left(${rounded(inputs[key])}\\right)`)}.`, true)}</div>`).join('');
     return `<p>The accepted intervals establish a unique equilibrium solution for the captured drawing. The substitutions below come from a separate numerical calculation and explain the field equations. Their rounded inputs do not inherit the accuracy guarantee of the exact midpoints.</p>
       <h3>1. Geometry and equilibrium</h3>
-      <p>Local x follows the member from its first node to its second node. The direction cosines c and s rotate local translations into global coordinates. For the displacement vector d, the columns of P span all motions permitted by the supports:</p>
+      <p>Local ${math('x')} follows the member from its first node to its second node. The direction cosines ${math('c')} and ${math('s')} rotate local translations into global coordinates. For the displacement vector ${math('\\mathbf d')}, the columns of ${math('P')} span all motions permitted by the supports:</p>
       ${math('\\mathbf d=P\\mathbf z,\\qquad A=P^{\\mathsf T}KP,\\qquad \\mathbf b=P^{\\mathsf T}\\mathbf F,\\qquad A\\mathbf z=\\mathbf b.', true)}
-      <p>Here K is the assembled stiffness matrix and F is the assembled load vector. The checker encloses the real member lengths and support directions before checking the reduced system. Positive elastic energy together with uniqueness establishes stability within this linear model.</p>
+      <p>Here ${math('K')} is the assembled stiffness matrix and ${math('\\mathbf F')} is the assembled load vector. The checker encloses the real member lengths and support directions before checking the reduced system. Positive elastic energy together with uniqueness establishes stability within this linear model.</p>
       <h3>2. Selected load segment</h3>
-      <p>The selected one-sided segment extends from t = ${span.from} to t = ${span.to}. Its local coordinate x is measured from the segment start. Distributed axial and transverse loads have the forms ${math('p(x)=p_0+k_px')} and ${math('q(x)=q_0+k_qx')}.</p>
+      <p>The selected one-sided segment extends from ${math('t = ' + numberLatex(span.from, 17))} to ${math('t = ' + numberLatex(span.to, 17))}. Its local coordinate ${math('x')} is measured from the segment start. Distributed axial and transverse loads have the forms ${math('p(x)=p_0+k_px')} and ${math('q(x)=q_0+k_qx')}.</p>
       <table><thead><tr><th>Operand</th><th>Numerical estimate</th><th>Unit</th></tr></thead><tbody>${Object.entries(inputs).map(([key, value]) => `<tr><td>${math(symbols[key])}</td><td>${math('\\approx ' + rounded(value))}</td><td>${units[key]}</td></tr>`).join('')}</tbody></table>
-      <p>The starting element actions are a₁, a₂, and a₃. Starting displacements u₀ and v₀ are local translations, and θ₀ is the starting rotation. Equilibrium and integration of the axial and bending strains give the following section fields:</p>
+      <p>The starting element actions are ${math('a_1')}, ${math('a_2')}, and ${math('a_3')}. Starting displacements ${math('u_0')} and ${math('v_0')} are local translations, and ${math('\\theta_0')} is the starting rotation. Equilibrium and integration of the axial and bending strains give the following section fields:</p>
       <h3>3. Field equations and numerical substitutions</h3>${rules}
       <h3>4. Accepted intervals and exact midpoint accuracy</h3>${renderIntervalValues(values, drawing)}`;
 }

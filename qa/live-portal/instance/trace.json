@@ -5,7 +5,7 @@
     "baseline": "584d32e1d78fc6e2c7baf439e5c048170a687f21",
     "source": "web/engine.ts: example('frame')",
     "menuLabel": "Portal frame",
-    "sourceFileSha256LF": "90c90f26aa1e806cbca6b1bb324212837c5ba194537a3ec81ae9d01351cc6799",
+    "sourceFileSha256LF": "1868f764f98080666b3054ad09b0d2ec9daca77b01236eac1934d7a6a29daadc",
     "rawExportSha256": "7bf62f84822db6993cc1a9608d18242381bd71def295148604f1b06be5e4967b",
     "parserDefaults": "Absent joint becomes rigid; absent custom-support flags become false. Mechanics are unchanged.",
     "unchangedOriginalModel": {

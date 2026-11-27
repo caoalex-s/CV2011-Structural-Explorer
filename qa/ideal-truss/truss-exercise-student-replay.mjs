@@ -43,6 +43,7 @@ async function moveToSvg(x, y) {
 }
 
 async function chooseJoint(joint) {
+    await tool('edit');
     await page.locator('#choose').selectOption(joint);
 }
 
@@ -187,7 +188,8 @@ async function collect(name, reference) {
 try {
     // 1. Find the exercise through the main workspace and draw all bars.
     await page.goto(new URL('#sandbox', base).href);
-    await page.getByRole('link', { name: /Ideal planar truss/i }).click();
+    await page.getByRole('link', { name: 'Course', exact: true }).first().click();
+    await page.getByRole('link', { name: 'Method of joints', exact: true }).click();
     await canvas.waitFor({ state: 'visible' });
     if (mode === 'pilot') {
         await control('Session').click();
@@ -200,9 +202,19 @@ try {
     await locked();
     assert.equal(await canvas.locator('[data-node]').count(), 0);
     await tool('joint');
-    const bottom = 285, top = 65, left = 80, right = 80 + 4 * 220 / 3;
-    for (const [x, y] of [[left, bottom], [right, bottom], [right, top], [left, top]]) await moveToSvg(x, y);
-    for (const bar of names) await connect(...bar);
+    const top = 65, left = 80, right = 80 + 4 * 220 / 3;
+    for (const x of ['0', '4']) {
+        await page.locator('#truss-x').fill(x);
+        await page.locator('#truss-y').fill('0');
+        await page.locator('#truss-y').press('Enter');
+        assert.equal(await page.locator('#truss-x').evaluate(input => input === document.activeElement), true);
+    }
+    for (const x of [right, left]) await moveToSvg(x, top);
+    await tool('bar');
+    await page.locator('#bar-start').selectOption(names[0][0]);
+    await page.locator('#bar-end').selectOption(names[0][1]);
+    await page.locator('#truss-connect button').press('Enter');
+    for (const bar of names.slice(1)) await connect(...bar);
     assert.equal(await canvas.locator('[data-edge]').count(), 5);
     await editJoint('A', { support: 'pin' });
     await editJoint('B', { support: 'roller', rx: 0, ry: 1 });
@@ -286,8 +298,8 @@ try {
         [['first_prediction', 'No'], ['retry', 'No'], ['reveal', 'Yes'], ['retry', 'Yes']]);
     assert.deepEqual(networkPosts, mode === 'pilot' ? events.map(() => '/api/attempts') : []);
     await page.screenshot({ path: join(directory, 'learning-insights.png'), fullPage: true });
-    await page.getByRole('link', { name: 'Frame workspace', exact: true }).click();
-    await page.getByRole('button', { name: 'Generate worked solution', exact: true }).waitFor();
+    await page.getByRole('link', { name: 'Sandbox', exact: true }).click();
+    await page.getByRole('button', { name: 'Show worked solution', exact: true }).waitFor();
     assert.equal(await canvas.count(), 0);
     assert.deepEqual(errors, []);
     await writeFile(join(directory, 'truss-exercise-replay.json'),

@@ -244,9 +244,12 @@ async function visibleStation(x, expected) {
 try {
     // 1. Discover the exercise and use the same canvas controls as a student.
     await page.goto(base);
-    await page.locator('#portal-exercise-link a').click();
+    await page.getByRole('link', { name: 'Course', exact: true }).first().click();
+    await page.locator('#frames').getByRole('link', { name: /Portal frame/ }).click();
     await momentPanel.waitFor({ state: 'visible' });
-    assert.match(await momentPanel.getByRole('heading').textContent(), /largest \|M\|.*BC/);
+    const heading = momentPanel.getByRole('heading');
+    assert.match(await heading.textContent(), /largest .*BC/);
+    assert.equal(await heading.locator('annotation').textContent(), '|M|');
     assert.equal(await canvas.locator('[data-object="member"]').count(), 0, 'Fresh exercise must open blank');
     const spacing = page.getByLabel('Grid spacing (m)');
     if (!(await spacing.isVisible())) await page.getByText('Snapping', { exact: true }).click();

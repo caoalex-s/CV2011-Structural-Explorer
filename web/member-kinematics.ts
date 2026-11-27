@@ -1,4 +1,7 @@
 /** Display only the local displacement and slope enclosed by the checker. */
+import { escapeHtml } from './ui.js';
+import { math } from './math.js';
+
 export function renderKinematics(bytes: Uint8Array, member: string, label: string): HTMLElement {
     const lines = new TextDecoder('utf-8', { fatal: true }).decode(bytes).split('\n');
     const expectedId = member.split('').map(c => c.charCodeAt(0).toString(16).padStart(4, '0')).join('');
@@ -7,9 +10,9 @@ export function renderKinematics(bytes: Uint8Array, member: string, label: strin
 
     const section = document.createElement('section');
     section.dataset.memberKinematics = member;
-    function append(tag: string, text: string) {
+    function append(tag: string, html: string) {
         const element = document.createElement(tag);
-        element.textContent = text;
+        element.innerHTML = html;
         section.append(element);
     }
     function table(headings: string[]) {
@@ -17,7 +20,7 @@ export function renderKinematics(bytes: Uint8Array, member: string, label: strin
         const header = element.createTHead().insertRow();
         for (const heading of headings) {
             const th = document.createElement('th');
-            th.textContent = heading;
+            th.innerHTML = heading;
             header.append(th);
         }
         section.append(element);
@@ -25,7 +28,7 @@ export function renderKinematics(bytes: Uint8Array, member: string, label: strin
     }
     function row(body: HTMLTableSectionElement, values: string[]) {
         const tr = body.insertRow();
-        for (const value of values) tr.insertCell().textContent = value;
+        for (const value of values) tr.insertCell().innerHTML = value;
     }
     // Round the two ends outward using integers, including negative values.
     function decimal(token: string, upper: boolean) {
@@ -62,10 +65,11 @@ export function renderKinematics(bytes: Uint8Array, member: string, label: strin
         return merged.map(({ piece, lo, hi }) => 'Piece ' + (piece + 1) + ' · ' + range([lo, hi], 0)).join('; ');
     }
 
-    append('h3', 'Slope and transverse displacement of ' + label);
-    append('p', 'Distance x follows the drawn member. Local transverse displacement v is positive to the left when looking from its start towards its end. For a rightward horizontal member, positive v is upward. On an incline, global vertical movement also depends on axial displacement. Physical slope θ = dv/dx is positive counterclockwise. On each prismatic piece, EI dθ/dx = M. Integrating the moment from the start face gives the slope, and integrating the slope gives v. The calculation assumes small rotations and constant EI.');
+    const slope = math('\\theta'), displacement = math('v');
+    append('h3', 'Slope and transverse displacement of ' + escapeHtml(label));
+    append('p', `Distance ${math('x')} follows the drawn member. Local transverse displacement ${displacement} is positive to the left when looking from its start towards its end. For a rightward horizontal member, positive ${displacement} is upward. On an incline, global vertical movement also depends on axial displacement. Physical slope ${math(String.raw`\theta=\mathrm{d}v/\mathrm{d}x`)} is positive counterclockwise. On each prismatic piece, ${math(String.raw`EI\,\mathrm{d}\theta/\mathrm{d}x=M`)}. Integrating the moment from the start face gives the slope, and integrating the slope gives ${displacement}. The calculation assumes small rotations and constant ${math('EI')}.`);
     const records = lines.map(line => line.split(' '));
-    const ends = table(['Piece', 'Member fraction', 'θ at start (rad)', 'θ at end (rad)', 'v at start (m)', 'v at end (m)']);
+    const ends = table(['Piece', 'Member fraction', `${slope} at start (rad)`, `${slope} at end (rad)`, `${displacement} at start (m)`, `${displacement} at end (m)`]);
     for (const tokens of records.filter(r => r[0] === 'P')) {
         if (tokens.length !== 12) throw Error('Incomplete piece-end values.');
         row(ends, [String(Number(tokens[1])+1), decimal(tokens[2], false) + ' to ' + decimal(tokens[3], true),
@@ -74,7 +78,7 @@ export function renderKinematics(bytes: Uint8Array, member: string, label: strin
     append('h4', 'Whole-member extrema');
     append('p', 'Each value is enclosed over the full member. The distance intervals cover every location attaining that extreme. A distance interval may also contain nearby stations.');
     const extrema = table(['Quantity', 'Extreme', 'Value', 'Distance from drawn start (m)']);
-    for (const [code, title] of [['S','Physical slope θ (rad)'], ['D','Local displacement v (m)']]) {
+    for (const [code, title] of [['S', `Physical slope ${slope} (rad)`], ['D', `Local displacement ${displacement} (m)`]]) {
         const values = records.find(r => r[0] === code && r[1] === 'bounds');
         if (values?.length !== 6) throw Error('Missing whole-member bounds.');
         for (const [index, kind] of ['Minimum','Maximum'].entries()) {

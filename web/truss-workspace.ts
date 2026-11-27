@@ -1,3 +1,4 @@
+import { showTrussNavigation } from './truss-navigation.js';
 import { createLearningSession } from './learning-session.js';
 import { checkDrawing, invalidateCheck, isolateForCheck } from './truss-check.js';
 import { rectangle, rectangleCase, joint, solve, validate, exact, number } from './ideal-truss.js';
@@ -11,6 +12,7 @@ type Event = {
     answer: string;
     drawing: Drawing;
 };
+showTrussNavigation('ideal-planar-truss');
 document.body.classList.add('truss-workspace');
 let drawingRevision = 0;
 let pendingRecord: Promise<unknown> = Promise.resolve();
@@ -24,13 +26,12 @@ try {
     }
 }
 catch { /* An invalid saved drawing opens the example. */ }
-document.querySelector('.topbar nav')!.innerHTML = '<a href="./">Frame workspace</a> <a href="learn/">Learn</a>';
-document.querySelector('.header-actions')!.innerHTML = '<button id="replay">Local replay</button> <button id="settings-button">Session</button> <button id="instructor">Learning insights</button>';
-el('workspace').innerHTML = `<h1>Ideal planar truss</h1>
-<p>What holds a rectangular panel in shape? Compare the braced panel with the same panel after removing AC or rotating the roller at B. Can you construct the braced panel by adding one joint and two bars to a triangle?</p>
+el('workspace').innerHTML = `<header class="exercise-heading"><p class="course-reference">Week 03 · Method of joints</p><h1>Ideal planar truss</h1></header>
+<p class="exercise-intro">What holds a rectangular panel in shape? Compare the braced panel with the same panel after removing AC or rotating the roller at B. Can you construct the braced panel by adding one joint and two bars to a triangle?</p>
 <div class="modelbar"><button id="rectangle">Reset rectangle</button><button id="blank">Blank drawing</button><button id="diagonal">Remove AC</button><button id="rotate">Rotate roller B</button></div>
-<div class="work-grid"><aside class="panel"><h2>Drawing tools</h2><p>Choose a tool, then click the drawing. New joints snap to whole metres.</p>
-<select id="truss-tool" aria-label="Drawing tool"><option value="edit">Edit joint</option><option value="joint">Add joint</option><option value="bar">Connect two joints</option><option value="remove">Remove bar</option></select><p id="hint" role="status"></p><div id="inspector"></div></aside>
+<div class="work-grid"><aside class="panel"><h2>Drawing tools</h2><p>Choose a tool to edit the drawing. Joint coordinates are in whole metres.</p>
+<select id="truss-tool" aria-label="Drawing tool"><option value="edit">Edit joint</option><option value="joint">Add joint</option><option value="bar">Connect two joints</option><option value="remove">Remove bar</option></select><p id="hint" role="status"></p><form id="truss-add-joint" hidden><label>x (m)<input id="truss-x" type="number" min="-1000" max="1000" step="1" required></label><label>y (m)<input id="truss-y" type="number" min="-1000" max="1000" step="1" required></label><button>Add joint</button></form>
+<form id="truss-connect" hidden><label>First joint<select id="bar-start" required></select></label><label>Second joint<select id="bar-end" required></select></label><button>Connect joints</button></form><div id="inspector"></div></aside>
 <section class="canvas-column panel"><svg id="truss-canvas" viewBox="0 0 600 360" aria-label="Ideal truss drawing" style="width:100%;touch-action:manipulation"></svg><p>Coordinates in m. Forces in kN. Positive x points right and positive y points up.</p></section>
 <section class="panel"><h2>Predict the response</h2><form id="prediction"><label>Member idealisation <select name="ideal" required><option value="">Choose</option><option>Two-force member</option><option>Member carrying bending moment</option></select></label>
 <label>Count m + r − 2j <input name="count" type="number" required></label>
@@ -48,7 +49,7 @@ function record(action: string, answer: string) {
     const snapshot = structuredClone(drawing);
     pendingRecord = pendingRecord.then(() => session.record({ model: snapshot, section: 0, step: 'ideal_planar_truss', side: '', hintUsed: false, solutionRevealed: action === 'reveal' || action === 'assisted retry' }, action === 'first prediction' ? 'first_prediction' : action === 'assisted retry' ? 'retry' : action, answer, '')).catch(error => { el('hint').textContent = String(error); });
 }
-function change(edit: (copy: Drawing) => void) {
+function change(edit: (copy: Drawing) => void, selectAfter?: string) {
     try {
         const copy = structuredClone(drawing);
         edit(copy);
@@ -56,6 +57,7 @@ function change(edit: (copy: Drawing) => void) {
         drawingRevision++;
         invalidateCheck();
         drawing = copy;
+        if (selectAfter) chosen = selectAfter;
         predicted = false;
         revealed = false;
         start = '';
@@ -66,13 +68,38 @@ function change(edit: (copy: Drawing) => void) {
         el<HTMLButtonElement>('reveal').disabled = true;
         persist();
         paint();
+        return true;
     }
     catch (error) {
         el('hint').textContent = String(error);
+        return false;
     }
 }
 const mode = el<HTMLSelectElement>('truss-tool');
 mode.onchange = () => { tool = mode.value; start = ''; paint(); };
+function addJoint(x: number, y: number) {
+    const id = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'].find(letter => !drawing.joints.some(j => j.id === letter));
+    if (!id) { el('hint').textContent = 'All joint letters are in use.'; return false; }
+    if (!change(copy => copy.joints.push(joint(id, x, y)), id)) return false;
+    el('hint').textContent = `Added joint ${id} at (${x}, ${y}) m.`;
+    return true;
+}
+function connectJoints(a: string, b: string) {
+    if (!change(copy => copy.bars.push([a, b]))) return false;
+    el('hint').textContent = `Connected joints ${a} and ${b}.`;
+    return true;
+}
+el<HTMLFormElement>('truss-add-joint').onsubmit = event => {
+    event.preventDefault();
+    const x = el<HTMLInputElement>('truss-x'), y = el<HTMLInputElement>('truss-y');
+    if (addJoint(x.valueAsNumber, y.valueAsNumber)) { x.focus(); x.select(); }
+};
+el<HTMLFormElement>('truss-connect').onsubmit = event => {
+    event.preventDefault();
+    if (connectJoints(el<HTMLSelectElement>('bar-start').value, el<HTMLSelectElement>('bar-end').value))
+        el('bar-start').focus();
+};
+el<HTMLSelectElement>('bar-start').onchange = event => { start = (event.target as HTMLSelectElement).value; };
 function coordinates() {
     const xs = drawing.joints.map(j => j.x), ys = drawing.joints.map(j => j.y);
     const left = Math.min(0, ...xs), right = Math.max(4, ...xs), bottom = Math.min(0, ...ys), top = Math.max(3, ...ys);
@@ -106,13 +133,30 @@ function paint() {
     el<HTMLButtonElement>('diagonal').disabled = !find('A') || !find('C');
     el<HTMLButtonElement>('rotate').disabled = find('B')?.support !== 'roller';
     el('hint').textContent = tool === 'bar' ? (start ? 'Select the second joint.' : 'Select the first joint.') : tool === 'remove' ? 'Click a bar to remove it.' : '';
+    el('truss-add-joint').hidden = tool !== 'joint';
+    el('truss-connect').hidden = tool !== 'bar';
+    if (tool === 'joint') el('hint').textContent = 'Enter whole-metre coordinates or select a point on the drawing.';
+    if (tool === 'bar') {
+        const options = '<option value="">Choose a joint</option>' + drawing.joints.map(j => `<option>${j.id}</option>`).join('');
+        for (const id of ['bar-start', 'bar-end']) el(id).innerHTML = options;
+        el<HTMLSelectElement>('bar-start').value = start;
+        el('hint').textContent = 'Choose the endpoints below or select two joints on the drawing.';
+    }
+    if (tool !== 'edit') { el('inspector').replaceChildren(); return; }
     const j = find(chosen);
     el('inspector').innerHTML = j ? `<h3>Joint ${j.id}</h3><form id="joint-edit"><label>Joint <select id="choose">${drawing.joints.map(v => '<option ' + (v.id === chosen ? 'selected' : '') + '>' + v.id + '</option>').join('')}</select></label>` +
         (['x', 'y', 'fx', 'fy', 'rx', 'ry'] as const).map((k, i) => `<label>${['x (m)', 'y (m)', 'Load x (kN)', 'Load y (kN)', 'Roller reaction direction x', 'Roller reaction direction y'][i]} <input type="number" name="${k}" required value="${j[k]}"></label>`).join('') +
         `<label>Support <select name="support">${['free', 'pin', 'roller'].map(s => '<option ' + (s === j.support ? 'selected' : '') + '>' + s + '</option>').join('')}</select></label><button>Apply joint edits</button></form><button id="delete-joint">Delete joint</button>` : '';
     if (!j)
         return;
-    el<HTMLSelectElement>('choose').onchange = e => { chosen = (e.target as HTMLSelectElement).value; paint(); };
+    const support = el('joint-edit').querySelector<HTMLSelectElement>('[name=support]')!;
+    function showRollerDirection() {
+        for (const field of el('joint-edit').querySelectorAll<HTMLInputElement>('[name=rx], [name=ry]'))
+            field.closest('label')!.hidden = support.value !== 'roller';
+    }
+    support.onchange = showRollerDirection;
+    showRollerDirection();
+    el<HTMLSelectElement>('choose').onchange = e => { chosen = (e.target as HTMLSelectElement).value; paint(); el('choose').focus(); };
     el<HTMLFormElement>('joint-edit').oninput = e => {
         if ((e.target as HTMLElement).id === 'choose')
             return;
@@ -143,13 +187,7 @@ svg.onclick = e => {
         if (node)
             return;
         const point = new DOMPoint(e.clientX, e.clientY).matrixTransform(svg.getScreenCTM()!.inverse()), c = coordinates();
-        change(copy => {
-            const id = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'].find(a => !copy.joints.some(j => j.id === a));
-            if (!id)
-                throw Error('All joint letters are in use.');
-            copy.joints.push(joint(id, Math.round((point.x - 80) / c.s + c.left), Math.round(c.top - (point.y - 65) / c.s)));
-            chosen = id;
-        });
+        addJoint(Math.round((point.x - 80) / c.s + c.left), Math.round(c.top - (point.y - 65) / c.s));
     }
     else if (tool === 'bar' && node) {
         if (!start) {
@@ -157,7 +195,7 @@ svg.onclick = e => {
             paint();
         }
         else
-            change(copy => copy.bars.push([start, node]));
+            connectJoints(start, node);
     }
     else if (tool === 'remove' && edge)
         change(copy => { copy.bars = copy.bars.filter(pair => pair.join('') !== edge); });

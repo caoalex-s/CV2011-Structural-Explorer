@@ -1,8 +1,16 @@
 import { setWorkspaceBusy } from './workspace-readiness.js';
 
+// The hash selects the current workspace mode. Skip navigation moves focus only.
+document.querySelector<HTMLAnchorElement>('.skip-workspace')!.onclick = event => {
+    event.preventDefault();
+    document.getElementById('workspace')!.focus();
+};
 const exercise = new URLSearchParams(location.search).get('exercise');
 try {
-    if (exercise === 'week04-truss-sections') {
+    if (exercise === 'simple-beams') {
+        await import('./simple-beams.js');
+        setWorkspaceBusy(false);
+    } else if (exercise === 'week04-truss-sections') {
         await import('./week04-workspace.js');
         setWorkspaceBusy(false);
     } else if (exercise === 'ideal-planar-truss') {

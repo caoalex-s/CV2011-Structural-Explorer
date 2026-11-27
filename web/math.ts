@@ -34,6 +34,17 @@ export function math(source: string, display = false): string {
     }
 }
 
+export const measureUnits = {
+    length: String.raw`\mathrm{m}`,
+    force: String.raw`\mathrm{kN}`,
+    moment: String.raw`\mathrm{kN}\,\mathrm{m}`,
+} as const;
+
+/** Format a measured quantity with upright units and scientific exponents. */
+export function quantity(value: string, unit: string): string {
+    return value.replace(/e([+-]?\d+)/g, (_, exponent: string) => '\\times10^{' + Number(exponent) + '}') + '\\,' + unit;
+}
+
 export function rationalLatex(value: string): string {
     const fraction = /^(-?\d+)\/(\d+)$/.exec(value);
     return fraction ? `\\frac{${fraction[1]}}{${fraction[2]}}` : value;

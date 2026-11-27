@@ -50,6 +50,25 @@ export interface Load {
     fy: number;
     mz: number;
     qEnd: number;
+    /** With a direction, fy and qEnd are signed intensities along that axis.
+     * Older drawings store both components along global +y. */
+    direction?: number | 'member-normal';
+}
+
+/** Unit vector at an angle counterclockwise from global +x. */
+export function angleVector(degrees: number) {
+    const angle = degrees % 360;
+    if (angle === 0) return { x: 1, y: 0 };
+    if (angle === 90 || angle === -270) return { x: 0, y: 1 };
+    if (Math.abs(angle) === 180) return { x: -1, y: 0 };
+    if (angle === 270 || angle === -90) return { x: 0, y: -1 };
+    return { x: Math.cos(angle * Math.PI / 180), y: Math.sin(angle * Math.PI / 180) };
+}
+
+/** Global axis of the stored line intensities, per metre of actual member. */
+export function lineLoadAxis(load: Load, c: number, s: number) {
+    if (load.direction === 'member-normal') return { x: -s, y: c };
+    return angleVector(load.direction ?? 90);
 }
 export interface Model {
     nodes: Point[];
@@ -246,6 +265,9 @@ export function analyse(model: Model): Analysis {
     for (const load of model.loads) {
         if (![load.fx, load.fy, load.mz, load.end, load.qEnd].every(Number.isFinite))
             return fail('invalid', 'Load components must be finite.');
+        if (load.direction !== undefined && (load.kind !== 'distributed' ||
+            (load.direction !== 'member-normal' && !Number.isFinite(load.direction))))
+            return fail('invalid', 'Use a finite global load angle or the member normal.');
         if (load.kind === 'distributed' && !(load.end > load.t && load.end <= 1))
             return fail('invalid', 'Distributed loads require a positive interval on the member.');
     }
@@ -280,16 +302,18 @@ export function analyse(model: Model): Analysis {
             const dx = points[j].x - points[i].x, dy = points[j].y - points[i].y;
             const length = Math.hypot(dx, dy), c = dx / length, s = dy / length;
             const transform = [[c, s, 0, 0, 0, 0], [-s, c, 0, 0, 0, 0], [0, 0, 1, 0, 0, 0], [0, 0, 0, c, s, 0], [0, 0, 0, -s, c, 0], [0, 0, 0, 0, 0, 1]];
-            let qyGlobal0 = 0, qyGlobal1 = 0;
+            let qx0 = 0, qx1 = 0, qy0 = 0, qy1 = 0;
             for (const load of model.loads.filter(l => l.member === member.id && l.kind === 'distributed')) {
                 const middle = (t0 + t1) / 2;
-                if (middle > load.t && middle < load.end) {
-                    qyGlobal0 += load.fy + (load.qEnd - load.fy) * (t0 - load.t) / (load.end - load.t);
-                    qyGlobal1 += load.fy + (load.qEnd - load.fy) * (t1 - load.t) / (load.end - load.t);
-                }
+                if (middle <= load.t || middle >= load.end) continue;
+                const axis = lineLoadAxis(load, c, s);
+                const axial = load.direction === 'member-normal' ? 0 : c * axis.x + s * axis.y;
+                const transverse = load.direction === 'member-normal' ? 1 : -s * axis.x + c * axis.y;
+                const intensity = (t: number) => load.fy + (load.qEnd - load.fy) * (t - load.t) / (load.end - load.t);
+                const start = intensity(t0), end = intensity(t1);
+                qx0 += axial * start; qx1 += axial * end;
+                qy0 += transverse * start; qy1 += transverse * end;
             }
-            const qx0 = s * qyGlobal0, qx1 = s * qyGlobal1;
-            const qy0 = c * qyGlobal0, qy1 = c * qyGlobal1;
             const equivalent = [length * (2 * qx0 + qx1) / 6, length * (7 * qy0 + 3 * qy1) / 20, length ** 2 * (3 * qy0 + 2 * qy1) / 60,
                 length * (qx0 + 2 * qx1) / 6, length * (3 * qy0 + 7 * qy1) / 20, -(length ** 2) * (2 * qy0 + 3 * qy1) / 60];
             segments.push({ member, t0, t1, i, j, length, c, s, transform, equivalent, qx0, qx1, qy0, qy1, stiffness: elementStiffness(member.EA, member.EI, length) });
